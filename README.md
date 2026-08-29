@@ -1,25 +1,39 @@
 # 🥚 Inf Egg Co.
 
-A super cute 2D pixel-art incremental game about experimenting with weird chickens.
+A super cute 2D pixel-art incremental **egg ranch & factory** game. One big grassy field, a hundred weird chickens, and a truck that hauls your eggs to market.
 
 ![Inf Egg Co. screenshot](docs/screenshot.png)
 
-## How to play
+## How it plays
 
-1. **Pet Mama Hen** 10 times — she lays a Common egg.
-2. **Nest it or sell it.** Every egg is both hatchable and sellable:
-   - 🐣 **Hatch** — put it in an incubation nest, wait, and a brand-new chicken pops out.
-   - 🪙 **Sell** — trade it for coins (or **buy** more eggs with coins).
-3. **Chickens lay eggs on their own** in the Free-Range Yard — rarer chickens lay rarer, pricier eggs.
-4. **Hatching earns 🪶 feathers** — spend them in the Research tree (4 branches, 20 upgradable nodes: faster hatching, auto-petting, double yolks, twin hatches, mutations, and the Grand Cluckening).
-5. **Upgrade Mama's rarity** with coins so her eggs climb the tiers: Common → Uncommon → Rare → Epic → Legendary → Mythic → Cosmic → Divine.
-6. **Collect all 100 chickens** in the Chickenpedia — from Peep and Butterball to Cluckthulhu, Black Hole Hen, and The Eternal Yolk. Eggs can *mutate* a tier up when laid, which is how you reach species beyond Mama's tier.
+- **Pet Mama Hen** (she sits on her nest) — every pet pops out an egg. Chickens roam the field and lay eggs on the grass all by themselves, so eggs pile up everywhere.
+- **Scoop eggs** by holding the mouse and sweeping over them — a magnet pulls them into your basket with satisfying pops.
+- **Drag & drop** your basket:
+  - onto the **truck** → loads it up; click the truck and it drives off to market, coming back with coins (full loads pay a bonus),
+  - onto an **incubator** → hatches eggs fast and automatically,
+  - onto **open grass** → eggs nest where they land and slowly hatch into new chickens.
+- **Automate it like a factory**: research **conveyor belts** and **vacuum bots**, then paint belt lines from the vacuum straight into the truck or an incubator. Eggs visibly ride the belts — and jam up when the truck is full.
+- **Research tree**: hatching earns 🪶 feathers, spent across 4 branches (Hens · Hatchery · Factory · Market) with real prerequisites — lay speed, golden eggs, mutations, twin hatches, belt speed, auto-dispatch, Overclock, and more.
+- **Upgrade Mama** through 8 rarity tiers so her eggs climb from Common to Divine; eggs can also **mutate** a tier up when laid.
+- **Collect all 100 chickens** in the Chickenpedia — from Peep and Butterball to Cluckthulhu, Black Hole Hen, and The Eternal Yolk.
 
-Progress saves automatically to your browser (plus offline egg-laying while you're away, up to 8 hours).
+Progress autosaves to your browser, with offline egg-laying while you're away (up to 8 hours).
+
+### Controls
+
+| Input | Action |
+| --- | --- |
+| Click chicken / Mama | pet (instant egg) |
+| Hold + drag | scoop eggs into your basket |
+| Release over truck / incubator / grass | sell · incubate · nest |
+| Click truck | send it to market |
+| `1` `2` `3` / build bar | place incubator / vacuum / conveyor |
+| drag while placing belts | paint a belt line (direction follows your drag) |
+| `R` | rotate · `X` remove mode · `Esc` cancel |
 
 ## Run it
 
-No build step, no dependencies — it's plain HTML/CSS/JS with canvas-rendered pixel sprites.
+No build step, no dependencies — plain HTML/CSS/JS with canvas-rendered pixel sprites.
 
 ```
 open index.html        # or serve the folder with any static server
@@ -29,9 +43,9 @@ open index.html        # or serve the folder with any static server
 
 | File | What it is |
 | --- | --- |
-| `index.html` | page skeleton |
-| `style.css` | the sunny pixel-farm look |
-| `js/data.js` | tiers, economy, all 100 species, the skill tree |
-| `js/sprites.js` | pixel sprite engine (chickens, eggs, nests, Mama) |
-| `js/game.js` | game state, actions, ticking, save/load |
-| `js/ui.js` | rendering, canvas scenes, particles, sounds |
+| `index.html` | page skeleton + HUD |
+| `style.css` | the sunny pixel-ranch look |
+| `js/data.js` | tiers, economy, all 100 species, buildings, the research tree |
+| `js/sprites.js` | pixel sprite engine (chickens, eggs, Mama, foliage) |
+| `js/game.js` | world simulation: chickens, eggs, belts, vacuums, incubators, truck |
+| `js/ui.js` | canvas renderer, input, HUD, modals, particles, sounds |

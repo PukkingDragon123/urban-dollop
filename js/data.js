@@ -21,21 +21,42 @@ const EGG_SHELL = ['#f8efe0','#dcf2c8','#cfe9fb','#ead4f8','#ffe4b8','#ffd3dc','
 const TIER_COUNTS = [18,16,14,13,12,10,9,8];
 
 const ECON = {
-  baseClicks: 10,          // pets per egg before skills
   eggValue: t => 5 * Math.pow(5, t),
-  hatchTime: t => 12 * Math.pow(1.7, t),      // seconds
-  layTime:   t => 24 * Math.pow(1.55, t),     // seconds
+  layTime:  t => 22 * Math.pow(1.55, t),       // seconds between eggs per chicken
+  groundHatch: t => 45 * Math.pow(1.6, t),     // seconds for an egg placed on grass
+  incHatch:    t => 12 * Math.pow(1.6, t),     // seconds inside an incubator
   feathers:  t => Math.pow(2, t),
   discoveryBonus: t => 5 * Math.pow(2, t),
-  mamaCost:  t => Math.round(250 * Math.pow(18, t)),   // cost to go t -> t+1
-  nestCost:  bought => Math.round(100 * Math.pow(8, bought)),
-  coopCost:  bought => Math.round(120 * Math.pow(2.4, bought)),
-  shopMult: 5,             // buy price = 5x sell value
-  baseNests: 2, maxBoughtNests: 3,
-  baseCoop: 4, coopPerBuy: 2, maxCoopBuys: 12,
+  mamaCost:  t => Math.round(250 * Math.pow(15, t)),   // cost to go t -> t+1
   baseMutation: 0.02,
+  goldenMult: 5,           // golden eggs sell for 5x
+  baseChickenCap: 8,
+  groundEggCap: 250,
+  basePetCd: 6,            // seconds between pets per chicken
+  mamaPetCd: 1.2,          // mama loves attention
+  baseTruckCap: 10,
+  baseTripTime: 7,         // seconds the truck is gone
+  baseScoopR: 26,          // px magnet radius around the cursor
+  baseVacR: 30,            // px vacuum suction radius
+  vacInterval: 1.2,        // seconds per egg vacuumed
+  vacHold: 12,             // eggs a vacuum can hold with no belt
+  beltSpeed: 26,           // px per second
   offlineCapHrs: 8,
 };
+
+/* buildable things — cost grows with how many you own (belts stay flat) */
+const BUILDS = {
+  incubator: { name:'Incubator', w:2, h:2, base:150, growth:1.6, refund:60,
+               desc:'Drop eggs in — hatches them fast, all by itself.' },
+  vacuum:    { name:'Vacuum Bot', w:1, h:1, base:300, growth:1.7, refund:100,
+               desc:'Slurps nearby ground eggs onto the belt it faces.', needs:'vacuum' },
+  belt:      { name:'Conveyor', w:1, h:1, base:15, growth:1, refund:7,
+               desc:'Carries eggs to the truck or an incubator.', needs:'belts' },
+};
+function buildCost(type, owned) {
+  const b = BUILDS[type];
+  return Math.round(b.base * Math.pow(b.growth, b.growth === 1 ? 0 : owned));
+}
 
 /* ------------------------------------------------------------
    SPECIES — exactly 100. Tier assigned by position (TIER_COUNTS).
@@ -183,42 +204,49 @@ const SPECIES = (() => {
 const SPECIES_BY_TIER = TIERS.map((_, t) => SPECIES.filter(s => s.tier === t));
 
 /* ------------------------------------------------------------
-   SKILLS — 4 branches x 5 nodes. Cost in feathers.
+   RESEARCH TREE — 4 branches with real prerequisites.
+   pos: [column, row] inside the branch for layout; pre: node id.
+   Cost in feathers: base * growth^level.
    ------------------------------------------------------------ */
-const BRANCHES = ["MAMA'S LOVE", 'EGGONOMICS', 'HATCHERY', 'COOP LIFE'];
+const BRANCHES = [
+  { name:'HENS',    icon:'🐔', hue:'#e8542f' },
+  { name:'HATCHERY',icon:'🐣', hue:'#6ab04c' },
+  { name:'FACTORY', icon:'⚙️', hue:'#3fa7d6' },
+  { name:'MARKET',  icon:'🚚', hue:'#f0a422' },
+];
 
 const SKILLS = [
-  /* Mama's Love */
-  { id:'soft',     br:0, name:'Soft Hands',      max:5,  base:3,    growth:2.3, desc:'+1 pet progress per pet' },
-  { id:'bond',     br:0, name:'Quick Bond',      max:3,  base:12,   growth:3.0, desc:'-1 pets needed per egg' },
-  { id:'golden',   br:0, name:'Golden Cluck',    max:5,  base:8,    growth:2.4, desc:'+4% chance a pet drops coins' },
-  { id:'auto',     br:0, name:'Auto-Petter',     max:5,  base:25,   growth:2.8, desc:'Pets Mama +0.5x per second' },
-  { id:'pedigree', br:0, name:'Prize Pedigree',  max:5,  base:60,   growth:3.0, desc:"+2% mutation on Mama's eggs" },
-  /* Eggonomics */
-  { id:'polish',   br:1, name:'Egg Polish',      max:10, base:3,    growth:1.9, desc:'+20% egg sell value' },
-  { id:'yolk',     br:1, name:'Double Yolk',     max:5,  base:10,   growth:2.5, desc:'+6% chance any egg doubles' },
-  { id:'lucky',    br:1, name:'Lucky Shells',    max:5,  base:15,   growth:2.6, desc:'+2% mutation on ALL eggs' },
-  { id:'collector',br:1, name:'Collector Market',max:3,  base:150,  growth:5.0, desc:'+1% sell value per species found' },
-  { id:'rainbow',  br:1, name:'Rainbow Yolk',    max:3,  base:400,  growth:6.0, desc:'+10% for mutations to jump 2 tiers' },
-  /* Hatchery */
-  { id:'warm',     br:2, name:'Warm Nests',      max:10, base:4,    growth:2.0, desc:'+15% hatch speed' },
-  { id:'twin',     br:2, name:'Twin Eggs',       max:5,  base:12,   growth:2.6, desc:'+5% chance to hatch twins' },
-  { id:'incubator',br:2, name:'Incubator',       max:3,  base:30,   growth:5.0, desc:'+1 nest slot' },
-  { id:'whisper',  br:2, name:'Egg Whisperer',   max:5,  base:20,   growth:2.4, desc:'+20% feathers from hatching' },
-  { id:'miracle',  br:2, name:'Miracle Hatch',   max:3,  base:100,  growth:5.0, desc:'+5% chance hatchling is +1 tier' },
-  /* Coop Life */
-  { id:'feed',     br:3, name:'Tasty Feed',      max:10, base:4,    growth:2.0, desc:'+12% lay speed' },
-  { id:'barn',     br:3, name:'Big Barn',        max:5,  base:10,   growth:2.7, desc:'+4 coop capacity' },
-  { id:'happy',    br:3, name:'Happy Hens',      max:5,  base:15,   growth:2.6, desc:'+2% mutation on laid eggs' },
-  { id:'choir',    br:3, name:'Cluck Choir',     max:3,  base:200,  growth:5.0, desc:'+0.5% lay speed per species found' },
-  { id:'grand',    br:3, name:'Grand Cluckening',max:1,  base:2000, growth:1.0, desc:'x2 egg value AND x2 lay speed' },
+  /* HENS */
+  { id:'happy',   br:0, pos:[0,0], pre:null,     name:'Happy Hens',      icon:'💗', max:10, base:4,   growth:1.9, desc:'+10% lay speed' },
+  { id:'pets',    br:0, pos:[1,1], pre:'happy',  name:'Pet Therapy',     icon:'🤲', max:5,  base:6,   growth:2.2, desc:'-15% pet cooldown' },
+  { id:'flock',   br:0, pos:[0,1], pre:'happy',  name:'Bigger Flock',    icon:'🏡', max:8,  base:10,  growth:2.1, desc:'+3 chicken capacity' },
+  { id:'golden',  br:0, pos:[0,2], pre:'flock',  name:'Golden Peck',     icon:'✨', max:5,  base:25,  growth:2.5, desc:'+3% golden eggs (worth 5x)' },
+  { id:'mutate',  br:0, pos:[1,2], pre:'pets',   name:'Mutation Vats',   icon:'🧬', max:8,  base:30,  growth:2.3, desc:'+1.5% egg mutation chance' },
+  { id:'rainbow', br:0, pos:[1,3], pre:'mutate', name:'Rainbow Genome',  icon:'🌈', max:3,  base:300, growth:5.0, desc:'+15% for mutations to jump 2 tiers' },
+  /* HATCHERY */
+  { id:'warm',    br:1, pos:[0,0], pre:null,       name:'Warm Ground',   icon:'☀️', max:8,  base:4,   growth:1.9, desc:'+15% all hatch speed' },
+  { id:'incspeed',br:1, pos:[0,1], pre:'warm',     name:'Turbo Coils',   icon:'🔥', max:8,  base:12,  growth:2.1, desc:'+20% incubator speed' },
+  { id:'inccap',  br:1, pos:[1,1], pre:'warm',     name:'Roomy Racks',   icon:'🗄️', max:5,  base:20,  growth:2.4, desc:'+3 incubator queue' },
+  { id:'twins',   br:1, pos:[0,2], pre:'incspeed', name:'Twin Yolks',    icon:'👯', max:5,  base:30,  growth:2.4, desc:'+4% twin hatch chance' },
+  { id:'whisper', br:1, pos:[1,2], pre:'inccap',   name:'Egg Whisperer', icon:'🪶', max:5,  base:25,  growth:2.3, desc:'+20% feathers from hatching' },
+  { id:'miracle', br:1, pos:[0,3], pre:'twins',    name:'Miracle Hatch', icon:'🌟', max:3,  base:120, growth:4.0, desc:'+5% hatchling is +1 tier' },
+  /* FACTORY */
+  { id:'belts',    br:2, pos:[0,0], pre:null,      name:'Conveyor Tech', icon:'📦', max:1,  base:30,  growth:1,   desc:'Unlock conveyor belts' },
+  { id:'beltspeed',br:2, pos:[1,1], pre:'belts',   name:'Belt Grease',   icon:'🛢️', max:5,  base:20,  growth:2.2, desc:'+20% belt speed' },
+  { id:'vacuum',   br:2, pos:[0,1], pre:'belts',   name:'Vacuum Bots',   icon:'🤖', max:1,  base:80,  growth:1,   desc:'Unlock egg vacuums' },
+  { id:'vacradius',br:2, pos:[0,2], pre:'vacuum',  name:'Wide Suction',  icon:'🌀', max:5,  base:40,  growth:2.2, desc:'+8px vacuum radius' },
+  { id:'vacspeed', br:2, pos:[1,2], pre:'vacuum',  name:'Turbo Pumps',   icon:'💨', max:5,  base:40,  growth:2.2, desc:'+25% vacuum speed' },
+  { id:'overclock',br:2, pos:[0,3], pre:'vacradius',name:'Overclock',    icon:'⚡', max:1,  base:1500,growth:1,   desc:'ALL machines run 2x faster' },
+  /* MARKET */
+  { id:'value',    br:3, pos:[0,0], pre:null,       name:'Egg Polish',      icon:'🥚', max:10, base:5,   growth:1.9, desc:'+15% egg sell value' },
+  { id:'magnet',   br:3, pos:[1,1], pre:'value',    name:'Magnet Gloves',   icon:'🧤', max:5,  base:10,  growth:2.2, desc:'+12px scoop radius' },
+  { id:'truckcap', br:3, pos:[0,1], pre:'value',    name:'Bigger Bed',      icon:'🛻', max:6,  base:15,  growth:2.2, desc:'+5 truck capacity' },
+  { id:'route',    br:3, pos:[0,2], pre:'truckcap', name:'Express Route',   icon:'🛣️', max:5,  base:25,  growth:2.3, desc:'truck trips 15% faster' },
+  { id:'fullbonus',br:3, pos:[1,2], pre:'truckcap', name:'Full Load Deal',  icon:'📈', max:5,  base:30,  growth:2.3, desc:'+6% payout for a full truck' },
+  { id:'autosend', br:3, pos:[0,3], pre:'route',    name:'Auto-Dispatch',   icon:'🗝️', max:1,  base:250, growth:1,   desc:'truck departs by itself when full' },
+  { id:'contracts',br:3, pos:[1,3], pre:'fullbonus',name:'Premium Contracts',icon:'📜',max:3,  base:400, growth:5.0, desc:'+1% value per species discovered' },
 ];
 
 const SKILL_BY_ID = Object.fromEntries(SKILLS.map(s => [s.id, s]));
 function skillCost(sk, lvl) { return Math.ceil(sk.base * Math.pow(sk.growth, lvl)); }
-/* a node unlocks when the node above it in the same branch has >= 1 level */
-function skillPrereq(sk) {
-  const col = SKILLS.filter(s => s.br === sk.br);
-  const i = col.indexOf(sk);
-  return i === 0 ? null : col[i - 1];
-}
+function skillPrereq(sk) { return sk.pre ? SKILL_BY_ID[sk.pre] : null; }

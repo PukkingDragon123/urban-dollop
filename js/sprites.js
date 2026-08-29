@@ -443,5 +443,135 @@ const SPR = (() => {
     return c;
   }
 
-  return { chickenSprite, eggSprite, nestSprite, mamaSprite, darken, lighten, CELL };
+  /* ---------- foliage & decoration ---------- */
+  const DECO_TPL = {
+    tree: {
+      pal: { O:'#2e4a1e', G:'#5da33a', g:'#8fd14f', T:'#8a5e2a', t:'#6e4a20', a:'#e8542f' },
+      rows: [
+        '......OOOOOO........',
+        '....OOGGGGGGOO......',
+        '...OGGGGgGGGGGO.....',
+        '..OGGgGGGGGGgGGO....',
+        '..OGGGGGGgGGGGGO....',
+        '.OGGgGGGGGGGGgGGO...',
+        '.OGGGGGgGGGGGGGGO...',
+        '.OGGGGGGGGGgGGGGO...',
+        '..OGGgGGGGGGGgGO....',
+        '...OGGGGGgGGGGO.....',
+        '....OOGGGGGGOO......',
+        '......OttTO.........',
+        '......OtTTO.........',
+        '.....OtTTTTO........',
+      ],
+    },
+    apple: null,   /* tree with apples — derived below */
+    pine: {
+      pal: { O:'#23421c', G:'#3a7d3a', g:'#5da35a', T:'#8a5e2a', t:'#6e4a20' },
+      rows: [
+        '.......OO.......',
+        '......OGGO......',
+        '.....OGgGGO.....',
+        '....OGGGGGGO....',
+        '.....OGgGGO.....',
+        '....OGGGGgGO....',
+        '...OGgGGGGGGO...',
+        '....OGGGgGGO....',
+        '...OGGgGGGGGO...',
+        '..OGGGGGGgGGGO..',
+        '.OGgGGGGGGGGgGO.',
+        '.......OTTO.....',
+        '......OtTTO.....',
+      ],
+    },
+    bush: {
+      pal: { O:'#2e4a1e', G:'#6ab04c', g:'#93d55b', r:'#e85f8a' },
+      rows: [
+        '....OOOOOO......',
+        '..OOGGgGGGOO....',
+        '.OGGgGGGGgGGO...',
+        'OGgGGGGrGGGGgO..',
+        'OGGGGgGGGGrGGO..',
+        '.OGrGGGGgGGGO...',
+        '..OOGGGGGGOO....',
+      ],
+    },
+    flower: {
+      pal: { O:'#2e4a1e', s:'#5da33a', p:'#ff8ab5', y:'#ffd23f', w:'#fff5f8' },
+      rows: [
+        '.p.....w..',
+        'pyp...wyw.',
+        '.p.....w..',
+        '.s.....s..',
+        '.s..p..s..',
+        '...pyp....',
+        '....s.....',
+      ],
+    },
+    tuft: {
+      pal: { s:'#63a331', g:'#8fd14f' },
+      rows: [
+        's..g..s.',
+        '.s.g.s..',
+        '.sgggs..',
+        '..sgs...',
+      ],
+    },
+    rock: {
+      pal: { O:'#5a5a52', R:'#a5a596', r:'#c4c4b5' },
+      rows: [
+        '...OOOO....',
+        '..ORrrRO...',
+        '.ORrrrRRO..',
+        'ORRrRRRRRO.',
+        'ORRRRRRRRO.',
+        '.OOOOOOOO..',
+      ],
+    },
+    shroom: {
+      pal: { O:'#5e2a1e', R:'#e8542f', w:'#fff5e8', S:'#f0e2c8' },
+      rows: [
+        '..OOOO..',
+        '.ORwRRO.',
+        'ORRRwRRO',
+        'OwRRRRwO',
+        '.OOSSOO.',
+        '..OSSO..',
+        '..OSSO..',
+      ],
+    },
+    stump: {
+      pal: { O:'#4a3220', T:'#a8783f', t:'#8a5e2a', r:'#c99a5b' },
+      rows: [
+        '.OOOOOO.',
+        'OTrrrrTO',
+        'OTrTTrTO',
+        'OtTTTTtO',
+        'OtTTTTtO',
+        '.OOOOOO.',
+      ],
+    },
+  };
+  /* apple tree = leafy tree + red fruit pixels */
+  DECO_TPL.apple = {
+    pal: Object.assign({}, DECO_TPL.tree.pal),
+    rows: DECO_TPL.tree.rows.map((r, y) =>
+      r.split('').map((ch, x) =>
+        (ch === 'g' && (x + y * 3) % 4 === 0) ? 'a' : ch).join('')),
+  };
+
+  function decoSprite(kind, scale) {
+    const key = 'deco_' + kind + '_' + scale;
+    if (cache.has(key)) return cache.get(key);
+    const t = DECO_TPL[kind];
+    const k = scale || 1;
+    const c = document.createElement('canvas');
+    c.width = t.rows[0].length * k; c.height = t.rows.length * k;
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    drawGrid(ctx, t.rows, t.pal, 0, 0, k);
+    cache.set(key, c);
+    return c;
+  }
+
+  return { chickenSprite, eggSprite, nestSprite, mamaSprite, decoSprite, darken, lighten, CELL };
 })();

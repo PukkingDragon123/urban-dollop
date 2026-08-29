@@ -1,11 +1,12 @@
 /* ============================================================
-   INF EGG CO. — UI: rendering, canvas scenes, fx, audio, boot
+   INF EGG CO. v2 — view/controller: canvas world, input, HUD
    ============================================================ */
 'use strict';
 
 (() => {
   const $ = sel => document.querySelector(sel);
   const S = () => GAME.S;
+  const W = WORLD;
 
   /* ================= AUDIO ================= */
   const snd = (() => {
@@ -22,45 +23,55 @@
       freqs.forEach((f, i) => {
         const o = a.createOscillator(), g = a.createGain();
         o.type = type || 'square';
-        const start = t0 + i * dur * 0.9;
-        o.frequency.setValueAtTime(f, start);
-        if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40, f * slide), start + dur);
-        g.gain.setValueAtTime(0.0001, start);
-        g.gain.exponentialRampToValueAtTime(vol || 0.08, start + 0.01);
-        g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+        const st = t0 + i * dur * 0.9;
+        o.frequency.setValueAtTime(f, st);
+        if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40, f * slide), st + dur);
+        g.gain.setValueAtTime(0.0001, st);
+        g.gain.exponentialRampToValueAtTime(vol || 0.07, st + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, st + dur);
         o.connect(g).connect(a.destination);
-        o.start(start); o.stop(start + dur + 0.02);
+        o.start(st); o.stop(st + dur + 0.02);
       });
     }
+    let comboT = 0, comboN = 0;
     return {
+      scoop() {
+        const now = performance.now();
+        if (now - comboT > 600) comboN = 0;
+        comboT = now; comboN = Math.min(comboN + 1, 24);
+        tone([340 + comboN * 28], 0.05, 'square', 0.05, 1.3);
+      },
       pet()    { tone([300 + Math.random() * 60], 0.06, 'square', 0.05, 0.8); },
-      egg()    { tone([523, 784], 0.09, 'triangle', 0.09); },
-      coin()   { tone([988, 1319], 0.07, 'sine', 0.08); },
-      hatch()  { tone([523, 659, 784, 1047], 0.11, 'triangle', 0.09); },
+      lay()    { tone([620], 0.05, 'triangle', 0.05, 1.25); },
+      place()  { tone([180], 0.06, 'square', 0.05, 0.85); },
+      clink()  { tone([880 + Math.random() * 120], 0.04, 'sine', 0.05); },
+      hatch()  { tone([523, 659, 784, 1047], 0.1, 'triangle', 0.08); },
+      coin()   { tone([988, 1319, 1760], 0.08, 'sine', 0.09); },
+      engine() { tone([90, 120, 90], 0.09, 'square', 0.06); },
+      build()  { tone([200, 260], 0.07, 'square', 0.06); },
+      demolish(){ tone([160, 110], 0.08, 'square', 0.06, 0.8); },
       skill()  { tone([392, 523, 659], 0.09, 'square', 0.06); },
       error()  { tone([130], 0.12, 'square', 0.06, 0.7); },
-      sparkle(){ tone([784, 1175, 1568], 0.08, 'sine', 0.07); },
+      sparkle(){ tone([784, 1175, 1568], 0.08, 'sine', 0.06); },
       grand()  { tone([392, 494, 587, 784, 1175], 0.13, 'triangle', 0.1); },
     };
   })();
 
-  /* ================= FX: floats & toasts ================= */
-  const fxLayer = $('#fx-layer');
-  function floatText(txt, x, y, cls) {
+  /* ================= FLOAT TEXT & TOASTS ================= */
+  const fxLayer = $('#fx-layer'), toastBox = $('#toasts');
+  function floatText(txt, sx, sy, cls) {
     const el = document.createElement('div');
     el.className = 'float-txt' + (cls ? ' ' + cls : '');
     el.textContent = txt;
-    el.style.left = Math.round(x) + 'px';
-    el.style.top = Math.round(y) + 'px';
+    el.style.left = Math.round(sx) + 'px';
+    el.style.top = Math.round(sy) + 'px';
     fxLayer.appendChild(el);
     setTimeout(() => el.remove(), 1150);
   }
-  function floatAt(el, txt, cls) {
-    const r = el.getBoundingClientRect();
-    floatText(txt, r.left + r.width / 2 - 20 + (Math.random() * 30 - 15), r.top - 8, cls);
+  function floatWorld(txt, wx, wy, cls) {
+    const p = worldToScreen(wx, wy);
+    floatText(txt, p.x - 20, p.y - 10, cls);
   }
-
-  const toastBox = $('#toasts');
   function toast(opts) {
     while (toastBox.children.length >= 3) toastBox.firstChild.remove();
     const el = document.createElement('div');
@@ -73,9 +84,6 @@
     toastBox.appendChild(el);
     setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 320); }, opts.long ? 6000 : 3600);
   }
-  let lastMutToast = 0;
-
-  /* ================= sprite -> element helpers ================= */
   function cloneCanvas(src) {
     const c = document.createElement('canvas');
     c.width = src.width; c.height = src.height;
@@ -84,464 +92,717 @@
   }
   const chickEl = (sp, k, sil) => cloneCanvas(SPR.chickenSprite(sp, k, sil));
   const eggEl = (tier, k) => cloneCanvas(SPR.eggSprite(tier, k));
-  function tierChip(t) {
-    return `<span class="tier-chip" style="background:${TIERS[t].c}">${TIERS[t].n}</span>`;
+
+  /* ================= CANVAS SETUP ================= */
+  const cv = $('#world');
+  const ctx = cv.getContext('2d');
+  const SC = 3;
+  cv.width = W.W * SC; cv.height = W.H * SC;
+
+  function worldToScreen(wx, wy) {
+    const r = cv.getBoundingClientRect();
+    return { x: r.left + wx / W.W * r.width, y: r.top + wy / W.H * r.height };
+  }
+  function eventToWorld(ev) {
+    const r = cv.getBoundingClientRect();
+    return { x: (ev.clientX - r.left) / r.width * W.W, y: (ev.clientY - r.top) / r.height * W.H };
   }
 
-  /* ================= MAMA SCENE ================= */
-  const stage = $('#mama-stage');
-  const sctx = stage.getContext('2d');
-  let hearts = [], eggFlies = [], clouds = [];
-  let lastPetAt = -99, petSquish = 0, blinkAt = 0;
-
-  function sizeStage() {
-    const w = stage.clientWidth || 300;
-    const h = stage.clientHeight || 230;
-    if (stage.width !== w) stage.width = w;
-    if (stage.height !== h) stage.height = h;
+  /* ================= STATIC GROUND ================= */
+  function mulberry(seed) {
+    let a = seed + 0x6D2B79F5;
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
   }
-  function initClouds() {
-    clouds = [0, 1, 2].map(i => ({
-      x: Math.random() * 300, y: 14 + i * 26 + Math.random() * 8,
-      w: 40 + Math.random() * 30, v: 3 + Math.random() * 4,
-    }));
-  }
-  function spawnHearts(n) {
-    const w = stage.width, h = stage.height;
-    for (let i = 0; i < n; i++) {
-      hearts.push({
-        x: w / 2 + (Math.random() * 90 - 45),
-        y: h - 90 - Math.random() * 40,
-        vy: -(22 + Math.random() * 20), vx: Math.random() * 16 - 8,
-        life: 1 + Math.random() * 0.4, t: 0, s: Math.random() < 0.3 ? 3 : 2,
-      });
-    }
-  }
-  function spawnEggFly(tier) {
-    eggFlies.push({ tier, t: 0, x: stage.width / 2 + (Math.random() * 40 - 20), y: stage.height - 96 });
-  }
-  const HEART = ['.x.x.', 'xxxxx', 'xxxxx', '.xxx.', '..x..'];
-  function drawHeart(x, y, s, alpha) {
-    sctx.globalAlpha = alpha;
-    sctx.fillStyle = '#ff5f9e';
-    for (let r = 0; r < HEART.length; r++)
-      for (let cx = 0; cx < 5; cx++)
-        if (HEART[r][cx] === 'x') sctx.fillRect(x + cx * s, y + r * s, s, s);
-    sctx.globalAlpha = 1;
-  }
-
-  function drawMamaScene(now, dt) {
-    sizeStage();
-    const w = stage.width, h = stage.height;
-    sctx.imageSmoothingEnabled = false;
-    /* sky */
-    sctx.fillStyle = '#aee3ff'; sctx.fillRect(0, 0, w, h);
-    sctx.fillStyle = '#c4ecff'; sctx.fillRect(0, h * 0.4, w, h * 0.6);
-    /* sun */
-    sctx.fillStyle = '#ffd23f';
-    sctx.fillRect(w - 52, 12, 26, 26);
-    sctx.fillRect(w - 58, 18, 38, 14); sctx.fillRect(w - 46, 6, 14, 38);
-    sctx.fillStyle = '#ffe9a0'; sctx.fillRect(w - 48, 16, 18, 18);
-    /* clouds */
-    sctx.fillStyle = '#ffffff';
-    clouds.forEach(cl => {
-      cl.x += cl.v * dt;
-      if (cl.x > w + 60) cl.x = -80;
-      const x = Math.round(cl.x), y = Math.round(cl.y);
-      sctx.fillRect(x, y + 6, cl.w, 10);
-      sctx.fillRect(x + 8, y, cl.w - 20, 8);
-      sctx.fillRect(x + 4, y + 14, cl.w - 8, 6);
-    });
+  let groundCv = null;
+  function buildGround() {
+    groundCv = document.createElement('canvas');
+    groundCv.width = W.W; groundCv.height = W.H;
+    const g = groundCv.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    const rnd = mulberry(20260829);
     /* grass */
-    const gy = h - 44;
-    sctx.fillStyle = '#9ede63'; sctx.fillRect(0, gy, w, 44);
-    sctx.fillStyle = '#8bcf52';
-    for (let x = 0; x < w; x += 16) sctx.fillRect(x + (Math.floor(gy) % 2 ? 8 : 0), gy, 8, 6);
-    /* nest */
-    const nest = SPR.nestSprite(7);
-    const nx = Math.round(w / 2 - nest.width / 2), ny = h - nest.height - 6;
-    /* mama */
-    const tier = S().mamaTier;
-    const sincePet = (now - lastPetAt) / 1000;
-    let mood = 'idle';
-    if (sincePet < 0.7) mood = 'happy';
-    else if (now / 1000 > blinkAt && now / 1000 < blinkAt + 0.18) mood = 'blink';
-    if (now / 1000 > blinkAt + 0.18) blinkAt = now / 1000 + 2.5 + Math.random() * 2.5;
-    const mama = SPR.mamaSprite(tier, 5, mood);
-    petSquish = Math.max(0, petSquish - dt * 5);
-    const bob = Math.sin(now / 450) * 2;
-    const mx = w / 2, myBottom = ny + 14;
-    sctx.save();
-    sctx.translate(mx, myBottom);
-    sctx.scale(1 + petSquish * 0.14, 1 - petSquish * 0.14);
-    sctx.drawImage(mama, Math.round(-mama.width / 2), Math.round(-mama.height + bob));
-    sctx.restore();
-    sctx.drawImage(nest, nx, ny);
-
-    /* egg flies */
-    eggFlies = eggFlies.filter(e => e.t < 0.9);
-    eggFlies.forEach(e => {
-      e.t += dt;
-      const spr = SPR.eggSprite(e.tier, 3);
-      const yy = e.y - 90 * e.t + 70 * e.t * e.t;
-      sctx.globalAlpha = Math.max(0, 1 - e.t / 0.9);
-      sctx.drawImage(spr, Math.round(e.x - spr.width / 2), Math.round(yy));
-      sctx.globalAlpha = 1;
+    g.fillStyle = '#8ed254'; g.fillRect(0, 0, W.W, W.H);
+    g.fillStyle = '#86c94d';
+    for (let y = 0; y < W.H; y += 8)
+      for (let x = (y / 8) % 2 ? 8 : 0; x < W.W; x += 16)
+        g.fillRect(x, y, 8, 8);
+    /* blades */
+    g.fillStyle = '#79bf42';
+    for (let i = 0; i < 260; i++) {
+      const x = Math.floor(rnd() * W.W), y = Math.floor(rnd() * (W.H - 8));
+      g.fillRect(x, y, 1, 2);
+    }
+    /* road */
+    g.fillStyle = '#c9a35f'; g.fillRect(0, W.roadY, W.W, W.H - W.roadY);
+    g.fillStyle = '#b58a48';
+    for (let x = 0; x < W.W; x += 10) { g.fillRect(x, W.roadY, 6, 1); g.fillRect(x + 4, W.H - 3, 5, 1); }
+    g.fillStyle = '#a8783f';
+    for (let i = 0; i < 40; i++) g.fillRect(Math.floor(rnd() * W.W), W.roadY + 3 + Math.floor(rnd() * 26), 2, 1);
+    g.fillStyle = '#8a5e2a'; g.fillRect(0, W.roadY - 1, W.W, 1);
+    /* pond */
+    const p = W.pond;
+    g.fillStyle = '#e8d5a8'; g.fillRect(p.x - 3, p.y - 2, p.w + 6, p.h + 5);
+    g.fillStyle = '#5fb8dd'; g.fillRect(p.x, p.y, p.w, p.h);
+    g.fillStyle = '#7fd0ee'; g.fillRect(p.x + 3, p.y + 2, p.w - 6, p.h - 5);
+    g.fillStyle = '#aee7ff';
+    for (let i = 0; i < 8; i++) g.fillRect(p.x + 4 + Math.floor(rnd() * (p.w - 10)), p.y + 3 + Math.floor(rnd() * (p.h - 7)), 4, 1);
+    /* lily pads */
+    g.fillStyle = '#6ab04c';
+    g.fillRect(p.x + 8, p.y + p.h - 8, 5, 3); g.fillRect(p.x + p.w - 14, p.y + 5, 5, 3);
+    g.fillStyle = '#ff8ab5'; g.fillRect(p.x + p.w - 12, p.y + 4, 2, 2);
+    /* fence along the top */
+    const fy = W.fieldTop - 12;
+    g.fillStyle = '#c98f4f'; g.fillRect(0, fy + 3, W.W, 3); g.fillRect(0, fy + 9, W.W, 3);
+    for (let x = 6; x < W.W; x += 32) {
+      g.fillStyle = '#b3773f'; g.fillRect(x, fy, 4, 15);
+      g.fillStyle = '#8a5e2a'; g.fillRect(x, fy, 4, 2);
+    }
+    /* trees behind the fence */
+    const kinds = ['tree', 'pine', 'apple', 'tree', 'pine', 'tree', 'apple', 'pine', 'tree', 'tree'];
+    for (let i = 0; i < 10; i++) {
+      const spr = SPR.decoSprite(kinds[i], 1);
+      const x = 4 + i * 38 + Math.floor(rnd() * 10);
+      g.drawImage(spr, x, fy - spr.height + 8);
+    }
+    /* side trees */
+    [[2, 60], [W.W - 22, 96], [2, 130], [W.W - 24, 52]].forEach(([x, y], i) => {
+      g.drawImage(SPR.decoSprite(i % 2 ? 'pine' : 'tree', 1), x, y);
     });
-    /* hearts */
-    hearts = hearts.filter(hh => hh.t < hh.life);
-    hearts.forEach(hh => {
-      hh.t += dt;
-      hh.x += hh.vx * dt; hh.y += hh.vy * dt;
-      drawHeart(Math.round(hh.x), Math.round(hh.y), hh.s, Math.max(0, 1 - hh.t / hh.life));
+    /* scattered foliage */
+    const scatter = [
+      ['bush', 8], ['flower', 14], ['tuft', 22], ['rock', 4], ['shroom', 4], ['stump', 2],
+    ];
+    scatter.forEach(([kind, n]) => {
+      const spr = SPR.decoSprite(kind, 1);
+      for (let i = 0; i < n; i++) {
+        let x, y, tries = 0;
+        do {
+          x = 8 + rnd() * (W.W - 40);
+          y = W.fieldTop + 4 + rnd() * (W.roadY - W.fieldTop - 30);
+          tries++;
+        } while (tries < 20 && (GAME.inPond(x + 8, y + 4) ||
+                 (Math.abs(x - W.mama.x) < 30 && Math.abs(y - W.mama.y) < 30) ||
+                 (Math.abs(x - (W.truckHome.x + 28)) < 44 && y > W.roadY - 40)));
+        g.drawImage(spr, Math.floor(x), Math.floor(y));
+      }
     });
+    /* mama's nest patch */
+    g.fillStyle = '#a8d35f';
+    g.fillRect(W.mama.x - 16, W.mama.y - 4, 34, 20);
   }
 
-  /* ================= YARD SCENE ================= */
-  const yard = $('#yard');
-  const yctx = yard.getContext('2d');
-  let wanderers = [];
-  const MAX_WANDER = 40;
-  let flowerSeed = [];
-
-  function sizeYard() {
-    const w = yard.clientWidth || 400;
-    const h = yard.clientHeight || 150;
-    if (yard.width !== w) { yard.width = w; flowerSeed = []; }
-    if (yard.height !== h) yard.height = h;
-  }
-  function ensureFlowers() {
-    if (flowerSeed.length || !yard.width) return;
-    const cols = ['#ff8ab5', '#fff5d9', '#ffd23f', '#c9a8f0'];
-    for (let i = 0; i < Math.max(6, Math.floor(yard.width / 60)); i++) {
-      flowerSeed.push({
-        x: Math.floor(Math.random() * (yard.width - 10)) + 5,
-        y: 44 + Math.floor(Math.random() * (yard.height - 60)),
-        c: cols[i % cols.length],
+  /* ================= PARTICLES (world space) ================= */
+  let parts = [];
+  function puff(x, y, col, n, spread, up) {
+    for (let i = 0; i < n; i++) {
+      parts.push({
+        type: 'px', x: x + (Math.random() - 0.5) * 6, y: y + (Math.random() - 0.5) * 4,
+        vx: (Math.random() - 0.5) * (spread || 30),
+        vy: -(up || 26) - Math.random() * 18,
+        g: 90, t: 0, life: 0.5 + Math.random() * 0.4, col, s: Math.random() < 0.4 ? 2 : 1,
       });
     }
   }
-  function syncWanderers() {
-    /* build desired list of species ids (one entry per bird, capped) */
-    const want = [];
-    const ids = Object.keys(S().flock).map(Number).sort((a, b) => SPECIES[b].tier - SPECIES[a].tier);
-    outer: for (const id of ids) {
-      for (let i = 0; i < S().flock[id]; i++) {
-        want.push(id);
-        if (want.length >= MAX_WANDER) break outer;
-      }
+  function heart(x, y, n) {
+    for (let i = 0; i < (n || 2); i++) {
+      parts.push({ type: 'heart', x: x + (Math.random() - 0.5) * 12, y: y - 4,
+        vx: (Math.random() - 0.5) * 8, vy: -14 - Math.random() * 8, g: 0, t: 0, life: 0.9, col: '#ff5f9e', s: 1 });
     }
-    /* keep existing entities where possible */
-    const pool = wanderers.slice();
-    const yw = yard.width || yard.clientWidth || 640;
-    const yh = yard.height || yard.clientHeight || 150;
-    wanderers = want.map(id => {
-      const i = pool.findIndex(e => e.id === id);
-      if (i >= 0) return pool.splice(i, 1)[0];
-      return {
-        id,
-        x: 12 + Math.random() * Math.max(40, yw - 70),
-        y: 40 + Math.random() * Math.max(20, yh - 100),
-        dir: Math.random() < 0.5 ? -1 : 1,
-        speed: 8 + Math.random() * 10,
-        state: 'idle', t: Math.random() * 2,
-      };
-    });
   }
-
-  function drawYard(now, dt) {
-    sizeYard(); ensureFlowers();
-    const w = yard.width, h = yard.height;
-    yctx.imageSmoothingEnabled = false;
-    /* grass checker */
-    yctx.fillStyle = '#9ede63'; yctx.fillRect(0, 0, w, h);
-    yctx.fillStyle = '#93d55b';
-    for (let y = 0; y < h; y += 12)
-      for (let x = (y / 12) % 2 ? 12 : 0; x < w; x += 24)
-        yctx.fillRect(x, y, 12, 12);
-    /* fence */
-    yctx.fillStyle = '#c98f4f';
-    yctx.fillRect(0, 10, w, 5); yctx.fillRect(0, 22, w, 5);
-    for (let x = 8; x < w; x += 48) {
-      yctx.fillStyle = '#b3773f'; yctx.fillRect(x, 2, 8, 32);
-      yctx.fillStyle = '#8a5e2a'; yctx.fillRect(x, 2, 8, 3);
-      yctx.fillStyle = '#c98f4f';
+  function shellBurst(x, y, tier) {
+    puff(x, y, EGG_SHELL[tier], 8, 40, 30);
+    puff(x, y, '#ffffff', 4, 30, 34);
+  }
+  function coinBurst(x, y, n) {
+    for (let i = 0; i < Math.min(n, 14); i++) {
+      parts.push({ type: 'coin', x, y, vx: (Math.random() - 0.5) * 50, vy: -40 - Math.random() * 30,
+        g: 130, t: 0, life: 0.8 + Math.random() * 0.3, col: '#ffd23f', s: 1 });
     }
-    /* flowers */
-    flowerSeed.forEach(f => {
-      yctx.fillStyle = f.c;
-      yctx.fillRect(f.x - 2, f.y, 2, 2); yctx.fillRect(f.x + 2, f.y, 2, 2);
-      yctx.fillRect(f.x, f.y - 2, 2, 2); yctx.fillRect(f.x, f.y + 2, 2, 2);
-      yctx.fillStyle = '#ffd23f'; yctx.fillRect(f.x, f.y, 2, 2);
-    });
-    /* chickens */
-    wanderers.forEach(e => {
-      e.t -= dt;
-      if (e.t <= 0) {
-        const r = Math.random();
-        if (r < 0.45) { e.state = 'walk'; e.dir = Math.random() < 0.5 ? -1 : 1; e.t = 0.8 + Math.random() * 1.8; }
-        else if (r < 0.75) { e.state = 'idle'; e.t = 0.6 + Math.random() * 1.6; }
-        else { e.state = 'peck'; e.t = 0.7 + Math.random() * 0.8; }
-      }
-      if (e.state === 'walk') {
-        e.x += e.dir * e.speed * dt;
-        e.y += Math.sin(now / 300 + e.x) * 4 * dt;
-        if (e.x < 6) { e.x = 6; e.dir = 1; }
-        if (e.x > w - 54) { e.x = w - 54; e.dir = -1; }
-        e.y = Math.max(34, Math.min(h - 62, e.y));
-      }
-      const sp = SPECIES[e.id];
-      const spr = SPR.chickenSprite(sp, 3, false);
-      const bob = e.state === 'walk' ? Math.abs(Math.sin(now / 110 + e.id)) * 3
-                : e.state === 'peck' ? Math.abs(Math.sin(now / 200)) * 2 : Math.sin(now / 500 + e.id) * 1;
-      const yy = Math.round(e.y - (e.state === 'peck' ? -bob : bob));
-      yctx.save();
-      if (e.dir === 1) {
-        yctx.translate(Math.round(e.x) + spr.width, yy);
-        yctx.scale(-1, 1);
-        yctx.drawImage(spr, 0, 0);
+  }
+  const HEART_PX = [[1,0],[3,0],[0,1],[1,1],[2,1],[3,1],[4,1],[1,2],[2,2],[3,2],[2,3]];
+  function drawParts(dt) {
+    parts = parts.filter(p => (p.t += dt) < p.life);
+    parts.forEach(p => {
+      p.vy += (p.g || 0) * dt;
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      const a = 1 - p.t / p.life;
+      ctx.globalAlpha = Math.max(0, a);
+      if (p.type === 'heart') {
+        ctx.fillStyle = p.col;
+        HEART_PX.forEach(([hx, hy]) => ctx.fillRect(Math.round(p.x + hx), Math.round(p.y + hy), 1, 1));
+      } else if (p.type === 'coin') {
+        ctx.fillStyle = '#ffd23f'; ctx.fillRect(Math.round(p.x), Math.round(p.y), 3, 3);
+        ctx.fillStyle = '#fff2b0'; ctx.fillRect(Math.round(p.x), Math.round(p.y), 1, 1);
       } else {
-        yctx.drawImage(spr, Math.round(e.x), yy);
-      }
-      yctx.restore();
-      /* sparkle for cosmic+ */
-      if (sp.tier >= 6 && Math.random() < 0.08) {
-        yctx.fillStyle = Math.random() < 0.5 ? '#fff' : '#ffd23f';
-        yctx.fillRect(Math.round(e.x + Math.random() * spr.width), Math.round(yy + Math.random() * spr.height * 0.7), 3, 3);
+        ctx.fillStyle = p.col;
+        ctx.fillRect(Math.round(p.x), Math.round(p.y), p.s, p.s);
       }
     });
-    /* empty message */
-    if (!wanderers.length) {
-      yctx.fillStyle = 'rgba(82,53,31,.75)';
-      yctx.font = '16px "Press Start 2P", monospace';
-      yctx.textAlign = 'center';
-      yctx.fillText('hatch a chicken!', w / 2, h / 2 + 6);
+    ctx.globalAlpha = 1;
+  }
+
+  /* butterflies */
+  const flies = [0, 1, 2, 3].map(i => ({
+    x: Math.random() * W.W, y: 50 + Math.random() * 100,
+    a: Math.random() * Math.PI * 2, col: ['#ff8ab5', '#fff5d9', '#ffd23f', '#c9a8f0'][i],
+  }));
+
+  /* ================= INPUT STATE ================= */
+  let cursor = { x: -99, y: -99, down: false, downAt: 0, downX: 0, downY: 0, moved: 0 };
+  let placeMode = null;       /* 'incubator' | 'vacuum' | 'belt' | 'demolish' | null */
+  let placeDir = 0;
+  let paintTile = null;
+  const petFx = new Map();    /* chicken id -> time of last pet (for hop anim) */
+
+  /* ================= RENDER ================= */
+  function tierColor(t) { return TIERS[t].c; }
+
+  function drawEggShadow(x, y) {
+    ctx.fillStyle = 'rgba(46,58,26,.25)';
+    ctx.fillRect(Math.round(x - 3), Math.round(y - 1), 7, 2);
+  }
+  function drawEgg(e, now) {
+    const spr = SPR.eggSprite(e.tier, 1);
+    drawEggShadow(e.x, e.y);
+    let wob = 0;
+    if (e.placed && e.hatch > 0 && e.hatch < 4) wob = Math.round(Math.sin(now / 40) * 1);
+    ctx.drawImage(spr, Math.round(e.x - 5 + wob), Math.round(e.y - 12 + e.z));
+    if (e.golden) {
+      ctx.fillStyle = 'rgba(255,220,80,.9)';
+      if (Math.floor(now / 160) % 3 === 0) ctx.fillRect(Math.round(e.x + 2), Math.round(e.y - 12 + e.z), 1, 1);
+      ctx.fillRect(Math.round(e.x - 4), Math.round(e.y - 6 + e.z), 1, 1);
+    }
+    if (e.placed && e.hatchTotal) {
+      const f = 1 - e.hatch / e.hatchTotal;
+      ctx.fillStyle = 'rgba(46,34,20,.5)'; ctx.fillRect(Math.round(e.x - 4), Math.round(e.y + 1), 8, 1);
+      ctx.fillStyle = '#7ac74f'; ctx.fillRect(Math.round(e.x - 4), Math.round(e.y + 1), Math.round(8 * f), 1);
     }
   }
 
-  /* yard click: name the chicken you tapped */
-  yard.addEventListener('pointerdown', ev => {
-    const r = yard.getBoundingClientRect();
-    const x = ev.clientX - r.left, y = ev.clientY - r.top;
-    const hit = [...wanderers].reverse().find(e => x >= e.x - 6 && x <= e.x + 66 && y >= e.y - 6 && y <= e.y + 66);
-    if (hit) {
-      const sp = SPECIES[hit.id];
-      floatText(sp.name + '!', ev.clientX - 30, ev.clientY - 24, 'pink');
-      snd.pet();
+  function drawBelt(c, r, dir, now) {
+    const x = c * 16, y = r * 16;
+    ctx.fillStyle = '#5e636e'; ctx.fillRect(x, y, 16, 16);
+    ctx.fillStyle = '#9aa0aa'; ctx.fillRect(x + 1, y + 1, 14, 14);
+    const phase = Math.floor(now / 1000 * GAME.beltSpeed()) % 8;
+    ctx.fillStyle = '#c8cdd6';
+    const horiz = dir === 0 || dir === 2;
+    for (let i = -1; i < 3; i++) {
+      let off = i * 8 + (dir === 0 || dir === 1 ? phase : 8 - phase);
+      off = ((off % 16) + 16) % 16;
+      if (horiz) ctx.fillRect(x + off, y + 2, 2, 12);
+      else ctx.fillRect(x + 2, y + off, 12, 2);
     }
-  });
+    /* side rails */
+    ctx.fillStyle = '#3f434c';
+    if (horiz) { ctx.fillRect(x, y, 16, 2); ctx.fillRect(x, y + 14, 16, 2); }
+    else { ctx.fillRect(x, y, 2, 16); ctx.fillRect(x + 14, y, 2, 16); }
+    /* direction nub */
+    ctx.fillStyle = '#ffd23f';
+    const [dx, dy] = [[13, 7], [7, 13], [1, 7], [7, 1]][dir];
+    ctx.fillRect(x + dx, y + dy, 2, 2);
+  }
 
-  /* ================= RENDERERS ================= */
+  function drawVacuum(c, r, v, now) {
+    const x = c * 16, y = r * 16;
+    /* faces */
+    const [dx, dy] = [[1, 0], [0, 1], [-1, 0], [0, -1]][v.dir];
+    /* body */
+    ctx.fillStyle = '#2e3238'; ctx.fillRect(x + 3, y + 2, 10, 13);
+    ctx.fillStyle = '#b8bcc4'; ctx.fillRect(x + 4, y + 3, 8, 11);
+    ctx.fillStyle = '#d5d9df'; ctx.fillRect(x + 5, y + 4, 6, 4);
+    /* eye */
+    const suck = S().eggs.some(e => e.suck === (c + ',' + r));
+    ctx.fillStyle = suck ? '#3fd0ff' : '#2e3238';
+    ctx.fillRect(x + 6, y + 5, 4, 2);
+    if (suck && Math.floor(now / 120) % 2) { ctx.fillStyle = '#aee7ff'; ctx.fillRect(x + 7, y + 5, 2, 2); }
+    /* funnel */
+    ctx.fillStyle = '#6a6f78';
+    ctx.fillRect(x + 5, y, 6, 2); ctx.fillRect(x + 6, y + 2, 4, 1);
+    /* nozzle toward facing dir */
+    ctx.fillStyle = '#3f434c';
+    ctx.fillRect(x + 7 + dx * 6, y + 9 + dy * 5, 2 + Math.abs(dx) * 2, 2 + Math.abs(dy) * 2);
+    /* held eggs pips */
+    for (let i = 0; i < Math.min(v.hold.length, 4); i++) {
+      ctx.fillStyle = EGG_SHELL[v.hold[i].tier];
+      ctx.fillRect(x + 4 + i * 2, y + 12, 2, 2);
+    }
+  }
+
+  function drawIncubator(c, r, inc, now) {
+    const x = c * 16, y = r * 16;
+    /* base */
+    ctx.fillStyle = '#4a3220'; ctx.fillRect(x + 1, y + 6, 30, 25);
+    ctx.fillStyle = '#efe6d2'; ctx.fillRect(x + 2, y + 7, 28, 23);
+    ctx.fillStyle = '#d9c9a8'; ctx.fillRect(x + 2, y + 24, 28, 6);
+    /* dome */
+    ctx.fillStyle = '#4a3220'; ctx.fillRect(x + 5, y + 1, 22, 12);
+    ctx.fillStyle = '#cfeef5'; ctx.fillRect(x + 6, y + 2, 20, 10);
+    ctx.fillStyle = '#e8f8fd'; ctx.fillRect(x + 7, y + 3, 6, 3);
+    /* current egg in dome */
+    if (inc.queue.length) {
+      const egg = SPR.eggSprite(inc.queue[0].tier, 1);
+      ctx.drawImage(egg, x + 12, y + 2);
+      /* progress bar */
+      const need = GAME.incHatchTime(inc.queue[0].tier);
+      const f = Math.min(1, inc.prog / need);
+      ctx.fillStyle = '#4a3220'; ctx.fillRect(x + 4, y + 15, 24, 3);
+      ctx.fillStyle = '#7ac74f'; ctx.fillRect(x + 5, y + 16, Math.round(22 * f), 1);
+      /* warm light blinking */
+      ctx.fillStyle = Math.floor(now / 300) % 2 ? '#ff9f1c' : '#ffd23f';
+      ctx.fillRect(x + 26, y + 20, 2, 2);
+    } else {
+      ctx.fillStyle = '#8a8d96'; ctx.fillRect(x + 26, y + 20, 2, 2);
+      /* faint "put an egg here" silhouette */
+      ctx.fillStyle = 'rgba(122,90,58,.28)';
+      ctx.fillRect(x + 13, y + 3, 6, 8); ctx.fillRect(x + 14, y + 2, 4, 10);
+    }
+    /* queue pips */
+    for (let i = 0; i < Math.min(inc.queue.length, GAME.incCap()); i++) {
+      ctx.fillStyle = i < inc.queue.length ? EGG_SHELL[inc.queue[Math.min(i, inc.queue.length - 1)].tier] : '#d9c9a8';
+      ctx.fillRect(x + 4 + (i % 8) * 3, y + 21 + Math.floor(i / 8) * 3, 2, 2);
+    }
+    /* little feet */
+    ctx.fillStyle = '#4a3220';
+    ctx.fillRect(x + 3, y + 30, 4, 2); ctx.fillRect(x + 25, y + 30, 4, 2);
+  }
+
+  function truckX(now) {
+    const tr = S().truck;
+    const T = GAME.tripTime();
+    if (tr.state === 'parked') return W.truckHome.x;
+    const gone = T - tr.t;
+    if (gone < 1) return W.truckHome.x + gone * 220;             /* leaving right */
+    if (tr.t < 1) return W.truckHome.x + tr.t * 220;             /* backing in from right */
+    return 9999;
+  }
+  function drawTruck(now) {
+    const tr = S().truck;
+    const x = truckX(now);
+    if (x > W.W + 60) return;
+    const y = W.roadY - 4;
+    const bounce = tr.state === 'parked' ? 0 : Math.round(Math.sin(now / 40) * 1);
+    /* bed */
+    ctx.fillStyle = '#4a3220'; ctx.fillRect(x, y - 12 + bounce, 34, 20);
+    ctx.fillStyle = '#c98f4f'; ctx.fillRect(x + 1, y - 11 + bounce, 32, 18);
+    ctx.fillStyle = '#a8663a'; ctx.fillRect(x + 1, y - 11 + bounce, 32, 3);
+    ctx.fillStyle = '#8a5e2a'; ctx.fillRect(x + 1, y + 4 + bounce, 32, 3);
+    /* eggs piled in the bed */
+    const n = Math.min(tr.load.length, 12);
+    for (let i = 0; i < n; i++) {
+      const ex = x + 3 + (i % 6) * 5, ey = y - 8 + bounce + Math.floor(i / 6) * -4 + 4;
+      const egg = tr.load[i];
+      ctx.fillStyle = EGG_SHELL[egg.tier];
+      ctx.fillRect(ex, ey, 4, 5);
+      ctx.fillStyle = SPR.darken(EGG_SHELL[egg.tier], 0.35);
+      ctx.fillRect(ex, ey + 4, 4, 1);
+      if (egg.golden) { ctx.fillStyle = '#ffd23f'; ctx.fillRect(ex + 1, ey + 1, 1, 1); }
+    }
+    /* cab */
+    ctx.fillStyle = '#2e3a55'; ctx.fillRect(x + 34, y - 16 + bounce, 18, 24);
+    ctx.fillStyle = '#5fa8e8'; ctx.fillRect(x + 35, y - 15 + bounce, 16, 22);
+    ctx.fillStyle = '#cfeef5'; ctx.fillRect(x + 37, y - 13 + bounce, 9, 7);
+    ctx.fillStyle = '#3f6ea8'; ctx.fillRect(x + 35, y + 1 + bounce, 16, 6);
+    ctx.fillStyle = '#ffd23f'; ctx.fillRect(x + 49, y - 2 + bounce, 2, 3);
+    /* wheels */
+    ctx.fillStyle = '#23262b';
+    ctx.fillRect(x + 4, y + 6, 8, 8); ctx.fillRect(x + 38, y + 6, 8, 8);
+    ctx.fillStyle = '#d5d9df';
+    ctx.fillRect(x + 7, y + 9, 2, 2); ctx.fillRect(x + 41, y + 9, 2, 2);
+    /* load label */
+    if (tr.state === 'parked') {
+      ctx.font = '5px monospace';
+      ctx.fillStyle = '#3a2a16';
+      ctx.fillText(tr.load.length + '/' + GAME.truckCap(), x + 8, y - 15);
+      if (tr.load.length > 0 && Math.floor(now / 500) % 2) {
+        ctx.fillStyle = '#2e6e2e';
+        ctx.fillText('SEND?', x + 34, y - 19);
+      }
+    }
+  }
+
+  function drawChicken(ch, now) {
+    const sp = SPECIES[ch.sp];
+    const spr = SPR.chickenSprite(sp, 1, false);
+    const bob = ch.state === 'walk' ? Math.abs(Math.sin(now / 110 + ch.id)) * 1.6
+              : ch.state === 'peck' ? Math.abs(Math.sin(now / 200)) * 1.2 : Math.sin(now / 500 + ch.id) * 0.6;
+    let hop = 0;
+    const pf = petFx.get(ch.id);
+    if (pf && now - pf < 350) hop = Math.sin((now - pf) / 350 * Math.PI) * 4;
+    const yy = Math.round(ch.y - bob - hop);
+    ctx.fillStyle = 'rgba(46,58,26,.25)';
+    ctx.fillRect(Math.round(ch.x + 4), Math.round(ch.y + 17), 12, 2);
+    ctx.save();
+    if (ch.dir === 1) {
+      ctx.translate(Math.round(ch.x) + spr.width, yy);
+      ctx.scale(-1, 1);
+      ctx.drawImage(spr, 0, 0);
+    } else {
+      ctx.drawImage(spr, Math.round(ch.x), yy);
+    }
+    ctx.restore();
+    if (sp.tier >= 6 && Math.random() < 0.06) {
+      ctx.fillStyle = Math.random() < 0.5 ? '#fff' : '#ffd23f';
+      ctx.fillRect(Math.round(ch.x + Math.random() * 18), Math.round(yy + Math.random() * 14), 1, 1);
+    }
+  }
+
+  function drawMama(now) {
+    const m = W.mama;
+    const nest = SPR.nestSprite(1);
+    const pf = petFx.get('mama');
+    const happy = pf && now - pf < 700;
+    const mood = happy ? 'happy' : (Math.floor(now / 3200) % 8 === 7 ? 'blink' : 'idle');
+    const mama = SPR.mamaSprite(S().mamaTier, 1, mood);
+    const bob = Math.sin(now / 450) * 1;
+    let squish = 0;
+    if (pf && now - pf < 250) squish = 1 - (now - pf) / 250;
+    ctx.fillStyle = 'rgba(46,58,26,.2)';
+    ctx.fillRect(m.x - 12, m.y + 12, 26, 3);
+    ctx.save();
+    ctx.translate(m.x + 1, m.y + 14);
+    ctx.scale(1 + squish * 0.12, 1 - squish * 0.12);
+    ctx.drawImage(mama, -15, -26 + Math.round(bob));
+    ctx.restore();
+    ctx.drawImage(nest, m.x - 10, m.y + 6);
+    /* cooldown sparkle when ready */
+    if (S().mama.petCd <= 0 && Math.floor(now / 400) % 2) {
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(m.x + 12, m.y - 22, 2, 2);
+    }
+  }
+
+  function drawGhost(now) {
+    if (!placeMode || cursor.x < 0) return;
+    const c = Math.floor(cursor.x / 16), r = Math.floor(cursor.y / 16);
+    if (placeMode === 'demolish') {
+      const o = GAME.occAt(c, r);
+      ctx.fillStyle = o ? 'rgba(232,84,47,.4)' : 'rgba(0,0,0,.15)';
+      ctx.fillRect(c * 16, r * 16, 16, 16);
+      return;
+    }
+    const b = BUILDS[placeMode];
+    const ok = GAME.canPlace(placeMode, c, r) && S().coins >= buildCost(placeMode, S().built[placeMode]);
+    ctx.globalAlpha = 0.55;
+    if (placeMode === 'belt') drawBelt(c, r, placeDir, now);
+    else if (placeMode === 'vacuum') drawVacuum(c, r, { dir: placeDir, hold: [] }, now);
+    else drawIncubator(c, r, { queue: [], prog: 0 }, now);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = ok ? 'rgba(122,199,79,.3)' : 'rgba(232,84,47,.35)';
+    ctx.fillRect(c * 16, r * 16, b.w * 16, b.h * 16);
+    if (placeMode === 'vacuum') {
+      ctx.strokeStyle = 'rgba(63,208,255,.6)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(c * 16 + 8, r * 16 + 8, GAME.vacR(), 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
+  function render(now, dt) {
+    ctx.setTransform(SC, 0, 0, SC, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(groundCv, 0, 0);
+
+    /* pond shimmer + ducks */
+    const p = W.pond;
+    ctx.fillStyle = 'rgba(255,255,255,.5)';
+    for (let i = 0; i < 3; i++) {
+      const sx = p.x + 6 + ((i * 17 + Math.floor(now / 400)) % (p.w - 12));
+      ctx.fillRect(sx, p.y + 5 + i * 8, 4, 1);
+    }
+    for (let i = 0; i < 2; i++) {
+      const dx = p.x + 8 + ((now / (900 + i * 300)) % 1 < 0.5
+        ? ((now / (900 + i * 300)) % 0.5) * 2 : (1 - (now / (900 + i * 300)) % 1) * 2) * (p.w - 22);
+      const dy = p.y + 6 + i * 12;
+      ctx.fillStyle = '#fff8ec'; ctx.fillRect(Math.round(dx), Math.round(dy), 6, 4);
+      ctx.fillStyle = '#fff8ec'; ctx.fillRect(Math.round(dx + 4), Math.round(dy - 3), 3, 4);
+      ctx.fillStyle = '#f2a03f'; ctx.fillRect(Math.round(dx + 7), Math.round(dy - 2), 2, 1);
+      ctx.fillStyle = '#2e2216'; ctx.fillRect(Math.round(dx + 5), Math.round(dy - 2), 1, 1);
+    }
+
+    /* belts */
+    for (const k of Object.keys(S().belts)) {
+      const [c, r] = k.split(',').map(Number);
+      drawBelt(c, r, S().belts[k].dir, now);
+    }
+    /* vacuums + incubators */
+    for (const k of Object.keys(S().vacs)) {
+      const [c, r] = k.split(',').map(Number);
+      drawVacuum(c, r, S().vacs[k], now);
+    }
+    for (const k of Object.keys(S().incs)) {
+      const [c, r] = k.split(',').map(Number);
+      drawIncubator(c, r, S().incs[k], now);
+    }
+    /* belt items */
+    S().items.forEach(it => {
+      const spr = SPR.eggSprite(it.tier, 1);
+      ctx.drawImage(spr, Math.round(it.x - 5), Math.round(it.y - 8));
+      if (it.golden) { ctx.fillStyle = '#ffd23f'; ctx.fillRect(Math.round(it.x), Math.round(it.y - 6), 1, 1); }
+    });
+    /* ground eggs */
+    S().eggs.forEach(e => drawEgg(e, now));
+    /* mama + chickens */
+    drawMama(now);
+    S().chickens.forEach(ch => drawChicken(ch, now));
+    /* truck */
+    drawTruck(now);
+    /* butterflies */
+    flies.forEach((f, i) => {
+      f.a += dt * (0.6 + i * 0.13);
+      f.x += Math.cos(f.a) * 12 * dt + Math.sin(now / 3000 + i) * 4 * dt;
+      f.y += Math.sin(f.a * 1.4) * 9 * dt;
+      if (f.x < 4) f.x = 4; if (f.x > W.W - 6) f.x = W.W - 6;
+      if (f.y < W.fieldTop) f.y = W.fieldTop; if (f.y > W.roadY - 10) f.y = W.roadY - 10;
+      const flap = Math.floor(now / 90 + i) % 2;
+      ctx.fillStyle = f.col;
+      ctx.fillRect(Math.round(f.x - 1 - flap), Math.round(f.y), 2, 2);
+      ctx.fillRect(Math.round(f.x + 1 + flap), Math.round(f.y), 2, 2);
+      ctx.fillStyle = '#3a2a16'; ctx.fillRect(Math.round(f.x), Math.round(f.y), 1, 2);
+    });
+    /* particles */
+    drawParts(dt);
+    /* scoop ring */
+    if (cursor.down && !placeMode && cursor.y < W.roadY + 20 && cursor.x >= 0) {
+      ctx.strokeStyle = 'rgba(255,255,255,.7)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.arc(cursor.x, cursor.y, GAME.scoopR(), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    /* drop target highlight while carrying */
+    if (S().basket.length && cursor.down) {
+      const th = W.truckHome;
+      if (S().truck.state === 'parked' && cursor.x > th.x - 10 && cursor.x < th.x + th.w + 10 && cursor.y > th.y - 14) {
+        ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 1;
+        ctx.strokeRect(th.x - 2, th.y - 14, th.w + 4, th.h + 12);
+      }
+      const c = Math.floor(cursor.x / 16), r = Math.floor(cursor.y / 16);
+      const o = GAME.occAt(c, r);
+      if (o && o.type === 'incubator') {
+        const [ic, ir] = o.k.split(',').map(Number);
+        ctx.strokeStyle = '#7ac74f'; ctx.lineWidth = 1;
+        ctx.strokeRect(ic * 16 - 1, ir * 16 - 1, 34, 34);
+      }
+    }
+    drawGhost(now);
+  }
+
+  /* ================= MAGNET SCOOPING ================= */
+  function magnet(dt, now) {
+    if (!cursor.down || placeMode || cursor.x < 0) return;
+    const R = GAME.scoopR();
+    const eggs = S().eggs;
+    for (let i = eggs.length - 1; i >= 0; i--) {
+      const e = eggs[i];
+      if (e.suck) continue;
+      const dx = cursor.x - e.x, dy = cursor.y - e.y;
+      const d = Math.hypot(dx, dy);
+      if (d < 7) {
+        if (GAME.scoopEgg(e)) { snd.scoop(); updateCursorChip(); }
+        continue;
+      }
+      if (d < R) {
+        const pull = (1 - d / R) * 320 * dt / d;
+        e.x += dx * pull; e.y += dy * pull;
+        e.z = Math.min(0, e.z);
+      }
+    }
+  }
+
+  /* ================= HUD ================= */
   const el = {
-    coins: $('#r-coins'), feathers: $('#r-feathers'), eggs: $('#r-eggs'),
-    petBar: $('#pet-bar'), petLabel: $('#pet-label'),
-    mamaChip: $('#mama-tier-chip'), mamaInfo: $('#mama-info'), mamaUp: $('#btn-mama-up'),
-    nests: $('#nests'), nestSub: $('#nest-sub'),
-    vault: $('#vault'), vaultSub: $('#vault-sub'),
-    coopSub: $('#coop-sub'), coopControls: $('#coop-controls'), flockList: $('#flock-list'),
-    skillTree: $('#skill-tree'), researchSub: $('#research-sub'),
-    pedia: $('#pedia'), pediaSub: $('#pedia-sub'),
-    hint: $('#hint-text'), hintBar: $('#hintbar'),
-    stats: $('#stats-line'),
+    coins: $('#r-coins'), feathers: $('#r-feathers'), basket: $('#r-basket'),
+    eggs: $('#r-eggs'), chick: $('#r-chick'),
+    hint: $('#hint-text'), stats: $('#stats-line'),
+    mamaChip: $('#mama-chip'), mamaBtn: $('#btn-mama-up'),
+    buildBar: $('#build-bar'), cursorChip: $('#cursor-chip'),
   };
 
-  let nestRefs = [];   /* {bar, label, idx} for ticking progress */
-  let vaultRefs = {};  /* tier -> {count, value, btnHatch, btnSell1, btnSellAll, btnBuy} */
+  function updateCursorChip() {
+    const n = S().basket.length;
+    el.cursorChip.hidden = n === 0;
+    if (n) el.cursorChip.textContent = '🥚×' + n;
+  }
+  document.addEventListener('pointermove', ev => {
+    el.cursorChip.style.left = (ev.clientX + 14) + 'px';
+    el.cursorChip.style.top = (ev.clientY - 8) + 'px';
+  });
 
-  function renderMama() {
+  function renderBuildBar() {
+    const bar = el.buildBar;
+    bar.innerHTML = '';
+    const mk = (html, act, extra) => {
+      const b = document.createElement('button');
+      b.className = 'btn build-btn' + (extra || '');
+      b.innerHTML = html;
+      b.dataset.act = act;
+      return b;
+    };
+    ['incubator', 'vacuum', 'belt'].forEach(type => {
+      const b = BUILDS[type];
+      const locked = b.needs && !GAME.lvl(b.needs);
+      const cost = buildCost(type, S().built[type]);
+      const icon = type === 'incubator' ? '🐣' : type === 'vacuum' ? '🤖' : '↦';
+      const btn = mk(
+        locked ? `${icon} ${b.name}<br>🔒 research` : `${icon} ${b.name}<br>🪙 ${GAME.fmt(cost)}`,
+        'place'
+      );
+      btn.dataset.type = type;
+      btn.disabled = locked;
+      btn.title = b.desc;
+      if (placeMode === type) btn.classList.add('active');
+      bar.appendChild(btn);
+    });
+    const rot = mk('⟳ ' + ['→', '↓', '←', '↑'][placeDir], 'rotate');
+    rot.title = 'Rotate (R)';
+    bar.appendChild(rot);
+    const dem = mk('🧨 remove', 'demolish');
+    if (placeMode === 'demolish') dem.classList.add('active');
+    bar.appendChild(dem);
+    if (placeMode) {
+      const x = mk('✖ done', 'cancel');
+      bar.appendChild(x);
+    }
+    GAME.dirty.build = false;
+  }
+
+  function renderMamaCard() {
     const t = S().mamaTier;
     el.mamaChip.textContent = TIERS[t].n;
     el.mamaChip.style.background = TIERS[t].c;
-    if (t < TIERS.length - 1) {
-      el.mamaUp.innerHTML = `⬆ UPGRADE MAMA to ${TIERS[t + 1].n}<br>🪙 ${GAME.fmt(GAME.mamaCost())}`;
-      el.mamaUp.dataset.cost = GAME.mamaCost();
-      el.mamaUp.dataset.res = 'coins';
-      el.mamaUp.hidden = false;
+    if (t >= TIERS.length - 1) {
+      el.mamaBtn.textContent = '👑 MAX';
+      el.mamaBtn.disabled = true;
     } else {
-      el.mamaUp.innerHTML = '👑 MAMA IS DIVINE — MAX TIER!';
-      delete el.mamaUp.dataset.cost;
-      el.mamaUp.disabled = true;
+      el.mamaBtn.innerHTML = `⬆ ${TIERS[t + 1].n} 🪙${GAME.fmt(GAME.mamaCost())}`;
+      el.mamaBtn.disabled = S().coins < GAME.mamaCost();
     }
-    GAME.dirty.mama = false;
   }
 
-  function renderNests() {
-    GAME.syncNests();
-    nestRefs = [];
-    el.nests.innerHTML = '';
-    S().nests.forEach((n, i) => {
-      const d = document.createElement('div');
-      d.className = 'nest';
-      if (!n) {
-        d.innerHTML = '<div class="nest-label">empty nest</div>';
-        const c = document.createElement('canvas');
-        c.width = 64; c.height = 64;
-        const cc = c.getContext('2d'); cc.imageSmoothingEnabled = false;
-        cc.drawImage(SPR.nestSprite(3), 2, 40);
-        d.insertBefore(c, d.firstChild);
-        d.insertAdjacentHTML('beforeend', '<div class="nest-label" style="min-height:0;color:var(--ink-soft)">use HATCH in the vault</div>');
-      } else {
-        const ready = n.left <= 0;
-        if (ready) d.classList.add('ready');
-        const c = document.createElement('canvas');
-        c.width = 64; c.height = 64;
-        const cc = c.getContext('2d'); cc.imageSmoothingEnabled = false;
-        const egg = SPR.eggSprite(n.tier, 4);
-        cc.drawImage(egg, 12, 0);
-        cc.drawImage(SPR.nestSprite(3), 2, 42);
-        d.appendChild(c);
-        d.insertAdjacentHTML('beforeend',
-          `<div class="nest-label"><span class="tier-chip" style="background:${TIERS[n.tier].c}">${TIERS[n.tier].n}</span></div>`);
-        if (ready) {
-          const b = document.createElement('button');
-          b.className = 'btn btn-green';
-          b.dataset.act = 'collect'; b.dataset.slot = i;
-          b.textContent = 'HATCH!';
-          d.appendChild(b);
-        } else {
-          d.insertAdjacentHTML('beforeend',
-            `<div class="bar-outer"><div class="bar-fill striped" style="width:${100 * (1 - n.left / n.total)}%"></div></div>
-             <div class="nest-label" style="min-height:0">${GAME.fmtTime(n.left)}</div>`);
-          nestRefs.push({ idx: i, bar: d.querySelector('.bar-fill'), label: d.querySelectorAll('.nest-label')[1] });
-        }
-      }
-      el.nests.appendChild(d);
-    });
-    /* buy slot */
-    if (GAME.canBuyNest()) {
-      const b = document.createElement('button');
-      b.className = 'nest-buy';
-      b.dataset.act = 'buy-nest';
-      b.dataset.cost = GAME.nestBuyCost(); b.dataset.res = 'coins';
-      b.innerHTML = `+ BUY NEST<br>🪙 ${GAME.fmt(GAME.nestBuyCost())}`;
-      el.nests.appendChild(b);
+  /* ---------- hints ---------- */
+  const TIPS = [
+    'Eggs can MUTATE a tier up when laid. Science!',
+    'Golden eggs are worth 5x. Shiny.',
+    'Vacuums + belts + incubator = chicken factory.',
+    'Collect all 100 species in the CHICKENPEDIA!',
+    'Placed eggs hatch slowly — incubators are much faster.',
+    'A full truck pays a bonus with Full Load Deal.',
+  ];
+  let tipIdx = 0, lastTip = 0;
+  function updateHint(now) {
+    const st = S(), stats = st.stats;
+    let msg;
+    if (stats.pets === 0) msg = 'Click MAMA HEN (on her nest) — every pet lays an egg!';
+    else if (stats.collected === 0 && st.eggs.length > 0) msg = 'Hold & drag over eggs to scoop them up!';
+    else if (stats.sold === 0 && (st.basket.length > 0 || st.truck.load.length > 0))
+      msg = st.truck.load.length ? 'Click the TRUCK to send it to market!' : 'Drop your eggs on the TRUCK to load it!';
+    else if (stats.hatched === 0 && stats.collected > 0) msg = 'Drop eggs on open grass — they hatch into chickens!';
+    else if (st.truck.state === 'parked' && st.truck.load.length >= GAME.truckCap() && !GAME.lvl('autosend'))
+      msg = 'The truck is FULL — click it to send it to market!';
+    else if (st.feathers >= 4 && Object.keys(st.sk).length === 0) msg = 'You have 🪶 feathers! Open 🧪 RESEARCH.';
+    else if (st.built.incubator === 0 && st.coins >= buildCost('incubator', 0)) msg = 'Build an INCUBATOR — it hatches eggs fast, automatically!';
+    else if (GAME.lvl('belts') && st.built.belt === 0) msg = 'Conveyors unlocked! Drag to paint a belt to the truck.';
+    else if (st.mamaTier < TIERS.length - 1 && st.coins >= GAME.mamaCost()) msg = 'You can UPGRADE MAMA — rarer eggs await!';
+    else {
+      if (now - lastTip > 12000) { lastTip = now; tipIdx = (tipIdx + 1) % TIPS.length; }
+      msg = TIPS[tipIdx];
     }
-    el.nestSub.textContent = `eggs hatch into chickens here`;
-    GAME.dirty.nests = false;
+    if (el.hint.textContent !== msg) el.hint.textContent = msg;
   }
 
-  function renderVault() {
-    el.vault.innerHTML = '';
-    vaultRefs = {};
-    let any = false;
-    TIERS.forEach((tier, t) => {
-      if (!S().everEgg[t]) return;
-      any = true;
-      const row = document.createElement('div');
-      row.className = 'vault-row';
-      row.appendChild(eggEl(t, 4));
-      row.insertAdjacentHTML('beforeend',
-        `<div class="vault-name">${tierChip(t)}<span class="vault-count" data-ref="count">x0</span></div>
-         <div class="vault-value" data-ref="value"></div>
-         <div class="vault-btns">
-           <button class="btn btn-green" data-act="hatch" data-tier="${t}">🐣 HATCH</button>
-           <button class="btn btn-gold" data-act="sell" data-tier="${t}">SELL 1</button>
-           <button class="btn btn-gold" data-act="sell-all" data-tier="${t}">SELL ALL</button>
-           <button class="btn btn-blue" data-act="buy-egg" data-tier="${t}">BUY</button>
-         </div>`);
-      el.vault.appendChild(row);
-      vaultRefs[t] = {
-        count: row.querySelector('[data-ref="count"]'),
-        value: row.querySelector('[data-ref="value"]'),
-        btns: row.querySelectorAll('button'),
-      };
-    });
-    if (!any) el.vault.innerHTML = '<div class="vault-empty">No eggs yet — go pet Mama Hen!</div>';
-    GAME.dirty.vault = false;
-    updateVault();
+  function flash(chip) { chip.classList.remove('flash'); void chip.offsetWidth; chip.classList.add('flash'); }
+
+  function lightUpdate(now) {
+    const st = S();
+    const set = (node, v) => { if (node.textContent !== v) node.textContent = v; };
+    set(el.coins, GAME.fmt(st.coins));
+    set(el.feathers, GAME.fmt(st.feathers));
+    set(el.basket, String(st.basket.length));
+    set(el.eggs, String(st.eggs.length));
+    set(el.chick, st.chickens.length + '/' + GAME.chickenCap());
+    renderMamaCard();
+    updateHint(now);
+    const stLine = `${GAME.fmt(st.stats.laid)} eggs laid · ${GAME.fmt(st.stats.collected)} scooped · ${GAME.fmt(st.stats.sold)} sold · ${GAME.fmt(st.stats.hatched)} hatched · ${GAME.disc()}/100 species`;
+    set(el.stats, stLine);
   }
 
-  function updateVault() {
-    let structureChanged = false;
-    TIERS.forEach((_, t) => {
-      if (S().everEgg[t] && !vaultRefs[t]) structureChanged = true;
-    });
-    if (structureChanged) { renderVault(); return; }
-    let total = 0;
-    Object.keys(vaultRefs).forEach(tStr => {
-      const t = +tStr, r = vaultRefs[t];
-      const n = S().eggs[t]; total += n;
-      const count = 'x' + GAME.fmt(n);
-      if (r.count.textContent !== count) r.count.textContent = count;
-      const val = `worth 🪙${GAME.fmt(GAME.sellValue(t))} · buy 🪙${GAME.fmt(GAME.shopPrice(t))}`;
-      if (r.value.textContent !== val) r.value.textContent = val;
-      const [bH, bS1, bSA, bBuy] = r.btns;
-      const noEgg = n <= 0;
-      const noNest = !S().nests.some(x => x === null);
-      bH.disabled = noEgg || noNest;
-      bH.title = noNest ? 'All nests are busy!' : '';
-      bS1.disabled = noEgg; bSA.disabled = noEgg;
-      bBuy.disabled = S().coins < GAME.shopPrice(t);
-    });
-    el.vaultSub.textContent = `sell for coins, or hatch for chickens + feathers`;
-  }
-
-  function renderCoop() {
-    const cap = GAME.coopCap(), n = GAME.flockSize();
-    el.coopSub.textContent = `${n} / ${cap} chickens`;
-    let html = `<span class="cap-label">CAPACITY ${n}/${cap}</span>`;
-    if (GAME.canBuyCoop()) {
-      html += `<button class="btn btn-green" data-act="buy-coop" data-cost="${GAME.coopBuyCost()}" data-res="coins">+${ECON.coopPerBuy} SPACE — 🪙 ${GAME.fmt(GAME.coopBuyCost())}</button>`;
-    }
-    const total = GAME.flockSize();
-    if (total > MAX_WANDER) html += `<span style="color:var(--ink-soft)">(showing ${MAX_WANDER} of ${total})</span>`;
-    el.coopControls.innerHTML = html;
-    GAME.dirty.coop = false;
-  }
-
-  function renderFlock() {
-    el.flockList.innerHTML = '';
-    const ids = Object.keys(S().flock).map(Number).sort((a, b) => SPECIES[b].tier - SPECIES[a].tier || a - b);
-    ids.forEach(id => {
-      const sp = SPECIES[id], n = S().flock[id];
-      const row = document.createElement('div');
-      row.className = 'flock-row';
-      row.appendChild(chickEl(sp, 2, false));
-      row.insertAdjacentHTML('beforeend',
-        `<div class="flock-info">
-           <span class="f-name" style="color:${TIERS[sp.tier].c}">${sp.name} x${n}</span>
-           <span class="f-rate">1 ${TIERS[sp.tier].n} egg / ${GAME.fmtTime(GAME.layTime(sp.tier))} each</span>
-         </div>
-         <button class="btn btn-ghost" data-act="release" data-sp="${id}" title="Set one free (+🪶)">🕊️</button>`);
-      el.flockList.appendChild(row);
-    });
-    syncWanderers();
-    GAME.dirty.flock = false;
-  }
+  /* ================= MODALS ================= */
+  function openModal(id) { $(id).hidden = false; }
+  function closeModals() { document.querySelectorAll('.modal').forEach(m => m.hidden = true); }
 
   function renderSkills() {
-    el.researchSub.textContent = `🪶 ${GAME.fmt(S().feathers)} feathers`;
-    el.skillTree.innerHTML = '';
-    BRANCHES.forEach((name, bi) => {
+    const box = $('#skill-tree');
+    box.innerHTML = '';
+    $('#research-sub').textContent = `🪶 ${GAME.fmt(S().feathers)} feathers`;
+    BRANCHES.forEach((br, bi) => {
       const col = document.createElement('div');
       col.className = 'skill-branch';
-      col.innerHTML = `<div class="branch-title">${name}</div>`;
+      col.innerHTML = `<div class="branch-title" style="background:${br.hue}">${br.icon} ${br.name}</div>`;
+      const grid = document.createElement('div');
+      grid.className = 'skill-grid';
       SKILLS.filter(sk => sk.br === bi).forEach(sk => {
         const cur = GAME.lvl(sk.id);
         const pre = skillPrereq(sk);
         const locked = pre && GAME.lvl(pre.id) < 1;
         const maxed = cur >= sk.max;
-        const node = document.createElement('div');
-        node.className = 'skill-node' + (locked ? ' locked' : '') + (maxed ? ' maxed' : '');
         const cost = skillCost(sk, cur);
+        const node = document.createElement('div');
+        node.className = 'skill-node' + (locked ? ' locked' : '') + (maxed ? ' maxed' : '') + (cur > 0 ? ' owned' : '');
+        node.style.gridColumn = sk.pos[0] + 1;
+        node.style.gridRow = sk.pos[1] + 1;
+        node.dataset.skill = sk.id;
         node.innerHTML =
-          `<div class="sk-head"><span class="sk-name">${sk.name}</span><span class="sk-lvl">Lv ${cur}/${sk.max}</span></div>
+          `<div class="sk-head"><span class="sk-ico">${sk.icon}</span><span class="sk-name">${sk.name}</span><span class="sk-lvl">${cur}/${sk.max}</span></div>
            <div class="sk-desc">${sk.desc}</div>` +
-          (maxed
-            ? `<button class="sk-buy btn" disabled>MAXED ★</button>`
-            : locked
-              ? `<button class="sk-buy btn" disabled>needs ${pre.name}</button>`
-              : `<button class="sk-buy btn" data-act="skill" data-id="${sk.id}" data-cost="${cost}" data-res="feathers">RESEARCH — 🪶 ${GAME.fmt(cost)}</button>`);
-        col.appendChild(node);
+          (maxed ? `<button class="sk-buy btn" disabled>MAXED ★</button>`
+            : locked ? `<button class="sk-buy btn" disabled>🔒 ${pre.name}</button>`
+            : `<button class="sk-buy btn ${S().feathers >= cost ? 'can' : ''}" data-act="skill" data-id="${sk.id}">🪶 ${GAME.fmt(cost)}</button>`);
+        grid.appendChild(node);
       });
-      el.skillTree.appendChild(col);
+      col.appendChild(grid);
+      box.appendChild(col);
+    });
+    /* connector lines */
+    requestAnimationFrame(() => {
+      document.querySelectorAll('.skill-branch').forEach(col => {
+        const old = col.querySelector('svg'); if (old) old.remove();
+        const rect = col.getBoundingClientRect();
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('class', 'skill-lines');
+        svg.setAttribute('width', rect.width); svg.setAttribute('height', rect.height);
+        col.querySelectorAll('.skill-node').forEach(node => {
+          const sk = SKILL_BY_ID[node.dataset.skill];
+          if (!sk.pre) return;
+          const preNode = col.querySelector(`[data-skill="${sk.pre}"]`);
+          if (!preNode) return;
+          const a = preNode.getBoundingClientRect(), b = node.getBoundingClientRect();
+          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          line.setAttribute('x1', a.left - rect.left + a.width / 2);
+          line.setAttribute('y1', a.top - rect.top + a.height);
+          line.setAttribute('x2', b.left - rect.left + b.width / 2);
+          line.setAttribute('y2', b.top - rect.top);
+          line.setAttribute('stroke', GAME.lvl(sk.pre) ? '#7ac74f' : '#b5a583');
+          line.setAttribute('stroke-width', '3');
+          svg.appendChild(line);
+        });
+        col.insertBefore(svg, col.firstChild);
+      });
     });
     GAME.dirty.skills = false;
   }
 
   function renderPedia() {
-    el.pedia.innerHTML = '';
-    el.pediaSub.textContent = `${GAME.discCount()} / 100 discovered`;
+    const box = $('#pedia');
+    box.innerHTML = '';
+    $('#pedia-sub').textContent = `${GAME.disc()} / 100 discovered`;
     TIERS.forEach((tier, t) => {
       const pool = SPECIES_BY_TIER[t];
       const found = pool.filter(sp => S().disc.includes(sp.id)).length;
@@ -556,297 +817,282 @@
         card.className = 'pedia-card' + (known ? '' : ' unknown');
         card.appendChild(chickEl(sp, 3, !known));
         if (known) {
-          const owned = S().flock[sp.id] || 0;
+          const inField = S().chickens.filter(c => c.sp === sp.id).length;
           card.insertAdjacentHTML('beforeend',
-            `<span class="p-name">${sp.name}</span>
-             <span class="p-quip">${sp.quip}</span>
-             <span class="p-count">${owned ? 'in coop: ' + owned : 'hatched before'}</span>`);
+            `<span class="p-name">${sp.name}</span><span class="p-quip">${sp.quip}</span>
+             <span class="p-count">${inField ? 'on field: ' + inField : 'hatched before'}</span>`);
         } else {
           card.insertAdjacentHTML('beforeend', `<span class="p-name">???</span><span class="p-quip">not yet hatched</span>`);
         }
         grid.appendChild(card);
       });
       sec.appendChild(grid);
-      el.pedia.appendChild(sec);
+      box.appendChild(sec);
     });
     GAME.dirty.pedia = false;
   }
 
-  /* ================= hints & stats ================= */
-  const TIPS = [
-    'Eggs can MUTATE a tier up when laid. Science!',
-    'Rarer chickens lay rarer, pricier eggs.',
-    'Feathers come from hatching — spend them on Research.',
-    'Collect all 100 chickens for the Chickenpedia!',
-    'Upgrading Mama makes her lay rarer eggs.',
-    'BUY eggs in the vault if you have spare coins.',
-  ];
-  let tipIdx = 0, lastTipSwap = 0;
-  function updateHint(now) {
-    const st = S();
-    let msg = null;
-    if (st.stats.eggsMade === 0) msg = `Pet Mama Hen ${GAME.clicksNeeded()} times to get your first egg!`;
-    else if (st.stats.hatched === 0 && GAME.totalEggs() > 0 && !st.nests.some(n => n)) msg = 'Put an egg in a nest — press 🐣 HATCH in the Egg Vault!';
-    else if (st.nests.some(n => n && n.left <= 0)) msg = 'An egg is ready — click HATCH! in the nest!';
-    else if (GAME.flockSize() >= GAME.coopCap() && st.nests.some(n => n)) msg = 'Coop is full! Buy more space or release a chicken.';
-    else if (st.stats.hatched > 0 && Object.keys(st.sk).length === 0 && st.feathers >= 3) msg = 'You have feathers! Spend them in 🧪 RESEARCH.';
-    else if (st.mamaTier < TIERS.length - 1 && st.coins >= GAME.mamaCost()) msg = 'You can afford to UPGRADE MAMA — rarer eggs await!';
-    else {
-      if (now - lastTipSwap > 12000) { lastTipSwap = now; tipIdx = (tipIdx + 1) % TIPS.length; }
-      msg = TIPS[tipIdx];
-    }
-    if (el.hint.textContent !== msg) el.hint.textContent = msg;
-  }
-
-  function updateStats() {
-    const st = S().stats;
-    const line = `${GAME.fmt(st.pets)} pets given · ${GAME.fmt(st.eggsMade)} eggs made · ${GAME.fmt(st.hatched)} chickens hatched · ${GAME.fmt(st.mutations)} mutations · ${GAME.discCount()}/100 species`;
-    if (el.stats.textContent !== line) el.stats.textContent = line;
-  }
-
-  /* ================= per-tick light update ================= */
-  function flash(chip) { chip.classList.remove('flash'); void chip.offsetWidth; chip.classList.add('flash'); }
-
-  function lightUpdate(now) {
-    const st = S();
-    /* header */
-    const c = GAME.fmt(st.coins);
-    if (el.coins.textContent !== c) el.coins.textContent = c;
-    const f = GAME.fmt(st.feathers);
-    if (el.feathers.textContent !== f) el.feathers.textContent = f;
-    const e = GAME.fmt(GAME.totalEggs());
-    if (el.eggs.textContent !== e) el.eggs.textContent = e;
-    /* pet bar */
-    const need = GAME.clicksNeeded();
-    el.petBar.style.width = Math.min(100, 100 * st.pets / need) + '%';
-    el.petLabel.textContent = `${Math.floor(st.pets)} / ${need} pets → 1 ${TIERS[st.mamaTier].n} egg`;
-    /* mama info */
-    const info = `Lays <b>${TIERS[st.mamaTier].n}</b> eggs (🪙${GAME.fmt(GAME.sellValue(st.mamaTier))}) · mutation <b>${Math.round(GAME.mutationChance('click') * 100)}%</b>` +
-      (GAME.autoPetRate() ? ` · auto-pets <b>${GAME.autoPetRate().toFixed(1)}/s</b>` : '');
-    if (el.mamaInfo.dataset.h !== info) { el.mamaInfo.dataset.h = info; el.mamaInfo.innerHTML = info; }
-    /* nest bars */
-    nestRefs.forEach(r => {
-      const n = st.nests[r.idx];
-      if (!n) return;
-      r.bar.style.width = (100 * (1 - n.left / n.total)) + '%';
-      r.label.textContent = GAME.fmtTime(n.left);
-    });
-    /* vault counts */
-    updateVault();
-    /* research sub while tab open */
-    el.researchSub.textContent = `🪶 ${GAME.fmt(st.feathers)} feathers`;
-    /* affordability */
-    document.querySelectorAll('[data-cost]').forEach(b => {
-      const res = b.dataset.res === 'feathers' ? st.feathers : st.coins;
-      const should = res < +b.dataset.cost;
-      if (b.disabled !== should) b.disabled = should;
-    });
-    updateHint(now);
-    updateStats();
-  }
-
-  function renderDirty() {
-    const d = GAME.dirty;
-    if (d.mama) renderMama();
-    if (d.nests) renderNests();
-    if (d.vault) renderVault();
-    if (d.coop) renderCoop();
-    if (d.flock) renderFlock();
-    if (d.skills) renderSkills();
-    if (d.pedia) renderPedia();
-  }
-
-  /* ================= actions ================= */
-  function doPet(clientX, clientY) {
-    const res = GAME.pet(1);
-    lastPetAt = performance.now();
-    petSquish = 1;
-    spawnHearts(2);
-    snd.pet();
-    if (clientX != null && Math.random() < 0.35) {
-      floatText(['cluck!', 'bok!', '♥', 'cluck~'][Math.floor(Math.random() * 4)], clientX - 14, clientY - 26, 'pink');
-    }
-    if (res.coinsDropped) {
-      floatAt(stage, `+🪙${GAME.fmt(res.coinsDropped)}`, 'gold');
-      snd.coin();
-    }
-    if (res.eggsLaid > 0) {
-      snd.egg();
-      floatAt($('#chip-eggs'), `+${res.eggsLaid} 🥚`, 'green');
-      flash($('#chip-eggs'));
-    }
-  }
-
-  function handle(act, ds, target, ev) {
-    const t = ds.tier != null ? +ds.tier : null;
-    switch (act) {
-      case 'pet': doPet(ev && ev.clientX, ev && ev.clientY); break;
-      case 'tab': {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === target));
-        document.querySelectorAll('.tab-page').forEach(p => p.hidden = p.id !== 'tab-' + ds.tab);
-        break;
+  /* ================= ACTIONS / INPUT ================= */
+  function tryPet(wx, wy) {
+    const m = W.mama;
+    if (wx > m.x - 16 && wx < m.x + 18 && wy > m.y - 26 && wy < m.y + 18) {
+      if (GAME.petMama()) {
+        petFx.set('mama', performance.now());
+        heart(m.x, m.y - 18, 3);
+        snd.pet();
       }
-      case 'sell': case 'sell-all': {
-        const n = act === 'sell' ? 1 : S().eggs[t];
-        const gain = GAME.sellEggs(t, n);
-        if (gain > 0) { snd.coin(); floatAt(target, `+🪙${GAME.fmt(gain)}`, 'gold'); flash($('#chip-coins')); }
-        break;
-      }
-      case 'buy-egg': {
-        if (GAME.buyEgg(t)) { snd.egg(); floatAt(target, `+1 🥚`, 'green'); }
-        else snd.error();
-        break;
-      }
-      case 'hatch': {
-        const r = GAME.placeEgg(t);
-        if (r.ok) { snd.egg(); floatAt(target, 'nested!', 'green'); }
-        else {
-          snd.error();
-          toast({ title: 'No free nests!', body: r.why === 'full' ? 'Buy another nest or wait for a hatch.' : 'No egg of that tier.' });
+      return true;
+    }
+    for (const ch of S().chickens) {
+      if (wx > ch.x && wx < ch.x + 20 && wy > ch.y - 4 && wy < ch.y + 20) {
+        if (GAME.petChicken(ch)) {
+          petFx.set(ch.id, performance.now());
+          heart(ch.x + 10, ch.y - 4, 2);
+          snd.pet();
         }
-        break;
-      }
-      case 'collect': {
-        const r = GAME.collectNest(+ds.slot);
-        if (!r.ok) {
-          snd.error();
-          if (r.why === 'coop-full') toast({ title: 'Coop is full!', body: 'Upgrade the coop or release a chicken first.' });
-          break;
-        }
-        snd.hatch();
-        const showBirth = b => {
-          toast({
-            sprite: chickEl(b.sp, 2, false),
-            title: (b.isNew ? '✨ NEW SPECIES! ' : '') + b.sp.name + ' hatched!',
-            body: `${TIERS[b.sp.tier].n} · +🪶${GAME.fmt(b.feathers)}${b.isNew ? ' · ' + b.sp.quip : ''}`,
-            long: b.isNew,
-          });
-        };
-        showBirth(r.first);
-        if (r.twin) { showBirth(r.twin); floatAt(target, 'TWINS!!', 'pink'); }
-        flash($('#chip-feathers'));
-        break;
-      }
-      case 'buy-nest': if (GAME.buyNest()) snd.skill(); else snd.error(); break;
-      case 'buy-coop': if (GAME.buyCoop()) snd.skill(); else snd.error(); break;
-      case 'mama-up': {
-        if (GAME.upgradeMama()) {
-          snd.grand();
-          spawnHearts(10);
-          toast({ title: 'MAMA EVOLVED!', body: `She now lays ${TIERS[S().mamaTier].n} eggs. She looks radiant.` });
-        } else snd.error();
-        break;
-      }
-      case 'skill': {
-        if (GAME.buySkill(ds.id)) {
-          snd.skill();
-          floatAt(target, SKILL_BY_ID[ds.id].name + ' ↑', 'green');
-        } else snd.error();
-        break;
-      }
-      case 'release': {
-        const sp = SPECIES[+ds.sp];
-        const refund = GAME.releaseChicken(+ds.sp);
-        if (refund) {
-          snd.egg();
-          toast({ sprite: chickEl(sp, 2, false), title: sp.name + ' set free!', body: `She waves goodbye. +🪶${refund}` });
-        }
-        break;
-      }
-      case 'mute': {
-        S().muted = !S().muted;
-        $('#btn-mute').textContent = S().muted ? '🔇' : '🔊';
-        break;
-      }
-      case 'save': {
-        GAME.save();
-        floatAt($('#topbar'), 'Saved!', 'green');
-        break;
-      }
-      case 'reset': {
-        if (confirm('Really reset EVERYTHING? All chickens will be released into the wild.')) {
-          GAME.reset();
-          renderDirty();
-        }
-        break;
+        return true;
       }
     }
-    renderDirty();
+    return false;
   }
 
+  function hitTruck(wx, wy) {
+    const th = W.truckHome;
+    return S().truck.state === 'parked' && wx > th.x - 10 && wx < th.x + th.w + 12 && wy > th.y - 16 && wy < th.y + th.h + 4;
+  }
+
+  function resolveDrop(wx, wy) {
+    if (!S().basket.length) return;
+    if (hitTruck(wx, wy)) {
+      const n = GAME.basketToTruck();
+      if (n) {
+        for (let i = 0; i < Math.min(n, 6); i++) setTimeout(() => snd.clink(), i * 60);
+        floatWorld('+' + n + ' loaded', W.truckHome.x + 20, W.truckHome.y - 14, 'green');
+      }
+      if (S().basket.length) floatWorld('truck full!', W.truckHome.x + 20, W.truckHome.y - 24, 'pink');
+      updateCursorChip();
+      return;
+    }
+    const c = Math.floor(wx / 16), r = Math.floor(wy / 16);
+    const o = GAME.occAt(c, r);
+    if (o && o.type === 'incubator') {
+      const n = GAME.basketToInc(o.k);
+      if (n) { snd.place(); floatWorld('+' + n + ' incubating', wx, wy - 12, 'green'); }
+      if (S().basket.length) floatWorld('incubator full!', wx, wy - 22, 'pink');
+      updateCursorChip();
+      return;
+    }
+    /* place on grass to hatch */
+    const n = GAME.basketToGround(wx, Math.min(wy, W.roadY - 8));
+    if (n) { snd.place(); floatWorld(n > 1 ? n + ' eggs nested' : 'egg nested', wx, wy - 12, ''); }
+    updateCursorChip();
+  }
+
+  function handlePlaceAt(wx, wy, isDragStep) {
+    const c = Math.floor(wx / 16), r = Math.floor(wy / 16);
+    if (placeMode === 'demolish') {
+      if (GAME.occAt(c, r)) { GAME.demolish(c, r); snd.demolish(); }
+      return;
+    }
+    if (placeMode === 'belt' && isDragStep && paintTile) {
+      const [pc, pr] = paintTile;
+      if (pc === c && pr === r) return;
+      /* direction follows the drag */
+      let dir = placeDir;
+      if (c > pc) dir = 0; else if (c < pc) dir = 2; else if (r > pr) dir = 1; else if (r < pr) dir = 3;
+      placeDir = dir;
+      GAME.setBeltDir(pc, pr, dir);
+      if (GAME.build('belt', c, r, dir)) snd.build();
+      paintTile = [c, r];
+      GAME.mark('build');
+      return;
+    }
+    if (GAME.build(placeMode, c, r, placeDir)) {
+      snd.build();
+      if (placeMode === 'belt') paintTile = [c, r];
+      GAME.mark('build');
+    } else if (!isDragStep) {
+      const cost = buildCost(placeMode, S().built[placeMode]);
+      if (S().coins < cost) { snd.error(); floatWorld('need 🪙' + GAME.fmt(cost), wx, wy - 10, 'pink'); }
+    }
+  }
+
+  cv.addEventListener('pointerdown', ev => {
+    ev.preventDefault();
+    cv.setPointerCapture(ev.pointerId);
+    const p = eventToWorld(ev);
+    cursor.x = p.x; cursor.y = p.y;
+    cursor.down = true; cursor.downAt = performance.now();
+    cursor.downX = p.x; cursor.downY = p.y; cursor.moved = 0;
+    if (placeMode) { paintTile = null; handlePlaceAt(p.x, p.y, false); return; }
+    tryPet(p.x, p.y);
+  });
+  cv.addEventListener('pointermove', ev => {
+    const p = eventToWorld(ev);
+    cursor.moved += Math.hypot(p.x - cursor.x, p.y - cursor.y);
+    cursor.x = p.x; cursor.y = p.y;
+    if (cursor.down && placeMode) handlePlaceAt(p.x, p.y, true);
+  });
+  function endPointer(ev) {
+    if (!cursor.down) return;
+    cursor.down = false;
+    const p = eventToWorld(ev);
+    if (placeMode) { paintTile = null; return; }
+    if (S().basket.length) { resolveDrop(p.x, p.y); return; }
+    /* plain tap on the truck sends it */
+    if (cursor.moved < 6 && performance.now() - cursor.downAt < 450 && hitTruck(p.x, p.y)) {
+      if (S().truck.load.length && GAME.sendTruck()) snd.engine();
+    }
+  }
+  cv.addEventListener('pointerup', endPointer);
+  cv.addEventListener('pointercancel', () => { cursor.down = false; paintTile = null; });
+  cv.addEventListener('contextmenu', ev => { ev.preventDefault(); setPlaceMode(null); });
+
+  function setPlaceMode(mode) {
+    placeMode = placeMode === mode ? null : mode;
+    paintTile = null;
+    GAME.mark('build');
+    cv.classList.toggle('placing', !!placeMode);
+  }
+
+  window.addEventListener('keydown', ev => {
+    if (ev.key === 'r' || ev.key === 'R') { placeDir = (placeDir + 1) % 4; GAME.mark('build'); }
+    if (ev.key === 'Escape') { setPlaceMode(null); closeModals(); }
+    if (ev.key === '1') setPlaceMode('incubator');
+    if (ev.key === '2') setPlaceMode('vacuum');
+    if (ev.key === '3') setPlaceMode('belt');
+    if (ev.key === 'x' || ev.key === 'X') setPlaceMode('demolish');
+  });
+
+  /* HUD clicks (delegated) */
   document.getElementById('app').addEventListener('click', ev => {
     const btn = ev.target.closest('[data-act]');
     if (!btn || btn.disabled) return;
-    if (btn.dataset.act === 'pet') return;   /* handled on pointerdown for snappiness */
-    handle(btn.dataset.act, btn.dataset, btn, ev);
-  });
-  /* petting: pointerdown for snap response */
-  $('#btn-pet').addEventListener('pointerdown', ev => { ev.preventDefault(); handle('pet', {}, null, ev); });
-  stage.addEventListener('pointerdown', ev => { ev.preventDefault(); handle('pet', {}, null, ev); });
-  stage.addEventListener('keydown', ev => {
-    if (ev.key === ' ' || ev.key === 'Enter') { ev.preventDefault(); handle('pet', {}, null, null); }
-  });
-
-  /* ================= game event listeners ================= */
-  GAME.on('egg', e => {
-    if (e.source === 'click') spawnEggFly(e.tier);
-    if (e.mutated && performance.now() - lastMutToast > 5000) {
-      lastMutToast = performance.now();
-      snd.sparkle();
-      toast({ sprite: eggEl(e.tier, 3), title: '⚡ MUTATION!', body: `A ${TIERS[e.tier].n} egg appeared!` });
+    const act = btn.dataset.act;
+    switch (act) {
+      case 'place': setPlaceMode(btn.dataset.type); break;
+      case 'rotate': placeDir = (placeDir + 1) % 4; GAME.mark('build'); break;
+      case 'demolish': setPlaceMode('demolish'); break;
+      case 'cancel': setPlaceMode(null); break;
+      case 'research': renderSkills(); openModal('#modal-skills'); break;
+      case 'pedia': renderPedia(); openModal('#modal-pedia'); break;
+      case 'close-modal': closeModals(); break;
+      case 'skill': {
+        if (GAME.buySkill(btn.dataset.id)) {
+          snd.skill();
+          if (btn.dataset.id === 'overclock') snd.grand();
+          renderSkills();
+        } else snd.error();
+        break;
+      }
+      case 'mama-up': {
+        if (GAME.upgradeMama()) {
+          snd.grand();
+          heart(W.mama.x, W.mama.y - 20, 8);
+          toast({ title: 'MAMA EVOLVED!', body: `She now lays ${TIERS[S().mamaTier].n} eggs. Radiant.` });
+        } else snd.error();
+        break;
+      }
+      case 'send-truck': if (GAME.sendTruck()) snd.engine(); break;
+      case 'mute': S().muted = !S().muted; $('#btn-mute').textContent = S().muted ? '🔇' : '🔊'; break;
+      case 'save': GAME.save(); floatText('Saved!', ev.clientX - 20, ev.clientY - 20, 'green'); break;
+      case 'reset':
+        if (confirm('Really reset EVERYTHING? The chickens will unionize.')) {
+          GAME.reset(); renderBuildBar(); updateCursorChip();
+        }
+        break;
     }
   });
-  GAME.on('discover', () => { /* handled in collect toast */ });
-  GAME.on('coins', e => { if (e.golden) flash($('#chip-coins')); });
 
-  /* ================= boot ================= */
+  /* ================= GAME EVENT FX ================= */
+  let lastMutToast = 0;
+  GAME.on('lay', ({ egg, mutated, fromPet }) => {
+    if (fromPet) snd.lay();
+    if (mutated) {
+      puff(egg.x, egg.y - 6, TIERS[egg.tier].c, 8, 40, 30);
+      if (performance.now() - lastMutToast > 5000) {
+        lastMutToast = performance.now();
+        snd.sparkle();
+        floatWorld('⚡ MUTATION! ' + TIERS[egg.tier].n + '!', egg.x, egg.y - 16, 'pink');
+      }
+    }
+    if (egg.golden) puff(egg.x, egg.y - 6, '#ffd23f', 6, 30, 26);
+  });
+  GAME.on('hatch', ({ births, x, y }) => {
+    snd.hatch();
+    births.forEach((b, i) => {
+      shellBurst(x + i * 6, y, b.sp.tier);
+      floatWorld('+🪶' + b.feathers, x, y - 14, 'green');
+      if (b.isNew) {
+        toast({
+          sprite: chickEl(b.sp, 2, false),
+          title: '✨ NEW! ' + b.sp.name,
+          body: TIERS[b.sp.tier].n + ' · ' + b.sp.quip,
+          long: true,
+        });
+        snd.sparkle();
+      }
+    });
+    if (births.length > 1) floatWorld('TWINS!!', x, y - 24, 'pink');
+    flash($('#chip-feathers'));
+  });
+  GAME.on('sell', ({ pay, n }) => {
+    snd.coin();
+    coinBurst(W.truckHome.x + 26, W.truckHome.y - 4, n);
+    floatWorld('+🪙' + GAME.fmt(pay), W.truckHome.x + 20, W.truckHome.y - 20, 'gold');
+    flash($('#chip-coins'));
+  });
+  GAME.on('truckleave', () => { snd.engine(); puff(W.truckHome.x - 4, W.roadY + 8, '#c9a35f', 8, 40, 14); });
+  GAME.on('truckload', () => {});
+
+  /* ================= BOOT & LOOPS ================= */
   function boot() {
     GAME.load();
-    GAME.syncNests();
     const off = GAME.applyOffline();
-
-    initClouds();
-    renderMama(); renderNests(); renderVault(); renderCoop(); renderFlock(); renderSkills(); renderPedia();
+    buildGround();
+    renderBuildBar();
+    updateCursorChip();
     $('#btn-mute').textContent = S().muted ? '🔇' : '🔊';
-
-    if (off && off.eggs > 0) {
+    if (off && (off.laid > 0 || off.hatched > 0 || off.pay > 0)) {
       toast({
         title: 'Welcome back!',
-        body: `While you were away (${GAME.fmtTime(off.seconds)}), your chickens laid ${GAME.fmt(off.eggs)} eggs!`,
+        body: `While you were away (${GAME.fmtTime(off.seconds)}): ${GAME.fmt(off.laid)} eggs laid` +
+          (off.hatched ? `, ${off.hatched} hatched` : '') + (off.pay ? `, truck sold +🪙${GAME.fmt(off.pay)}` : '') + '.',
         long: true,
       });
     }
 
-    /* logic loop */
-    let lastLogic = performance.now();
-    let saveAcc = 0;
-    setInterval(() => {
-      const now = performance.now();
-      const dt = Math.min(2, (now - lastLogic) / 1000);
-      lastLogic = now;
+    let last = performance.now(), saveAcc = 0, hudAcc = 0;
+    function frame(now) {
+      let dt = (now - last) / 1000;
+      last = now;
+      /* catch up after tab sleep in small steps */
+      if (dt > 2) {
+        let rest = Math.min(dt, 600);
+        while (rest > 0) { GAME.tick(Math.min(0.5, rest)); rest -= 0.5; }
+        dt = 0.016;
+      }
+      dt = Math.min(dt, 0.1);
       GAME.tick(dt);
-      renderDirty();
-      lightUpdate(now);
+      magnet(dt, now);
+      render(now, dt);
+      hudAcc += dt;
+      if (hudAcc > 0.12) {
+        hudAcc = 0;
+        lightUpdate(now);
+        if (GAME.dirty.build) renderBuildBar();
+        if (GAME.dirty.skills && !$('#modal-skills').hidden) renderSkills();
+        if (GAME.dirty.pedia && !$('#modal-pedia').hidden) renderPedia();
+        updateCursorChip();
+      }
       saveAcc += dt;
       if (saveAcc >= 10) { saveAcc = 0; GAME.save(); }
-    }, 200);
-
-    /* draw loop */
-    let lastDraw = performance.now();
-    function frame(now) {
-      const dt = Math.min(0.1, (now - lastDraw) / 1000);
-      lastDraw = now;
-      if (!document.hidden) {
-        drawMamaScene(now, dt);
-        if (!$('#tab-farm').hidden) drawYard(now, dt);
-      }
       requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);
 
     document.addEventListener('visibilitychange', () => { if (document.hidden) GAME.save(); });
     window.addEventListener('beforeunload', () => GAME.save());
-    window.addEventListener('resize', () => { sizeStage(); sizeYard(); });
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
