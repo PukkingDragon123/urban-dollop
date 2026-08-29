@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inf Egg Co.</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐣</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <header id="topbar">
+    <div id="logo">
+      <span id="logo-egg">🥚</span>
+      <span id="logo-text">INF EGG CO.<small>weird chicken laboratory</small></span>
+    </div>
+    <div id="resources">
+      <div class="res-chip" id="chip-coins" title="Coins — sell eggs to earn them">🪙 <b id="r-coins">0</b></div>
+      <div class="res-chip" id="chip-feathers" title="Feathers — earned by hatching, spent on Research">🪶 <b id="r-feathers">0</b></div>
+      <div class="res-chip" id="chip-eggs" title="Eggs in your vault">🥚 <b id="r-eggs">0</b></div>
+    </div>
+    <div id="sys-buttons">
+      <button class="btn btn-tiny" id="btn-mute" data-act="mute" title="Sound on/off">🔊</button>
+      <button class="btn btn-tiny" data-act="save" title="Save now">💾</button>
+      <button class="btn btn-tiny" data-act="reset" title="Reset everything">🗑️</button>
+    </div>
+  </header>
+
+  <div id="hintbar"><span id="hint-arrow">▶</span> <span id="hint-text"></span></div>
+
+  <main id="layout">
+
+    <!-- ============ MAMA PANEL ============ -->
+    <section id="mama-panel" class="panel">
+      <div class="panel-title">
+        <h2>MAMA HEN</h2>
+        <span class="tier-chip" id="mama-tier-chip">Common</span>
+      </div>
+      <div id="mama-stage-wrap">
+        <canvas id="mama-stage" tabindex="0" aria-label="Mama Hen. Press space or click to pet her."></canvas>
+      </div>
+      <div id="pet-progress">
+        <div class="bar-outer"><div class="bar-fill pink" id="pet-bar"></div></div>
+        <div class="bar-label" id="pet-label">0 / 10 pets</div>
+      </div>
+      <button class="btn btn-pink btn-big" id="btn-pet" data-act="pet">PET MAMA!</button>
+      <div class="mama-info" id="mama-info"></div>
+      <button class="btn btn-gold" id="btn-mama-up" data-act="mama-up"></button>
+    </section>
+
+    <!-- ============ RIGHT PANEL ============ -->
+    <section id="right-panel">
+      <nav id="tabs">
+        <button class="tab-btn active" data-act="tab" data-tab="farm">🏡 FARM</button>
+        <button class="tab-btn" data-act="tab" data-tab="research">🧪 RESEARCH</button>
+        <button class="tab-btn" data-act="tab" data-tab="pedia">📖 CHICKENPEDIA</button>
+      </nav>
+
+      <!-- FARM TAB -->
+      <div class="tab-page" id="tab-farm">
+        <div class="panel">
+          <div class="panel-title"><h2>🐣 INCUBATION NESTS</h2><span class="panel-sub" id="nest-sub"></span></div>
+          <div id="nests"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-title"><h2>🥚 EGG VAULT</h2><span class="panel-sub" id="vault-sub"></span></div>
+          <div id="vault"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-title"><h2>🌿 FREE-RANGE YARD</h2><span class="panel-sub" id="coop-sub"></span></div>
+          <canvas id="yard"></canvas>
+          <div id="coop-controls"></div>
+          <div id="flock-list"></div>
+        </div>
+      </div>
+
+      <!-- RESEARCH TAB -->
+      <div class="tab-page" id="tab-research" hidden>
+        <div class="panel">
+          <div class="panel-title"><h2>🧪 CLUCKOLOGY RESEARCH</h2><span class="panel-sub" id="research-sub"></span></div>
+          <p class="flavor">Hatch chickens to earn 🪶 feathers. Spend them on very serious science.</p>
+          <div id="skill-tree"></div>
+        </div>
+      </div>
+
+      <!-- PEDIA TAB -->
+      <div class="tab-page" id="tab-pedia" hidden>
+        <div class="panel">
+          <div class="panel-title"><h2>📖 CHICKENPEDIA</h2><span class="panel-sub" id="pedia-sub"></span></div>
+          <p class="flavor">Every weird chicken the lab has ever produced. Collect all 100!</p>
+          <div id="pedia"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer id="statsbar"><span id="stats-line"></span></footer>
+
+  <div id="fx-layer"></div>
+  <div id="toasts"></div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/sprites.js"></script>
+<script src="js/game.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>
