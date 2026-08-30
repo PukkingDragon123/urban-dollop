@@ -573,5 +573,113 @@ const SPR = (() => {
     return c;
   }
 
-  return { chickenSprite, eggSprite, nestSprite, mamaSprite, decoSprite, darken, lighten, CELL };
+  /* ---------- the floating hand & tools ---------- */
+  const UI_TPL = {
+    handPoint: {   /* white glove, finger pointing down — tip is bottom center */
+      pal: { O:'#3a2a16', W:'#fff8ee', w:'#f0e2d0', C:'#5fa8e8', c:'#3f6ea8' },
+      rows: [
+        '..CCCCCCCC..',
+        '..cCCCCCCc..',
+        '.OWWWWWWWWO.',
+        'OWWWWWWWWWWO',
+        'OWWWWWWWWWWO',
+        'OWWWWWWWWwWO',
+        '.OWWWWWWWWO.',
+        '..OOOWWOOO..',
+        '....OWWO....',
+        '....OWWO....',
+        '....OWwO....',
+        '.....OO.....',
+      ],
+    },
+    handGrab: {    /* closed fist */
+      pal: { O:'#3a2a16', W:'#fff8ee', w:'#f0e2d0', C:'#5fa8e8', c:'#3f6ea8' },
+      rows: [
+        '..CCCCCCCC..',
+        '..cCCCCCCc..',
+        '.OWWWWWWWWO.',
+        'OWWWWWWWWWWO',
+        'OWWWWwWWwWWO',
+        'OWWWWWWWWWWO',
+        '.OWWWWWWwWO.',
+        '..OOOOOOOO..',
+      ],
+    },
+    basket: {
+      pal: { O:'#4a3220', b:'#d9a95f', s:'#b3773f', r:'#8a5e2a' },
+      rows: [
+        '.OOOOOOOOOO.',
+        'ObsbsbsbsbsO',
+        'OsbsbsbsbsbO',
+        '.ObsbsbsbsO.',
+        '..OrrrrrrO..',
+        '...OOOOOO...',
+      ],
+    },
+    feedbag: {
+      pal: { O:'#4a3220', S:'#d9b98c', s:'#c99a5b', g:'#f2c94c', t:'#8a5e2a' },
+      rows: [
+        '...OttO...',
+        '..OSSSSO..',
+        '.OSSSSSSO.',
+        '.OSgSgSSO.',
+        '.OSSgSSgO.',
+        '.OSSSSSSO.',
+        '..OSSSSO..',
+        '...OOOO...',
+      ],
+    },
+    hammer: {
+      pal: { O:'#3a2a16', M:'#b8bcc4', m:'#8a8f98', T:'#c98f4f' },
+      rows: [
+        '.OOOOOOO.',
+        'OMMMMMMMO',
+        'OMMMMmmMO',
+        '.OOOTOOO.',
+        '...OTO...',
+        '...OTO...',
+        '...OTO...',
+        '....O....',
+      ],
+    },
+    sign: {
+      pal: { O:'#4a3220', W:'#e8d5a8', w:'#d9c28c', T:'#a8783f' },
+      rows: [
+        '.OOOOOOOOOOOO.',
+        'OWWWWWWWWWWWWO',
+        'OWwWWWWWWWwWWO',
+        'OWWWWWWWWWWWWO',
+        '.OOOOOOOOOOOO.',
+        '.....OTTO.....',
+        '.....OTTO.....',
+        '.....OTTO.....',
+      ],
+    },
+    plume: {
+      pal: { O:'#b5a583', F:'#fff8ee', f:'#f0e2d0' },
+      rows: [
+        '....OF',
+        '...OFF',
+        '..OFFf',
+        '.OFFf.',
+        'OFFf..',
+        'Of....',
+      ],
+    },
+  };
+  function uiSprite(kind, scale) {
+    const key = 'ui_' + kind + '_' + scale;
+    if (cache.has(key)) return cache.get(key);
+    const t = UI_TPL[kind];
+    const k = scale || 1;
+    const c = document.createElement('canvas');
+    c.width = t.rows[0].length * k; c.height = t.rows.length * k;
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    drawGrid(ctx, t.rows, t.pal, 0, 0, k);
+    cache.set(key, c);
+    return c;
+  }
+
+  return { chickenSprite, eggSprite, nestSprite, mamaSprite, decoSprite, uiSprite, darken, lighten, CELL };
 })();

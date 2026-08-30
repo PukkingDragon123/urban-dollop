@@ -1,20 +1,27 @@
 /* ============================================================
-   INF EGG CO. v2 — world model: field, chickens, eggs, factory
+   INF EGG CO. v3 — world model: big buyable field, hand tools,
+   feather plumes, breeding, incubator-only hatching.
    World units are virtual pixels; the UI scales them up 3x.
    ============================================================ */
 'use strict';
 
-const SAVE_KEY = 'infEggCoSave_v2';
+const SAVE_KEY = 'infEggCoSave_v3';
 
-/* the field */
+/* the world: 3x2 plots of 16x13 tiles = 48x26 tiles = 768x416 px */
 const WORLD = {
-  W: 384, H: 208, T: 16, COLS: 24, ROWS: 13,
-  roadY: 176,                                   /* road strip rows 11-12 */
-  fieldTop: 34,                                 /* fence line */
-  pond: { x: 20, y: 40, w: 56, h: 30 },
-  mama: { x: 56, y: 98 },                       /* nest center */
-  truckHome: { x: 232, y: 172, w: 56, h: 32 },  /* parked spot on the road */
-  buildRows: [3, 10], buildCols: [1, 22],
+  T: 16, COLS: 48, ROWS: 26,
+  W: 768, H: 416,
+  roadY: 384,                                /* road rows 24-25, bottom plots only */
+  view: { w: 384, h: 208 },                  /* camera viewport */
+  mama: { x: 118, y: 272 },
+  pond: { x: 180, y: 226, w: 56, h: 28 },
+  truckHome: { x: 150, y: 380, w: 56, h: 32 },
+  stations: {
+    lab:      { x: 18,  y: 222, w: 30, h: 32 },   /* research shack */
+    stand:    { x: 56,  y: 228, w: 16, h: 24 },   /* chickenpedia stand */
+    mamaSign: { x: 88,  y: 250, w: 14, h: 20 },   /* upgrade-mama signpost */
+  },
+  starterInc: [3, 18],                      /* prebuilt incubator anchor tile */
 };
 
 const GAME = (() => {
@@ -23,21 +30,25 @@ const GAME = (() => {
   let nextId = 1;
   function freshState() {
     return {
-      v: 2,
+      v: 3,
       coins: 0, feathers: 0,
+      plots: [false, false, false, true, false, false],   /* start: bottom-left */
       mamaTier: 0,
-      mama: { lay: 10, petCd: 0 },
-      chickens: [],          /* {id, sp, x, y, dir, state, t, lay, petCd} */
-      eggs: [],              /* ground eggs {id,tier,golden,x,y,z,vz,placed,hatch,suck} */
-      basket: [],            /* {tier, golden} held by the cursor */
-      belts: {},             /* "c,r" -> {dir} 0→ 1↓ 2← 3↑ */
-      incs: {},              /* "c,r" -> {queue:[{tier,golden}], prog} */
-      vacs: {},              /* "c,r" -> {dir, hold:[{tier,golden}], cd} */
-      items: [],             /* eggs riding belts {tier,golden,x,y} */
+      mama: { lay: 8, petCd: 0 },
+      chickens: [],          /* {id, sp, x, y, dir, state, t, lay, petCd, buffT} */
+      eggs: [],              /* ground eggs {id,tier,golden,x,y,z,vz,suck} */
+      plumes: [],            /* feathers on the ground {x,y,z,vz,value,sway} */
+      feed: [],              /* {x,y,n} seed piles */
+      basket: [],            /* eggs in the basket tool */
+      tool: 'hand',
+      held: null,            /* {kind:'chicken', ch} | {kind:'egg', egg} */
+      belts: {}, incs: {}, vacs: {}, nests: {},   /* "c,r" -> building */
+      items: [],             /* eggs riding belts */
       truck: { state: 'parked', t: 0, load: [] },
-      built: { incubator: 0, vacuum: 0, belt: 0 },
-      disc: [], sk: {},
-      stats: { pets: 0, laid: 0, collected: 0, sold: 0, coinsEarned: 0, hatched: 0, mutations: 0 },
+      built: { incubator: 0, vacuum: 0, belt: 0, lovenest: 0 },
+      disc: [], sk: { root: 1 },
+      cam: { x: 0, y: 200 },
+      stats: { pets: 0, laid: 0, collected: 0, sold: 0, coinsEarned: 0, hatched: 0, mutations: 0, bred: 0, plumes: 0 },
       muted: false, last: Date.now(),
     };
   }
@@ -46,29 +57,33 @@ const GAME = (() => {
   const listeners = {};
   function on(ev, fn) { (listeners[ev] = listeners[ev] || []).push(fn); }
   function emit(ev, d) { (listeners[ev] || []).forEach(fn => fn(d)); }
-  const dirty = { hud: true, skills: true, pedia: true, build: true };
+  const dirty = { skills: true, pedia: true, build: true, ground: true };
   function mark(...k) { k.forEach(x => dirty[x] = true); }
 
   /* ---------- derived values ---------- */
   const lvl = id => S.sk[id] || 0;
   const disc = () => S.disc.length;
   const overclock = () => (lvl('overclock') ? 2 : 1);
+  const tycoon = () => (lvl('tycoon') ? 2 : 1);
+  const ownedPlots = () => S.plots.filter(Boolean).length;
 
   function eggValue(tier, golden) {
     let v = ECON.eggValue(tier);
     v *= 1 + 0.15 * lvl('value');
     v *= 1 + 0.01 * lvl('contracts') * disc();
     if (golden) v *= ECON.goldenMult;
-    return Math.round(v);
+    return Math.round(v * tycoon());
   }
   function layTime(t) { return ECON.layTime(t) / (1 + 0.10 * lvl('happy')); }
   function petCd(isMama) { return (isMama ? ECON.mamaPetCd : ECON.basePetCd) * Math.pow(0.85, lvl('pets')); }
-  function groundHatchTime(t) { return ECON.groundHatch(t) / (1 + 0.15 * lvl('warm')); }
-  function incHatchTime(t) {
-    return ECON.incHatch(t) / (1 + 0.15 * lvl('warm')) / (1 + 0.20 * lvl('incspeed')) / overclock();
+  function incHatchTime(t, rainbow) {
+    let time = ECON.incHatch(t) / (1 + 0.15 * lvl('warm')) / (1 + 0.30 * lvl('quantum')) / overclock();
+    if (rainbow && lvl('secretlore')) time /= 3;
+    return time;
   }
-  function chickenCap() { return ECON.baseChickenCap + 3 * lvl('flock'); }
+  function chickenCap() { return ECON.baseChickenCap + 4 * lvl('flock') + ECON.capPerPlot * (ownedPlots() - 1); }
   function incCap() { return 6 + 3 * lvl('inccap'); }
+  function basketCap() { return ECON.baseBasketCap + 8 * lvl('basket1') + 16 * lvl('basket2'); }
   function scoopR() { return ECON.baseScoopR + 12 * lvl('magnet'); }
   function vacR() { return ECON.baseVacR + 8 * lvl('vacradius'); }
   function vacInterval() { return ECON.vacInterval / (1 + 0.25 * lvl('vacspeed')) / overclock(); }
@@ -77,7 +92,12 @@ const GAME = (() => {
   function tripTime() { return ECON.baseTripTime * Math.pow(0.85, lvl('route')); }
   function mutationChance() { return ECON.baseMutation + 0.015 * lvl('mutate'); }
   function goldenChance() { return 0.03 * lvl('golden'); }
-  function mamaCost() { return ECON.mamaCost(S.mamaTier); }
+  function mamaCost() { return Math.round(ECON.mamaCost(S.mamaTier) / tycoon() * tycoon()); }
+  function scoopFeatherChance() { return ECON.scoopFeather + 0.03 * lvl('feather1'); }
+  function sweepLuck() { return 0.02 * lvl('sweepluck'); }
+  function breedTime() { return ECON.breedTime / (1 + 0.20 * lvl('candle')); }
+  function breedUp() { return ECON.breedUpBase + 0.06 * lvl('genes'); }
+  function rainbowChance() { return ECON.rainbowBase + 0.08 * lvl('rainbowegg'); }
   function featherFor(t, isNew) {
     let f = ECON.feathers(t);
     if (isNew) f += ECON.discoveryBonus(t);
@@ -89,26 +109,82 @@ const GAME = (() => {
     return Math.round(sum);
   }
 
-  /* ---------- grid helpers ---------- */
+  /* ---------- geography ---------- */
   const key = (c, r) => c + ',' + r;
-  let occ = {};  /* "c,r" -> {type, k} rebuilt on change */
+  function plotAt(x, y) {
+    const c = Math.floor(x / WORLD.T), r = Math.floor(y / WORLD.T);
+    for (const p of PLOTS)
+      if (c >= p.tc && c < p.tc + PLOT_W && r >= p.tr && r < p.tr + PLOT_H) return p;
+    return null;
+  }
+  function inOwned(x, y) {
+    if (x < 4 || x > WORLD.W - 4 || y < 4 || y > WORLD.H - 4) return false;
+    const p = plotAt(x, y);
+    return !!(p && S.plots[p.id]);
+  }
+  function inPond(x, y) {
+    const p = WORLD.pond;
+    return x > p.x - 6 && x < p.x + p.w + 6 && y > p.y - 6 && y < p.y + p.h + 6;
+  }
+  function inStation(x, y, pad) {
+    pad = pad || 0;
+    for (const k of Object.keys(WORLD.stations)) {
+      const s = WORLD.stations[k];
+      if (x > s.x - pad && x < s.x + s.w + pad && y > s.y - pad && y < s.y + s.h + pad) return k;
+    }
+    return null;
+  }
+  function ownedBounds() {
+    /* camera may roam owned plots plus locked neighbors (to visit FOR SALE signs) */
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    PLOTS.forEach(p => {
+      const owned = S.plots[p.id];
+      const adjacent = !owned && plotNeighbors(p.id).some(n => S.plots[n]);
+      if (!owned && !adjacent) return;
+      x0 = Math.min(x0, p.tc * 16); y0 = Math.min(y0, p.tr * 16);
+      x1 = Math.max(x1, (p.tc + PLOT_W) * 16); y1 = Math.max(y1, (p.tr + PLOT_H) * 16);
+    });
+    return { x0, y0, x1, y1 };
+  }
+  function clampCam() {
+    const b = ownedBounds();
+    const vw = WORLD.view.w, vh = WORLD.view.h;
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const loX = Math.max(0, Math.min(b.x0, WORLD.W - vw));
+    const hiX = Math.max(loX, Math.min(WORLD.W - vw, b.x1 - vw));
+    const loY = Math.max(0, Math.min(b.y0, WORLD.H - vh));
+    const hiY = Math.max(loY, Math.min(WORLD.H - vh, b.y1 - vh));
+    S.cam.x = clamp(S.cam.x, loX, hiX);
+    S.cam.y = clamp(S.cam.y, loY, hiY);
+  }
+
+  /* ---------- grid / occupancy ---------- */
+  let occ = {};
   function rebuildOcc() {
     occ = {};
     Object.keys(S.belts).forEach(k => occ[k] = { type: 'belt', k });
     Object.keys(S.vacs).forEach(k => occ[k] = { type: 'vacuum', k });
-    Object.keys(S.incs).forEach(k => {
+    const two = (map, type) => Object.keys(map).forEach(k => {
       const [c, r] = k.split(',').map(Number);
       for (let dc = 0; dc < 2; dc++) for (let dr = 0; dr < 2; dr++)
-        occ[key(c + dc, r + dr)] = { type: 'incubator', k };
+        occ[key(c + dc, r + dr)] = { type, k };
     });
+    two(S.incs, 'incubator');
+    two(S.nests, 'lovenest');
   }
   function tileBuildable(c, r) {
-    if (c < WORLD.buildCols[0] || c > WORLD.buildCols[1]) return false;
-    if (r < WORLD.buildRows[0] || r > WORLD.buildRows[1]) return false;
-    const x = c * WORLD.T, y = r * WORLD.T, p = WORLD.pond;
-    if (x + 16 > p.x && x < p.x + p.w && y + 16 > p.y && y < p.y + p.h) return false;
-    const m = WORLD.mama;
-    if (Math.abs(x + 8 - m.x) < 26 && Math.abs(y + 8 - m.y) < 26) return false;
+    const x = c * 16 + 8, y = r * 16 + 8;
+    const p = plotAt(x, y);
+    if (!p || !S.plots[p.id]) return false;
+    if (r >= 24) return false;                          /* the road */
+    if (r === p.tr && p.tr === 0) return false;         /* top tree line */
+    const px = c * 16, py = r * 16, pd = WORLD.pond;
+    if (px + 16 > pd.x - 4 && px < pd.x + pd.w + 4 && py + 16 > pd.y - 4 && py < pd.y + pd.h + 4) return false;
+    if (Math.abs(px + 8 - WORLD.mama.x) < 28 && Math.abs(py + 8 - WORLD.mama.y) < 28) return false;
+    for (const k of Object.keys(WORLD.stations)) {
+      const st = WORLD.stations[k];
+      if (px + 16 > st.x - 4 && px < st.x + st.w + 4 && py + 16 > st.y - 4 && py < st.y + st.h + 4) return false;
+    }
     return true;
   }
   function canPlace(type, c, r) {
@@ -121,48 +197,85 @@ const GAME = (() => {
   }
   const DIRV = [[1, 0], [0, 1], [-1, 0], [0, -1]];
 
+  /* ---------- land ---------- */
+  function buyPlot(id) {
+    const p = PLOTS[id];
+    if (!p || S.plots[id]) return false;
+    if (!plotNeighbors(id).some(n => S.plots[n])) return false;
+    if (S.coins < p.price) return false;
+    S.coins -= p.price;
+    S.plots[id] = true;
+    mark('ground');
+    emit('land', { plot: p });
+    return true;
+  }
+
   /* ---------- egg creation ---------- */
   function rollTier(base) {
     let t = base, mutated = false;
-    if (t < TIERS.length - 1 && Math.random() < mutationChance()) {
+    const capT = TIERS.length - 2;   /* mutations never reach Secret */
+    if (t < capT && Math.random() < mutationChance()) {
       let jump = 1;
       if (Math.random() < 0.15 * lvl('rainbow')) jump = 2;
-      t = Math.min(TIERS.length - 1, t + jump);
+      t = Math.min(capT, t + jump);
       mutated = true;
       S.stats.mutations++;
     }
     return { tier: t, mutated };
   }
-
+  function spawnEgg(x, y, tier, golden, rainbow) {
+    if (S.eggs.length >= ECON.groundEggCap) return null;
+    const egg = {
+      id: nextId++, tier, golden: !!golden, rainbow: !!rainbow,
+      x: Math.max(6, Math.min(WORLD.W - 6, x)),
+      y: Math.max(20, Math.min(WORLD.roadY - 6, y)),
+      z: 0, vz: -34 - Math.random() * 18, suck: null,
+    };
+    S.eggs.push(egg);
+    return egg;
+  }
   function layEgg(x, y, baseTier, fromPet) {
     if (S.eggs.length >= ECON.groundEggCap) return null;
     const { tier, mutated } = rollTier(baseTier);
     const golden = Math.random() < goldenChance();
-    const egg = {
-      id: nextId++, tier, golden,
-      x: Math.max(6, Math.min(WORLD.W - 6, x + (Math.random() * 22 - 11))),
-      y: Math.max(WORLD.fieldTop, Math.min(WORLD.roadY - 6, y + (Math.random() * 14 - 4))),
-      z: 0, vz: -34 - Math.random() * 18,
-      placed: false, hatch: 0, suck: null,
-    };
-    S.eggs.push(egg);
+    const egg = spawnEgg(x + (Math.random() * 22 - 11), y + (Math.random() * 14 - 4), tier, golden, false);
+    if (!egg) return null;
     S.stats.laid++;
     emit('lay', { egg, mutated, fromPet });
     return egg;
   }
 
-  /* ---------- chickens ---------- */
-  function inPond(x, y) {
-    const p = WORLD.pond;
-    return x > p.x - 6 && x < p.x + p.w + 6 && y > p.y - 6 && y < p.y + p.h + 6;
+  /* ---------- plumes (physical feathers) ---------- */
+  function dropPlumes(x, y, total) {
+    const n = Math.max(1, Math.min(4, Math.round(total / 3) + 1));
+    const each = Math.ceil(total / n);
+    for (let i = 0; i < n; i++) {
+      if (S.plumes.length > 140) { S.feathers += each; continue; }  /* overflow: auto-collect */
+      S.plumes.push({
+        id: nextId++, value: each,
+        x: x + (Math.random() * 26 - 13), y: Math.max(20, y + (Math.random() * 16 - 8)),
+        z: -14 - Math.random() * 8, vz: 0, sway: Math.random() * Math.PI * 2,
+      });
+    }
   }
-  function spawnChicken(sp, x, y) {
+  function collectPlume(pl) {
+    const i = S.plumes.indexOf(pl);
+    if (i === -1) return 0;
+    S.plumes.splice(i, 1);
+    S.feathers += pl.value;
+    S.stats.plumes += pl.value;
+    return pl.value;
+  }
+
+  /* ---------- chickens ---------- */
+  function spawnChicken(spId, x, y) {
+    const sp = SPECIES[spId];
     const ch = {
-      id: nextId++, sp: sp.id,
+      id: nextId++, sp: spId,
       x: Math.max(10, Math.min(WORLD.W - 30, x)),
-      y: Math.max(WORLD.fieldTop, Math.min(WORLD.roadY - 24, y)),
+      y: Math.max(20, Math.min(WORLD.roadY - 24, y)),
       dir: Math.random() < 0.5 ? -1 : 1, state: 'idle', t: Math.random() * 2,
-      lay: layTime(sp.tier) * (0.3 + Math.random() * 0.7), petCd: 0,
+      lay: layTime(sp.tier) * (0.3 + Math.random() * 0.7), petCd: 0, buffT: 0,
     };
     S.chickens.push(ch);
     return ch;
@@ -174,33 +287,67 @@ const GAME = (() => {
       return unknown[Math.floor(Math.random() * unknown.length)];
     return pool[Math.floor(Math.random() * pool.length)];
   }
-  /* hatch an egg of `tier` at (x,y): returns array of birth infos (twins!) */
-  function hatchChicken(tier, x, y) {
+  /* hatch an egg (only incubators call this) */
+  function hatchChicken(tier, x, y, rainbow) {
     const births = [];
     const once = t => {
       if (S.chickens.length >= chickenCap()) return;
-      let ht = t;
-      if (ht < TIERS.length - 1 && Math.random() < 0.05 * lvl('miracle')) ht++;
+      let ht = rainbow ? TIERS.length - 1 : t;
+      if (!rainbow && ht < TIERS.length - 2 && Math.random() < 0.05 * lvl('miracle')) ht++;
       const sp = pickSpecies(ht);
       const isNew = !S.disc.includes(sp.id);
       if (isNew) S.disc.push(sp.id);
       const f = featherFor(ht, isNew);
-      S.feathers += f;
+      dropPlumes(x, y + 6, f);
       S.stats.hatched++;
-      spawnChicken(sp, x, y);
-      births.push({ sp, feathers: f, isNew, miracle: ht > t });
+      spawnChicken(sp.id, x, y);
+      births.push({ sp, feathers: f, isNew, miracle: !rainbow && ht > t });
       if (isNew) mark('pedia');
     };
     once(tier);
-    if (Math.random() < 0.04 * lvl('twins')) once(tier);
-    if (births.length) emit('hatch', { births, x, y });
+    if (!rainbow && Math.random() < 0.04 * lvl('twins')) once(tier);
+    if (births.length) emit('hatch', { births, x, y, rainbow });
     return births;
+  }
+
+  function nearestFeed(x, y, R) {
+    let best = null, bd = R * R;
+    for (const f of S.feed) {
+      const d = (f.x - x) * (f.x - x) + (f.y - y) * (f.y - y);
+      if (d < bd) { best = f; bd = d; }
+    }
+    return best;
   }
 
   function tickChicken(ch, dt) {
     ch.t -= dt;
     ch.petCd = Math.max(0, ch.petCd - dt);
-    if (ch.t <= 0) {
+    ch.buffT = Math.max(0, ch.buffT - dt);
+    /* seek feed */
+    if (ch.state !== 'seek' && ch.buffT <= 0 && S.feed.length) {
+      const f = nearestFeed(ch.x + 10, ch.y + 10, 70);
+      if (f) { ch.state = 'seek'; ch.target = f; ch.t = 6; }
+    }
+    if (ch.state === 'seek') {
+      const f = ch.target;
+      if (!f || f.n <= 0 || S.feed.indexOf(f) === -1) { ch.state = 'idle'; ch.t = 0.5; ch.target = null; }
+      else {
+        const dx = f.x - (ch.x + 10), dy = f.y - (ch.y + 12);
+        const d = Math.hypot(dx, dy);
+        if (d < 6) {
+          f.n--;
+          if (f.n <= 0) S.feed.splice(S.feed.indexOf(f), 1);
+          ch.buffT = ECON.feedBuff * (1 + 0.5 * lvl('feedplus'));
+          ch.state = 'peck'; ch.t = 0.8; ch.target = null;
+          emit('feedeat', { x: ch.x + 10, y: ch.y });
+        } else {
+          ch.dir = dx > 0 ? 1 : -1;
+          const nx = ch.x + (dx / d) * 22 * dt, ny = ch.y + (dy / d) * 22 * dt;
+          if (inOwned(nx + 10, ny + 10) && !inPond(nx + 10, ny + 10)) { ch.x = nx; ch.y = ny; }
+          else { ch.state = 'idle'; ch.t = 1; ch.target = null; }
+        }
+      }
+    } else if (ch.t <= 0) {
       const r = Math.random();
       if (r < 0.45) { ch.state = 'walk'; ch.dir = Math.random() < 0.5 ? -1 : 1; ch.t = 0.8 + Math.random() * 2; }
       else if (r < 0.75) { ch.state = 'idle'; ch.t = 0.6 + Math.random() * 1.6; }
@@ -209,20 +356,19 @@ const GAME = (() => {
     if (ch.state === 'walk') {
       const nx = ch.x + ch.dir * 9 * dt;
       const ny = ch.y + Math.sin(ch.id + ch.x / 9) * 5 * dt;
-      if (!inPond(nx + 10, ny + 10)) { ch.x = nx; ch.y = ny; } else ch.dir *= -1;
-      if (ch.x < 6) { ch.x = 6; ch.dir = 1; }
-      if (ch.x > WORLD.W - 26) { ch.x = WORLD.W - 26; ch.dir = -1; }
-      ch.y = Math.max(WORLD.fieldTop, Math.min(WORLD.roadY - 24, ch.y));
+      if (inOwned(nx + 10, ny + 12) && inOwned(nx + 10, ny + 20) && !inPond(nx + 10, ny + 12) && ny < WORLD.roadY - 24) {
+        ch.x = nx; ch.y = ny;
+      } else ch.dir *= -1;
     }
     const sp = SPECIES[ch.sp];
-    ch.lay -= dt;
+    ch.lay -= dt * (ch.buffT > 0 ? 2 : 1);
     if (ch.lay <= 0) {
       ch.lay = layTime(sp.tier);
       layEgg(ch.x + 10, ch.y + 16, sp.tier, false);
     }
   }
 
-  /* ---------- petting ---------- */
+  /* ---------- petting / grabbing ---------- */
   function petMama() {
     if (S.mama.petCd > 0) return false;
     S.mama.petCd = petCd(true);
@@ -237,53 +383,118 @@ const GAME = (() => {
     layEgg(ch.x + 10, ch.y + 14, SPECIES[ch.sp].tier, true);
     return true;
   }
+  function grabChicken(ch) {
+    const i = S.chickens.indexOf(ch);
+    if (i === -1 || S.held) return false;
+    S.chickens.splice(i, 1);
+    S.held = { kind: 'chicken', ch };
+    return true;
+  }
+  function grabEgg(egg) {
+    const i = S.eggs.indexOf(egg);
+    if (i === -1 || S.held) return false;
+    S.eggs.splice(i, 1);
+    S.held = { kind: 'egg', egg: { tier: egg.tier, golden: egg.golden, rainbow: egg.rainbow } };
+    return true;
+  }
+  /* returns a short outcome string for fx */
+  function dropHeld(x, y) {
+    if (!S.held) return null;
+    const held = S.held;
+    S.held = null;
+    if (held.kind === 'chicken') {
+      const ch = held.ch;
+      /* love nest? */
+      const o = occ[key(Math.floor(x / 16), Math.floor(y / 16))];
+      if (o && o.type === 'lovenest') {
+        const nest = S.nests[o.k];
+        if (nest.slots.filter(Boolean).length < 2 && nest.cd <= 0) {
+          nest.slots[nest.slots[0] ? 1 : 0] = { sp: ch.sp };
+          if (nest.slots[0] && nest.slots[1]) nest.prog = 0.0001;
+          return 'nested';
+        }
+      }
+      /* the lab: graduate a chicken into feathers */
+      if (inStation(x, y, 4) === 'lab') {
+        const t = SPECIES[ch.sp].tier;
+        const f = Math.max(1, Math.ceil(ECON.feathers(t) * 1.5));
+        dropPlumes(WORLD.stations.lab.x + 15, WORLD.stations.lab.y + 30, f);
+        emit('graduate', { sp: SPECIES[ch.sp], f });
+        return 'graduated';
+      }
+      ch.x = Math.max(10, Math.min(WORLD.W - 30, x - 10));
+      ch.y = Math.max(20, Math.min(WORLD.roadY - 24, y - 10));
+      if (!inOwned(ch.x + 10, ch.y + 10)) { ch.x = WORLD.mama.x + 20; ch.y = WORLD.mama.y; }
+      S.chickens.push(ch);
+      return 'dropped';
+    }
+    /* egg */
+    const e = held.egg;
+    const c = Math.floor(x / 16), r = Math.floor(y / 16);
+    const o = occ[key(c, r)];
+    if (o && o.type === 'incubator') {
+      const inc = S.incs[o.k];
+      if (inc.queue.length < incCap()) { inc.queue.push(e); return 'incubated'; }
+    }
+    if (S.truck.state === 'parked' && hitTruck(x, y)) {
+      if (S.truck.load.length < truckCap()) { S.truck.load.push(e); return 'loaded'; }
+    }
+    spawnEgg(x, Math.min(y, WORLD.roadY - 8), e.tier, e.golden, e.rainbow);
+    return 'placed';
+  }
+  function hitTruck(x, y) {
+    const th = WORLD.truckHome;
+    return x > th.x - 10 && x < th.x + th.w + 12 && y > th.y - 16 && y < th.y + th.h + 4;
+  }
 
-  /* ---------- basket: scoop / drop ---------- */
+  /* ---------- basket ---------- */
   function scoopEgg(egg) {
+    if (S.basket.length >= basketCap()) return 'full';
     const i = S.eggs.indexOf(egg);
     if (i === -1) return false;
     S.eggs.splice(i, 1);
-    S.basket.push({ tier: egg.tier, golden: egg.golden });
+    S.basket.push({ tier: egg.tier, golden: egg.golden, rainbow: egg.rainbow });
     S.stats.collected++;
+    if (Math.random() < sweepLuck() && S.basket.length < basketCap())
+      S.basket.push({ tier: egg.tier, golden: egg.golden, rainbow: egg.rainbow });
+    if (Math.random() < scoopFeatherChance()) dropPlumes(egg.x, egg.y, 1);
     return true;
   }
-  /* returns how many were accepted */
   function basketToTruck() {
     if (S.truck.state !== 'parked') return 0;
     let n = 0;
-    while (S.basket.length && S.truck.load.length < truckCap()) {
-      S.truck.load.push(S.basket.pop()); n++;
-    }
+    while (S.basket.length && S.truck.load.length < truckCap()) { S.truck.load.push(S.basket.pop()); n++; }
     return n;
   }
   function basketToInc(k) {
     const inc = S.incs[k];
     if (!inc) return 0;
     let n = 0;
-    while (S.basket.length && inc.queue.length < incCap()) {
-      inc.queue.push(S.basket.pop()); n++;
-    }
+    while (S.basket.length && inc.queue.length < incCap()) { inc.queue.push(S.basket.pop()); n++; }
     return n;
   }
   function basketToGround(x, y) {
     let n = 0;
     while (S.basket.length) {
       const e = S.basket.pop();
-      const a = (n / Math.max(1, S.basket.length + n)) * Math.PI * 2 + Math.random();
-      const d = n === 0 ? 0 : 5 + Math.random() * 4 + n * 1.2;
-      S.eggs.push({
-        id: nextId++, tier: e.tier, golden: e.golden,
-        x: Math.max(6, Math.min(WORLD.W - 6, x + Math.cos(a) * d)),
-        y: Math.max(WORLD.fieldTop, Math.min(WORLD.roadY - 6, y + Math.sin(a) * d * 0.6)),
-        z: 0, vz: -26 - Math.random() * 10,
-        placed: true, hatch: 0, suck: null,
-      });
-      const egg = S.eggs[S.eggs.length - 1];
-      egg.hatch = groundHatchTime(egg.tier);
-      egg.hatchTotal = egg.hatch;
+      const a = Math.random() * Math.PI * 2, d = n === 0 ? 0 : 4 + Math.random() * 5 + n;
+      spawnEgg(x + Math.cos(a) * d, Math.min(y + Math.sin(a) * d * 0.6, WORLD.roadY - 8), e.tier, e.golden, e.rainbow);
       n++;
     }
     return n;
+  }
+
+  /* ---------- feed tool ---------- */
+  function sprinkleFeed(x, y) {
+    if (!lvl('feed')) return false;
+    if (S.coins < ECON.feedCost) return false;
+    if (!inOwned(x, y) || y > WORLD.roadY - 10) return false;
+    S.coins -= ECON.feedCost;
+    for (let i = 0; i < 4; i++) {
+      S.feed.push({ x: x + (Math.random() * 22 - 11), y: y + (Math.random() * 14 - 7), n: 1 });
+    }
+    if (S.feed.length > 60) S.feed.splice(0, S.feed.length - 60);
+    return true;
   }
 
   /* ---------- truck ---------- */
@@ -308,16 +519,13 @@ const GAME = (() => {
         tr.state = 'parked';
         emit('sell', { pay, n });
       }
-    } else if (lvl('autosend') && tr.load.length >= truckCap()) {
-      sendTruck();
-    }
+    } else if (lvl('autosend') && tr.load.length >= truckCap()) sendTruck();
   }
 
-  /* ---------- ground eggs ---------- */
+  /* ---------- eggs & plumes physics ---------- */
   function tickEggs(dt) {
     for (let i = S.eggs.length - 1; i >= 0; i--) {
       const e = S.eggs[i];
-      /* being vacuumed: fly toward the vac */
       if (e.suck) {
         const [c, r] = e.suck.split(',').map(Number);
         const tx = c * 16 + 8, ty = r * 16 + 8;
@@ -326,32 +534,28 @@ const GAME = (() => {
         if (d < 5) {
           const vac = S.vacs[e.suck];
           S.eggs.splice(i, 1);
-          if (vac) { vac.hold.push({ tier: e.tier, golden: e.golden }); S.stats.collected++; }
+          if (vac) { vac.hold.push({ tier: e.tier, golden: e.golden, rainbow: e.rainbow }); S.stats.collected++; }
           continue;
         }
         const sp = 90 * dt / d;
         e.x += dx * sp; e.y += dy * sp;
         continue;
       }
-      /* bounce physics */
       if (e.z < 0 || e.vz !== 0) {
         e.vz += 160 * dt;
         e.z += e.vz * dt;
         if (e.z >= 0) {
           e.z = 0;
           e.vz = Math.abs(e.vz) > 24 ? -Math.abs(e.vz) * 0.4 : 0;
-          if (e.vz !== 0) emit('bounce', { egg: e });
         }
       }
-      /* placed eggs hatch on the ground */
-      if (e.placed && e.hatch > 0) {
-        e.hatch -= dt;
-        if (e.hatch <= 0) {
-          if (S.chickens.length >= chickenCap()) { e.hatch = 0.0001; continue; } /* wait for room */
-          S.eggs.splice(i, 1);
-          hatchChicken(e.tier, e.x, e.y - 8);
-        }
-      }
+    }
+    for (const pl of S.plumes) {
+      pl.sway += dt * 3;
+      if (pl.z < 0) {
+        pl.z += 9 * dt;
+        pl.x += Math.sin(pl.sway) * 6 * dt;
+      } else pl.z = 0;
     }
   }
 
@@ -362,7 +566,6 @@ const GAME = (() => {
       const [c, r] = k.split(',').map(Number);
       const vx = c * 16 + 8, vy = r * 16 + 8;
       v.cd -= dt;
-      /* suck */
       if (v.cd <= 0 && v.hold.length < ECON.vacHold) {
         const R = vacR();
         let best = null, bd = 1e9;
@@ -371,9 +574,13 @@ const GAME = (() => {
           const d = Math.hypot(e.x - vx, e.y - vy);
           if (d < R && d < bd) { best = e; bd = d; }
         }
-        if (best) { best.suck = k; best.placed = false; best.hatch = 0; v.cd = vacInterval(); }
+        if (best) { best.suck = k; v.cd = vacInterval(); }
+        /* plumes get slurped instantly (they're light) */
+        for (let i = S.plumes.length - 1; i >= 0; i--) {
+          const pl = S.plumes[i];
+          if (Math.hypot(pl.x - vx, pl.y - vy) < R) { collectPlume(pl); emit('plume', { auto: true }); }
+        }
       }
-      /* eject onto the belt it faces */
       if (v.hold.length) {
         const [dx, dy] = DIRV[v.dir];
         const nk = key(c + dx, r + dy);
@@ -382,7 +589,7 @@ const GAME = (() => {
           const blocked = S.items.some(it => Math.hypot(it.x - px, it.y - py) < 8);
           if (!blocked) {
             const e = v.hold.shift();
-            S.items.push({ tier: e.tier, golden: e.golden, x: px, y: py });
+            S.items.push({ tier: e.tier, golden: e.golden, rainbow: e.rainbow, x: px, y: py });
           }
         }
       }
@@ -398,7 +605,6 @@ const GAME = (() => {
       const belt = S.belts[key(c, r)];
       if (!belt) { dropItem(i); continue; }
       const [dx, dy] = DIRV[belt.dir];
-      /* spacing: stall if another item is just ahead */
       let stalled = false;
       for (const o of S.items) {
         if (o === it) continue;
@@ -410,38 +616,34 @@ const GAME = (() => {
       const nx = it.x + dx * spd * dt, ny = it.y + dy * spd * dt;
       const nc = Math.floor(nx / 16), nr = Math.floor(ny / 16);
       if (nc === c && nr === r) { it.x = nx; it.y = ny; continue; }
-      /* crossing into a new tile */
-      const nk = key(nc, nr);
-      const target = occ[nk];
+      const target = occ[key(nc, nr)];
       if (target && target.type === 'belt') { it.x = nx; it.y = ny; continue; }
       if (target && target.type === 'incubator') {
         const inc = S.incs[target.k];
-        if (inc.queue.length < incCap()) { inc.queue.push({ tier: it.tier, golden: it.golden }); S.items.splice(i, 1); }
-        /* else stall at the edge */
+        if (inc.queue.length < incCap()) {
+          inc.queue.push({ tier: it.tier, golden: it.golden, rainbow: it.rainbow });
+          S.items.splice(i, 1);
+        }
         continue;
       }
-      if (ny >= WORLD.roadY) {  /* reached the road: truck dock */
+      if (ny >= WORLD.roadY) {
         const th = WORLD.truckHome;
         if (S.truck.state === 'parked' && nx > th.x - 6 && nx < th.x + th.w + 6) {
           if (S.truck.load.length < truckCap()) {
-            S.truck.load.push({ tier: it.tier, golden: it.golden });
+            S.truck.load.push({ tier: it.tier, golden: it.golden, rainbow: it.rainbow });
             S.items.splice(i, 1);
-            emit('truckload', { n: 1 });
+            emit('truckload', {});
           }
-          continue; /* full: wait on belt */
+          continue;
         }
         dropItem(i); continue;
       }
-      /* belt ends on grass: egg rolls off */
       dropItem(i);
     }
     function dropItem(i) {
       const it = S.items[i];
       S.items.splice(i, 1);
-      if (S.eggs.length < ECON.groundEggCap) {
-        S.eggs.push({ id: nextId++, tier: it.tier, golden: it.golden,
-          x: it.x, y: Math.min(WORLD.roadY - 4, it.y), z: 0, vz: -14, placed: false, hatch: 0, suck: null });
-      }
+      spawnEgg(it.x, Math.min(WORLD.roadY - 6, it.y), it.tier, it.golden, it.rainbow);
     }
   }
 
@@ -450,16 +652,69 @@ const GAME = (() => {
     for (const k of Object.keys(S.incs)) {
       const inc = S.incs[k];
       if (!inc.queue.length) { inc.prog = 0; continue; }
-      const t = inc.queue[0].tier;
+      const egg = inc.queue[0];
       inc.prog += dt;
-      if (inc.prog >= incHatchTime(t)) {
-        if (S.chickens.length >= chickenCap()) continue; /* hold at 100% */
-        const egg = inc.queue.shift();
+      if (inc.prog >= incHatchTime(egg.tier, egg.rainbow)) {
+        if (S.chickens.length >= chickenCap()) continue;
+        inc.queue.shift();
         inc.prog = 0;
         const [c, r] = k.split(',').map(Number);
-        hatchChicken(egg.tier, c * 16 + 16, r * 16 + 34);
+        hatchChicken(egg.tier, c * 16 + 16, r * 16 + 36, egg.rainbow);
       }
     }
+  }
+
+  /* ---------- love nests (breeding) ---------- */
+  function tickNests(dt) {
+    for (const k of Object.keys(S.nests)) {
+      const nest = S.nests[k];
+      nest.cd = Math.max(0, (nest.cd || 0) - dt);
+      if (!(nest.slots[0] && nest.slots[1])) continue;
+      const a = SPECIES[nest.slots[0].sp], b = SPECIES[nest.slots[1].sp];
+      let need = breedTime();
+      if (a.id === b.id) need *= 0.6;
+      nest.prog += dt;
+      if (nest.prog < need) continue;
+      /* breeding complete! */
+      const [c, r] = k.split(',').map(Number);
+      const x = c * 16 + 16, y = r * 16 + 36;
+      let tier = Math.max(a.tier, b.tier);
+      let rainbow = false;
+      if (a.tier >= 7 && b.tier >= 7 && Math.random() < rainbowChance()) rainbow = true;
+      else {
+        let up = breedUp();
+        if (a.tier === b.tier && a.id !== b.id) up += 0.10;
+        if (tier < TIERS.length - 2 && Math.random() < up) tier++;
+      }
+      const lay = n => {
+        const egg = spawnEgg(x + (Math.random() * 20 - 10), y, rainbow ? 7 : tier, false, rainbow);
+        if (egg && rainbow) egg.tier = TIERS.length - 1;   /* rainbow eggs are Secret tier */
+        return egg;
+      };
+      lay();
+      if (Math.random() < 0.10 * lvl('twindate')) lay();
+      S.stats.bred++;
+      /* parents hop back out */
+      spawnChicken(a.id, x - 14, y - 4);
+      spawnChicken(b.id, x + 8, y - 2);
+      nest.slots = [null, null];
+      nest.prog = 0;
+      nest.cd = ECON.breedCd;
+      emit('breed', { x, y, rainbow, tier: rainbow ? TIERS.length - 1 : tier });
+    }
+  }
+
+  /* removing a chicken from a love nest slot (tap it out) */
+  function ejectNest(k) {
+    const nest = S.nests[k];
+    if (!nest) return false;
+    const [c, r] = k.split(',').map(Number);
+    let any = false;
+    nest.slots.forEach((s, i) => {
+      if (s) { spawnChicken(s.sp, c * 16 + i * 18, r * 16 + 34); nest.slots[i] = null; any = true; }
+    });
+    nest.prog = 0;
+    return any;
   }
 
   /* ---------- building ---------- */
@@ -472,6 +727,7 @@ const GAME = (() => {
     if (type === 'belt') S.belts[k] = { dir: dir || 0 };
     else if (type === 'vacuum') S.vacs[k] = { dir: dir || 0, hold: [], cd: 0 };
     else if (type === 'incubator') S.incs[k] = { queue: [], prog: 0 };
+    else if (type === 'lovenest') S.nests[k] = { slots: [null, null], prog: 0, cd: 0 };
     rebuildOcc();
     mark('build');
     return true;
@@ -481,27 +737,20 @@ const GAME = (() => {
     const o = occ[key(c, r)];
     if (!o) return false;
     const k = o.k;
-    if (o.type === 'belt') {
-      /* items on this tile roll off */
-      delete S.belts[k];
-      S.built.belt = Math.max(0, S.built.belt - 1);
-    } else if (o.type === 'vacuum') {
-      const v = S.vacs[k];
-      v.hold.forEach(e => S.eggs.length < ECON.groundEggCap && S.eggs.push({
-        id: nextId++, tier: e.tier, golden: e.golden,
-        x: +k.split(',')[0] * 16 + 8, y: +k.split(',')[1] * 16 + 10, z: 0, vz: -18, placed: false, hatch: 0, suck: null }));
-      delete S.vacs[k];
-      S.built.vacuum = Math.max(0, S.built.vacuum - 1);
+    const [kc, kr] = k.split(',').map(Number);
+    if (o.type === 'belt') { delete S.belts[k]; S.built.belt = Math.max(0, S.built.belt - 1); }
+    else if (o.type === 'vacuum') {
+      S.vacs[k].hold.forEach(e => spawnEgg(kc * 16 + 8, kr * 16 + 10, e.tier, e.golden, e.rainbow));
+      delete S.vacs[k]; S.built.vacuum = Math.max(0, S.built.vacuum - 1);
     } else if (o.type === 'incubator') {
-      const inc = S.incs[k];
-      inc.queue.forEach(e => S.eggs.length < ECON.groundEggCap && S.eggs.push({
-        id: nextId++, tier: e.tier, golden: e.golden,
-        x: +k.split(',')[0] * 16 + 12 + Math.random() * 8, y: +k.split(',')[1] * 16 + 20, z: 0, vz: -18, placed: false, hatch: 0, suck: null }));
-      delete S.incs[k];
-      S.built.incubator = Math.max(0, S.built.incubator - 1);
+      if (k === WORLD.starterInc.join(',')) return false;   /* the starter one stays */
+      S.incs[k].queue.forEach(e => spawnEgg(kc * 16 + 12 + Math.random() * 8, kr * 16 + 20, e.tier, e.golden, e.rainbow));
+      delete S.incs[k]; S.built.incubator = Math.max(0, S.built.incubator - 1);
+    } else if (o.type === 'lovenest') {
+      ejectNest(k);
+      delete S.nests[k]; S.built.lovenest = Math.max(0, S.built.lovenest - 1);
     }
     S.coins += BUILDS[o.type].refund;
-    /* eggs sucked toward a removed vacuum are freed */
     S.eggs.forEach(e => { if (e.suck === k) e.suck = null; });
     rebuildOcc();
     mark('build');
@@ -511,7 +760,7 @@ const GAME = (() => {
   /* ---------- skills & mama ---------- */
   function buySkill(id) {
     const sk = SKILL_BY_ID[id];
-    if (!sk) return false;
+    if (!sk || id === 'root') return false;
     const cur = lvl(id);
     if (cur >= sk.max) return false;
     const pre = skillPrereq(sk);
@@ -520,16 +769,15 @@ const GAME = (() => {
     if (S.feathers < cost) return false;
     S.feathers -= cost;
     S.sk[id] = cur + 1;
-    mark('skills', 'build', 'hud');
+    mark('skills', 'build');
     return true;
   }
   function upgradeMama() {
-    if (S.mamaTier >= TIERS.length - 1) return false;
-    const cost = mamaCost();
+    if (S.mamaTier >= TIERS.length - 2) return false;    /* mama tops out at Divine */
+    const cost = ECON.mamaCost(S.mamaTier);
     if (S.coins < cost) return false;
     S.coins -= cost;
     S.mamaTier++;
-    mark('hud');
     return true;
   }
 
@@ -546,6 +794,7 @@ const GAME = (() => {
     tickVacs(dt);
     tickBelts(dt);
     tickIncs(dt);
+    tickNests(dt);
     tickTruck(dt);
   }
 
@@ -556,72 +805,92 @@ const GAME = (() => {
     S.last = now;
     if (dt < 30) { tick(Math.min(2, Math.max(0, dt))); return null; }
     dt = Math.min(dt, ECON.offlineCapHrs * 3600);
-    let laid = 0, hatched = 0, pay = 0;
-    /* chickens lay onto the ground (respecting the cap) */
+    let laid = 0, hatched = 0, pay = 0, feathersGot = 0;
     const layers = [{ tier: S.mamaTier, x: WORLD.mama.x, y: WORLD.mama.y + 10 }]
       .concat(S.chickens.map(ch => ({ tier: SPECIES[ch.sp].tier, x: ch.x + 10, y: ch.y + 14 })));
     for (const L of layers) {
       const n = Math.floor(dt / layTime(L.tier));
       for (let i = 0; i < n && S.eggs.length < ECON.groundEggCap; i++) {
-        if (layEgg(L.x + (Math.random() * 60 - 30), L.y + (Math.random() * 40 - 20), L.tier, false)) laid++;
+        if (layEgg(L.x + (Math.random() * 80 - 40), L.y + (Math.random() * 50 - 25), L.tier, false)) laid++;
       }
     }
-    /* incubators keep hatching */
     for (const k of Object.keys(S.incs)) {
       const inc = S.incs[k];
       let budget = dt + inc.prog;
       inc.prog = 0;
       while (inc.queue.length && S.chickens.length < chickenCap()) {
-        const need = incHatchTime(inc.queue[0].tier);
+        const egg = inc.queue[0];
+        const need = incHatchTime(egg.tier, egg.rainbow);
         if (budget < need) { inc.prog = budget; break; }
         budget -= need;
-        const egg = inc.queue.shift();
+        inc.queue.shift();
+        const before = S.feathers;
+        const pcount = S.plumes.length;
         const [c, r] = k.split(',').map(Number);
-        hatchChicken(egg.tier, c * 16 + 16, r * 16 + 34);
+        hatchChicken(egg.tier, c * 16 + 16, r * 16 + 36, egg.rainbow);
+        /* auto-collect plumes dropped while away */
+        while (S.plumes.length > pcount) feathersGot += collectPlume(S.plumes[S.plumes.length - 1]);
+        feathersGot += S.feathers - before;
         hatched++;
       }
     }
-    /* a truck that was away finishes its trip */
     if (S.truck.state === 'away') {
       pay = truckPayout();
       S.coins += pay; S.stats.coinsEarned += pay; S.stats.sold += S.truck.load.length;
       S.truck.load = []; S.truck.state = 'parked';
     }
     S.eggs.forEach(e => { e.z = 0; e.vz = 0; });
-    return { seconds: dt, laid, hatched, pay };
+    return { seconds: dt, laid, hatched, pay, feathersGot };
   }
 
   /* ---------- save / load ---------- */
   function save() {
     try {
+      /* anything in hand goes back to the world first */
+      if (S.held) {
+        if (S.held.kind === 'chicken') { S.chickens.push(S.held.ch); }
+        else spawnEgg(WORLD.mama.x + 20, WORLD.mama.y + 10, S.held.egg.tier, S.held.egg.golden, S.held.egg.rainbow);
+        S.held = null;
+      }
       S.last = Date.now();
       const slim = JSON.parse(JSON.stringify(S));
       slim.eggs.forEach(e => { e.x = Math.round(e.x); e.y = Math.round(e.y); e.z = 0; e.vz = 0; e.suck = null; });
-      slim.chickens.forEach(c => { c.x = Math.round(c.x); c.y = Math.round(c.y); });
+      slim.chickens.forEach(c => { c.x = Math.round(c.x); c.y = Math.round(c.y); c.target = null; });
       slim.items.forEach(i => { i.x = Math.round(i.x); i.y = Math.round(i.y); });
+      slim.plumes.forEach(p => { p.x = Math.round(p.x); p.y = Math.round(p.y); p.z = 0; });
       localStorage.setItem(SAVE_KEY, JSON.stringify(slim));
       return true;
     } catch (e) { return false; }
   }
+  function ensureStarterInc() {
+    const k = WORLD.starterInc.join(',');
+    if (!S.incs[k]) S.incs[k] = { queue: [], prog: 0 };
+  }
   function load() {
     try {
       const raw = localStorage.getItem(SAVE_KEY);
-      if (!raw) return false;
+      if (!raw) { ensureStarterInc(); rebuildOcc(); return false; }
       const d = JSON.parse(raw);
-      if (!d || d.v !== 2) return false;
+      if (!d || d.v !== 3) { ensureStarterInc(); rebuildOcc(); return false; }
       S = Object.assign(freshState(), d);
       S.truck = Object.assign({ state: 'parked', t: 0, load: [] }, d.truck);
-      nextId = 1 + Math.max(0, ...S.eggs.map(e => e.id), ...S.chickens.map(c => c.id));
+      S.held = null;
+      S.chickens.forEach(c => { c.target = null; c.state = 'idle'; c.t = Math.random(); });
+      ensureStarterInc();
+      nextId = 1 + Math.max(0, ...S.eggs.map(e => e.id || 0), ...S.chickens.map(c => c.id || 0), ...S.plumes.map(p => p.id || 0));
       rebuildOcc();
+      clampCam();
       return true;
-    } catch (e) { return false; }
+    } catch (e) { ensureStarterInc(); rebuildOcc(); return false; }
   }
   function reset() {
     S = freshState();
     nextId = 1;
+    ensureStarterInc();
     rebuildOcc();
+    clampCam();
     try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
-    mark('hud', 'skills', 'pedia', 'build');
+    mark('skills', 'pedia', 'build', 'ground');
   }
 
   /* ---------- formatting ---------- */
@@ -642,16 +911,22 @@ const GAME = (() => {
     return h + 'h' + (m % 60 ? (m % 60) + 'm' : '');
   }
 
+  ensureStarterInc();
   rebuildOcc();
+  clampCam();
+
   return {
     get S() { return S; },
-    WORLD, dirty, mark, on, lvl, disc,
-    eggValue, layTime, petCd, groundHatchTime, incHatchTime,
-    chickenCap, incCap, scoopR, vacR, vacInterval, beltSpeed,
-    truckCap, tripTime, mutationChance, goldenChance, mamaCost, featherFor, truckPayout,
+    WORLD, dirty, mark, on, lvl, disc, ownedPlots,
+    eggValue, layTime, petCd, incHatchTime, chickenCap, incCap, basketCap,
+    scoopR, vacR, vacInterval, beltSpeed, truckCap, tripTime,
+    mutationChance, goldenChance, mamaCost: () => ECON.mamaCost(S.mamaTier),
+    breedTime, breedUp, rainbowChance, featherFor, truckPayout,
+    plotAt, inOwned, inPond, inStation, ownedBounds, clampCam,
     tileBuildable, canPlace, occAt: (c, r) => occ[key(c, r)],
-    petMama, petChicken, scoopEgg, basketToTruck, basketToInc, basketToGround,
-    sendTruck, build, demolish, setBeltDir, buySkill, upgradeMama,
-    hatchChicken, tick, applyOffline, save, load, reset, fmt, fmtTime, inPond,
+    buyPlot, petMama, petChicken, grabChicken, grabEgg, dropHeld, hitTruck,
+    scoopEgg, collectPlume, basketToTruck, basketToInc, basketToGround, sprinkleFeed,
+    sendTruck, build, demolish, setBeltDir, ejectNest, buySkill, upgradeMama,
+    tick, applyOffline, save, load, reset, fmt, fmtTime,
   };
 })();

@@ -1,35 +1,40 @@
 # 🥚 Inf Egg Co.
 
-A super cute 2D pixel-art incremental **egg ranch & factory** game. One big grassy field, a hundred weird chickens, and a truck that hauls your eggs to market.
+A super cute, cozy 2D pixel-art incremental game. You're a floating hand tending an egg ranch that grows into a whole valley — with almost no UI in the way.
 
 ![Inf Egg Co. screenshot](docs/screenshot.png)
 
 ## How it plays
 
-- **Pet Mama Hen** (she sits on her nest) — every pet pops out an egg. Chickens roam the field and lay eggs on the grass all by themselves, so eggs pile up everywhere.
-- **Scoop eggs** by holding the mouse and sweeping over them — a magnet pulls them into your basket with satisfying pops.
-- **Drag & drop** your basket:
-  - onto the **truck** → loads it up; click the truck and it drives off to market, coming back with coins (full loads pay a bonus),
-  - onto an **incubator** → hatches eggs fast and automatically,
-  - onto **open grass** → eggs nest where they land and slowly hatch into new chickens.
-- **Automate it like a factory**: research **conveyor belts** and **vacuum bots**, then paint belt lines from the vacuum straight into the truck or an incubator. Eggs visibly ride the belts — and jam up when the truck is full.
-- **Research tree**: hatching earns 🪶 feathers, spent across 4 branches (Hens · Hatchery · Factory · Market) with real prerequisites — lay speed, golden eggs, mutations, twin hatches, belt speed, auto-dispatch, Overclock, and more.
-- **Upgrade Mama** through 8 rarity tiers so her eggs climb from Common to Divine; eggs can also **mutate** a tier up when laid.
-- **Collect all 100 chickens** in the Chickenpedia — from Peep and Butterball to Cluckthulhu, Black Hole Hen, and The Eternal Yolk.
+You're the hand. Everything on the field is touchable:
 
-Progress autosaves to your browser, with offline egg-laying while you're away (up to 8 hours).
+- 🖐️ **Hand** — tap chickens (and Mama Hen) to pet them for an instant egg; hold & drag to *pick chickens up* and carry them around; grab single eggs; drag empty grass to pan the camera.
+- 🧺 **Basket** — hold and sweep to magnet eggs into your basket (it has a real capacity — research bigger ones). Release over the truck to load it, or over an incubator to queue hatching.
+- 🌾 **Feed** (research to unlock) — sprinkle seeds; chickens waddle over, snack, and lay twice as fast.
+- 🔨 **Build** — incubators, love nests, vacuum bots, and conveyor belts. Drag to paint belt lines; they carry eggs to the truck or incubators, factory-style.
+
+**Everything is a place, not a menu:**
+
+- 🚚 The **truck** on the road sells eggs — load it, tap it, and it drives to market and comes back with coins.
+- 🐣 **Incubators are the only way to hatch.** Eggs go in, chickens pop out with a burst of feathers.
+- 🪶 **Feathers are physical** — they flutter out of every hatch (and sometimes when you scoop eggs). Sweep them up; they're your research currency.
+- 🧪 The **Lab shack** opens the research tree — an *actual tree* with a trunk and six branches (Gather · Hens · Hatchery · Love · Factory · Market), ~40 nodes deep. You can even drop a chicken on the Lab to "graduate" it for bonus feathers.
+- 💘 **Love Nests breed chickens**: carry two chickens in, wait for the hearts, and get a fancier egg — two Divine parents can lay a 🌈 **rainbow egg**, which hatches the 12 breed-only **Secret** species (112 species total in the Chickenpedia bookstand).
+- 🪧 **Buy land from FOR SALE signs** — 6 plots with their own scenery (sunflower field, lavender meadow, mushroom glen…), each raising your chicken capacity and giving room for a bigger factory.
+- ⬆️ Mama's little signpost upgrades her egg rarity through 8 tiers; laid eggs can also mutate a tier up.
+
+Autosaves to your browser, with up to 8 hours of offline laying and hatching.
 
 ### Controls
 
 | Input | Action |
 | --- | --- |
-| Click chicken / Mama | pet (instant egg) |
-| Hold + drag | scoop eggs into your basket |
-| Release over truck / incubator / grass | sell · incubate · nest |
-| Click truck | send it to market |
-| `1` `2` `3` / build bar | place incubator / vacuum / conveyor |
-| drag while placing belts | paint a belt line (direction follows your drag) |
-| `R` | rotate · `X` remove mode · `Esc` cancel |
+| tap chicken / Mama | pet → instant egg |
+| hold + drag a chicken | carry it (drop on a Love Nest to breed, on the Lab to graduate) |
+| drag with basket | sweep eggs & feathers |
+| drag empty grass (hand) / WASD / wheel | pan the big map |
+| tap Lab / bookstand / signposts / truck | research · chickenpedia · upgrades · sell |
+| `1`–`4` tools · `R` rotate · `Esc` close | shortcuts |
 
 ## Run it
 
@@ -43,9 +48,9 @@ open index.html        # or serve the folder with any static server
 
 | File | What it is |
 | --- | --- |
-| `index.html` | page skeleton + HUD |
-| `style.css` | the sunny pixel-ranch look |
-| `js/data.js` | tiers, economy, all 100 species, buildings, the research tree |
-| `js/sprites.js` | pixel sprite engine (chickens, eggs, Mama, foliage) |
-| `js/game.js` | world simulation: chickens, eggs, belts, vacuums, incubators, truck |
-| `js/ui.js` | canvas renderer, input, HUD, modals, particles, sounds |
+| `index.html` | shell + the (tiny) HUD |
+| `style.css` | cozy pixel-ranch styling |
+| `js/data.js` | tiers, economy, 112 species, buildings, land plots, the research tree |
+| `js/sprites.js` | pixel sprite engine (chickens, eggs, Mama, foliage, the hand) |
+| `js/game.js` | world simulation: plots, chickens, eggs, plumes, breeding, belts, truck |
+| `js/ui.js` | camera renderer, tools & input, stations, modals, particles, sounds |

@@ -13,56 +13,44 @@
 <body>
 <div id="app">
 
-  <header id="topbar">
-    <div id="logo">
-      <span id="logo-egg">🥚</span>
-      <span id="logo-text">INF EGG CO.<small>egg ranch &amp; factory</small></span>
-    </div>
-    <div id="resources">
-      <div class="res-chip" id="chip-coins" title="Coins — the truck pays when it returns">🪙 <b id="r-coins">0</b></div>
-      <div class="res-chip" id="chip-feathers" title="Feathers — earned by hatching, spent on Research">🪶 <b id="r-feathers">0</b></div>
-      <div class="res-chip" id="chip-basket" title="Eggs in your hands">🧺 <b id="r-basket">0</b></div>
-      <div class="res-chip" id="chip-eggs" title="Eggs lying on the field">🥚 <b id="r-eggs">0</b></div>
-      <div class="res-chip" id="chip-chick" title="Chickens / capacity">🐔 <b id="r-chick">0/8</b></div>
-    </div>
-    <div id="sys-buttons">
-      <button class="btn btn-tiny btn-gold" data-act="research" title="Research tree">🧪 RESEARCH</button>
-      <button class="btn btn-tiny" data-act="pedia" title="Chickenpedia">📖</button>
-      <button class="btn btn-tiny" id="btn-mute" data-act="mute" title="Sound on/off">🔊</button>
-      <button class="btn btn-tiny" data-act="save" title="Save now">💾</button>
-      <button class="btn btn-tiny" data-act="reset" title="Reset everything">🗑️</button>
-    </div>
-  </header>
-
-  <div id="hintbar"><span id="hint-arrow">▶</span> <span id="hint-text"></span></div>
-
   <div id="stage-wrap">
     <canvas id="world" width="1152" height="624"></canvas>
-    <div id="mama-card">
-      <span class="mc-title">MAMA</span>
-      <span class="tier-chip" id="mama-chip">Common</span>
-      <button class="btn btn-gold" id="btn-mama-up" data-act="mama-up">⬆</button>
+
+    <div id="res-float">
+      <span class="pill">🪙 <b id="r-coins">0</b></span>
+      <span class="pill">🪶 <b id="r-feathers">0</b></span>
     </div>
-    <div id="build-bar"></div>
+
+    <div id="toolbelt"></div>
+    <div id="build-palette" hidden></div>
+
+    <div id="menu-pop" hidden>
+      <button class="btn" data-act="mute">🔊 sound</button>
+      <button class="btn" data-act="save">💾 save</button>
+      <button class="btn" data-act="reset">🗑️ reset</button>
+    </div>
+
+    <div id="bubble" hidden></div>
     <div id="cursor-chip" hidden></div>
   </div>
 
-  <footer id="statsbar"><span id="stats-line"></span></footer>
-
-  <!-- RESEARCH MODAL -->
+  <!-- RESEARCH TREE (the Lab) -->
   <div class="modal" id="modal-skills" hidden>
-    <div class="modal-panel">
+    <div class="modal-panel tree-panel">
       <div class="modal-head">
-        <h2>🧪 CLUCKOLOGY RESEARCH</h2>
+        <h2>🧪 THE LAB</h2>
         <span class="panel-sub" id="research-sub"></span>
         <button class="btn btn-tiny" data-act="close-modal">✖</button>
       </div>
-      <p class="flavor">Hatch chickens to earn 🪶 feathers. Spend them on very serious science.</p>
-      <div id="skill-tree"></div>
+      <div id="tree-wrap">
+        <svg id="tree-lines"></svg>
+        <div id="tree-nodes"></div>
+      </div>
+      <div id="skill-card"></div>
     </div>
   </div>
 
-  <!-- PEDIA MODAL -->
+  <!-- CHICKENPEDIA -->
   <div class="modal" id="modal-pedia" hidden>
     <div class="modal-panel">
       <div class="modal-head">
@@ -70,7 +58,6 @@
         <span class="panel-sub" id="pedia-sub"></span>
         <button class="btn btn-tiny" data-act="close-modal">✖</button>
       </div>
-      <p class="flavor">Every weird chicken the ranch has ever hatched. Collect all 100!</p>
       <div id="pedia"></div>
     </div>
   </div>
