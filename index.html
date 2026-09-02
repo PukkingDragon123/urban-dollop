@@ -19,6 +19,7 @@
     <div id="res-float">
       <span class="pill" id="pill-coins"><b id="r-coins">0</b></span>
       <span class="pill" id="pill-feathers"><b id="r-feathers">0</b></span>
+      <span class="pill" id="pill-cap" title="Chickens on the ranch"><b id="r-cap">0/10</b></span>
     </div>
 
     <div id="toolbelt"></div>
@@ -27,10 +28,18 @@
     <div id="menu-pop" hidden>
       <button class="btn" id="btn-mute" data-act="mute">SOUND ON</button>
       <button class="btn" data-act="save">SAVE</button>
+      <button class="btn" data-act="title">TITLE</button>
       <button class="btn" data-act="reset">RESET</button>
     </div>
 
     <div id="inspect-panel" hidden></div>
+    <div id="duck-panel" hidden></div>
+    <div id="title-screen">
+      <canvas id="title-canvas" width="384" height="208"></canvas>
+      <div id="title-buttons">
+        <button class="btn btn-green" data-act="start-game">START</button>
+      </div>
+    </div>
     <div id="bubble" hidden></div>
     <div id="cursor-chip" hidden></div>
   </div>
@@ -63,13 +72,19 @@
     </div>
   </div>
 
-  <!-- CHICKENPEDIA -->
+  <!-- THE INDEX: chickens, ducks, eggs and the diary -->
   <div class="modal" id="modal-pedia" hidden>
     <div class="modal-panel">
       <div class="modal-head">
-        <h2>CHICKENPEDIA</h2>
+        <h2>THE INDEX</h2>
         <span class="panel-sub" id="pedia-sub"></span>
         <button class="btn btn-tiny" data-act="close-modal">CLOSE</button>
+      </div>
+      <div id="index-tabs">
+        <button class="tab-btn" data-act="index-tab" data-tab="chickens">CHICKENS</button>
+        <button class="tab-btn" data-act="index-tab" data-tab="ducks">DUCKS</button>
+        <button class="tab-btn" data-act="index-tab" data-tab="eggs">EGGS</button>
+        <button class="tab-btn" data-act="index-tab" data-tab="diary">DIARY</button>
       </div>
       <div id="pedia"></div>
     </div>

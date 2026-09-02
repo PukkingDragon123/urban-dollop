@@ -48,6 +48,14 @@ const GAME = (() => {
       hired: { hand: 0, feeder: 0, cull: 0, match: 0 },
       autoMark: -1,          /* auto-mark chickens below this tier (-1 = off) */
       unpaid: false,
+      duck: null,            /* the visitor at the pond, if any */
+      duckCd: 25,            /* seconds until the next visitor */
+      duckMet: [],           /* ids of ducks you have helped */
+      quest: null,           /* {duckId, type, need, base, coins, feathers} */
+      questsDone: 0,
+      diary: [],             /* {day, kind, text, sp} */
+      day: 1, dayT: 0,
+      seenTitle: false,
       items: [],             /* eggs riding belts */
       truck: { state: 'parked', t: 0, load: [] },
       built: { incubator: 0, vacuum: 0, belt: 0, lovenest: 0, staffhut: 0, silo: 0, blower: 0, sorter: 0, fence: 0 },
@@ -216,6 +224,7 @@ const GAME = (() => {
     if (S.coins < p.price) return false;
     S.coins -= p.price;
     S.plots[id] = true;
+    note('land', 'Bought the ' + p.theme + ' plot next door.');
     mark('ground');
     emit('land', { plot: p });
     return true;
@@ -254,6 +263,15 @@ const GAME = (() => {
     S.stats.laid++;
     emit('lay', { egg, mutated, fromPet });
     return egg;
+  }
+
+  /* ---------- the diary ---------- */
+  function note(kind, text, sp) {
+    const last = S.diary[S.diary.length - 1];
+    if (last && last.text === text && last.kind === kind) return;
+    S.diary.push({ day: S.day, kind, text, sp: sp === undefined ? null : sp });
+    if (S.diary.length > ECON.diaryMax) S.diary.shift();
+    emit('diary', { kind, text });
   }
 
   /* ---------- plumes (physical feathers) ---------- */
@@ -314,7 +332,8 @@ const GAME = (() => {
       const born = spawnChicken(sp.id, x, y);
       if (S.autoMark >= 0 && sp.tier < S.autoMark) born.marked = true;
       births.push({ sp, feathers: f, isNew, miracle: !rainbow && ht > t });
-      if (isNew) mark('pedia');
+      if (isNew) { mark('pedia'); note('species', 'Met ' + sp.name + ' for the first time.', sp.id); }
+      if (S.stats.hatched === 1) note('first', 'The very first egg hatched on the ranch.', sp.id);
     };
     once(tier);
     if (!rainbow && Math.random() < 0.04 * lvl('twins')) once(tier);
@@ -812,6 +831,7 @@ const GAME = (() => {
     if (S.coins < cost) return false;
     S.coins -= cost;
     S.hired[type] = (S.hired[type] || 0) + 1;
+    note('hire', 'Hired a ' + STAFF[type].name + '.');
     const hutK = Object.keys(S.huts)[0].split(',').map(Number);
     S.staff.push({
       id: nextId++, type,
@@ -1023,6 +1043,102 @@ const GAME = (() => {
     };
   }
 
+  /* ============================================================
+     SPECIAL DUCKS + QUESTS
+     ============================================================ */
+  function duckSpot() {
+    const p = WORLD.pond;
+    return { x: p.x + p.w + 10, y: p.y + p.h - 4 };
+  }
+  function pickDuck() {
+    const unseen = DUCKS.filter(d => !S.duckMet.includes(d.id));
+    const pool = unseen.length ? unseen : DUCKS;
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+  function rollQuest(duckId) {
+    const q = QUESTS[Math.floor(Math.random() * QUESTS.length)];
+    const scale = questScale(S.questsDone);
+    const need = Math.max(1, Math.round(q.base * scale));
+    const mult = 1 + S.questsDone * 0.5 + ownedPlots() * 0.4;
+    return {
+      duckId, type: q.id, stat: q.stat, need,
+      base: S.stats[q.stat] || 0,
+      coins: Math.round(ECON.questCoins * mult * tycoon()),
+      feathers: Math.round(ECON.questFeathers * mult),
+    };
+  }
+  function questProgress() {
+    if (!S.quest) return 0;
+    return Math.max(0, (S.stats[S.quest.stat] || 0) - S.quest.base);
+  }
+  function questDone() { return !!S.quest && questProgress() >= S.quest.need; }
+  function questText() {
+    if (!S.quest) return '';
+    const q = QUESTS.find(x => x.id === S.quest.type);
+    return q ? q.text(S.quest.need) : '';
+  }
+  function acceptQuest() {
+    if (!S.duck || S.quest) return false;
+    S.quest = rollQuest(S.duck.id);
+    S.duck.state = 'waiting';
+    note('quest', DUCKS[S.duck.id].name + ' asked for help: ' + questText());
+    emit('quest', { kind: 'accept' });
+    return true;
+  }
+  function turnInQuest() {
+    if (!S.duck || !S.quest || !questDone()) return null;
+    const d = DUCKS[S.duck.id];
+    const reward = { coins: S.quest.coins, feathers: S.quest.feathers };
+    S.coins += reward.coins;
+    dropPlumes(S.duck.x + 4, S.duck.y + 10, reward.feathers);
+    S.questsDone++;
+    if (!S.duckMet.includes(d.id)) S.duckMet.push(d.id);
+    note('duck', 'Helped ' + d.name + '. ' + d.bye, null);
+    S.quest = null;
+    S.duck.state = 'leaving';
+    S.duck.t = 3;
+    S.duckCd = ECON.duckCooldown;
+    mark('pedia');
+    emit('quest', { kind: 'reward', duck: d, reward });
+    return reward;
+  }
+  function dismissDuck() {
+    if (!S.duck) return;
+    S.duck.state = 'leaving';
+    S.duck.t = 2;
+    S.duckCd = ECON.duckCooldown;
+  }
+  function tickDucks(dt) {
+    S.dayT += dt;
+    if (S.dayT > 300) { S.dayT -= 300; S.day++; }
+    if (S.duck) {
+      const d = S.duck;
+      d.anim = (d.anim || 0) + dt;
+      if (d.state === 'arriving') {
+        const goal = duckSpot();
+        const dx = goal.x - d.x, dy = goal.y - d.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < 2) { d.state = 'idle'; d.t = ECON.duckStay; }
+        else { d.x += (dx / dist) * 18 * dt; d.y += (dy / dist) * 18 * dt; }
+      } else if (d.state === 'leaving') {
+        d.t -= dt;
+        d.x += 26 * dt;
+        if (d.t <= 0) S.duck = null;
+      } else {
+        d.t -= dt;
+        if (d.t <= 0 && !S.quest) { d.state = 'leaving'; d.t = 3; S.duckCd = ECON.duckCooldown; }
+      }
+      return;
+    }
+    S.duckCd -= dt;
+    if (S.duckCd <= 0 && S.stats.laid > 3) {
+      const d = pickDuck();
+      const goal = duckSpot();
+      S.duck = { id: d.id, x: goal.x + 70, y: goal.y - 6, state: 'arriving', t: 0, anim: 0 };
+      emit('duckarrive', { duck: d });
+    }
+  }
+
   /* ---------- building ---------- */
   function build(type, c, r, dir) {
     const cost = buildCost(type, S.built[type]);
@@ -1102,6 +1218,7 @@ const GAME = (() => {
     if (S.coins < cost) return false;
     S.coins -= cost;
     S.mamaTier++;
+    note('mama', 'Mama Hen became a ' + TIERS[S.mamaTier].n + ' layer.');
     return true;
   }
 
@@ -1123,6 +1240,7 @@ const GAME = (() => {
     tickIncs(dt);
     tickNests(dt);
     tickTruck(dt);
+    tickDucks(dt);
   }
 
   /* ---------- offline ---------- */
@@ -1207,6 +1325,10 @@ const GAME = (() => {
       S.staff = (S.staff || []).map(w => Object.assign({ carry: [], frame: 0, anim: 0, say: 0 }, w, { target: null, state: 'idle' }));
       S.hired = Object.assign({ hand: 0, feeder: 0, cull: 0, match: 0 }, S.hired);
       ['huts', 'silos', 'blowers', 'sorters', 'fences'].forEach(m => { if (!S[m]) S[m] = {}; });
+      if (!Array.isArray(S.diary)) S.diary = [];
+      if (!Array.isArray(S.duckMet)) S.duckMet = [];
+      if (typeof S.day !== 'number') { S.day = 1; S.dayT = 0; }
+      if (typeof S.duckCd !== 'number') S.duckCd = ECON.duckCooldown;
       Object.values(S.silos).forEach(si => { if (!si.store) si.store = []; });
       ensureStarterInc();
       nextId = 1 + Math.max(0, ...S.eggs.map(e => e.id || 0), ...S.chickens.map(c => c.id || 0), ...S.plumes.map(p => p.id || 0));
@@ -1261,6 +1383,7 @@ const GAME = (() => {
     sendTruck, build, demolish, setBeltDir, ejectNest, buySkill, upgradeMama,
     staffSlots, wagePerSec, staffHireCost, canHire, hireStaff, fireStaff,
     markChicken, retireChicken, rates, beltDirFor,
+    duckSpot, questProgress, questDone, questText, acceptQuest, turnInQuest, dismissDuck, note,
     tick, applyOffline, save, load, reset, fmt, fmtTime,
   };
 })();

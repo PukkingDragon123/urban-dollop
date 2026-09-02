@@ -115,8 +115,8 @@ const SPR = (() => {
     '>': ['#  ', ' # ', '  #', ' # ', '#  '],
     ' ': ['   ', '   ', '   ', '   ', '   '],
   };
-  function textW(str, k) { k = k || 1; return str.length * 4 * k - k; }
-  function drawText(ctx, str, x, y, col, k, shadow) {
+  function tinyW(str, k) { k = k || 1; return str.length * 4 * k - k; }
+  function drawTiny(ctx, str, x, y, col, k, shadow) {
     k = k || 1;
     str = String(str).toUpperCase();
     if (shadow) {
@@ -133,6 +133,89 @@ const SPR = (() => {
       for (let r = 0; r < 5; r++) for (let c = 0; c < 3; c++)
         if (g[r][c] === '#') ctx.fillRect(x + (i * 4 + c) * k, y + r * k, k, k);
     }
+  }
+
+  /* ============================================================
+     EGGTYPE - the display font: 5 wide, 6 tall caps, 6px advance
+     ============================================================ */
+  const FONT5 = {
+    A: ['.###.', '#...#', '#...#', '#####', '#...#', '#...#'],
+    B: ['####.', '#...#', '####.', '#...#', '#...#', '####.'],
+    C: ['.####', '#....', '#....', '#....', '#....', '.####'],
+    D: ['####.', '#...#', '#...#', '#...#', '#...#', '####.'],
+    E: ['#####', '#....', '####.', '#....', '#....', '#####'],
+    F: ['#####', '#....', '####.', '#....', '#....', '#....'],
+    G: ['.###.', '#....', '#....', '#..##', '#...#', '.###.'],
+    H: ['#...#', '#...#', '#####', '#...#', '#...#', '#...#'],
+    I: ['#####', '..#..', '..#..', '..#..', '..#..', '#####'],
+    J: ['..###', '....#', '....#', '....#', '#...#', '.###.'],
+    K: ['#...#', '#..#.', '###..', '#..#.', '#...#', '#...#'],
+    L: ['#....', '#....', '#....', '#....', '#....', '#####'],
+    M: ['#...#', '##.##', '#.#.#', '#...#', '#...#', '#...#'],
+    N: ['#...#', '##..#', '#.#.#', '#..##', '#...#', '#...#'],
+    O: ['.###.', '#...#', '#...#', '#...#', '#...#', '.###.'],
+    P: ['####.', '#...#', '#...#', '####.', '#....', '#....'],
+    Q: ['.###.', '#...#', '#...#', '#.#.#', '#..#.', '.##.#'],
+    R: ['####.', '#...#', '#...#', '####.', '#..#.', '#...#'],
+    S: ['.####', '#....', '.###.', '....#', '....#', '####.'],
+    T: ['#####', '..#..', '..#..', '..#..', '..#..', '..#..'],
+    U: ['#...#', '#...#', '#...#', '#...#', '#...#', '.###.'],
+    V: ['#...#', '#...#', '#...#', '#...#', '.#.#.', '..#..'],
+    W: ['#...#', '#...#', '#...#', '#.#.#', '##.##', '#...#'],
+    X: ['#...#', '.#.#.', '..#..', '..#..', '.#.#.', '#...#'],
+    Y: ['#...#', '.#.#.', '..#..', '..#..', '..#..', '..#..'],
+    Z: ['#####', '....#', '...#.', '..#..', '.#...', '#####'],
+    0: ['.###.', '#..##', '#.#.#', '##..#', '#...#', '.###.'],
+    1: ['..#..', '.##..', '..#..', '..#..', '..#..', '#####'],
+    2: ['.###.', '#...#', '...#.', '..#..', '.#...', '#####'],
+    3: ['####.', '....#', '.###.', '....#', '....#', '####.'],
+    4: ['#..#.', '#..#.', '#..#.', '#####', '...#.', '...#.'],
+    5: ['#####', '#....', '####.', '....#', '#...#', '.###.'],
+    6: ['.###.', '#....', '####.', '#...#', '#...#', '.###.'],
+    7: ['#####', '....#', '...#.', '..#..', '..#..', '..#..'],
+    8: ['.###.', '#...#', '.###.', '#...#', '#...#', '.###.'],
+    9: ['.###.', '#...#', '#...#', '.####', '....#', '.###.'],
+    '.': ['.....', '.....', '.....', '.....', '.##..', '.##..'],
+    ',': ['.....', '.....', '.....', '.##..', '.##..', '.#...'],
+    ':': ['.....', '.##..', '.##..', '.....', '.##..', '.##..'],
+    '!': ['..#..', '..#..', '..#..', '..#..', '.....', '..#..'],
+    '?': ['.###.', '#...#', '...#.', '..#..', '.....', '..#..'],
+    '/': ['....#', '...#.', '..#..', '.#...', '#....', '.....'],
+    '-': ['.....', '.....', '#####', '.....', '.....', '.....'],
+    '+': ['.....', '..#..', '#####', '..#..', '.....', '.....'],
+    "'": ['..#..', '..#..', '.....', '.....', '.....', '.....'],
+    '"': ['.#.#.', '.#.#.', '.....', '.....', '.....', '.....'],
+    '(': ['...#.', '..#..', '..#..', '..#..', '..#..', '...#.'],
+    ')': ['.#...', '..#..', '..#..', '..#..', '..#..', '.#...'],
+    '%': ['##..#', '##.#.', '..#..', '.#.##', '#..##', '.....'],
+    '*': ['#.#.#', '.###.', '#####', '.###.', '#.#.#', '.....'],
+    '=': ['.....', '#####', '.....', '#####', '.....', '.....'],
+    '>': ['#....', '.#...', '..#..', '..#..', '.#...', '#....'],
+    '<': ['....#', '...#.', '..#..', '..#..', '...#.', '....#'],
+    '#': ['.#.#.', '#####', '.#.#.', '#####', '.#.#.', '.....'],
+    ' ': ['.....', '.....', '.....', '.....', '.....', '.....'],
+  };
+  function textW(str, k) { k = k || 1; return String(str).length * 6 * k - k; }
+  function drawText(ctx, str, x, y, col, k, shadow) {
+    k = k || 1;
+    str = String(str).toUpperCase();
+    const stamp = (dx, dy, c) => {
+      ctx.fillStyle = c;
+      for (let i = 0; i < str.length; i++) {
+        const g = FONT5[str[i]]; if (!g) continue;
+        for (let r = 0; r < 6; r++) for (let cc = 0; cc < 5; cc++)
+          if (g[r][cc] === '#') ctx.fillRect(x + (i * 6 + cc) * k + dx, y + r * k + dy, k, k);
+      }
+    };
+    if (shadow) stamp(0, k, shadow);
+    stamp(0, 0, col);
+  }
+  /* chunky outlined title lettering */
+  function drawTitle(ctx, str, x, y, col, outline, k) {
+    k = k || 1;
+    [[-k, 0], [k, 0], [0, -k], [0, k], [-k, -k], [k, -k], [-k, k], [k, k]]
+      .forEach(([dx, dy]) => drawText(ctx, str, x + dx, y + dy, outline, k));
+    drawText(ctx, str, x, y, col, k);
   }
 
   /* ============================================================
@@ -886,6 +969,50 @@ const SPR = (() => {
     return c;
   }
 
+  /* crack stages drawn over an egg: 1 = hairline, 2 = split, 3 = broken open */
+  function eggCrackSprite(tier, stage, scale) {
+    const key = 'crk' + tier + '_' + stage + '_' + scale;
+    if (cache.has(key)) return cache.get(key);
+    const k = scale || 1;
+    const c = newCanvas(10 * k, 12 * k);
+    const ctx = c.getContext('2d');
+    const shell = EGG_SHELL[Math.min(tier, EGG_SHELL.length - 1)];
+    const dark = darken(shell, 0.45), line = darken(shell, 0.6);
+    const P = (x, y, col) => px(ctx, x, y, k, col);
+    if (stage >= 1) {
+      [[3, 5], [4, 4], [5, 5], [6, 4]].forEach(([x, y]) => P(x, y, line));
+    }
+    if (stage >= 2) {
+      [[2, 6], [3, 6], [4, 5], [5, 6], [6, 5], [7, 6]].forEach(([x, y]) => P(x, y, line));
+      [[3, 7], [5, 7], [6, 7]].forEach(([x, y]) => P(x, y, dark));
+    }
+    if (stage >= 3) {
+      /* a chip is gone from the top-right */
+      ctx.clearRect(5 * k, 1 * k, 4 * k, 4 * k);
+      [[5, 5], [6, 4], [7, 5], [8, 5]].forEach(([x, y]) => P(x, y, line));
+      P(6, 5, '#2e2216'); P(7, 4, '#2e2216');
+    }
+    cache.set(key, c);
+    return c;
+  }
+  /* the two halves that fly apart when a chick pops out */
+  function shellHalfSprite(tier, top, scale) {
+    const key = 'shl' + tier + '_' + (top ? 't' : 'b') + '_' + scale;
+    if (cache.has(key)) return cache.get(key);
+    const k = scale || 1;
+    const c = newCanvas(10 * k, 7 * k);
+    const ctx = c.getContext('2d');
+    const shell = EGG_SHELL[Math.min(tier, EGG_SHELL.length - 1)];
+    const rows = top
+      ? ['...oooo...', '..owwwwo..', '.owwwwwwo.', 'owwwwwwwwo', 'o.w.o.w.oo', '..........', '..........']
+      : ['o.w.o.ww.o', 'owwwwwwwwo', 'owwwwwwwwo', '.owwwwwwo.', '.owwwwwwo.', '..owwwwo..', '...oooo...'];
+    drawGrid(ctx, rows, { o: darken(shell, 0.45), w: shell }, 0, 0, k);
+    /* highlight */
+    px(ctx, 2, top ? 2 : 1, k, lighten(shell, 0.6));
+    cache.set(key, c);
+    return c;
+  }
+
   function nestSprite(scale) {
     const key = 'nest_' + scale;
     if (cache.has(key)) return cache.get(key);
@@ -1235,6 +1362,71 @@ const SPR = (() => {
     return c;
   }
 
+  /* ---------- special ducks: quest-giving pond folk ---------- */
+  function duckSprite(d, frame, scale) {
+    const key = 'duck' + d.id + '_' + frame + '_' + scale;
+    if (cache.has(key)) return cache.get(key);
+    const k = scale || 1;
+    const c = newCanvas(18 * k, 16 * k);
+    const ctx = c.getContext('2d');
+    const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
+    const body = d.body, dark = darken(body, 0.26), lite = lighten(body, 0.34);
+    const OUT = lum(body) < 0.3 ? '#14141c' : darken(body, 0.55);
+    /* body mask for a plump duck */
+    const m = newMask(18, 16);
+    mCircle(m, 8, 10, 6, 0.72);
+    mCircle(m, 12, 5, 3.4, 1);          /* head */
+    mRect(m, 10, 6, 3, 3);              /* neck */
+    renderMask(ctx, m, k, 0, 0, { base: body, light: lite, dark: dark, out: OUT }, d.id + 3,
+      { lightBand: 2, shadeBand: 2 });
+    /* head cap colour (mallard types) */
+    if (d.head) {
+      const hm = newMask(18, 16);
+      mCircle(hm, 12, 4.4, 3.2, 1);
+      renderMask(ctx, hm, k, 0, 0,
+        { base: d.head, light: lighten(d.head, 0.3), dark: darken(d.head, 0.3), out: darken(d.head, 0.55) },
+        d.id + 9, { lightBand: 1, shadeBand: 1 });
+    }
+    /* tail */
+    R(2, 8, 2, 2, dark);
+    R(1, 9, 2, 2, OUT);
+    /* wing */
+    R(6, 9, 5, 3, dark);
+    R(6, 9, 5, 1, lite);
+    /* bill */
+    R(15, 5, 3, 2, d.bill);
+    R(15, 6, 3, 1, darken(d.bill, 0.25));
+    /* eye */
+    R(13, 4, 1, 1, '#ffffff');
+    R(13, 4, 1, 1, '#2e2216');
+    R(12, 4, 1, 1, '#2e2216');
+    /* feet paddling */
+    const f = frame ? 1 : 0;
+    R(7 + f, 15, 2, 1, '#f2a03f');
+    R(10 - f, 15, 2, 1, '#e0862f');
+    /* accessory */
+    if (d.acc === 'monocle') {
+      R(12, 3, 3, 1, '#ffd23f'); R(12, 5, 3, 1, '#ffd23f');
+      R(11, 4, 1, 1, '#ffd23f'); R(15, 4, 1, 1, '#ffd23f');
+    } else if (d.acc === 'cap') {
+      R(10, 1, 6, 1, '#2f5f9e'); R(10, 2, 6, 1, '#3f7ec0'); R(15, 2, 3, 1, '#2f5f9e');
+    } else if (d.acc === 'flower') {
+      R(11, 1, 1, 1, '#ff8ab5'); R(13, 1, 1, 1, '#ff8ab5');
+      R(12, 0, 1, 1, '#ff8ab5'); R(12, 2, 1, 1, '#ff8ab5'); R(12, 1, 1, 1, '#ffd23f');
+    } else if (d.acc === 'scarf') {
+      R(10, 7, 4, 2, '#e8542f'); R(9, 8, 2, 3, '#c43a2a');
+    } else if (d.acc === 'glasses') {
+      R(11, 3, 6, 1, '#3a3a4a'); R(11, 5, 6, 1, '#3a3a4a');
+      R(11, 4, 1, 1, '#3a3a4a'); R(16, 4, 1, 1, '#3a3a4a'); R(14, 4, 1, 1, '#8fd6ff');
+    } else if (d.acc === 'hat') {
+      R(9, 2, 8, 1, '#7a5230'); R(11, 0, 4, 2, '#8a5e2a'); R(11, 1, 4, 1, '#a8783f');
+    } else if (d.acc === 'star') {
+      R(12, 0, 1, 1, '#ffd23f'); R(11, 1, 3, 1, '#ffd23f'); R(12, 2, 1, 1, '#ffd23f');
+    }
+    cache.set(key, c);
+    return c;
+  }
+
   /* ---------- staff: little walking workers ---------- */
   const STAFF_PAL = {
     hand:   { hat:'#e0bd82', hatDark:'#b89355', shirt:'#5fa8e8', shirtDark:'#2f5f9e',
@@ -1398,8 +1590,8 @@ const SPR = (() => {
   return {
     chickenSprite, eggSprite, nestSprite, mamaSprite, decoSprite,
     uiSprite, iconSprite, basketSprite, feedbagSprite, hammerSprite, staffSprite,
-    plumeSprite, signSprite, treeSprite,
-    drawText, textW, drawHex, hexHit, hexRows,
+    plumeSprite, signSprite, treeSprite, duckSprite, eggCrackSprite, shellHalfSprite,
+    drawText, textW, drawTiny, tinyW, drawTitle, drawHex, hexHit, hexRows,
     newMask, mRect, mCircle, renderMask, mulberry, newCanvas,
     darken, lighten, warm, cool, lum, px, CELL, ICONS,
   };

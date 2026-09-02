@@ -419,6 +419,56 @@
     });
     ctx.globalAlpha = 1;
   }
+  /* hatch bursts: shell halves fly, the chick pops out and hops */
+  let hatchFx = [];
+  const bornFx = new Map();
+  function spawnHatchFx(sp, x, y, rainbow) {
+    hatchFx.push({ sp, x, y, t: 0, life: 1.15, rainbow, seed: Math.random() });
+    shellBurst(x, y, sp.tier);
+  }
+  function drawHatchFx(dt, now) {
+    hatchFx = hatchFx.filter(h => (h.t += dt) < h.life);
+    hatchFx.forEach(h => {
+      const p = h.t / h.life;
+      const shell = Math.min(h.sp.tier, EGG_SHELL.length - 1);
+      /* bottom half stays put and settles */
+      const bot = SPR.shellHalfSprite(shell, false, 1);
+      ctx.drawImage(bot, Math.round(h.x - 5), Math.round(h.y - 4 + Math.min(2, p * 6)));
+      /* top half tumbles away */
+      const top = SPR.shellHalfSprite(shell, true, 1);
+      const tx = h.x - 5 + (h.seed < 0.5 ? -1 : 1) * p * 22;
+      const ty = h.y - 8 - Math.sin(Math.min(1, p * 1.4) * Math.PI) * 18 + p * p * 14;
+      ctx.save();
+      ctx.translate(Math.round(tx + 5), Math.round(ty + 3));
+      ctx.rotate(p * (h.seed < 0.5 ? -7 : 7));
+      ctx.globalAlpha = Math.max(0, 1 - p * 1.1);
+      ctx.drawImage(top, -5, -3);
+      ctx.restore();
+      ctx.globalAlpha = 1;
+      /* the chick rises, squashing as it lands */
+      const spr = SPR.chickenSprite(h.sp, 1, false);
+      const rise = p < 0.45 ? (p / 0.45) : 1;
+      const hop = Math.sin(Math.min(1, p / 0.75) * Math.PI) * 7;
+      const squash = p < 0.2 ? 1.35 - p * 1.5 : (p > 0.8 ? 1 + (p - 0.8) * 0.5 : 1);
+      ctx.save();
+      ctx.translate(Math.round(h.x), Math.round(h.y + 4 - rise * 6 - hop));
+      ctx.scale(1 / squash, squash);
+      ctx.globalAlpha = Math.min(1, p * 3);
+      ctx.drawImage(spr, -10, -16);
+      ctx.restore();
+      ctx.globalAlpha = 1;
+      /* sparkle ring on the first beat */
+      if (p < 0.5) {
+        const r = 4 + p * 26;
+        ctx.fillStyle = h.rainbow ? '#ff5fd0' : 'rgba(255,255,255,.85)';
+        for (let a = 0; a < 6; a++) {
+          const ang = a / 6 * Math.PI * 2 + h.seed * 6;
+          ctx.fillRect(Math.round(h.x + Math.cos(ang) * r), Math.round(h.y - 4 + Math.sin(ang) * r * 0.6), 2, 2);
+        }
+      }
+    });
+  }
+
   const flies = [0, 1, 2, 3, 4, 5].map(i => ({
     x: Math.random() * W.W, y: 40 + Math.random() * 300,
     a: Math.random() * Math.PI * 2,
@@ -566,8 +616,18 @@
     if (inc.queue.length) {
       const q = inc.queue[0];
       const spr = q.rainbow ? SPR.eggSprite(q.tier, 1, true, Math.floor(now / 120) % 6) : SPR.eggSprite(q.tier, 1);
-      const wob = Math.sin(now / 150) * 0.6;
+      const need = GAME.incHatchTime(q.tier, q.rainbow);
+      const frac = Math.min(1, inc.prog / need);
+      /* the closer to hatching, the harder the egg rocks */
+      const rock = frac > 0.55 ? Math.sin(now / (frac > 0.85 ? 45 : 90)) * (frac > 0.85 ? 1.6 : 0.9) : 0;
+      const wob = Math.sin(now / 150) * 0.6 + rock;
       ctx.drawImage(spr, Math.round(x + 11 + wob), y + 2);
+      const stage = frac > 0.94 ? 3 : frac > 0.82 ? 2 : frac > 0.66 ? 1 : 0;
+      if (stage) ctx.drawImage(SPR.eggCrackSprite(q.tier, stage, 1), Math.round(x + 11 + wob), y + 2);
+      if (stage >= 2 && Math.floor(now / 140) % 3 === 0) {
+        ctx.fillStyle = '#fff8ee';
+        ctx.fillRect(Math.round(x + 11 + wob + 2 + Math.random() * 5), y + 12, 1, 1);
+      }
       /* warm glow */
       ctx.fillStyle = 'rgba(255,190,90,.25)';
       ctx.fillRect(x + 6, y + 9, 20, 3);
@@ -705,10 +765,10 @@
     ctx.fillStyle = '#5e3d18'; ctx.fillRect(x + 21, y + 15, 10, 9);
     ctx.fillStyle = '#e8d5a8'; ctx.fillRect(x + 22, y + 16, 8, 7);
     const n = S().staff.length, cap = GAME.staffSlots();
-    SPR.drawText(ctx, String(n), x + 23, y + 17, '#3a2a16', 1);
-    SPR.drawText(ctx, '/' + cap, x + 23, y + 20, '#7a5a3a', 1);
+    SPR.drawTiny(ctx, String(n), x + 23, y + 17, '#3a2a16', 1);
+    SPR.drawTiny(ctx, '/' + cap, x + 23, y + 20, '#7a5a3a', 1);
     if (S().unpaid && Math.floor(now / 400) % 2) {
-      SPR.drawText(ctx, 'NO PAY', x + 2, y - 4, '#c43a2a', 1, '#ffffff');
+      SPR.drawTiny(ctx, 'NO PAY', x + 2, y - 4, '#c43a2a', 1, '#ffffff');
     }
   }
 
@@ -740,7 +800,31 @@
     ctx.fillStyle = '#8a9099'; ctx.fillRect(x + 27, y + 20, 5, 3);
     ctx.fillStyle = '#5a626e'; ctx.fillRect(x + 27, y + 23, 5, 1);
     /* count plate */
-    SPR.drawText(ctx, String(silo.store.length), x + 7, y + 29, '#2e2216', 1);
+    SPR.drawTiny(ctx, String(silo.store.length), x + 7, y + 29, '#2e2216', 1);
+  }
+
+  function drawDuck(now) {
+    const d = S().duck;
+    if (!d) return;
+    const def = DUCKS[d.id];
+    const frame = Math.floor(now / 260) % 2;
+    const spr = SPR.duckSprite(def, frame, 1);
+    const bob = Math.sin(now / 420 + d.id) * 0.8;
+    ctx.fillStyle = 'rgba(40,58,26,.26)';
+    ctx.fillRect(Math.round(d.x + 3), Math.round(d.y + 15), 11, 2);
+    ctx.drawImage(spr, Math.round(d.x), Math.round(d.y + bob));
+    /* status bubble above: ! to talk, ? while working, star when done */
+    const q = S().quest;
+    const mine = q && q.duckId === d.id;
+    let glyph = '!', col = '#ffd23f';
+    if (mine) { glyph = GAME.questDone() ? '*' : '?'; col = GAME.questDone() ? '#7ac74f' : '#8fd6ff'; }
+    if (d.state !== 'leaving') {
+      const by = Math.round(d.y - 13 + Math.sin(now / 300) * 1.2);
+      ctx.fillStyle = '#2e2216'; ctx.fillRect(Math.round(d.x + 4), by, 9, 11);
+      ctx.fillStyle = '#fff9ec'; ctx.fillRect(Math.round(d.x + 5), by + 1, 7, 9);
+      ctx.fillStyle = '#2e2216'; ctx.fillRect(Math.round(d.x + 7), by + 11, 2, 2);
+      SPR.drawText(ctx, glyph, Math.round(d.x + 6), by + 2, col === '#ffd23f' ? '#c98f1f' : col, 1);
+    }
   }
 
   function drawStaff(w, now) {
@@ -772,7 +856,7 @@
     }
     /* status marks */
     if (S().unpaid && Math.floor(now / 350) % 2) {
-      SPR.drawText(ctx, '!', Math.round(w.x + 5), Math.round(w.y - 8), '#c43a2a', 1, '#ffffff');
+      SPR.drawTiny(ctx, '!', Math.round(w.x + 5), Math.round(w.y - 8), '#c43a2a', 1, '#ffffff');
     } else if (w.type === 'cull' && w.state === 'work') {
       ctx.fillStyle = '#ff6b4a';
       ctx.fillRect(Math.round(w.x + 12), Math.round(w.y + 4), 4, 1);
@@ -821,8 +905,8 @@
       const f = Math.min(1, nest.prog / need);
       ctx.fillStyle = '#e8407a'; ctx.fillRect(x + 6, y + 31, Math.round(20 * f), 1);
     } else if (!nest.slots[0] && !nest.slots[1]) {
-      SPR.drawText(ctx, 'DROP', x + 8, y + 9, 'rgba(90,62,38,.8)', 1);
-      SPR.drawText(ctx, '2 HENS', x + 5, y + 15, 'rgba(90,62,38,.8)', 1);
+      SPR.drawTiny(ctx, 'DROP', x + 8, y + 9, 'rgba(90,62,38,.8)', 1);
+      SPR.drawTiny(ctx, '2 HENS', x + 5, y + 15, 'rgba(90,62,38,.8)', 1);
     }
   }
 
@@ -884,7 +968,7 @@
     }
     /* hanging sign */
     ctx.fillStyle = '#5e3d18'; ctx.fillRect(x + 6, y + 26, 10, 5);
-    SPR.drawText(ctx, 'LAB', x + 7, y + 27, '#ffd23f', 1);
+    SPR.drawTiny(ctx, 'LAB', x + 7, y + 27, '#ffd23f', 1);
     /* crates outside */
     ctx.fillStyle = '#8a5e2a'; ctx.fillRect(x + 30, y + 24, 7, 7);
     ctx.fillStyle = '#c9924f'; ctx.fillRect(x + 31, y + 25, 5, 5);
@@ -921,12 +1005,12 @@
     const cost = GAME.mamaCost();
     const afford = !maxed && S().coins >= cost;
     ctx.drawImage(SPR.signSprite(26, 1, 0), x, y + 2);
-    SPR.drawText(ctx, 'MAMA', x + 4, y + 4, '#4a3018', 1);
-    if (maxed) SPR.drawText(ctx, 'MAX', x + 6, y + 10, '#4a3018', 1);
+    SPR.drawTiny(ctx, 'MAMA', x + 4, y + 4, '#4a3018', 1);
+    if (maxed) SPR.drawTiny(ctx, 'MAX', x + 6, y + 10, '#4a3018', 1);
     else {
       const label = GAME.fmt(cost);
       const col = afford && Math.floor(now / 400) % 2 ? '#2e6e2e' : '#5e3d18';
-      SPR.drawText(ctx, label, x + 8, y + 10, col, 1);
+      SPR.drawTiny(ctx, label, x + 8, y + 10, col, 1);
       ctx.fillStyle = afford ? '#ffd23f' : '#b5a06a';
       ctx.fillRect(x + 4, y + 10, 3, 3);
       ctx.fillStyle = '#e0a416'; ctx.fillRect(x + 5, y + 11, 1, 1);
@@ -942,16 +1026,16 @@
       const wig = afford ? Math.sin(now / 260) * 1 : 0;
       ctx.save();
       ctx.translate(Math.round(cx), Math.round(cy + wig));
-      const BW = 40;
-      ctx.drawImage(SPR.signSprite(BW, 1, 1), -BW / 2, -13);
+      const BW = 58;
+      ctx.drawImage(SPR.signSprite(BW, 1, 1), -BW / 2, -16);
       const t1 = 'FOR SALE';
-      SPR.drawText(ctx, t1, -Math.floor(SPR.textW(t1, 1) / 2), -11, '#4a3018', 1);
+      SPR.drawText(ctx, t1, -Math.floor(SPR.textW(t1, 1) / 2), -14, '#4a3018', 1);
       const priceTxt = GAME.fmt(p.price);
-      const pw = SPR.textW(priceTxt, 1) + 5;
-      SPR.drawText(ctx, priceTxt, -Math.floor(pw / 2) + 5, -5, afford ? '#2e6e2e' : '#a83a2a', 1);
+      const pw = SPR.textW(priceTxt, 1) + 6;
+      SPR.drawText(ctx, priceTxt, -Math.floor(pw / 2) + 6, -6, afford ? '#2e6e2e' : '#a83a2a', 1);
       ctx.fillStyle = afford ? '#ffd23f' : '#b5a06a';
-      ctx.fillRect(-Math.floor(pw / 2), -5, 3, 3);
-      ctx.fillStyle = '#e0a416'; ctx.fillRect(-Math.floor(pw / 2) + 1, -4, 1, 1);
+      ctx.fillRect(-Math.floor(pw / 2) - 1, -5, 4, 4);
+      ctx.fillStyle = '#e0a416'; ctx.fillRect(-Math.floor(pw / 2), -4, 2, 2);
       ctx.restore();
     });
   }
@@ -1030,16 +1114,16 @@
     /* load counter plate */
     if (!moving) {
       const label = tr.load.length + '/' + GAME.truckCap();
-      const w = SPR.textW(label, 1) + 6;
+      const w = SPR.tinyW(label, 1) + 6;
       const px0 = x + 34, py0 = y - 26;
       ctx.fillStyle = '#3a2a16'; ctx.fillRect(px0, py0, w, 9);
       ctx.fillStyle = '#e8d5a8'; ctx.fillRect(px0 + 1, py0 + 1, w - 2, 7);
       ctx.fillStyle = '#c9b48a'; ctx.fillRect(px0 + 1, py0 + 6, w - 2, 2);
-      SPR.drawText(ctx, label, px0 + 3, py0 + 2, '#3a2a16', 1);
+      SPR.drawTiny(ctx, label, px0 + 3, py0 + 2, '#3a2a16', 1);
       const full = tr.load.length >= GAME.truckCap();
       if (tr.load.length > 0 && Math.floor(now / 460) % 2) {
         const msg = full ? 'FULL - TAP' : 'TAP TO SEND';
-        SPR.drawText(ctx, msg, x + 2, y - 36, full ? '#c43a2a' : '#2e6e2e', 1, '#ffffff');
+        SPR.drawText(ctx, msg, x + 1, y - 40, full ? '#c43a2a' : '#2e6e2e', 1, '#ffffff');
       }
     }
   }
@@ -1054,13 +1138,24 @@
     let hop = 0;
     const pf = petFx.get(ch.id);
     if (pf && now - pf < 350) hop = Math.sin((now - pf) / 350 * Math.PI) * 4;
+    const bf = bornFx.get(ch.id);
+    let grow = 1;
+    if (bf !== undefined) {
+      const bp = (now - bf) / 700;
+      if (bp >= 1) bornFx.delete(ch.id);
+      else { grow = 0.45 + 0.55 * bp; hop += Math.sin(bp * Math.PI) * 3; }
+    }
     const yy = Math.round(ch.y - bob - hop);
     /* soft shadow that shrinks as it hops */
     const sw = 12 - Math.round(hop * 0.6);
     ctx.fillStyle = 'rgba(40,58,26,.26)';
     ctx.fillRect(Math.round(ch.x + 4 + (12 - sw) / 2), Math.round(ch.y + 17), sw, 2);
     ctx.save();
-    if (ch.dir === 1) {
+    if (grow !== 1) {
+      ctx.translate(Math.round(ch.x) + spr.width / 2, yy + spr.height);
+      ctx.scale(ch.dir === 1 ? -grow : grow, grow);
+      ctx.drawImage(spr, -spr.width / 2, -spr.height);
+    } else if (ch.dir === 1) {
       ctx.translate(Math.round(ch.x) + spr.width, yy);
       ctx.scale(-1, 1);
       ctx.drawImage(spr, 0, 0);
@@ -1269,6 +1364,7 @@
     drawMama(now);
     S().chickens.forEach(ch => drawChicken(ch, now));
     S().staff.forEach(w => drawStaff(w, now));
+    drawDuck(now);
     drawTruck(now);
     drawSaleSigns(now);
 
@@ -1288,6 +1384,7 @@
       ctx.fillStyle = '#3a2a16'; ctx.fillRect(Math.round(f.x), Math.round(f.y), 1, 2);
     });
 
+    drawHatchFx(dt, now);
     drawParts(dt);
 
     /* drifting cloud shadows (dithered, very soft) */
@@ -1374,14 +1471,16 @@
   /* ================= HUD ================= */
   const el = {
     coins: $('#r-coins'), feathers: $('#r-feathers'),
+    cap: $('#r-cap'), capPill: $('#pill-cap'),
     cursorChip: $('#cursor-chip'), bubble: $('#bubble'),
     toolbelt: $('#toolbelt'), palette: $('#build-palette'),
   };
   /* prepend pixel icons to the resource pills once */
   (function seedPills() {
-    const cp = $('#pill-coins'), fp = $('#pill-feathers');
+    const cp = $('#pill-coins'), fp = $('#pill-feathers'), hp = $('#pill-cap');
     cp.insertBefore(mkIcon('coin', 2), cp.firstChild);
     fp.insertBefore(mkIcon('feather', 2), fp.firstChild);
+    hp.insertBefore(mkIcon('chick', 2), hp.firstChild);
   })();
 
   function updateCursorChip() {
@@ -1512,7 +1611,7 @@
     else if (GAME.lvl('hiring') && !Object.keys(st.huts).length) { anchor = null; text = 'build a staff hut, then tap it to hire crew'; }
     else if (st.chickens.length > 6 && !st.inspected) { anchor = null; text = 'use the magnifier tool to inspect any hen, worker or machine'; }
     else if (st.mamaTier < TIERS.length - 2 && st.coins >= GAME.mamaCost() * 1.2) { anchor = [W.stations.mamaSign.x + 7, W.stations.mamaSign.y - 8]; text = 'upgrade mama at her sign'; }
-    if (!text) { el.bubble.hidden = true; bubbleText = ''; return; }
+    if (!text || !titleEl.hidden) { el.bubble.hidden = true; bubbleText = ''; return; }
     if (text !== bubbleText) { bubbleText = text; el.bubble.textContent = text; }
     el.bubble.hidden = false;
     const r = cv.getBoundingClientRect();
@@ -1531,14 +1630,256 @@
     const set = (node, v) => { if (node.textContent !== v) node.textContent = v; };
     set(el.coins, GAME.fmt(S().coins));
     set(el.feathers, GAME.fmt(S().feathers));
+    const n = S().chickens.length, capn = GAME.chickenCap();
+    set(el.cap, n + '/' + capn);
+    const full = n >= capn;
+    if (el.capPill.classList.contains('full') !== full) el.capPill.classList.toggle('full', full);
     updateCursorChip();
     hintLogic();
     refreshInspect();
+    if (duckOpen) { if (!S().duck) closeDuck(); else renderDuckPanel(); }
     if (!$('#modal-hire').hidden) {
       const sig = S().staff.length + '|' + S().coins.toFixed(0) + '|' + S().autoMark + '|' + GAME.staffSlots();
       if (sig !== hireSig) { hireSig = sig; renderHire(); }
     }
     if (GAME.dirty.build) renderPalette();
+  }
+
+  /* ================= TITLE SCREEN ================= */
+  const titleEl = $('#title-screen');
+  const titleCv = $('#title-canvas');
+  const tctx = titleCv.getContext('2d');
+  const TW = 384, TH = 208;
+  let titleT = 0;
+  const titleEggs = Array.from({ length: 20 }, () => ({
+    x: 16 + Math.random() * (TW - 32), y: 52 + Math.random() * (TH + 40),
+    tier: Math.floor(Math.random() * 8), sp: 8 + Math.random() * 14, sw: Math.random() * 6,
+  }));
+  const titleClouds = [0, 1, 2, 3].map(i => ({ x: Math.random() * TW, y: 58 + i * 13, w: 34 + i * 12, v: 4 + i * 2 }));
+  const silCache = new Map();
+
+  function drawTitleScreen(dt) {
+    titleT += dt;
+    const now = titleT * 1000;
+    tctx.imageSmoothingEnabled = false;
+    /* dusk sky: a long ramp with dithered seams so it reads as pixel gradient */
+    const bands = ['#16203c', '#1d2b4a', '#26375c', '#2f4470', '#3b5686', '#4a6a9c',
+                   '#5d7fae', '#7d9ac4', '#9fa8bd', '#bda6a6', '#d8ab94', '#eebd8c'];
+    const per = (TH * 0.66) / bands.length;
+    for (let y = 0; y < TH; y++) {
+      const f = y / per;
+      const i = Math.min(bands.length - 1, Math.floor(f));
+      tctx.fillStyle = bands[i];
+      tctx.fillRect(0, y, TW, 1);
+      const frac = f - i;
+      if (i < bands.length - 1 && frac > 0.62) {
+        tctx.fillStyle = bands[i + 1];
+        for (let x = (y % 2); x < TW; x += 2) tctx.fillRect(x, y, 1, 1);
+      }
+    }
+    /* stars */
+    for (let i = 0; i < 52; i++) {
+      const sx = (i * 97) % TW, sy = (i * 43) % 78;
+      if (Math.floor(now / 500 + i) % 7 === 0) continue;
+      tctx.fillStyle = i % 3 ? 'rgba(255,255,255,.75)' : 'rgba(255,240,200,.9)';
+      tctx.fillRect(sx, sy, 1, 1);
+    }
+    /* moon, kept out of the logo's way */
+    tctx.fillStyle = '#fff3d0';
+    tctx.fillRect(330, 88, 16, 16); tctx.fillRect(328, 92, 20, 8); tctx.fillRect(334, 86, 8, 20);
+    tctx.fillStyle = '#e8dcb8';
+    tctx.fillRect(339, 94, 4, 4); tctx.fillRect(333, 99, 3, 3); tctx.fillRect(342, 101, 2, 2);
+    /* clouds */
+    titleClouds.forEach(c => {
+      c.x += c.v * dt;
+      if (c.x > TW + 50) c.x = -60;
+      tctx.fillStyle = 'rgba(255,235,220,.26)';
+      tctx.fillRect(Math.round(c.x), c.y, c.w, 5);
+      tctx.fillRect(Math.round(c.x) + 6, c.y - 3, c.w - 16, 4);
+      tctx.fillStyle = 'rgba(255,255,245,.18)';
+      tctx.fillRect(Math.round(c.x) + 10, c.y - 5, c.w - 26, 2);
+    });
+    /* eggs drifting up, fading out before they reach the logo */
+    titleEggs.forEach(e => {
+      e.y -= e.sp * dt;
+      e.sw += dt * 2;
+      if (e.y < 44) { e.y = TH + 10; e.x = 16 + Math.random() * (TW - 32); e.tier = Math.floor(Math.random() * 8); }
+      tctx.globalAlpha = Math.max(0, Math.min(0.92, (e.y - 48) / 26));
+      tctx.drawImage(SPR.eggSprite(e.tier, 1), Math.round(e.x + Math.sin(e.sw) * 3), Math.round(e.y));
+      tctx.globalAlpha = 1;
+    });
+    /* a duck flying by */
+    const dx = ((now / 26) % (TW + 90)) - 50;
+    const dyy = 64 + Math.sin(now / 700) * 8;
+    const duck = SPR.duckSprite(DUCKS[2], Math.floor(now / 180) % 2, 1);
+    tctx.save();
+    tctx.translate(Math.round(dx) + duck.width, Math.round(dyy));
+    tctx.scale(-1, 1);
+    tctx.drawImage(duck, 0, 0);
+    tctx.restore();
+    /* hills, back to front, each with a lit rim */
+    const layers = [
+      { col: '#40614a', rim: '#557a58', base: 58, a: 11, b: 5, ph: 0.6, sc: 44, sc2: 15 },
+      { col: '#37573f', rim: '#4d7150', base: 44, a: 9, b: 4, ph: 1.9, sc: 33, sc2: 12 },
+      { col: '#2b4a34', rim: '#3f6644', base: 26, a: 7, b: 3, ph: 3.4, sc: 27, sc2: 9 },
+    ];
+    layers.forEach(L => {
+      for (let x = 0; x < TW; x++) {
+        const h = Math.round(L.base + Math.sin(x / L.sc + L.ph) * L.a + Math.sin(x / L.sc2 + L.ph * 2) * L.b);
+        tctx.fillStyle = L.col;
+        tctx.fillRect(x, TH - h, 1, h);
+        tctx.fillStyle = L.rim;
+        tctx.fillRect(x, TH - h, 1, 2);
+        if ((x * 7 + h * 3) % 23 === 0) tctx.fillRect(x, TH - h + 3 + (x % 4), 1, 1);
+      }
+    });
+    /* silhouette trees (tinted on an offscreen copy so only the tree darkens) */
+    [22, 66, 300, 352].forEach((tx, i) => {
+      const spr = SPR.decoSprite(i % 2 ? 'pine' : 'tree', 1, 400 + i);
+      const key = 'sil' + i;
+      let sil = silCache.get(key);
+      if (!sil) {
+        sil = SPR.newCanvas(spr.width, spr.height);
+        const g = sil.getContext('2d');
+        g.imageSmoothingEnabled = false;
+        g.drawImage(spr, 0, 0);
+        g.globalCompositeOperation = 'source-atop';
+        g.fillStyle = 'rgba(20,34,24,.62)';
+        g.fillRect(0, 0, spr.width, spr.height);
+        silCache.set(key, sil);
+      }
+      tctx.drawImage(sil, tx, TH - 52 - spr.height + 12);
+    });
+    /* mama on her nest, up on the middle hill so the plate below stays clear */
+    const mx = 100, gy = TH - 54;
+    const bob = Math.sin(now / 500) * 1.5;
+    const mamaTier = Math.abs(Math.floor(now / 2600)) % 8;
+    const mama = SPR.mamaSprite(mamaTier, 2, Math.abs(Math.floor(now / 3000)) % 5 === 4 ? 'blink' : 'idle');
+    tctx.fillStyle = 'rgba(16,26,18,.34)';
+    tctx.fillRect(mx - 26, gy, 52, 4);
+    tctx.drawImage(mama, Math.round(mx - mama.width / 2), Math.round(gy - mama.height + bob));
+    const nest = SPR.nestSprite(2);
+    tctx.drawImage(nest, Math.round(mx - nest.width / 2), gy - 6);
+    /* three chicks pecking beside her */
+    [[mx + 38, 0], [mx + 56, 1], [mx - 40, 2]].forEach(([cx, o], i) => {
+      const sp = SPECIES[(Math.abs(Math.floor(now / 3400)) + i * 5) % Math.min(14, SPECIES.length)];
+      const hop = Math.abs(Math.sin(now / 420 + o * 1.7)) * 2;
+      const c = SPR.chickenSprite(sp, 1, false);
+      tctx.fillStyle = 'rgba(16,26,18,.3)';
+      tctx.fillRect(cx - 5, gy + 1, 11, 3);
+      tctx.drawImage(c, Math.round(cx - c.width / 2), Math.round(gy + 1 - c.height - hop));
+    });
+    /* logo */
+    const title = 'INF EGG CO.';
+    const k = 3;
+    SPR.drawTitle(tctx, title, Math.round(TW / 2 - SPR.textW(title, k) / 2), 18, '#ffd23f', '#3a2410', k);
+    const sub = 'A COZY CHICKEN RANCH';
+    SPR.drawText(tctx, sub, Math.round(TW / 2 - SPR.textW(sub, 1) / 2), 46, '#ffe9b0', 1, '#3a2410');
+    /* progress plate above the START button */
+    const line = GAME.disc() + ' OF ' + SPECIES_TOTAL + ' CHICKENS FOUND';
+    const lw = SPR.textW(line, 1), px0 = Math.round(TW / 2 - lw / 2) - 7, py0 = TH - 40;
+    tctx.fillStyle = 'rgba(24,18,12,.62)';
+    tctx.fillRect(px0, py0 - 4, lw + 14, 14);
+    tctx.fillStyle = 'rgba(255,232,180,.28)';
+    tctx.fillRect(px0, py0 - 5, lw + 14, 1);
+    tctx.fillRect(px0, py0 + 10, lw + 14, 1);
+    const blink = Math.floor(now / 480) % 2;
+    SPR.drawText(tctx, line, px0 + 7, py0, blink ? '#fff8ec' : '#e8d5a8', 1, '#1a120a');
+  }
+  function showTitle() { titleEl.hidden = false; el.bubble.hidden = true; closeDuck(); setInspect(null); }
+  function hideTitle() { titleEl.hidden = true; S().seenTitle = true; }
+
+  /* ================= DUCK DIALOGUE ================= */
+  const duckPanel = $('#duck-panel');
+  let duckOpen = false, duckSig = '';
+  function openDuck() { duckOpen = true; duckSig = ''; renderDuckPanel(); }
+  function closeDuck() { duckOpen = false; duckPanel.hidden = true; }
+  function renderDuckPanel() {
+    const d = S().duck;
+    if (!duckOpen || !d) { duckPanel.hidden = true; return; }
+    const def = DUCKS[d.id];
+    const q = S().quest;
+    const mine = q && q.duckId === d.id;
+    const done = mine && GAME.questDone();
+    const sig = d.id + '|' + (mine ? q.type + q.need : 'none') + '|' + (done ? 'done' : GAME.questProgress());
+    if (sig === duckSig) return;
+    duckSig = sig;
+    duckPanel.hidden = false;
+    duckPanel.innerHTML = '';
+    const head = document.createElement('div');
+    head.className = 'dp-head';
+    head.appendChild(cloneCanvas(SPR.duckSprite(def, 0, 2)));
+    const nm = document.createElement('b');
+    nm.textContent = def.name.toUpperCase();
+    head.appendChild(nm);
+    const x = document.createElement('button');
+    x.className = 'btn btn-tiny';
+    x.dataset.act = 'close-duck';
+    x.textContent = 'X';
+    head.appendChild(x);
+    duckPanel.appendChild(head);
+    const line = document.createElement('div');
+    line.className = 'dp-line';
+    line.textContent = done ? def.bye : def.line;
+    duckPanel.appendChild(line);
+    const btns = document.createElement('div');
+    btns.className = 'dp-btns';
+    if (!mine) {
+      const task = document.createElement('div');
+      task.className = 'dp-task';
+      const b = document.createElement('b');
+      b.textContent = 'ODD JOB';
+      task.appendChild(b);
+      task.appendChild(document.createTextNode('Take on a task and I will pay you well for it.'));
+      duckPanel.appendChild(task);
+      const ok = document.createElement('button');
+      ok.className = 'btn btn-green';
+      ok.dataset.act = 'quest-accept';
+      ok.textContent = 'HEAR THE JOB';
+      btns.appendChild(ok);
+      const later = document.createElement('button');
+      later.className = 'btn';
+      later.dataset.act = 'quest-later';
+      later.textContent = 'NOT NOW';
+      btns.appendChild(later);
+    } else {
+      const task = document.createElement('div');
+      task.className = 'dp-task';
+      const b = document.createElement('b');
+      b.textContent = 'TASK';
+      task.appendChild(b);
+      task.appendChild(document.createTextNode(GAME.questText()));
+      const bar = document.createElement('div');
+      bar.className = 'dp-bar';
+      const fill = document.createElement('i');
+      fill.style.width = Math.min(100, GAME.questProgress() / q.need * 100) + '%';
+      bar.appendChild(fill);
+      task.appendChild(bar);
+      const prog = document.createElement('div');
+      prog.textContent = Math.min(GAME.questProgress(), q.need) + ' / ' + q.need;
+      task.appendChild(prog);
+      duckPanel.appendChild(task);
+      const rew = document.createElement('div');
+      rew.className = 'dp-reward';
+      rew.appendChild(document.createTextNode('reward'));
+      rew.appendChild(mkIcon('coin', 2));
+      rew.appendChild(document.createTextNode(GAME.fmt(q.coins)));
+      rew.appendChild(mkIcon('feather', 2));
+      rew.appendChild(document.createTextNode(GAME.fmt(q.feathers)));
+      duckPanel.appendChild(rew);
+      const claim = document.createElement('button');
+      claim.className = 'btn' + (done ? ' btn-green' : '');
+      claim.dataset.act = 'quest-claim';
+      claim.disabled = !done;
+      claim.textContent = done ? 'CLAIM REWARD' : 'STILL WORKING';
+      btns.appendChild(claim);
+      const later = document.createElement('button');
+      later.className = 'btn';
+      later.dataset.act = 'close-duck';
+      later.textContent = 'CLOSE';
+      btns.appendChild(later);
+    }
+    duckPanel.appendChild(btns);
   }
 
   /* ================= MODALS ================= */
@@ -1731,7 +2072,7 @@
       g.fillStyle = SPR.darken(br.hue, 0.5); g.fillRect(lx - 1, 5, 8, 8);
       g.fillStyle = br.hue; g.fillRect(lx, 6, 6, 6);
       g.fillStyle = SPR.lighten(br.hue, 0.4); g.fillRect(lx, 6, 6, 1);
-      SPR.drawText(g, br.name, lx + 10, 7, '#3a5a2a', 1, 'rgba(255,255,255,.7)');
+      SPR.drawText(g, br.name, lx + 10, 6, '#33552a', 1, 'rgba(255,255,255,.8)');
       lx += 12 + SPR.textW(br.name, 1) + 10;
     });
   }
@@ -1780,8 +2121,8 @@
         const cur = GAME.lvl(sk.id);
         const label = sk.max > 1 ? cur + '/' + sk.max : (cur ? 'ON' : '');
         if (label) {
-          const tw = SPR.textW(label, 1);
-          SPR.drawText(g, label, p.x - Math.floor(tw / 2), p.y + 4,
+          const tw = SPR.tinyW(label, 1);
+          SPR.drawTiny(g, label, p.x - Math.floor(tw / 2), p.y + 4,
             st === 'locked' ? '#4a4438' : st === 'can' ? '#5e3d18' : '#2e2216', 1);
         }
       }
@@ -1877,51 +2218,143 @@
     GAME.dirty.skills = false;
   }
 
+  let indexTab = 'chickens';
   function renderPedia() {
     const box = $('#pedia');
     box.innerHTML = '';
-    $('#pedia-sub').textContent = GAME.disc() + ' / ' + SPECIES_TOTAL + ' FOUND';
-    TIERS.forEach((tier, t) => {
-      const pool = SPECIES_BY_TIER[t];
-      const found = pool.filter(sp => S().disc.includes(sp.id)).length;
-      const sec = document.createElement('div');
-      sec.className = 'pedia-tier';
-      const head = document.createElement('div');
-      head.className = 'pedia-tier-head';
-      head.style.background = tier.c;
-      const hl = document.createElement('span');
-      hl.textContent = tier.n + (t === TIERS.length - 1 ? ' - bred from two Divine parents' : '');
-      const hr = document.createElement('span');
-      hr.textContent = found + '/' + pool.length;
-      head.appendChild(hl); head.appendChild(hr);
-      sec.appendChild(head);
+    document.querySelectorAll('#index-tabs .tab-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.tab === indexTab));
+
+    if (indexTab === 'chickens') {
+      $('#pedia-sub').textContent = GAME.disc() + ' / ' + SPECIES_TOTAL + ' CHICKENS';
+      TIERS.forEach((tier, t) => {
+        const pool = SPECIES_BY_TIER[t];
+        const found = pool.filter(sp => S().disc.includes(sp.id)).length;
+        const sec = document.createElement('div');
+        sec.className = 'pedia-tier';
+        const head = document.createElement('div');
+        head.className = 'pedia-tier-head';
+        head.style.background = tier.c;
+        const hl = document.createElement('span');
+        hl.textContent = tier.n + (t === TIERS.length - 1 ? ' - bred from two Divine parents' : '');
+        const hr = document.createElement('span');
+        hr.textContent = found + '/' + pool.length;
+        head.appendChild(hl); head.appendChild(hr);
+        sec.appendChild(head);
+        const grid = document.createElement('div');
+        grid.className = 'pedia-grid';
+        pool.forEach(sp => {
+          const known = S().disc.includes(sp.id);
+          const card = document.createElement('div');
+          card.className = 'pedia-card' + (known ? '' : ' unknown');
+          card.appendChild(chickEl(sp, 3, !known));
+          const name = document.createElement('span');
+          name.className = 'p-name';
+          name.textContent = known ? sp.name : '???';
+          card.appendChild(name);
+          const quip = document.createElement('span');
+          quip.className = 'p-quip';
+          quip.textContent = known ? sp.quip : 'not yet hatched';
+          card.appendChild(quip);
+          if (known) {
+            const cnt = document.createElement('span');
+            cnt.className = 'p-count';
+            const inField = S().chickens.filter(c => c.sp === sp.id).length;
+            cnt.textContent = inField ? 'on field: ' + inField : 'met before';
+            card.appendChild(cnt);
+          }
+          grid.appendChild(card);
+        });
+        sec.appendChild(grid);
+        box.appendChild(sec);
+      });
+    } else if (indexTab === 'ducks') {
+      $('#pedia-sub').textContent = S().duckMet.length + ' / ' + DUCKS.length + ' DUCKS';
+      const intro = document.createElement('p');
+      intro.className = 'flavor';
+      intro.textContent = 'Travelling ducks drop by the pond with odd jobs. Help one and it joins your index.';
+      box.appendChild(intro);
       const grid = document.createElement('div');
-      grid.className = 'pedia-grid';
-      pool.forEach(sp => {
-        const known = S().disc.includes(sp.id);
+      grid.className = 'duck-grid';
+      DUCKS.forEach(d => {
+        const met = S().duckMet.includes(d.id);
+        const here = S().duck && S().duck.id === d.id;
         const card = document.createElement('div');
-        card.className = 'pedia-card' + (known ? '' : ' unknown');
-        card.appendChild(chickEl(sp, 3, !known));
-        const name = document.createElement('span');
-        name.className = 'p-name';
-        name.textContent = known ? sp.name : '???';
-        card.appendChild(name);
-        const quip = document.createElement('span');
-        quip.className = 'p-quip';
-        quip.textContent = known ? sp.quip : 'not yet hatched';
-        card.appendChild(quip);
-        if (known) {
-          const cnt = document.createElement('span');
-          cnt.className = 'p-count';
-          const inField = S().chickens.filter(c => c.sp === sp.id).length;
-          cnt.textContent = inField ? 'on field: ' + inField : 'met before';
-          card.appendChild(cnt);
+        card.className = 'duck-card' + (met ? '' : ' unknown');
+        const spr = cloneCanvas(SPR.duckSprite(d, 0, 2));
+        if (!met) {
+          const g = spr.getContext('2d');
+          g.globalCompositeOperation = 'source-in';
+          g.fillStyle = '#7d6a4d';
+          g.fillRect(0, 0, spr.width, spr.height);
         }
+        card.appendChild(spr);
+        const nm = document.createElement('b');
+        nm.textContent = met ? d.name : '???';
+        card.appendChild(nm);
+        const sub = document.createElement('span');
+        sub.textContent = met ? d.line : (here ? 'waiting at the pond' : 'not met yet');
+        card.appendChild(sub);
         grid.appendChild(card);
       });
-      sec.appendChild(grid);
-      box.appendChild(sec);
-    });
+      box.appendChild(grid);
+    } else if (indexTab === 'eggs') {
+      $('#pedia-sub').textContent = 'EGG VALUES';
+      const intro = document.createElement('p');
+      intro.className = 'flavor';
+      intro.textContent = 'Every shell your ranch can produce, with what the market pays today.';
+      box.appendChild(intro);
+      const grid = document.createElement('div');
+      grid.className = 'egg-grid';
+      TIERS.forEach((tier, t) => {
+        const card = document.createElement('div');
+        card.className = 'egg-card';
+        card.appendChild(cloneCanvas(SPR.eggSprite(t, 3, t === TIERS.length - 1, 0)));
+        const mid = document.createElement('div');
+        const b = document.createElement('b');
+        b.textContent = tier.n;
+        b.style.color = tier.c;
+        mid.appendChild(b);
+        const v = document.createElement('span');
+        v.textContent = 'worth ' + GAME.fmt(GAME.eggValue(t, false)) + ' coins';
+        mid.appendChild(v);
+        mid.appendChild(document.createElement('br'));
+        const h = document.createElement('span');
+        h.textContent = 'hatches in ' + GAME.fmtTime(GAME.incHatchTime(t, t === TIERS.length - 1));
+        mid.appendChild(h);
+        card.appendChild(mid);
+        grid.appendChild(card);
+      });
+      box.appendChild(grid);
+    } else {
+      const st = S();
+      $('#pedia-sub').textContent = 'DAY ' + st.day + ' - ' + st.diary.length + ' ENTRIES';
+      const list = document.createElement('div');
+      list.className = 'diary-list';
+      if (!st.diary.length) {
+        const p = document.createElement('p');
+        p.className = 'diary-empty';
+        p.textContent = 'Nothing written yet. Pet Mama Hen and the diary starts itself.';
+        list.appendChild(p);
+      }
+      const icons = { species: null, first: null, land: 'house', mama: 'crown', hire: 'hands', quest: 'doc', duck: 'star' };
+      st.diary.slice().reverse().forEach(e => {
+        const row = document.createElement('div');
+        row.className = 'diary-row';
+        const day = document.createElement('span');
+        day.className = 'd-day';
+        day.textContent = 'DAY ' + e.day;
+        row.appendChild(day);
+        if (e.sp !== null && e.sp !== undefined && SPECIES[e.sp]) row.appendChild(chickEl(SPECIES[e.sp], 2, false));
+        else row.appendChild(mkIcon(icons[e.kind] || 'egg', 2));
+        const tx = document.createElement('span');
+        tx.className = 'd-text';
+        tx.textContent = e.text;
+        row.appendChild(tx);
+        list.appendChild(row);
+      });
+      box.appendChild(list);
+    }
     GAME.dirty.pedia = false;
   }
 
@@ -2295,6 +2728,11 @@
     }
     return null;
   }
+  function duckAt(x, y) {
+    const d = S().duck;
+    if (!d || d.state === 'leaving') return null;
+    return (x > d.x - 4 && x < d.x + 20 && y > d.y - 16 && y < d.y + 18) ? d : null;
+  }
   function staffAt(x, y) {
     for (let i = S().staff.length - 1; i >= 0; i--) {
       const w = S().staff[i];
@@ -2346,6 +2784,7 @@
       if (S().tool === 'basket' && S().basket.length) return false;
       if (S().truck.load.length && GAME.sendTruck()) { snd.engine(); return true; }
     }
+    if (duckAt(x, y)) { openDuck(); snd.plop(); return true; }
     const o = GAME.occAt(Math.floor(x / 16), Math.floor(y / 16));
     if (o && o.type === 'staffhut' && S().tool !== 'build') {
       renderHire(); openModal('#modal-hire'); snd.build(); return true;
@@ -2385,7 +2824,8 @@
     if (tool === 'inspect') { ptr.mode = 'inspect'; return; }
     if (tool === 'basket') { ptr.mode = 'sweep'; return; }
     if (S().held) { ptr.mode = 'carry'; return; }
-    cand = { ch: chickenAt(p.x, p.y), egg: eggAt(p.x, p.y), mama: overMama(p.x, p.y), plume: plumeAt(p.x, p.y) };
+    cand = { duck: duckAt(p.x, p.y), ch: chickenAt(p.x, p.y), egg: eggAt(p.x, p.y),
+             mama: overMama(p.x, p.y), plume: plumeAt(p.x, p.y) };
     ptr.mode = 'pending';
   });
 
@@ -2398,7 +2838,8 @@
     if (!ptr.down) return;
     if (ptr.mode === 'inspect' && ptr.moved > 6) ptr.mode = 'pan';
     if (ptr.mode === 'pending' && ptr.moved > 5) {
-      if (cand && cand.ch && GAME.grabChicken(cand.ch)) { snd.squawk(); ptr.mode = 'carry'; heldSince = performance.now(); }
+      if (cand && cand.duck) ptr.mode = 'pan';
+      else if (cand && cand.ch && GAME.grabChicken(cand.ch)) { snd.squawk(); ptr.mode = 'carry'; heldSince = performance.now(); }
       else if (cand && cand.egg && GAME.grabEgg(cand.egg)) { snd.plop(); ptr.mode = 'carry'; heldSince = performance.now(); }
       else ptr.mode = 'pan';
     }
@@ -2428,6 +2869,7 @@
       return;
     }
     if (ptr.mode === 'pending' && wasTap && cand) {
+      if (cand.duck) { openDuck(); snd.plop(); return; }
       if (cand.mama) {
         if (GAME.petMama()) { petFx.set('mama', performance.now()); heart(W.mama.x, W.mama.y - 18, 3); snd.pet(); }
         return;
@@ -2569,6 +3011,25 @@
       case 'menu': $('#menu-pop').hidden = !$('#menu-pop').hidden; break;
       case 'close-modal': closeModals(); break;
       case 'close-inspect': setInspect(null); break;
+      case 'start-game': hideTitle(); snd.sparkle(); break;
+      case 'title': showTitle(); $('#menu-pop').hidden = true; break;
+      case 'close-duck': closeDuck(); break;
+      case 'quest-later': GAME.dismissDuck(); closeDuck(); snd.plop(); break;
+      case 'quest-accept': {
+        if (GAME.acceptQuest()) { snd.skill(); duckSig = ''; renderDuckPanel(); }
+        break;
+      }
+      case 'quest-claim': {
+        const r = GAME.turnInQuest();
+        if (r) {
+          snd.grand();
+          coinBurst(S().duck ? S().duck.x + 6 : W.mama.x, S().duck ? S().duck.y : W.mama.y, 12);
+          toast({ icon: 'coin', title: 'JOB DONE', body: 'Paid ' + GAME.fmt(r.coins) + ' coins and ' + r.feathers + ' feathers.' });
+          closeDuck();
+        } else snd.error();
+        break;
+      }
+      case 'index-tab': { indexTab = btn.dataset.tab; renderPedia(); break; }
       case 'open-hire': renderHire(); openModal('#modal-hire'); break;
       case 'mark-chicken': {
         if (inspect && inspect.kind === 'chicken') {
@@ -2684,8 +3145,11 @@
   });
   GAME.on('hatch', ({ births, x, y, rainbow }) => {
     snd.hatch();
+    /* the chickens just pushed onto the field are these births */
+    const fresh = S().chickens.slice(-births.length);
+    fresh.forEach(ch => bornFx.set(ch.id, performance.now()));
     births.forEach((b, i) => {
-      shellBurst(x + i * 6, y, b.sp.tier);
+      spawnHatchFx(b.sp, x + i * 8, y, rainbow);
       if (b.isNew) {
         toast({
           sprite: cloneCanvas(SPR.chickenSprite(b.sp, 2, false)),
@@ -2725,6 +3189,7 @@
     renderToolbelt();
     renderPalette();
     updateCursorChip();
+    if (S().seenTitle) titleEl.hidden = true;
     const mb = $('#btn-mute');
     if (mb) mb.textContent = S().muted ? 'SOUND OFF' : 'SOUND ON';
     if (off && (off.laid > 0 || off.hatched > 0 || off.pay > 0)) {
@@ -2740,7 +3205,8 @@
 
     let last = performance.now(), saveAcc = 0, hudAcc = 0;
     function frame(now) {
-      let dt = (now - last) / 1000;
+      /* the first rAF timestamp can predate boot's clock read - never go backwards */
+      let dt = Math.max(0, (now - last) / 1000);
       last = now;
       if (dt > 2) {
         let rest = Math.min(dt, 600);
@@ -2763,6 +3229,7 @@
         if (ey < 0.05) pdy -= 1; if (ey > 0.95) pdy += 1;
       }
       if (pdx || pdy) { cam().x += pdx * 150 * dt; cam().y += pdy * 150 * dt; GAME.clampCam(); }
+      if (!titleEl.hidden) drawTitleScreen(dt);
       render(now, dt);
       if (!$('#modal-skills').hidden) drawTree(now);
       hudAcc += dt;

@@ -60,6 +60,11 @@ const ECON = {
   blowerR: 34,             // blower reach
   blowerPush: 46,          // px/sec push
   sorterRare: 2,           // tier >= this goes straight through a sorter
+  duckCooldown: 75,        // seconds between pond visitors
+  duckStay: 240,           // how long a duck waits around with no answer
+  questCoins: 320,         // base coin reward
+  questFeathers: 18,       // base feather reward
+  diaryMax: 140,
 };
 
 /* buildable things — cost grows with how many you own (belts stay flat) */
@@ -106,6 +111,47 @@ function buildCost(type, owned) {
   const b = BUILDS[type];
   return Math.round(b.base * Math.pow(b.growth, b.growth === 1 ? 0 : owned));
 }
+
+/* ------------------------------------------------------------
+   SPECIAL DUCKS - travelling quest folk who visit the pond
+   ------------------------------------------------------------ */
+const DUCKS = [
+  { id:0, name:'Quackers',      body:'#fff8ec', bill:'#f2a03f', acc:'none',
+    line:'Word travels fast on the pond. You make eggs?',
+    bye:'Splendid. I shall tell the other ducks.' },
+  { id:1, name:'Sir Pondsworth', body:'#e8e2d0', bill:'#e0a416', acc:'monocle',
+    line:'One hears this ranch is frightfully productive.',
+    bye:'Most satisfactory. Carry on.' },
+  { id:2, name:'Marigold',      body:'#ffd97d', bill:'#f2a03f', acc:'flower',
+    line:'Your field smells like sunshine and warm straw!',
+    bye:'You are a darling. Take this for your trouble.' },
+  { id:3, name:'Captain Puddle', body:'#8fc8e8', bill:'#e0a416', acc:'cap',
+    line:'Permission to inspect the cargo, farmhand!',
+    bye:'Shipshape. The fleet thanks you.' },
+  { id:4, name:'Mallory',       body:'#c9a35f', bill:'#f2c94c', acc:'scarf', head:'#3f8a5a',
+    line:'Migrating through. Fancy a trade?',
+    bye:'Pleasure doing business. See you next season.' },
+  { id:5, name:'Prof. Webfoot', body:'#c9a8f0', bill:'#e8a52f', acc:'glasses',
+    line:'I study poultry productivity. Care to assist?',
+    bye:'Fascinating data. My thesis thanks you.' },
+  { id:6, name:'Biscuit Bill',  body:'#e8c48f', bill:'#d98a2f', acc:'hat',
+    line:'Howdy. Long way from my puddle, but worth it.',
+    bye:'Much obliged, partner.' },
+  { id:7, name:'Moonquack',     body:'#b8c8f0', bill:'#a8b4d8', acc:'star',
+    line:'I only visit on quiet evenings. This one counts.',
+    bye:'The pond remembers kind farmers.' },
+];
+
+/* quest kinds, measured against a stat snapshot taken on accept */
+const QUESTS = [
+  { id:'collect', stat:'collected', base:12, text:n => 'Sweep up ' + n + ' eggs off the grass.' },
+  { id:'hatch',   stat:'hatched',   base:3,  text:n => 'Hatch ' + n + ' chickens in an incubator.' },
+  { id:'plumes',  stat:'plumes',    base:20, text:n => 'Gather ' + n + ' feathers.' },
+  { id:'sell',    stat:'sold',      base:15, text:n => 'Send ' + n + ' eggs to market.' },
+  { id:'pets',    stat:'pets',      base:14, text:n => 'Pet the flock ' + n + ' times.' },
+  { id:'bred',    stat:'bred',      base:2,  text:n => 'Breed ' + n + ' eggs in a love nest.' },
+];
+function questScale(done) { return 1 + done * 0.75; }
 
 /* ------------------------------------------------------------
    LAND — 3x2 plots of 16x13 tiles. You start with the
