@@ -51,19 +51,57 @@ const ECON = {
   breedUpBase: 0.30,       // chance the bred egg is +1 tier
   rainbowBase: 0.18,       // chance two Divine parents make a rainbow egg
   offlineCapHrs: 8,
+  staffSpeed: 26,          // px per second a worker walks
+  staffCarry: 4,           // eggs a farmhand carries per trip
+  staffBaseSlots: 2,       // slots before any Staff Hut
+  hutSlots: 3,             // slots per Staff Hut
+  cullReward: 2.5,         // feathers multiplier when a chicken is retired
+  siloCap: 240,
+  blowerR: 34,             // blower reach
+  blowerPush: 46,          // px/sec push
+  sorterRare: 2,           // tier >= this goes straight through a sorter
 };
 
 /* buildable things — cost grows with how many you own (belts stay flat) */
 const BUILDS = {
   incubator: { name:'Incubator', w:2, h:2, base:120, growth:1.6, refund:50,
-               desc:'Drop eggs in — the only way they hatch!' },
+               desc:'Drop eggs in - the only way they hatch.' },
   lovenest:  { name:'Love Nest', w:2, h:2, base:400, growth:1.8, refund:150,
                desc:'Drop two chickens in to breed a fancy egg.', needs:'court' },
+  staffhut:  { name:'Staff Hut', w:2, h:2, base:500, growth:1.9, refund:200,
+               desc:'Hire farmhands and robots here. +3 staff slots each.', needs:'hiring' },
+  silo:      { name:'Egg Silo',  w:2, h:2, base:900, growth:1.8, refund:350,
+               desc:'Stores eggs from belts and loads the truck by itself.', needs:'silo' },
   vacuum:    { name:'Vacuum Bot', w:1, h:1, base:300, growth:1.7, refund:100,
                desc:'Slurps nearby eggs onto the belt it faces.', needs:'vacuum' },
-  belt:      { name:'Conveyor', w:1, h:1, base:15, growth:1, refund:7,
-               desc:'Carries eggs to the truck or an incubator.', needs:'belts' },
+  blower:    { name:'Air Blower', w:1, h:1, base:260, growth:1.7, refund:90,
+               desc:'Blows loose eggs across the grass in the way it faces.', needs:'blower' },
+  sorter:    { name:'Sorter',    w:1, h:1, base:150, growth:1.6, refund:60,
+               desc:'On a belt: rare eggs go straight, common ones turn aside.', needs:'sorter' },
+  belt:      { name:'Conveyor',  w:1, h:1, base:15, growth:1, refund:7,
+               desc:'Carries eggs to the truck, a silo or an incubator.', needs:'belts' },
+  fence:     { name:'Fence',     w:1, h:1, base:10, growth:1, refund:5,
+               desc:'Chickens will not cross it. Pen them where you want them.', needs:'belts' },
 };
+
+/* ------------------------------------------------------------
+   STAFF - hired workers. Wages are coins per second.
+   ------------------------------------------------------------ */
+const STAFF = {
+  hand:   { name:'Farmhand',  icon:'hand',   robot:false, hire:260,  grow:1.55, wage:0.6,
+            job:'Gathers loose eggs and runs them to a silo, incubator or the truck.' },
+  feeder: { name:'Feeder',    icon:'seed',   robot:false, hire:420,  grow:1.55, wage:0.5, needs:'feed',
+            job:'Scatters seed so the flock keeps laying at double speed.' },
+  cull:   { name:'Cull-Bot',  icon:'remove', robot:true,  hire:1100, grow:1.7,  wage:0.9, needs:'cullbot',
+            job:'Retires chickens you mark as unwanted, recycling them into feathers.' },
+  match:  { name:'Match-Bot', icon:'cupid',  robot:true,  hire:1500, grow:1.7,  wage:1.0, needs:'matchbot',
+            job:'Carries pairs of chickens into any empty love nest.' },
+};
+function staffCost(type, owned) {
+  const s = STAFF[type];
+  return Math.round(s.hire * Math.pow(s.grow, owned));
+}
+
 function buildCost(type, owned) {
   const b = BUILDS[type];
   return Math.round(b.base * Math.pow(b.growth, b.growth === 1 ? 0 : owned));
@@ -254,6 +292,7 @@ const SPECIES_BY_TIER = TIERS.map((_, t) => SPECIES.filter(s => s.tier === t));
    Cost in feathers: base * growth^level.
    ------------------------------------------------------------ */
 const BRANCHES = [
+  { name:'CREW', icon:'hands', hue:'#9b6bd0' },
   { name:'GATHER', icon:'basket', hue:'#6ab04c' },
   { name:'HENS', icon:'chick', hue:'#e8542f' },
   { name:'HATCHERY', icon:'egg', hue:'#f0a422' },
@@ -263,57 +302,68 @@ const BRANCHES = [
 ];
 
 const SKILLS = [
-  { id:'root', br:2, x:50, y:93, pre:null, name:'Egg Science', icon:'egg', max:1, base:0, growth:1, desc:'It all starts with one egg.' },
+  { id:'root', br:3, x:50, y:93, pre:null, name:'Egg Science', icon:'egg', max:1, base:0, growth:1, desc:'It all starts with one egg.' },
 
-  /* GATHER — far left */
-  { id:'basket1',  br:0, x:31, y:78, pre:'root',    name:'Bigger Basket', icon:'basket', max:5, base:4,   growth:2.0, desc:'+8 basket capacity' },
-  { id:'magnet',   br:0, x:19, y:69, pre:'basket1', name:'Magnet Palm',   icon:'magnet', max:5, base:8,   growth:2.1, desc:'+12px scoop radius' },
-  { id:'feather1', br:0, x:29, y:63, pre:'basket1', name:'Feather Finder',icon:'feather', max:5, base:10,  growth:2.2, desc:'+3% feathers when scooping eggs' },
-  { id:'feed',     br:0, x:10, y:57, pre:'magnet',  name:'Bird Feed',     icon:'seed', max:1, base:25,  growth:1,   desc:'Unlock the Feed tool (hens lay 2x)' },
-  { id:'feedplus', br:0, x:6,  y:43, pre:'feed',    name:'Tasty Mix',     icon:'bowl', max:3, base:45,  growth:2.5, desc:'feed lasts +50% longer' },
-  { id:'sweepluck',br:0, x:23, y:49, pre:'feather1',name:'Lucky Sweep',   icon:'clover', max:5, base:30,  growth:2.4, desc:'+2% scooped eggs duplicate' },
-  { id:'basket2',  br:0, x:16, y:33, pre:'sweepluck',name:'Deep Basket',  icon:'basket2', max:3, base:60,  growth:2.6, desc:'+16 basket capacity' },
+  /* CREW - hire people and robots to work the ranch */
+  { id:'hiring',    br:0, x:11, y:78, pre:'root',      name:'Hire Crew',    icon:'hands',  max:1, base:40,  growth:1,   desc:'Unlock the Staff Hut and start hiring' },
+  { id:'crewspeed', br:0, x:6,  y:64, pre:'hiring',    name:'Sturdy Boots', icon:'wind',   max:5, base:25,  growth:2.2, desc:'+20% staff walking speed' },
+  { id:'wages',     br:0, x:16, y:64, pre:'hiring',    name:'Payroll Deals',icon:'coin',   max:5, base:30,  growth:2.3, desc:'-12% staff wages' },
+  { id:'cullbot',   br:0, x:6,  y:50, pre:'crewspeed', name:'Cull-Bot',     icon:'remove', max:1, base:160, growth:1,   desc:'Unlock the Cull-Bot: retires chickens you mark' },
+  { id:'matchbot',  br:0, x:16, y:50, pre:'wages',     name:'Match-Bot',    icon:'cupid',  max:1, base:220, growth:1,   desc:'Unlock the Match-Bot: fills love nests for you' },
+  { id:'crewcap',   br:0, x:11, y:36, pre:'cullbot',   name:'Bunkhouse',    icon:'house',  max:4, base:140, growth:2.5, desc:'+2 staff slots' },
 
-  /* HENS — left of trunk */
-  { id:'happy',   br:1, x:40, y:73, pre:'root',   name:'Happy Hens',    icon:'heart', max:10, base:4,   growth:1.9, desc:'+10% lay speed' },
-  { id:'pets',    br:1, x:33, y:56, pre:'happy',  name:'Pet Therapy',   icon:'hands', max:5,  base:6,   growth:2.2, desc:'-15% pet cooldown' },
-  { id:'flock',   br:1, x:43, y:59, pre:'happy',  name:'Bigger Flock',  icon:'house', max:8,  base:10,  growth:2.1, desc:'+4 chicken capacity' },
-  { id:'golden',  br:1, x:39, y:45, pre:'flock',  name:'Golden Peck',   icon:'sparkle', max:5,  base:25,  growth:2.5, desc:'+3% golden eggs (worth 5x)' },
-  { id:'mutate',  br:1, x:33, y:33, pre:'golden', name:'Mutation Vats', icon:'dna', max:8,  base:30,  growth:2.3, desc:'+1.5% egg mutation chance' },
-  { id:'rainbow', br:1, x:38, y:20, pre:'mutate', name:'Rainbow Genome',icon:'rainbow', max:3,  base:300, growth:5.0, desc:'+15% for mutations to jump 2 tiers' },
+  /* GATHER */
+  { id:'basket1',  br:1, x:24, y:78, pre:'root',      name:'Bigger Basket', icon:'basket', max:5, base:4,   growth:2.0, desc:'+8 basket capacity' },
+  { id:'magnet',   br:1, x:19, y:64, pre:'basket1',   name:'Magnet Palm',   icon:'magnet', max:5, base:8,   growth:2.1, desc:'+12px scoop radius' },
+  { id:'feather1', br:1, x:29, y:64, pre:'basket1',   name:'Feather Finder',icon:'feather',max:5, base:10,  growth:2.2, desc:'+3% feathers when scooping eggs' },
+  { id:'feed',     br:1, x:19, y:50, pre:'magnet',    name:'Bird Feed',     icon:'seed',   max:1, base:25,  growth:1,   desc:'Unlock the Feed tool (hens lay 2x)' },
+  { id:'sweepluck',br:1, x:29, y:50, pre:'feather1',  name:'Lucky Sweep',   icon:'clover', max:5, base:30,  growth:2.4, desc:'+2% scooped eggs duplicate' },
+  { id:'feedplus', br:1, x:19, y:36, pre:'feed',      name:'Tasty Mix',     icon:'bowl',   max:3, base:45,  growth:2.5, desc:'feed lasts +50% longer' },
+  { id:'basket2',  br:1, x:29, y:36, pre:'sweepluck', name:'Deep Basket',   icon:'basket2',max:3, base:60,  growth:2.6, desc:'+16 basket capacity' },
 
-  /* HATCHERY — center */
-  { id:'warm',    br:2, x:50, y:70, pre:'root',   name:'Warm Coils',    icon:'flame', max:10, base:4,   growth:1.9, desc:'+15% incubator speed' },
-  { id:'inccap',  br:2, x:46, y:55, pre:'warm',   name:'Roomy Racks',   icon:'rack', max:5,  base:20,  growth:2.4, desc:'+3 incubator queue' },
-  { id:'twins',   br:2, x:54, y:55, pre:'warm',   name:'Twin Yolks',    icon:'twins', max:5,  base:30,  growth:2.4, desc:'+4% twin hatch chance' },
-  { id:'whisper', br:2, x:46, y:41, pre:'inccap', name:'Egg Whisperer', icon:'feather', max:5,  base:25,  growth:2.3, desc:'+20% feathers from hatching' },
-  { id:'miracle', br:2, x:54, y:41, pre:'twins',  name:'Miracle Hatch', icon:'star', max:3,  base:120, growth:4.0, desc:'+5% hatchling is +1 tier' },
-  { id:'quantum', br:2, x:50, y:27, pre:'whisper',name:'Quantum Coils', icon:'atom', max:5,  base:220, growth:2.6, desc:'+30% incubator speed' },
+  /* HENS */
+  { id:'happy',   br:2, x:37, y:78, pre:'root',   name:'Happy Hens',    icon:'heart',  max:10, base:4,   growth:1.9, desc:'+10% lay speed' },
+  { id:'flock',   br:2, x:32, y:64, pre:'happy',  name:'Bigger Flock',  icon:'house',  max:8,  base:10,  growth:2.1, desc:'+4 chicken capacity' },
+  { id:'pets',    br:2, x:42, y:64, pre:'happy',  name:'Pet Therapy',   icon:'hands',  max:5,  base:6,   growth:2.2, desc:'-15% pet cooldown' },
+  { id:'golden',  br:2, x:32, y:50, pre:'flock',  name:'Golden Peck',   icon:'sparkle',max:5,  base:25,  growth:2.5, desc:'+3% golden eggs (worth 5x)' },
+  { id:'mutate',  br:2, x:42, y:50, pre:'pets',   name:'Mutation Vats', icon:'dna',    max:8,  base:30,  growth:2.3, desc:'+1.5% egg mutation chance' },
+  { id:'rainbow', br:2, x:37, y:36, pre:'mutate', name:'Rainbow Genome',icon:'rainbow',max:3,  base:300, growth:5.0, desc:'+15% for mutations to jump 2 tiers' },
 
-  /* LOVE — right of trunk */
-  { id:'court',    br:3, x:61, y:72, pre:'root',     name:'Courtship',     icon:'cupid', max:1, base:15,  growth:1,   desc:'Unlock the LOVE NEST (breed chickens!)' },
-  { id:'candle',   br:3, x:58, y:57, pre:'court',    name:'Candlelight',   icon:'candle', max:5, base:20,  growth:2.3, desc:'+20% breeding speed' },
-  { id:'genes',    br:3, x:66, y:58, pre:'court',    name:'Fine Genes',    icon:'flask', max:5, base:35,  growth:2.5, desc:'+6% bred egg tier-up chance' },
-  { id:'twindate', br:3, x:60, y:44, pre:'candle',   name:'Double Date',   icon:'hearts', max:3, base:90,  growth:3.0, desc:'+10% breeding lays 2 eggs' },
-  { id:'rainbowegg',br:3,x:67, y:44, pre:'genes',    name:'Rainbow Clutch',icon:'rainbowegg', max:3, base:250, growth:4.0, desc:'+8% rainbow egg from Divine pairs' },
-  { id:'secretlore',br:3,x:63, y:29, pre:'rainbowegg',name:'Secret Lore',  icon:'scroll', max:1, base:1200,growth:1,   desc:'Rainbow eggs hatch 3x faster' },
+  /* HATCHERY */
+  { id:'warm',    br:3, x:50, y:78, pre:'root',   name:'Warm Coils',    icon:'flame',  max:10, base:4,   growth:1.9, desc:'+15% incubator speed' },
+  { id:'inccap',  br:3, x:45, y:64, pre:'warm',   name:'Roomy Racks',   icon:'rack',   max:5,  base:20,  growth:2.4, desc:'+3 incubator queue' },
+  { id:'twins',   br:3, x:55, y:64, pre:'warm',   name:'Twin Yolks',    icon:'twins',  max:5,  base:30,  growth:2.4, desc:'+4% twin hatch chance' },
+  { id:'whisper', br:3, x:45, y:50, pre:'inccap', name:'Egg Whisperer', icon:'feather',max:5,  base:25,  growth:2.3, desc:'+20% feathers from hatching' },
+  { id:'miracle', br:3, x:55, y:50, pre:'twins',  name:'Miracle Hatch', icon:'star',   max:3,  base:120, growth:4.0, desc:'+5% hatchling is +1 tier' },
+  { id:'quantum', br:3, x:50, y:36, pre:'whisper',name:'Quantum Coils', icon:'atom',   max:5,  base:220, growth:2.6, desc:'+30% incubator speed' },
 
-  /* FACTORY — right */
-  { id:'belts',    br:4, x:73, y:75, pre:'root',    name:'Conveyor Tech', icon:'crate', max:1, base:30,  growth:1,   desc:'Unlock conveyor belts' },
-  { id:'beltspeed',br:4, x:70, y:62, pre:'belts',   name:'Belt Grease',   icon:'oil', max:5, base:20,  growth:2.2, desc:'+20% belt speed' },
-  { id:'vacuum',   br:4, x:78, y:62, pre:'belts',   name:'Vacuum Bots',   icon:'robot', max:1, base:80,  growth:1,   desc:'Unlock egg vacuums' },
-  { id:'vacradius',br:4, x:74, y:49, pre:'vacuum',  name:'Wide Suction',  icon:'spiral', max:5, base:40,  growth:2.2, desc:'+8px vacuum radius' },
-  { id:'vacspeed', br:4, x:81, y:48, pre:'vacuum',  name:'Turbo Pumps',   icon:'wind', max:5, base:40,  growth:2.2, desc:'+25% vacuum speed' },
-  { id:'overclock',br:4, x:77, y:34, pre:'vacradius',name:'Overclock',    icon:'bolt', max:1, base:1500,growth:1,   desc:'ALL machines run 2x faster' },
+  /* LOVE */
+  { id:'court',     br:4, x:63, y:78, pre:'root',       name:'Courtship',      icon:'cupid',     max:1, base:15,  growth:1,   desc:'Unlock the LOVE NEST (breed chickens!)' },
+  { id:'candle',    br:4, x:58, y:64, pre:'court',      name:'Candlelight',    icon:'candle',    max:5, base:20,  growth:2.3, desc:'+20% breeding speed' },
+  { id:'genes',     br:4, x:68, y:64, pre:'court',      name:'Fine Genes',     icon:'flask',     max:5, base:35,  growth:2.5, desc:'+6% bred egg tier-up chance' },
+  { id:'twindate',  br:4, x:58, y:50, pre:'candle',     name:'Double Date',    icon:'hearts',    max:3, base:90,  growth:3.0, desc:'+10% breeding lays 2 eggs' },
+  { id:'rainbowegg',br:4, x:68, y:50, pre:'genes',      name:'Rainbow Clutch', icon:'rainbowegg',max:3, base:250, growth:4.0, desc:'+8% rainbow egg from Divine pairs' },
+  { id:'secretlore',br:4, x:63, y:36, pre:'rainbowegg', name:'Secret Lore',    icon:'scroll',    max:1, base:1200,growth:1,   desc:'Rainbow eggs hatch 3x faster' },
 
-  /* MARKET — far right */
-  { id:'value',    br:5, x:88, y:76, pre:'root',     name:'Egg Polish',       icon:'egg', max:10, base:5,   growth:1.9, desc:'+15% egg sell value' },
-  { id:'truckcap', br:5, x:85, y:63, pre:'value',    name:'Bigger Bed',       icon:'truck', max:6,  base:15,  growth:2.2, desc:'+5 truck capacity' },
-  { id:'route',    br:5, x:92, y:62, pre:'value',    name:'Express Route',    icon:'road', max:5,  base:25,  growth:2.3, desc:'truck trips 15% faster' },
-  { id:'fullbonus',br:5, x:86, y:49, pre:'truckcap', name:'Full Load Deal',   icon:'chart', max:5,  base:30,  growth:2.3, desc:'+6% payout for a full truck' },
-  { id:'autosend', br:5, x:93, y:48, pre:'route',    name:'Auto-Dispatch',    icon:'key', max:1,  base:250, growth:1,   desc:'truck departs by itself when full' },
-  { id:'contracts',br:5, x:89, y:35, pre:'fullbonus',name:'Premium Contracts',icon:'doc', max:3,  base:400, growth:5.0, desc:'+1% value per species discovered' },
-  { id:'tycoon',   br:5, x:92, y:21, pre:'contracts',name:'Egg Empire',       icon:'crown', max:1,  base:5000,growth:1,   desc:'ALL coin gains x2' },
+  /* FACTORY */
+  { id:'belts',    br:5, x:76, y:78, pre:'root',      name:'Conveyor Tech', icon:'crate',  max:1, base:30,  growth:1,   desc:'Unlock conveyor belts and fences' },
+  { id:'beltspeed',br:5, x:71, y:64, pre:'belts',     name:'Belt Grease',   icon:'oil',    max:5, base:20,  growth:2.2, desc:'+20% belt speed' },
+  { id:'vacuum',   br:5, x:81, y:64, pre:'belts',     name:'Vacuum Bots',   icon:'robot',  max:1, base:80,  growth:1,   desc:'Unlock egg vacuums' },
+  { id:'sorter',   br:5, x:71, y:50, pre:'beltspeed', name:'Egg Sorter',    icon:'sorter', max:1, base:140, growth:1,   desc:'Unlock the Sorter: splits belts by rarity' },
+  { id:'vacradius',br:5, x:81, y:50, pre:'vacuum',    name:'Wide Suction',  icon:'spiral', max:5, base:40,  growth:2.2, desc:'+8px vacuum radius' },
+  { id:'blower',   br:5, x:71, y:36, pre:'sorter',    name:'Air Blower',    icon:'blower', max:1, base:260, growth:1,   desc:'Unlock the Blower: herds loose eggs along' },
+  { id:'vacspeed', br:5, x:81, y:36, pre:'vacradius', name:'Turbo Pumps',   icon:'wind',   max:5, base:40,  growth:2.2, desc:'+25% vacuum speed' },
+  { id:'overclock',br:5, x:76, y:22, pre:'blower',    name:'Overclock',     icon:'bolt',   max:1, base:1500,growth:1,   desc:'ALL machines run 2x faster' },
+
+  /* MARKET */
+  { id:'value',    br:6, x:89, y:78, pre:'root',      name:'Egg Polish',       icon:'egg',   max:10, base:5,   growth:1.9, desc:'+15% egg sell value' },
+  { id:'truckcap', br:6, x:84, y:64, pre:'value',     name:'Bigger Bed',       icon:'truck', max:6,  base:15,  growth:2.2, desc:'+5 truck capacity' },
+  { id:'route',    br:6, x:94, y:64, pre:'value',     name:'Express Route',    icon:'road',  max:5,  base:25,  growth:2.3, desc:'truck trips 15% faster' },
+  { id:'silo',     br:6, x:84, y:50, pre:'truckcap',  name:'Egg Silo',         icon:'silo',  max:1,  base:180, growth:1,   desc:'Unlock the Silo: stores eggs, auto-loads the truck' },
+  { id:'fullbonus',br:6, x:94, y:50, pre:'route',     name:'Full Load Deal',   icon:'chart', max:5,  base:30,  growth:2.3, desc:'+6% payout for a full truck' },
+  { id:'autosend', br:6, x:84, y:36, pre:'silo',      name:'Auto-Dispatch',    icon:'key',   max:1,  base:250, growth:1,   desc:'truck departs by itself when full' },
+  { id:'contracts',br:6, x:94, y:36, pre:'fullbonus', name:'Premium Contracts',icon:'doc',   max:3,  base:400, growth:5.0, desc:'+1% value per species discovered' },
+  { id:'tycoon',   br:6, x:89, y:22, pre:'contracts', name:'Egg Empire',       icon:'crown', max:1,  base:5000,growth:1,   desc:'ALL coin gains x2' },
 ];
 
 const SKILL_BY_ID = Object.fromEntries(SKILLS.map(s => [s.id, s]));

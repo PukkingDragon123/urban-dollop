@@ -603,6 +603,182 @@
     }
   }
 
+  function drawFence(c, r, now) {
+    const x = c * 16, y = r * 16;
+    ctx.fillStyle = 'rgba(40,58,26,.22)'; ctx.fillRect(x + 1, y + 13, 14, 2);
+    /* two posts and two rails */
+    const post = px => {
+      ctx.fillStyle = '#5e3d18'; ctx.fillRect(x + px, y + 1, 3, 13);
+      ctx.fillStyle = '#a8783f'; ctx.fillRect(x + px, y + 2, 2, 11);
+      ctx.fillStyle = '#c9a35f'; ctx.fillRect(x + px, y + 3, 1, 5);
+      ctx.fillStyle = '#3e2810'; ctx.fillRect(x + px, y + 1, 3, 1);
+    };
+    ctx.fillStyle = '#8a5e2a'; ctx.fillRect(x, y + 4, 16, 3); ctx.fillRect(x, y + 9, 16, 3);
+    ctx.fillStyle = '#c9a35f'; ctx.fillRect(x, y + 4, 16, 1); ctx.fillRect(x, y + 9, 16, 1);
+    post(1); post(12);
+  }
+
+  function drawSorter(c, r, so, now) {
+    const x = c * 16, y = r * 16;
+    ctx.fillStyle = 'rgba(40,58,26,.22)'; ctx.fillRect(x + 1, y + 14, 15, 2);
+    /* housing */
+    ctx.fillStyle = '#3d434e'; ctx.fillRect(x, y, 16, 16);
+    ctx.fillStyle = '#7e8794'; ctx.fillRect(x + 1, y + 1, 14, 14);
+    ctx.fillStyle = '#a6aeba'; ctx.fillRect(x + 1, y + 1, 14, 3);
+    ctx.fillStyle = '#5a626e'; ctx.fillRect(x + 1, y + 12, 14, 3);
+    /* window showing the scanner beam */
+    ctx.fillStyle = '#23262b'; ctx.fillRect(x + 3, y + 5, 10, 6);
+    const beam = Math.floor(now / 90) % 8;
+    ctx.fillStyle = '#3fd0ff';
+    ctx.fillRect(x + 4 + beam, y + 6, 1, 4);
+    ctx.fillStyle = 'rgba(63,208,255,.35)';
+    ctx.fillRect(x + 4, y + 6, 8, 4);
+    /* output arrows: straight = rare, side = common */
+    const [dx, dy] = [[1, 0], [0, 1], [-1, 0], [0, -1]][so.dir];
+    const [sx, sy] = [[1, 0], [0, 1], [-1, 0], [0, -1]][(so.dir + 1) % 4];
+    ctx.fillStyle = '#ffc72f';
+    ctx.fillRect(x + 7 + dx * 6, y + 7 + dy * 6, 2, 2);
+    ctx.fillStyle = '#b8c0cc';
+    ctx.fillRect(x + 7 + sx * 6, y + 7 + sy * 6, 2, 2);
+    /* rarity threshold pips */
+    const thr = so.thr === undefined ? ECON.sorterRare : so.thr;
+    for (let i = 0; i < 4; i++) {
+      ctx.fillStyle = i < thr ? TIERS[Math.min(i, TIERS.length - 1)].c : 'rgba(40,40,50,.5)';
+      ctx.fillRect(x + 3 + i * 3, y + 2, 2, 1);
+    }
+  }
+
+  function drawBlower(c, r, b, now) {
+    const x = c * 16, y = r * 16;
+    const [dx, dy] = [[1, 0], [0, 1], [-1, 0], [0, -1]][b.dir];
+    ctx.fillStyle = 'rgba(40,58,26,.22)'; ctx.fillRect(x + 2, y + 14, 12, 2);
+    /* stand */
+    ctx.fillStyle = '#3d434e'; ctx.fillRect(x + 6, y + 11, 4, 4);
+    ctx.fillStyle = '#23262b'; ctx.fillRect(x + 4, y + 14, 8, 2);
+    /* housing ring */
+    ctx.fillStyle = '#2e3238'; ctx.fillRect(x + 2, y + 1, 12, 11);
+    ctx.fillStyle = '#c9ced6'; ctx.fillRect(x + 3, y + 2, 10, 9);
+    ctx.fillStyle = '#8a9099'; ctx.fillRect(x + 3, y + 9, 10, 2);
+    /* fan blades */
+    const spin = Math.floor(now / 70) % 4;
+    ctx.fillStyle = '#4b515c';
+    if (spin % 2 === 0) { ctx.fillRect(x + 4, y + 6, 8, 2); ctx.fillRect(x + 7, y + 3, 2, 8); }
+    else { ctx.fillRect(x + 5, y + 4, 6, 6); ctx.fillStyle = '#7e8794'; ctx.fillRect(x + 6, y + 5, 4, 4); }
+    ctx.fillStyle = '#ffd23f'; ctx.fillRect(x + 7, y + 6, 2, 2);
+    /* nozzle + gust puffs */
+    ctx.fillStyle = '#5a626e';
+    ctx.fillRect(x + 6 + dx * 7, y + 5 + dy * 7, 3 + Math.abs(dx) * 2, 3 + Math.abs(dy) * 2);
+    ctx.fillStyle = 'rgba(210,240,255,.6)';
+    for (let i = 0; i < 3; i++) {
+      const t = (Math.floor(now / 110) + i) % 3;
+      ctx.fillRect(x + 7 + dx * (10 + t * 6), y + 6 + dy * (10 + t * 6), 2, 2);
+    }
+  }
+
+  function drawStaffHut(c, r, hut, now) {
+    const x = c * 16, y = r * 16;
+    ctx.fillStyle = 'rgba(40,58,26,.26)'; ctx.fillRect(x + 2, y + 30, 28, 3);
+    /* walls */
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 1, y + 10, 30, 21);
+    for (let i = 0; i < 5; i++) {
+      ctx.fillStyle = i % 2 ? '#d9b98c' : '#c9a675';
+      ctx.fillRect(x + 2, y + 11 + i * 4, 28, 4);
+    }
+    ctx.fillStyle = '#a8865e'; ctx.fillRect(x + 2, y + 27, 28, 3);
+    /* thatched roof */
+    for (let row = 0; row < 4; row++) {
+      const wRow = 34 - row * 2;
+      ctx.fillStyle = row % 2 ? '#c9924f' : '#b8843f';
+      ctx.fillRect(x - 1 + row, y + 2 + row * 2, wRow, 3);
+      ctx.fillStyle = '#e0bd82';
+      for (let i = 0; i < wRow; i += 5) ctx.fillRect(x - 1 + row + i, y + 2 + row * 2, 2, 1);
+    }
+    /* door */
+    ctx.fillStyle = '#5e3d18'; ctx.fillRect(x + 12, y + 18, 8, 13);
+    ctx.fillStyle = '#8a5e2a'; ctx.fillRect(x + 13, y + 19, 6, 12);
+    ctx.fillStyle = '#ffd23f'; ctx.fillRect(x + 17, y + 25, 1, 1);
+    /* window with a lamp */
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 3, y + 16, 7, 6);
+    ctx.fillStyle = '#ffe9a0'; ctx.fillRect(x + 4, y + 17, 5, 4);
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 6, y + 16, 1, 6);
+    /* hiring board with staff count */
+    ctx.fillStyle = '#5e3d18'; ctx.fillRect(x + 21, y + 15, 10, 9);
+    ctx.fillStyle = '#e8d5a8'; ctx.fillRect(x + 22, y + 16, 8, 7);
+    const n = S().staff.length, cap = GAME.staffSlots();
+    SPR.drawText(ctx, String(n), x + 23, y + 17, '#3a2a16', 1);
+    SPR.drawText(ctx, '/' + cap, x + 23, y + 20, '#7a5a3a', 1);
+    if (S().unpaid && Math.floor(now / 400) % 2) {
+      SPR.drawText(ctx, 'NO PAY', x + 2, y - 4, '#c43a2a', 1, '#ffffff');
+    }
+  }
+
+  function drawSilo(c, r, silo, now) {
+    const x = c * 16, y = r * 16;
+    const fill = silo.store.length / ECON.siloCap;
+    ctx.fillStyle = 'rgba(40,58,26,.26)'; ctx.fillRect(x + 3, y + 30, 26, 3);
+    /* concrete base */
+    ctx.fillStyle = '#6e6a60'; ctx.fillRect(x + 2, y + 27, 28, 5);
+    ctx.fillStyle = '#8a867a'; ctx.fillRect(x + 2, y + 27, 28, 2);
+    /* body */
+    ctx.fillStyle = '#3d434e'; ctx.fillRect(x + 5, y + 6, 22, 22);
+    ctx.fillStyle = '#c9ced6'; ctx.fillRect(x + 6, y + 7, 20, 20);
+    ctx.fillStyle = '#e6eaf0'; ctx.fillRect(x + 6, y + 7, 6, 20);
+    ctx.fillStyle = '#9aa1ab'; ctx.fillRect(x + 22, y + 7, 4, 20);
+    /* corrugation */
+    ctx.fillStyle = 'rgba(90,98,110,.5)';
+    for (let i = 0; i < 5; i++) ctx.fillRect(x + 6, y + 10 + i * 4, 20, 1);
+    /* fill gauge */
+    ctx.fillStyle = '#23262b'; ctx.fillRect(x + 13, y + 9, 6, 16);
+    const h = Math.round(14 * Math.min(1, fill));
+    ctx.fillStyle = '#ffd23f'; ctx.fillRect(x + 14, y + 24 - h, 4, h);
+    ctx.fillStyle = '#fff2b0'; ctx.fillRect(x + 14, y + 24 - h, 4, Math.min(1, h));
+    /* dome roof */
+    ctx.fillStyle = '#3d434e'; ctx.fillRect(x + 4, y + 2, 24, 4);
+    ctx.fillStyle = '#aeb4bd'; ctx.fillRect(x + 6, y + 1, 20, 4);
+    ctx.fillStyle = '#e6eaf0'; ctx.fillRect(x + 8, y, 10, 2);
+    /* chute toward the road */
+    ctx.fillStyle = '#8a9099'; ctx.fillRect(x + 27, y + 20, 5, 3);
+    ctx.fillStyle = '#5a626e'; ctx.fillRect(x + 27, y + 23, 5, 1);
+    /* count plate */
+    SPR.drawText(ctx, String(silo.store.length), x + 7, y + 29, '#2e2216', 1);
+  }
+
+  function drawStaff(w, now) {
+    if (w.x + 20 < cam().x || w.x > cam().x + W.view.w || w.y + 24 < cam().y || w.y > cam().y + W.view.h) return;
+    const moving = w.state === 'walk';
+    const spr = SPR.staffSprite(w.type, moving ? w.frame : 0, 1);
+    const bob = moving ? 0 : Math.sin(now / 600 + w.id) * 0.5;
+    ctx.fillStyle = 'rgba(40,58,26,.26)';
+    ctx.fillRect(Math.round(w.x + 1), Math.round(w.y + spr.height - 2), 10, 2);
+    ctx.save();
+    if (w.dir === 1) {
+      ctx.translate(Math.round(w.x) + spr.width, Math.round(w.y + bob));
+      ctx.scale(-1, 1);
+      ctx.drawImage(spr, 0, 0);
+    } else ctx.drawImage(spr, Math.round(w.x), Math.round(w.y + bob));
+    ctx.restore();
+    /* carried eggs stack above the head */
+    for (let i = 0; i < Math.min(w.carry.length, 4); i++) {
+      const e = w.carry[i];
+      ctx.fillStyle = EGG_SHELL[e.tier];
+      ctx.fillRect(Math.round(w.x + 3 + (i % 2) * 5), Math.round(w.y - 4 - Math.floor(i / 2) * 4), 4, 4);
+      ctx.fillStyle = SPR.darken(EGG_SHELL[e.tier], 0.3);
+      ctx.fillRect(Math.round(w.x + 3 + (i % 2) * 5), Math.round(w.y - 1 - Math.floor(i / 2) * 4), 4, 1);
+    }
+    /* match-bot carrying a chicken */
+    if (w.hold) {
+      const ch = SPR.chickenSprite(SPECIES[w.hold.sp], 1, false);
+      ctx.drawImage(ch, Math.round(w.x - 3), Math.round(w.y - 14));
+    }
+    /* status marks */
+    if (S().unpaid && Math.floor(now / 350) % 2) {
+      SPR.drawText(ctx, '!', Math.round(w.x + 5), Math.round(w.y - 8), '#c43a2a', 1, '#ffffff');
+    } else if (w.type === 'cull' && w.state === 'work') {
+      ctx.fillStyle = '#ff6b4a';
+      ctx.fillRect(Math.round(w.x + 12), Math.round(w.y + 4), 4, 1);
+    }
+  }
+
   function drawLoveNest(c, r, nest, now) {
     const x = c * 16, y = r * 16;
     ctx.fillStyle = 'rgba(40,58,26,.25)'; ctx.fillRect(x + 3, y + 29, 26, 3);
@@ -890,6 +1066,15 @@
       ctx.drawImage(spr, 0, 0);
     } else ctx.drawImage(spr, Math.round(ch.x), yy);
     ctx.restore();
+    /* marked for the cull-bot */
+    if (ch.marked) {
+      const blink = Math.floor(now / 380) % 2;
+      ctx.fillStyle = blink ? '#e8542f' : '#a8321c';
+      ctx.fillRect(Math.round(ch.x + 7), Math.round(yy - 6), 6, 5);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(Math.round(ch.x + 9), Math.round(yy - 5), 2, 2);
+      ctx.fillRect(Math.round(ch.x + 9), Math.round(yy - 2), 2, 1);
+    }
     /* feed buff sparkle */
     if (ch.buffT > 0 && Math.floor(now / 250) % 2) {
       ctx.fillStyle = '#ffd23f';
@@ -962,6 +1147,9 @@
       ctx.drawImage(b, Math.round(x - 7), Math.round(y - 3 + (ptr.down ? 2 : 0)));
     } else if (tool === 'feed') {
       ctx.drawImage(SPR.feedbagSprite(1), Math.round(x - 6), Math.round(y - 4));
+    } else if (tool === 'inspect') {
+      const g = SPR.iconSprite('magnify', 1);
+      ctx.drawImage(g, Math.round(x - 4), Math.round(y - 4));
     } else if (tool === 'build') {
       const h = SPR.hammerSprite(1);
       ctx.save();
@@ -990,7 +1178,12 @@
     ctx.globalAlpha = 0.55;
     if (buildSel === 'belt') drawBelt(c, r, placeDir, now);
     else if (buildSel === 'vacuum') drawVacuum(c, r, { dir: placeDir, hold: [] }, now);
+    else if (buildSel === 'blower') drawBlower(c, r, { dir: placeDir }, now);
+    else if (buildSel === 'sorter') drawSorter(c, r, { dir: placeDir, thr: ECON.sorterRare }, now);
+    else if (buildSel === 'fence') drawFence(c, r, now);
     else if (buildSel === 'lovenest') drawLoveNest(c, r, { slots: [null, null], prog: 0 }, now);
+    else if (buildSel === 'staffhut') drawStaffHut(c, r, {}, now);
+    else if (buildSel === 'silo') drawSilo(c, r, { store: [] }, now);
     else drawIncubator(c, r, { queue: [], prog: 0 }, now);
     ctx.globalAlpha = 1;
     ctx.fillStyle = ok ? 'rgba(122,199,79,.28)' : 'rgba(232,84,47,.34)';
@@ -1004,6 +1197,12 @@
     if (buildSel === 'vacuum') {
       ctx.strokeStyle = 'rgba(63,208,255,.5)'; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(c * 16 + 8, r * 16 + 8, GAME.vacR(), 0, Math.PI * 2); ctx.stroke();
+    }
+    if (buildSel === 'blower') {
+      const [bdx, bdy] = [[1, 0], [0, 1], [-1, 0], [0, -1]][placeDir];
+      ctx.fillStyle = 'rgba(180,230,255,.35)';
+      for (let d = 10; d < ECON.blowerR; d += 4)
+        ctx.fillRect(c * 16 + 7 + bdx * d, r * 16 + 7 + bdy * d, 3, 3);
     }
   }
 
@@ -1041,9 +1240,14 @@
     drawLab(now); drawStand(now); drawMamaSign(now);
 
     for (const k of Object.keys(S().belts)) { const [c, r] = k.split(',').map(Number); drawBelt(c, r, S().belts[k].dir, now); }
+    for (const k of Object.keys(S().sorters)) { const [c, r] = k.split(',').map(Number); drawSorter(c, r, S().sorters[k], now); }
+    for (const k of Object.keys(S().fences)) { const [c, r] = k.split(',').map(Number); drawFence(c, r, now); }
     for (const k of Object.keys(S().vacs)) { const [c, r] = k.split(',').map(Number); drawVacuum(c, r, S().vacs[k], now); }
+    for (const k of Object.keys(S().blowers)) { const [c, r] = k.split(',').map(Number); drawBlower(c, r, S().blowers[k], now); }
     for (const k of Object.keys(S().incs)) { const [c, r] = k.split(',').map(Number); drawIncubator(c, r, S().incs[k], now); }
     for (const k of Object.keys(S().nests)) { const [c, r] = k.split(',').map(Number); drawLoveNest(c, r, S().nests[k], now); }
+    for (const k of Object.keys(S().huts)) { const [c, r] = k.split(',').map(Number); drawStaffHut(c, r, S().huts[k], now); }
+    for (const k of Object.keys(S().silos)) { const [c, r] = k.split(',').map(Number); drawSilo(c, r, S().silos[k], now); }
 
     S().items.forEach(it => {
       const spr = it.rainbow ? SPR.eggSprite(it.tier, 1, true, Math.floor(now / 120) % 6) : SPR.eggSprite(it.tier, 1);
@@ -1064,6 +1268,7 @@
     S().plumes.forEach(pl => drawPlume(pl, now));
     drawMama(now);
     S().chickens.forEach(ch => drawChicken(ch, now));
+    S().staff.forEach(w => drawStaff(w, now));
     drawTruck(now);
     drawSaleSigns(now);
 
@@ -1189,10 +1394,10 @@
     el.cursorChip.style.top = (ev.clientY + 12) + 'px';
   });
 
-  const TOOL_ICON = { hand: 'hand', basket: 'basket', feed: 'seed', build: 'hammer' };
+  const TOOL_ICON = { hand: 'hand', basket: 'basket', feed: 'seed', build: 'hammer', inspect: 'magnify' };
   function renderToolbelt() {
     el.toolbelt.innerHTML = '';
-    ['hand', 'basket', 'feed', 'build'].forEach(id => {
+    ['hand', 'basket', 'feed', 'build', 'inspect'].forEach(id => {
       if (id === 'feed' && !GAME.lvl('feed')) return;
       const b = document.createElement('button');
       b.className = 'tool-btn' + (S().tool === id ? ' active' : '');
@@ -1202,6 +1407,7 @@
         basket: 'Basket - sweep up eggs and feathers',
         feed: 'Feed - sprinkle seed, hens lay twice as fast',
         build: 'Build - place machines',
+        inspect: 'Inspect - tap anything for its stats',
       }[id];
       b.appendChild(mkIcon(TOOL_ICON[id], 3));
       el.toolbelt.appendChild(b);
@@ -1217,7 +1423,7 @@
   /* miniature building render for the palette buttons: reuse the world painters
      by pointing `ctx` at an offscreen canvas for the duration of the call */
   function buildingThumb(type) {
-    const small = type === 'belt' || type === 'vacuum';
+    const small = ['belt', 'vacuum', 'blower', 'sorter', 'fence'].includes(type);
     const wpx = small ? 16 : 34, hpx = small ? 16 : 36;
     const k = small ? 2 : 1;
     const c = document.createElement('canvas');
@@ -1232,7 +1438,12 @@
       const now = performance.now();
       if (type === 'belt') drawBelt(0, 0, placeDir, now);
       else if (type === 'vacuum') drawVacuum(0, 0, { dir: placeDir, hold: [] }, now);
+      else if (type === 'blower') drawBlower(0, 0, { dir: placeDir }, now);
+      else if (type === 'sorter') drawSorter(0, 0, { dir: placeDir, thr: ECON.sorterRare }, now);
+      else if (type === 'fence') drawFence(0, 0, now);
       else if (type === 'lovenest') drawLoveNest(0, 0, { slots: [null, null], prog: 0 }, now);
+      else if (type === 'staffhut') drawStaffHut(0, 0, {}, now);
+      else if (type === 'silo') drawSilo(0, 0, { store: [] }, now);
       else drawIncubator(0, 0, { queue: [], prog: 0 }, now);
     } finally {
       ctx = saved;
@@ -1244,7 +1455,7 @@
     if (S().tool !== 'build') { el.palette.hidden = true; return; }
     el.palette.hidden = false;
     el.palette.innerHTML = '';
-    ['incubator', 'lovenest', 'vacuum', 'belt'].forEach(type => {
+    ['incubator', 'lovenest', 'staffhut', 'silo', 'vacuum', 'blower', 'sorter', 'belt', 'fence'].forEach(type => {
       const b = BUILDS[type];
       const locked = b.needs && !GAME.lvl(b.needs);
       const cost = buildCost(type, S().built[type]);
@@ -1296,7 +1507,10 @@
     else if (stats.sold === 0 && (st.basket.length > 2 || st.truck.load.length)) { anchor = [W.truckHome.x + 26, W.truckHome.y - 24]; text = st.truck.load.length ? 'tap the truck to sell' : 'drop eggs on the truck'; }
     else if (st.truck.state === 'parked' && st.truck.load.length >= GAME.truckCap() && !GAME.lvl('autosend')) { anchor = [W.truckHome.x + 26, W.truckHome.y - 24]; text = 'truck is full - tap to send it'; }
     else if (st.feathers >= 4 && Object.keys(st.sk).length <= 1) { anchor = [W.stations.lab.x + 15, W.stations.lab.y - 10]; text = 'spend feathers in the lab'; }
+    else if (st.unpaid) { anchor = null; text = 'payroll is empty - your staff have stopped working'; }
     else if (GAME.lvl('court') && st.built.lovenest === 0 && stats.bred === 0) { anchor = null; text = 'build a love nest to breed chickens'; }
+    else if (GAME.lvl('hiring') && !Object.keys(st.huts).length) { anchor = null; text = 'build a staff hut, then tap it to hire crew'; }
+    else if (st.chickens.length > 6 && !st.inspected) { anchor = null; text = 'use the magnifier tool to inspect any hen, worker or machine'; }
     else if (st.mamaTier < TIERS.length - 2 && st.coins >= GAME.mamaCost() * 1.2) { anchor = [W.stations.mamaSign.x + 7, W.stations.mamaSign.y - 8]; text = 'upgrade mama at her sign'; }
     if (!text) { el.bubble.hidden = true; bubbleText = ''; return; }
     if (text !== bubbleText) { bubbleText = text; el.bubble.textContent = text; }
@@ -1319,6 +1533,11 @@
     set(el.feathers, GAME.fmt(S().feathers));
     updateCursorChip();
     hintLogic();
+    refreshInspect();
+    if (!$('#modal-hire').hidden) {
+      const sig = S().staff.length + '|' + S().coins.toFixed(0) + '|' + S().autoMark + '|' + GAME.staffSlots();
+      if (sig !== hireSig) { hireSig = sig; renderHire(); }
+    }
     if (GAME.dirty.build) renderPalette();
   }
 
@@ -1327,13 +1546,13 @@
   function closeModals() { document.querySelectorAll('.modal').forEach(m => m.hidden = true); }
 
   /* ---------- HEX RESEARCH GRID (canvas) ---------- */
-  const TREE_W = 620, TREE_H = 360, HEX_R = 15;
+  const TREE_W = 760, TREE_H = 400, HEX_R = 15;
   let treeCv = null, treeCtx = null, selSkill = null, hoverSkill = null;
 
   function treePos(sk) {
     return {
-      x: Math.round(38 + (sk.x / 100) * (TREE_W - 76)),
-      y: Math.round(26 + (sk.y / 100) * (TREE_H - 52)),
+      x: Math.round(34 + (sk.x / 100) * (TREE_W - 68)),
+      y: Math.round(30 + (sk.y / 100) * (TREE_H - 58)),
     };
   }
   function hexPalFor(state, hue) {
@@ -1706,6 +1925,354 @@
     GAME.dirty.pedia = false;
   }
 
+  /* ================= INSPECT PANEL ================= */
+  const ipanel = $('#inspect-panel');
+  let inspect = null;   /* {kind, ref} */
+
+  let ipUpdaters = [];
+  function ipRow(label, value) {
+    const d = document.createElement('div');
+    d.className = 'ip-row';
+    const a = document.createElement('span'); a.textContent = label;
+    const b = document.createElement('span');
+    if (typeof value === 'function') {
+      const set = () => { const v = String(value()); if (b.textContent !== v) b.textContent = v; };
+      set();
+      ipUpdaters.push(set);
+    } else b.textContent = value;
+    d.appendChild(a); d.appendChild(b);
+    return d;
+  }
+  function ipHead(spriteCanvas, title, sub) {
+    const h = document.createElement('div');
+    h.className = 'ip-head';
+    if (spriteCanvas) h.appendChild(spriteCanvas);
+    const t = document.createElement('b');
+    t.textContent = title;
+    if (sub) {
+      const sp = document.createElement('span');
+      sp.className = 'ip-sub';
+      sp.textContent = sub;
+      t.appendChild(sp);
+    }
+    h.appendChild(t);
+    const x = document.createElement('button');
+    x.className = 'btn btn-tiny ip-close';
+    x.dataset.act = 'close-inspect';
+    x.textContent = 'X';
+    h.appendChild(x);
+    return h;
+  }
+  function ipBtns(defs) {
+    const row = document.createElement('div');
+    row.className = 'ip-btns';
+    defs.forEach(d => {
+      const b = document.createElement('button');
+      Object.keys(d.data || {}).forEach(k => b.dataset[k] = d.data[k]);
+      const apply = () => {
+        const label = typeof d.label === 'function' ? d.label() : d.label;
+        if (b.textContent !== label) b.textContent = label;
+        const cls = typeof d.cls === 'function' ? d.cls() : d.cls;
+        b.className = 'btn' + (cls ? ' ' + cls : '');
+        const dis = typeof d.disabled === 'function' ? d.disabled() : d.disabled;
+        if (b.disabled !== !!dis) b.disabled = !!dis;
+      };
+      apply();
+      if (typeof d.label === 'function' || typeof d.cls === 'function' || typeof d.disabled === 'function')
+        ipUpdaters.push(apply);
+      row.appendChild(b);
+    });
+    return row;
+  }
+
+  let ipSig = '';
+  function setInspect(target) {
+    inspect = target;
+    if (target) S().inspected = true;
+    ipSig = '';           /* force a rebuild for the new target */
+    renderInspect();
+  }
+  /* called every frame-ish: only rebuilds when the target changes,
+     otherwise just refreshes the live values so buttons stay clickable */
+  function refreshInspect() {
+    if (!inspect) return;
+    const sig = inspectSig();
+    if (sig !== ipSig) { renderInspect(); return; }
+    for (const u of ipUpdaters) u();
+  }
+  function inspectSig() {
+    if (!inspect) return '';
+    const r = inspect.ref;
+    return inspect.kind + '|' + (r ? (r.id !== undefined ? 'id' + r.id : (r.k || '')) : '') +
+      (inspect.kind === 'build' && r ? r.type : '');
+  }
+  function renderInspect() {
+    if (!inspect) { ipanel.hidden = true; ipanel.innerHTML = ''; ipUpdaters = []; return; }
+    ipanel.hidden = false;
+    ipanel.innerHTML = '';
+    ipUpdaters = [];
+    ipSig = inspectSig();
+    const st = S();
+    const kind = inspect.kind;
+
+    if (kind === 'farm') {
+      const r = GAME.rates();
+      ipanel.appendChild(ipHead(mkIcon('doc', 3), 'RANCH REPORT', 'live production'));
+      ipanel.appendChild(ipRow('eggs / min', () => GAME.fmt(Math.round(GAME.rates().eggsPerMin))));
+      ipanel.appendChild(ipRow('coins / min', () => GAME.fmt(Math.round(GAME.rates().coinsPerMin))));
+      ipanel.appendChild(ipRow('wages / sec', () => GAME.wagePerSec().toFixed(1)));
+      ipanel.appendChild(ipRow('chickens', () => S().chickens.length + ' / ' + GAME.chickenCap()));
+      ipanel.appendChild(ipRow('staff', () => S().staff.length + ' / ' + GAME.staffSlots()));
+      ipanel.appendChild(ipRow('eggs on field', () => String(S().eggs.length)));
+      ipanel.appendChild(ipRow('in silos', () => String(GAME.rates().stored)));
+      ipanel.appendChild(ipRow('species', () => GAME.disc() + ' / ' + SPECIES_TOTAL));
+      ipanel.appendChild(ipRow('land owned', GAME.ownedPlots() + ' / ' + PLOTS.length));
+      ipanel.appendChild(ipRow('total sold', () => GAME.fmt(S().stats.sold)));
+      ipanel.appendChild(ipRow('retired', () => GAME.fmt(S().stats.culled)));
+      if (st.unpaid) {
+        const w = document.createElement('p');
+        w.className = 'ip-note';
+        w.textContent = 'Payroll is empty - your staff have downed tools!';
+        ipanel.appendChild(w);
+      }
+      return;
+    }
+
+    if (kind === 'chicken') {
+      const ch = inspect.ref;
+      if (st.chickens.indexOf(ch) === -1) { setInspect({ kind: 'farm' }); return; }
+      const sp = SPECIES[ch.sp];
+      ipanel.appendChild(ipHead(chickEl(sp, 2, false), sp.name, TIERS[sp.tier].n));
+      ipanel.appendChild(ipRow('lays every', GAME.fmtTime(GAME.layTime(sp.tier) / (ch.buffT > 0 ? 2 : 1))));
+      ipanel.appendChild(ipRow('egg value', GAME.fmt(GAME.eggValue(sp.tier, false))));
+      ipanel.appendChild(ipRow('next egg in', () => GAME.fmtTime(Math.max(0, ch.lay))));
+      ipanel.appendChild(ipRow('well fed', () => ch.buffT > 0 ? GAME.fmtTime(ch.buffT) : 'no'));
+      ipanel.appendChild(ipRow('petting', () => ch.petCd > 0 ? GAME.fmtTime(ch.petCd) : 'ready'));
+      ipanel.appendChild(ipRow('status', () => ch.marked ? 'MARKED' : 'keeping'));
+      const note = document.createElement('p');
+      note.className = 'ip-note';
+      note.textContent = sp.quip;
+      ipanel.appendChild(note);
+      ipanel.appendChild(ipBtns([
+        { label: () => ch.marked ? 'UNMARK' : 'MARK CULL', data: { act: 'mark-chicken' }, cls: () => ch.marked ? '' : 'btn-green' },
+        { label: 'RETIRE NOW', data: { act: 'retire-chicken' } },
+      ]));
+      return;
+    }
+
+    if (kind === 'staff') {
+      const w = inspect.ref;
+      if (st.staff.indexOf(w) === -1) { setInspect({ kind: 'farm' }); return; }
+      const def = STAFF[w.type];
+      ipanel.appendChild(ipHead(cloneCanvas(SPR.staffSprite(w.type, 0, 2)), def.name, def.robot ? 'robot worker' : 'farmhand'));
+      ipanel.appendChild(ipRow('wage', (def.wage * Math.pow(0.88, GAME.lvl('wages'))).toFixed(2) + '/s'));
+      ipanel.appendChild(ipRow('doing', () => S().unpaid ? 'UNPAID' : w.state));
+      if (w.type === 'hand') ipanel.appendChild(ipRow('carrying', () => w.carry.length + ' eggs'));
+      if (w.type === 'match') ipanel.appendChild(ipRow('holding', () => w.hold ? SPECIES[w.hold.sp].name : 'nobody'));
+      const note = document.createElement('p');
+      note.className = 'ip-note';
+      note.textContent = def.job;
+      ipanel.appendChild(note);
+      ipanel.appendChild(ipBtns([{ label: 'DISMISS', data: { act: 'fire-staff' } }]));
+      return;
+    }
+
+    if (kind === 'mama') {
+      ipanel.appendChild(ipHead(cloneCanvas(SPR.mamaSprite(st.mamaTier, 1, 'idle')), 'MAMA HEN', TIERS[st.mamaTier].n + ' layer'));
+      ipanel.appendChild(ipRow('lays every', GAME.fmtTime(GAME.layTime(st.mamaTier))));
+      ipanel.appendChild(ipRow('egg value', GAME.fmt(GAME.eggValue(st.mamaTier, false))));
+      ipanel.appendChild(ipRow('pet cooldown', GAME.fmtTime(GAME.petCd(true))));
+      ipanel.appendChild(ipRow('mutation', Math.round(GAME.mutationChance() * 100) + '%'));
+      const maxed = st.mamaTier >= TIERS.length - 2;
+      ipanel.appendChild(ipBtns([{
+        label: () => S().mamaTier >= TIERS.length - 2 ? 'MAX TIER' : 'UPGRADE ' + GAME.fmt(GAME.mamaCost()),
+        data: { act: 'upgrade-mama' },
+        disabled: () => S().mamaTier >= TIERS.length - 2 || S().coins < GAME.mamaCost(),
+        cls: () => S().mamaTier < TIERS.length - 2 && S().coins >= GAME.mamaCost() ? 'btn-green' : '',
+      }]));
+      return;
+    }
+
+    if (kind === 'land') {
+      const pl = inspect.ref;
+      ipanel.appendChild(ipHead(mkIcon('house', 3), 'PLOT FOR SALE', pl.theme + ' ground'));
+      ipanel.appendChild(ipRow('price', GAME.fmt(pl.price)));
+      ipanel.appendChild(ipRow('you have', () => GAME.fmt(S().coins)));
+      ipanel.appendChild(ipRow('size', PLOT_W + ' x ' + PLOT_H + ' tiles'));
+      ipanel.appendChild(ipRow('adds', '+' + ECON.capPerPlot + ' chicken room'));
+      const note = document.createElement('p');
+      note.className = 'ip-note';
+      note.textContent = 'Buy it from the sign with any other tool.';
+      ipanel.appendChild(note);
+      ipanel.appendChild(ipBtns([{
+        label: () => 'BUY ' + GAME.fmt(pl.price),
+        data: { act: 'buy-plot', id: String(pl.id) },
+        disabled: () => S().coins < pl.price,
+        cls: () => S().coins >= pl.price ? 'btn-green' : '',
+      }]));
+      return;
+    }
+
+    if (kind === 'build') {
+      const o = inspect.ref;    /* {type, k} */
+      const b = BUILDS[o.type];
+      const [c, r] = o.k.split(',').map(Number);
+      ipanel.appendChild(ipHead(buildingThumb(o.type), b.name.toUpperCase(), 'tile ' + c + ',' + r));
+      const btns = [];
+      if (o.type === 'incubator') {
+        const inc = st.incs[o.k];
+        if (!inc) { setInspect({ kind: 'farm' }); return; }
+        ipanel.appendChild(ipRow('queue', () => inc.queue.length + ' / ' + GAME.incCap()));
+        if (inc.queue.length) {
+          const q = inc.queue[0];
+          ipanel.appendChild(ipRow('hatching', () => inc.queue.length ? TIERS[inc.queue[0].tier].n : 'empty'));
+          const need = GAME.incHatchTime(q.tier, q.rainbow);
+          ipanel.appendChild(ipRow('ready in', () => inc.queue.length ? GAME.fmtTime(Math.max(0, GAME.incHatchTime(inc.queue[0].tier, inc.queue[0].rainbow) - inc.prog)) : '-'));
+        }
+        ipanel.appendChild(ipRow('speed', 'x' + (10 / GAME.incHatchTime(0, false)).toFixed(2)));
+      } else if (o.type === 'lovenest') {
+        const n = st.nests[o.k];
+        if (!n) { setInspect({ kind: 'farm' }); return; }
+        ipanel.appendChild(ipRow('slot 1', () => n.slots[0] ? SPECIES[n.slots[0].sp].name : 'empty'));
+        ipanel.appendChild(ipRow('slot 2', () => n.slots[1] ? SPECIES[n.slots[1].sp].name : 'empty'));
+        ipanel.appendChild(ipRow('tier-up odds', Math.round(GAME.breedUp() * 100) + '%'));
+        ipanel.appendChild(ipRow('rainbow odds', Math.round(GAME.rainbowChance() * 100) + '%'));
+        btns.push({ label: 'EJECT PAIR', data: { act: 'eject-nest', k: o.k } });
+      } else if (o.type === 'sorter') {
+        const so = st.sorters[o.k];
+        if (!so) { setInspect({ kind: 'farm' }); return; }
+        const thr = so.thr === undefined ? ECON.sorterRare : so.thr;
+        ipanel.appendChild(ipRow('straight if', () => TIERS[Math.min(so.thr === undefined ? ECON.sorterRare : so.thr, TIERS.length - 1)].n + '+'));
+        ipanel.appendChild(ipRow('others', 'turn aside'));
+        ipanel.appendChild(ipRow('facing', () => ['east', 'south', 'west', 'north'][so.dir]));
+        btns.push({ label: 'THRESHOLD +', data: { act: 'sorter-thr', k: o.k }, cls: 'btn-green' });
+        btns.push({ label: 'TURN', data: { act: 'rotate-build', k: o.k, kind: 'sorter' } });
+      } else if (o.type === 'silo') {
+        const si = st.silos[o.k];
+        if (!si) { setInspect({ kind: 'farm' }); return; }
+        ipanel.appendChild(ipRow('stored', () => si.store.length + ' / ' + ECON.siloCap));
+        const worth = si.store.reduce((a, e) => a + GAME.eggValue(e.tier, e.golden), 0);
+        ipanel.appendChild(ipRow('worth', () => GAME.fmt(si.store.reduce((a, e) => a + GAME.eggValue(e.tier, e.golden), 0))));
+        ipanel.appendChild(ipRow('loading', () => S().truck.state === 'parked' ? 'truck is here' : 'waiting'));
+      } else if (o.type === 'vacuum') {
+        const v = st.vacs[o.k];
+        if (!v) { setInspect({ kind: 'farm' }); return; }
+        ipanel.appendChild(ipRow('radius', Math.round(GAME.vacR()) + 'px'));
+        ipanel.appendChild(ipRow('holding', () => v.hold.length + ' / ' + ECON.vacHold));
+        ipanel.appendChild(ipRow('every', GAME.vacInterval().toFixed(2) + 's'));
+        btns.push({ label: 'TURN', data: { act: 'rotate-build', k: o.k, kind: 'vacuum' } });
+      } else if (o.type === 'blower') {
+        const bl = st.blowers[o.k];
+        if (!bl) { setInspect({ kind: 'farm' }); return; }
+        ipanel.appendChild(ipRow('reach', ECON.blowerR + 'px'));
+        ipanel.appendChild(ipRow('facing', () => ['east', 'south', 'west', 'north'][bl.dir]));
+        btns.push({ label: 'TURN', data: { act: 'rotate-build', k: o.k, kind: 'blower' } });
+      } else if (o.type === 'belt') {
+        const be = st.belts[o.k];
+        if (!be) { setInspect({ kind: 'farm' }); return; }
+        ipanel.appendChild(ipRow('speed', Math.round(GAME.beltSpeed()) + ' px/s'));
+        ipanel.appendChild(ipRow('facing', () => ['east', 'south', 'west', 'north'][be.dir]));
+        btns.push({ label: 'TURN', data: { act: 'rotate-build', k: o.k, kind: 'belt' } });
+      } else if (o.type === 'staffhut') {
+        ipanel.appendChild(ipRow('staff', () => S().staff.length + ' / ' + GAME.staffSlots()));
+        ipanel.appendChild(ipRow('wages', () => GAME.wagePerSec().toFixed(2) + '/s'));
+        btns.push({ label: 'HIRE CREW', data: { act: 'open-hire' }, cls: 'btn-green' });
+      } else if (o.type === 'fence') {
+        ipanel.appendChild(ipRow('blocks', 'chickens'));
+      }
+      const note = document.createElement('p');
+      note.className = 'ip-note';
+      note.textContent = b.desc;
+      ipanel.appendChild(note);
+      btns.push({ label: 'REMOVE', data: { act: 'demolish-here', k: o.k } });
+      ipanel.appendChild(ipBtns(btns));
+      return;
+    }
+  }
+
+  /* ================= HIRING ================= */
+  let hireSig = '';
+  function renderHire() {
+    const list = $('#hire-list');
+    const crew = $('#crew-list');
+    const st = S();
+    $('#hire-sub').textContent = st.staff.length + ' / ' + GAME.staffSlots() + ' SLOTS  -  ' +
+      GAME.wagePerSec().toFixed(2) + ' COINS/SEC';
+    list.innerHTML = '';
+    Object.keys(STAFF).forEach(type => {
+      const def = STAFF[type];
+      const locked = def.needs && !GAME.lvl(def.needs);
+      const cost = GAME.staffHireCost(type);
+      const card = document.createElement('div');
+      card.className = 'hire-card' + (locked ? ' locked' : '');
+      card.appendChild(cloneCanvas(SPR.staffSprite(type, 0, 2)));
+      const mid = document.createElement('div');
+      mid.className = 'hc-mid';
+      const b = document.createElement('b');
+      b.textContent = def.name.toUpperCase();
+      mid.appendChild(b);
+      const job = document.createElement('span');
+      job.textContent = locked ? 'Research required to hire this worker.' : def.job;
+      mid.appendChild(job);
+      const wage = document.createElement('span');
+      wage.textContent = 'wage ' + (def.wage * Math.pow(0.88, GAME.lvl('wages'))).toFixed(2) + ' coins/sec';
+      mid.appendChild(wage);
+      const btn = document.createElement('button');
+      btn.className = 'btn';
+      btn.dataset.act = 'hire';
+      btn.dataset.type = type;
+      const canH = !locked && GAME.canHire(type) && st.coins >= cost;
+      if (canH) btn.classList.add('btn-green');
+      btn.disabled = !canH;
+      btn.appendChild(mkIcon('coin', 2));
+      btn.appendChild(document.createTextNode(locked ? 'LOCKED' : GAME.fmt(cost)));
+      mid.appendChild(btn);
+      card.appendChild(mid);
+      list.appendChild(card);
+    });
+    crew.innerHTML = '';
+    if (!Object.keys(st.huts).length) {
+      const warn = document.createElement('p');
+      warn.id = 'hire-warn';
+      warn.textContent = 'Build a Staff Hut first - crews need somewhere to sleep.';
+      crew.appendChild(warn);
+    }
+    if (st.staff.length >= GAME.staffSlots() && Object.keys(st.huts).length) {
+      const warn = document.createElement('p');
+      warn.id = 'hire-warn';
+      warn.textContent = 'All slots full - build another Staff Hut or research Bunkhouse.';
+      crew.appendChild(warn);
+    }
+    st.staff.forEach(w => {
+      const chip = document.createElement('div');
+      chip.className = 'crew-chip';
+      chip.appendChild(cloneCanvas(SPR.staffSprite(w.type, 0, 1)));
+      const t = document.createElement('span');
+      t.textContent = STAFF[w.type].name;
+      chip.appendChild(t);
+      const b = document.createElement('button');
+      b.className = 'btn';
+      b.dataset.act = 'fire';
+      b.dataset.id = String(w.id);
+      b.textContent = 'DISMISS';
+      chip.appendChild(b);
+      crew.appendChild(chip);
+    });
+    /* auto-mark rule */
+    const rule = document.createElement('div');
+    rule.className = 'crew-chip';
+    const rt = document.createElement('span');
+    const am = st.autoMark;
+    rt.textContent = 'auto-mark culls below: ' + (am < 0 ? 'off' : TIERS[Math.min(am, TIERS.length - 1)].n);
+    rule.appendChild(rt);
+    const rb = document.createElement('button');
+    rb.className = 'btn';
+    rb.dataset.act = 'cycle-automark';
+    rb.textContent = 'CHANGE';
+    rule.appendChild(rb);
+    crew.appendChild(rule);
+  }
+
   /* ================= INTERACTION ================= */
   function chickenAt(x, y) {
     for (let i = S().chickens.length - 1; i >= 0; i--) {
@@ -1728,6 +2295,13 @@
     }
     return null;
   }
+  function staffAt(x, y) {
+    for (let i = S().staff.length - 1; i >= 0; i--) {
+      const w = S().staff[i];
+      if (x > w.x - 2 && x < w.x + 14 && y > w.y - 6 && y < w.y + 18) return w;
+    }
+    return null;
+  }
   function overMama(x, y) {
     const m = W.mama;
     return x > m.x - 16 && x < m.x + 18 && y > m.y - 26 && y < m.y + 18;
@@ -1747,6 +2321,7 @@
     if (st === 'lab') { renderSkills(); openModal('#modal-skills'); snd.build(); return true; }
     if (st === 'stand') { renderPedia(); openModal('#modal-pedia'); snd.build(); return true; }
     if (st === 'mamaSign') {
+      if (S().tool === 'inspect') { setInspect({ kind: 'mama' }); return true; }
       if (GAME.upgradeMama()) {
         snd.grand(); heart(W.mama.x, W.mama.y - 20, 8);
         toast({ icon: 'crown', title: 'MAMA EVOLVED', body: 'She now lays ' + TIERS[S().mamaTier].n + ' eggs.' });
@@ -1755,6 +2330,7 @@
     }
     const sign = saleSignAt(x, y);
     if (sign) {
+      if (S().tool === 'inspect') { setInspect({ kind: 'land', ref: sign }); return true; }
       if (GAME.buyPlot(sign.id)) {
         snd.grand();
         puff(x, y, '#ffd23f', 18, 64, 44);
@@ -1771,10 +2347,25 @@
       if (S().truck.load.length && GAME.sendTruck()) { snd.engine(); return true; }
     }
     const o = GAME.occAt(Math.floor(x / 16), Math.floor(y / 16));
+    if (o && o.type === 'staffhut' && S().tool !== 'build') {
+      renderHire(); openModal('#modal-hire'); snd.build(); return true;
+    }
     if (o && o.type === 'lovenest' && S().tool === 'hand' && !S().held) {
       if (GAME.ejectNest(o.k)) { snd.plop(); return true; }
     }
     return false;
+  }
+
+  /* the inspect tool: tap anything to read its stats */
+  function inspectAt(x, y) {
+    const w = staffAt(x, y);
+    if (w) { setInspect({ kind: 'staff', ref: w }); return; }
+    const ch = chickenAt(x, y);
+    if (ch) { setInspect({ kind: 'chicken', ref: ch }); return; }
+    if (overMama(x, y)) { setInspect({ kind: 'mama' }); return; }
+    const o = GAME.occAt(Math.floor(x / 16), Math.floor(y / 16));
+    if (o) { setInspect({ kind: 'build', ref: o }); return; }
+    setInspect({ kind: 'farm' });
   }
 
   let heldSince = 0, cand = null;
@@ -1791,6 +2382,7 @@
       return;
     }
     if (tool === 'feed') { trySprinkle(p.x, p.y); ptr.mode = 'feed'; return; }
+    if (tool === 'inspect') { ptr.mode = 'inspect'; return; }
     if (tool === 'basket') { ptr.mode = 'sweep'; return; }
     if (S().held) { ptr.mode = 'carry'; return; }
     cand = { ch: chickenAt(p.x, p.y), egg: eggAt(p.x, p.y), mama: overMama(p.x, p.y), plume: plumeAt(p.x, p.y) };
@@ -1804,6 +2396,7 @@
     ptr.x = p.x; ptr.y = p.y; ptr.sx = p.sx; ptr.sy = p.sy;
     ptr.inside = true;
     if (!ptr.down) return;
+    if (ptr.mode === 'inspect' && ptr.moved > 6) ptr.mode = 'pan';
     if (ptr.mode === 'pending' && ptr.moved > 5) {
       if (cand && cand.ch && GAME.grabChicken(cand.ch)) { snd.squawk(); ptr.mode = 'carry'; heldSince = performance.now(); }
       else if (cand && cand.egg && GAME.grabEgg(cand.egg)) { snd.plop(); ptr.mode = 'carry'; heldSince = performance.now(); }
@@ -1827,6 +2420,11 @@
     const tool = S().tool;
     if (ptr.mode === 'carry' && S().held) {
       if (performance.now() - heldSince > 260 || ptr.moved > 6) dropHeldAt(x, y);
+      return;
+    }
+    if (ptr.mode === 'inspect') {
+      if (wasTap) { if (!tapWorld(x, y)) { inspectAt(x, y); snd.plop(); } }
+      else { ptr.mode = 'pan'; }
       return;
     }
     if (ptr.mode === 'pending' && wasTap && cand) {
@@ -1942,6 +2540,7 @@
     if (ev.key === '2') setTool('basket');
     if (ev.key === '3' && GAME.lvl('feed')) setTool('feed');
     if (ev.key === '4') setTool('build');
+    if (ev.key === '5') setTool('inspect');
   });
   window.addEventListener('keyup', ev => { keys[ev.key.toLowerCase()] = false; });
 
@@ -1969,6 +2568,84 @@
     switch (btn.dataset.act) {
       case 'menu': $('#menu-pop').hidden = !$('#menu-pop').hidden; break;
       case 'close-modal': closeModals(); break;
+      case 'close-inspect': setInspect(null); break;
+      case 'open-hire': renderHire(); openModal('#modal-hire'); break;
+      case 'mark-chicken': {
+        if (inspect && inspect.kind === 'chicken') {
+          const on = GAME.markChicken(inspect.ref);
+          snd.plop();
+          floatWorld(on ? 'MARKED' : 'SPARED', inspect.ref.x + 8, inspect.ref.y - 6, on ? 'pink' : 'green');
+          refreshInspect();
+        }
+        break;
+      }
+      case 'retire-chicken': {
+        if (inspect && inspect.kind === 'chicken') {
+          const ch = inspect.ref;
+          const f = GAME.retireChicken(ch);
+          if (f) { snd.demolish(); setInspect({ kind: 'farm' }); }
+        }
+        break;
+      }
+      case 'fire-staff': {
+        if (inspect && inspect.kind === 'staff') {
+          GAME.fireStaff(inspect.ref.id);
+          snd.demolish();
+          setInspect({ kind: 'farm' });
+        }
+        break;
+      }
+      case 'upgrade-mama': {
+        if (GAME.upgradeMama()) {
+          snd.grand(); heart(W.mama.x, W.mama.y - 20, 8);
+          toast({ icon: 'crown', title: 'MAMA EVOLVED', body: 'She now lays ' + TIERS[S().mamaTier].n + ' eggs.' });
+          refreshInspect();
+        } else snd.error();
+        break;
+      }
+      case 'buy-plot': {
+        const id = +btn.dataset.id;
+        if (GAME.buyPlot(id)) {
+          snd.grand();
+          toast({ icon: 'house', title: 'NEW LAND', body: 'The fences come down. Room to grow!' });
+          GAME.clampCam();
+          setInspect({ kind: 'farm' });
+        } else snd.error();
+        break;
+      }
+      case 'eject-nest': { if (GAME.ejectNest(btn.dataset.k)) { snd.plop(); refreshInspect(); } break; }
+      case 'sorter-thr': {
+        const so = S().sorters[btn.dataset.k];
+        if (so) { so.thr = ((so.thr === undefined ? ECON.sorterRare : so.thr) + 1) % (TIERS.length - 1); snd.build(); refreshInspect(); }
+        break;
+      }
+      case 'rotate-build': {
+        const k = btn.dataset.k, kindMap = { belt: 'belts', vacuum: 'vacs', blower: 'blowers', sorter: 'sorters' };
+        const store = S()[kindMap[btn.dataset.kind]];
+        if (store && store[k]) { store[k].dir = (store[k].dir + 1) % 4; snd.build(); refreshInspect(); }
+        break;
+      }
+      case 'demolish-here': {
+        const [c, r] = btn.dataset.k.split(',').map(Number);
+        if (GAME.demolish(c, r)) { snd.demolish(); setInspect({ kind: 'farm' }); }
+        break;
+      }
+      case 'hire': {
+        if (GAME.hireStaff(btn.dataset.type)) {
+          snd.skill();
+          toast({ icon: STAFF[btn.dataset.type].icon, title: STAFF[btn.dataset.type].name.toUpperCase() + ' HIRED', body: STAFF[btn.dataset.type].job });
+        } else snd.error();
+        renderHire();
+        break;
+      }
+      case 'fire': { GAME.fireStaff(+btn.dataset.id); snd.demolish(); renderHire(); break; }
+      case 'cycle-automark': {
+        const st = S();
+        st.autoMark = st.autoMark >= TIERS.length - 3 ? -1 : st.autoMark + 1;
+        snd.plop();
+        renderHire();
+        break;
+      }
       case 'buy-skill': {
         if (GAME.buySkill(btn.dataset.id)) {
           snd.skill();
@@ -1984,7 +2661,7 @@
       case 'save': GAME.save(); floatText('SAVED', ev.clientX - 20, ev.clientY - 24, 'green'); break;
       case 'reset':
         if (confirm('Reset everything? The chickens will write memoirs.')) {
-          GAME.reset(); buildSel = null;
+          GAME.reset(); buildSel = null; setInspect(null);
           renderToolbelt(); renderPalette(); updateCursorChip();
         }
         break;

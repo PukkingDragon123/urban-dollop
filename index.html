@@ -30,6 +30,7 @@
       <button class="btn" data-act="reset">RESET</button>
     </div>
 
+    <div id="inspect-panel" hidden></div>
     <div id="bubble" hidden></div>
     <div id="cursor-chip" hidden></div>
   </div>
@@ -43,9 +44,22 @@
         <button class="btn btn-tiny" data-act="close-modal">CLOSE</button>
       </div>
       <div id="tree-wrap">
-        <canvas id="tree-canvas" width="620" height="360"></canvas>
+        <canvas id="tree-canvas" width="760" height="400"></canvas>
       </div>
       <div id="skill-card"></div>
+    </div>
+  </div>
+
+  <!-- HIRING -->
+  <div class="modal" id="modal-hire" hidden>
+    <div class="modal-panel">
+      <div class="modal-head">
+        <h2>STAFF HUT</h2>
+        <span class="panel-sub" id="hire-sub"></span>
+        <button class="btn btn-tiny" data-act="close-modal">CLOSE</button>
+      </div>
+      <div id="hire-list"></div>
+      <div id="crew-list"></div>
     </div>
   </div>
 

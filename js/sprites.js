@@ -1087,6 +1087,27 @@ const SPR = (() => {
     plus: [
       '...oooo...', '...oGGo...', 'oooGGGGooo', 'oGGGGGGGGo', 'oGGGGGGGGo',
       'oooGGGGooo', '...oGGo...', '...oooo...', '..........', '..........'],
+    sorter: [
+      'oooooooooo', 'oWWWWWWWWo', 'oWoooooWWo', 'oWWWWWoWWo', 'ooooWWoWWo',
+      '...oyyoWWo', '...oyyoWWo', 'oooooooooo', '..........', '..........'],
+    blower: [
+      '..oooo....', '.oWWWWo...', 'oWWggWWo..', 'oWggggWo.c', 'oWggggWo.c',
+      'oWWggWWoc.', '.oWWWWo.c.', '..oooo..c.', '..........', '..........'],
+    silo: [
+      '..oooooo..', '.oWWWWWWo.', 'oWWWWWWWWo', 'oWnnnnnnWo', 'oWnwwwwnWo',
+      'oWnnnnnnWo', 'oWnwwwwnWo', 'oWnnnnnnWo', 'oooooooooo', '..........'],
+    magnify: [
+      '..oooo....', '.oWWWWo...', 'oWwwwwWo..', 'oWwwwwWo..', 'oWwwwwWo..',
+      '.oWWWWo...', '..oooo.o..', '.......oo.', '........oo', '.........o'],
+    fence: [
+      '..o....o..', '.oNo..oNo.', 'oNNNooNNNo', 'oNnNooNnNo', 'ooooooooooo',
+      'oNnNooNnNo', 'oNNNooNNNo', '.oNo..oNo.', '..o....o..', '..........'],
+    person: [
+      '...oooo...', '..oNNNNo..', '.oNNNNNNo.', '...osso...', '...oeso...',
+      '..obbbbo..', '.obbbbbbo.', '..obbbbo..', '..ok..ko..', '..oo..oo..'],
+    bot: [
+      '....o.....', '...oyo....', '..oWWWWo..', '.oWbbbbWo.', '.oWWWWWWo.',
+      'ooWWWWWWoo', 'oWWkWWkWWo', 'oWWWWWWWWo', '.okkookko.', '..........'],
   };
   function iconSprite(name, scale) {
     const key = 'ic_' + name + '_' + scale;
@@ -1214,6 +1235,101 @@ const SPR = (() => {
     return c;
   }
 
+  /* ---------- staff: little walking workers ---------- */
+  const STAFF_PAL = {
+    hand:   { hat:'#e0bd82', hatDark:'#b89355', shirt:'#5fa8e8', shirtDark:'#2f5f9e',
+              pants:'#6e4a20', boot:'#3a2a16', skin:'#f2c9a0' },
+    feeder: { hat:'#c9a35f', hatDark:'#8a5e2a', shirt:'#7ac74f', shirtDark:'#3f7d32',
+              pants:'#5e3d18', boot:'#3a2a16', skin:'#e8b98c' },
+  };
+  const BOT_PAL = {
+    cull:  { shell:'#c9ced6', shade:'#8a9099', dark:'#3a3f47', visor:'#e8542f', glow:'#ff9f7a', trim:'#ffd23f' },
+    match: { shell:'#f2d8e6', shade:'#d0a8c0', dark:'#5e3a4e', visor:'#ff5f9e', glow:'#ffb0d0', trim:'#fff2b0' },
+  };
+
+  function personSprite(type, frame, scale) {
+    const key = 'staffp_' + type + '_' + frame + '_' + scale;
+    if (cache.has(key)) return cache.get(key);
+    const k = scale || 1;
+    const P = STAFF_PAL[type] || STAFF_PAL.hand;
+    const c = newCanvas(12 * k, 17 * k);
+    const ctx = c.getContext('2d');
+    const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
+    const OUT = '#2e2216';
+    /* straw hat */
+    R(3, 0, 6, 1, OUT); R(3, 1, 6, 2, P.hat);
+    R(1, 3, 10, 1, OUT); R(1, 4, 10, 1, P.hat);
+    R(2, 4, 8, 1, P.hatDark); R(3, 1, 6, 1, lighten(P.hat, 0.3));
+    /* head */
+    R(4, 5, 4, 3, P.skin);
+    R(4, 5, 1, 3, darken(P.skin, 0.18));
+    ctx.fillStyle = OUT; ctx.fillRect(5 * k, 6 * k, k, k); ctx.fillRect(7 * k, 6 * k, k, k);
+    ctx.fillStyle = '#e8917a'; ctx.fillRect(4 * k, 7 * k, k, k);
+    /* body + arms */
+    R(3, 8, 6, 5, OUT);
+    R(3, 8, 6, 4, P.shirt);
+    R(3, 11, 6, 1, P.shirtDark);
+    R(3, 8, 6, 1, lighten(P.shirt, 0.28));
+    const swing = frame ? 1 : -1;
+    R(2, 9 + (frame ? 0 : 1), 1, 3, P.shirt);
+    R(9, 9 + (frame ? 1 : 0), 1, 3, P.shirt);
+    R(2, 12 + (frame ? 0 : 1), 1, 1, P.skin);
+    R(9, 12 + (frame ? 1 : 0), 1, 1, P.skin);
+    /* legs, alternating */
+    R(4, 13, 2, 2 + (frame ? 1 : 0), P.pants);
+    R(7, 13, 2, 2 + (frame ? 0 : 1), P.pants);
+    R(3 + (frame ? 0 : 1), 15 + (frame ? 1 : 0), 3, 2, P.boot);
+    R(7, 15 + (frame ? 0 : 1), 3, 2, P.boot);
+    cache.set(key, c);
+    return c;
+  }
+
+  function botSprite(type, frame, scale) {
+    const key = 'staffb_' + type + '_' + frame + '_' + scale;
+    if (cache.has(key)) return cache.get(key);
+    const k = scale || 1;
+    const P = BOT_PAL[type] || BOT_PAL.cull;
+    const c = newCanvas(13 * k, 16 * k);
+    const ctx = c.getContext('2d');
+    const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
+    const OUT = '#23262b';
+    /* antenna + blinker */
+    R(6, 0, 1, 2, P.dark);
+    R(6, 0, 1, 1, frame ? P.trim : P.visor);
+    /* head */
+    R(2, 2, 9, 6, OUT);
+    R(3, 3, 7, 4, P.shell);
+    R(3, 3, 7, 1, lighten(P.shell, 0.35));
+    R(3, 6, 7, 1, P.shade);
+    /* visor */
+    R(4, 4, 5, 2, P.dark);
+    R(4, 4, frame ? 5 : 3, 2, P.visor);
+    R(4, 4, 2, 1, P.glow);
+    /* body */
+    R(2, 8, 9, 5, OUT);
+    R(3, 8, 7, 4, P.shell);
+    R(3, 8, 7, 1, lighten(P.shell, 0.3));
+    R(3, 11, 7, 1, P.shade);
+    /* chest panel */
+    R(5, 9, 3, 2, P.dark);
+    R(5 + (frame ? 1 : 0), 9, 1, 1, P.trim);
+    /* side arms / claw */
+    R(1, 9, 1, 3, P.shade);
+    R(10, 9, 2, 2, P.shade);
+    R(11, 8 + (frame ? 0 : 1), 1, 1, P.visor);
+    /* treads */
+    R(2, 13, 9, 3, OUT);
+    for (let i = 0; i < 4; i++) R(3 + i * 2 + (frame ? 1 : 0), 14, 1, 1, P.shade);
+    cache.set(key, c);
+    return c;
+  }
+
+  function staffSprite(type, frame, scale) {
+    return (type === 'cull' || type === 'match')
+      ? botSprite(type, frame, scale)
+      : personSprite(type, frame, scale);
+  }
+
   /* wooden sign board — text drawn by the caller */
   function signSprite(w, scale, style) {
     const key = 'sign_' + w + '_' + scale + '_' + (style || 0);
@@ -1281,7 +1397,7 @@ const SPR = (() => {
 
   return {
     chickenSprite, eggSprite, nestSprite, mamaSprite, decoSprite,
-    uiSprite, iconSprite, basketSprite, feedbagSprite, hammerSprite,
+    uiSprite, iconSprite, basketSprite, feedbagSprite, hammerSprite, staffSprite,
     plumeSprite, signSprite, treeSprite,
     drawText, textW, drawHex, hexHit, hexRows,
     newMask, mRect, mCircle, renderMask, mulberry, newCanvas,

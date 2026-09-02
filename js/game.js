@@ -43,12 +43,17 @@ const GAME = (() => {
       tool: 'hand',
       held: null,            /* {kind:'chicken', ch} | {kind:'egg', egg} */
       belts: {}, incs: {}, vacs: {}, nests: {},   /* "c,r" -> building */
+      huts: {}, silos: {}, blowers: {}, sorters: {}, fences: {},
+      staff: [],             /* hired workers */
+      hired: { hand: 0, feeder: 0, cull: 0, match: 0 },
+      autoMark: -1,          /* auto-mark chickens below this tier (-1 = off) */
+      unpaid: false,
       items: [],             /* eggs riding belts */
       truck: { state: 'parked', t: 0, load: [] },
-      built: { incubator: 0, vacuum: 0, belt: 0, lovenest: 0 },
+      built: { incubator: 0, vacuum: 0, belt: 0, lovenest: 0, staffhut: 0, silo: 0, blower: 0, sorter: 0, fence: 0 },
       disc: [], sk: { root: 1 },
       cam: { x: 0, y: 200 },
-      stats: { pets: 0, laid: 0, collected: 0, sold: 0, coinsEarned: 0, hatched: 0, mutations: 0, bred: 0, plumes: 0 },
+      stats: { pets: 0, laid: 0, collected: 0, sold: 0, coinsEarned: 0, hatched: 0, mutations: 0, bred: 0, plumes: 0, culled: 0, wagesPaid: 0, staffEggs: 0 },
       muted: false, last: Date.now(),
     };
   }
@@ -92,7 +97,7 @@ const GAME = (() => {
   function tripTime() { return ECON.baseTripTime * Math.pow(0.85, lvl('route')); }
   function mutationChance() { return ECON.baseMutation + 0.015 * lvl('mutate'); }
   function goldenChance() { return 0.03 * lvl('golden'); }
-  function mamaCost() { return Math.round(ECON.mamaCost(S.mamaTier) / tycoon() * tycoon()); }
+  function mamaCost() { return ECON.mamaCost(S.mamaTier); }
   function scoopFeatherChance() { return ECON.scoopFeather + 0.03 * lvl('feather1'); }
   function sweepLuck() { return 0.02 * lvl('sweepluck'); }
   function breedTime() { return ECON.breedTime / (1 + 0.20 * lvl('candle')); }
@@ -164,6 +169,9 @@ const GAME = (() => {
     occ = {};
     Object.keys(S.belts).forEach(k => occ[k] = { type: 'belt', k });
     Object.keys(S.vacs).forEach(k => occ[k] = { type: 'vacuum', k });
+    Object.keys(S.blowers).forEach(k => occ[k] = { type: 'blower', k });
+    Object.keys(S.sorters).forEach(k => occ[k] = { type: 'sorter', k });
+    Object.keys(S.fences).forEach(k => occ[k] = { type: 'fence', k });
     const two = (map, type) => Object.keys(map).forEach(k => {
       const [c, r] = k.split(',').map(Number);
       for (let dc = 0; dc < 2; dc++) for (let dr = 0; dr < 2; dr++)
@@ -171,7 +179,10 @@ const GAME = (() => {
     });
     two(S.incs, 'incubator');
     two(S.nests, 'lovenest');
+    two(S.huts, 'staffhut');
+    two(S.silos, 'silo');
   }
+  function isFence(x, y) { return !!S.fences[key(Math.floor(x / 16), Math.floor(y / 16))]; }
   function tileBuildable(c, r) {
     const x = c * 16 + 8, y = r * 16 + 8;
     const p = plotAt(x, y);
@@ -300,7 +311,8 @@ const GAME = (() => {
       const f = featherFor(ht, isNew);
       dropPlumes(x, y + 6, f);
       S.stats.hatched++;
-      spawnChicken(sp.id, x, y);
+      const born = spawnChicken(sp.id, x, y);
+      if (S.autoMark >= 0 && sp.tier < S.autoMark) born.marked = true;
       births.push({ sp, feathers: f, isNew, miracle: !rainbow && ht > t });
       if (isNew) mark('pedia');
     };
@@ -343,7 +355,7 @@ const GAME = (() => {
         } else {
           ch.dir = dx > 0 ? 1 : -1;
           const nx = ch.x + (dx / d) * 22 * dt, ny = ch.y + (dy / d) * 22 * dt;
-          if (inOwned(nx + 10, ny + 10) && !inPond(nx + 10, ny + 10)) { ch.x = nx; ch.y = ny; }
+          if (inOwned(nx + 10, ny + 10) && !inPond(nx + 10, ny + 10) && !isFence(nx + 10, ny + 16)) { ch.x = nx; ch.y = ny; }
           else { ch.state = 'idle'; ch.t = 1; ch.target = null; }
         }
       }
@@ -356,7 +368,8 @@ const GAME = (() => {
     if (ch.state === 'walk') {
       const nx = ch.x + ch.dir * 9 * dt;
       const ny = ch.y + Math.sin(ch.id + ch.x / 9) * 5 * dt;
-      if (inOwned(nx + 10, ny + 12) && inOwned(nx + 10, ny + 20) && !inPond(nx + 10, ny + 12) && ny < WORLD.roadY - 24) {
+      if (inOwned(nx + 10, ny + 12) && inOwned(nx + 10, ny + 20) && !inPond(nx + 10, ny + 12)
+          && !isFence(nx + 10, ny + 16) && ny < WORLD.roadY - 24) {
         ch.x = nx; ch.y = ny;
       } else ch.dir *= -1;
     }
@@ -597,14 +610,24 @@ const GAME = (() => {
   }
 
   /* ---------- belts ---------- */
+  function beltDirFor(c, r, item) {
+    const b = S.belts[key(c, r)];
+    if (b) return b.dir;
+    const so = S.sorters[key(c, r)];
+    if (so) {
+      const rare = item.tier >= (so.thr === undefined ? ECON.sorterRare : so.thr);
+      return rare ? so.dir : (so.dir + 1) % 4;   /* commons peel off to the side */
+    }
+    return null;
+  }
   function tickBelts(dt) {
     const spd = beltSpeed();
     for (let i = S.items.length - 1; i >= 0; i--) {
       const it = S.items[i];
       const c = Math.floor(it.x / 16), r = Math.floor(it.y / 16);
-      const belt = S.belts[key(c, r)];
-      if (!belt) { dropItem(i); continue; }
-      const [dx, dy] = DIRV[belt.dir];
+      const dir = beltDirFor(c, r, it);
+      if (dir === null) { dropItem(i); continue; }
+      const [dx, dy] = DIRV[dir];
       let stalled = false;
       for (const o of S.items) {
         if (o === it) continue;
@@ -617,11 +640,19 @@ const GAME = (() => {
       const nc = Math.floor(nx / 16), nr = Math.floor(ny / 16);
       if (nc === c && nr === r) { it.x = nx; it.y = ny; continue; }
       const target = occ[key(nc, nr)];
-      if (target && target.type === 'belt') { it.x = nx; it.y = ny; continue; }
+      if (target && (target.type === 'belt' || target.type === 'sorter')) { it.x = nx; it.y = ny; continue; }
       if (target && target.type === 'incubator') {
         const inc = S.incs[target.k];
         if (inc.queue.length < incCap()) {
           inc.queue.push({ tier: it.tier, golden: it.golden, rainbow: it.rainbow });
+          S.items.splice(i, 1);
+        }
+        continue;
+      }
+      if (target && target.type === 'silo') {
+        const silo = S.silos[target.k];
+        if (silo.store.length < ECON.siloCap) {
+          silo.store.push({ tier: it.tier, golden: it.golden, rainbow: it.rainbow });
           S.items.splice(i, 1);
         }
         continue;
@@ -647,6 +678,45 @@ const GAME = (() => {
     }
   }
 
+  /* ---------- blowers: shove loose eggs along the grass ---------- */
+  function tickBlowers(dt) {
+    for (const k of Object.keys(S.blowers)) {
+      const b = S.blowers[k];
+      const [c, r] = k.split(',').map(Number);
+      const bx = c * 16 + 8, by = r * 16 + 8;
+      const [dx, dy] = DIRV[b.dir];
+      const R = ECON.blowerR * (lvl('overclock') ? 1.35 : 1);
+      for (const e of S.eggs) {
+        if (e.suck) continue;
+        const ox = e.x - bx, oy = e.y - by;
+        const along = ox * dx + oy * dy;
+        const side = Math.abs(ox * dy - oy * dx);
+        if (along < -4 || along > R || side > 12) continue;
+        const push = ECON.blowerPush * (1 - along / R) * dt;
+        e.x += dx * push;
+        e.y += dy * push + (Math.random() - 0.5) * 6 * dt;
+        e.x = Math.max(6, Math.min(WORLD.W - 6, e.x));
+        e.y = Math.max(20, Math.min(WORLD.roadY - 6, e.y));
+      }
+    }
+  }
+
+  /* ---------- silos: buffer eggs and feed the parked truck ---------- */
+  function tickSilos(dt) {
+    for (const k of Object.keys(S.silos)) {
+      const silo = S.silos[k];
+      silo.t = (silo.t || 0) + dt;
+      const rate = 3 * (lvl('overclock') ? 2 : 1);
+      while (silo.store.length && S.truck.state === 'parked' && S.truck.load.length < truckCap() && silo.t > 1 / rate) {
+        silo.t -= 1 / rate;
+        S.truck.load.push(silo.store.shift());
+        emit('truckload', {});
+      }
+      if (!silo.store.length || S.truck.state !== 'parked') silo.t = Math.min(silo.t, 1 / rate);
+    }
+  }
+
+  /* ---------- incubators ---------- */
   /* ---------- incubators ---------- */
   function tickIncs(dt) {
     for (const k of Object.keys(S.incs)) {
@@ -717,6 +787,242 @@ const GAME = (() => {
     return any;
   }
 
+  /* ============================================================
+     STAFF - hired farmhands and robots
+     ============================================================ */
+  function staffSlots() {
+    return ECON.staffBaseSlots + ECON.hutSlots * Object.keys(S.huts).length + 2 * lvl('crewcap');
+  }
+  function staffSpeed() { return ECON.staffSpeed * (1 + 0.20 * lvl('crewspeed')); }
+  function wageMult() { return Math.pow(0.88, lvl('wages')); }
+  function wagePerSec() {
+    return S.staff.reduce((a, w) => a + STAFF[w.type].wage, 0) * wageMult();
+  }
+  function staffHireCost(type) { return staffCost(type, S.hired[type] || 0); }
+  function canHire(type) {
+    const def = STAFF[type];
+    if (!def) return false;
+    if (def.needs && !lvl(def.needs)) return false;
+    if (!Object.keys(S.huts).length) return false;
+    return S.staff.length < staffSlots();
+  }
+  function hireStaff(type) {
+    if (!canHire(type)) return false;
+    const cost = staffHireCost(type);
+    if (S.coins < cost) return false;
+    S.coins -= cost;
+    S.hired[type] = (S.hired[type] || 0) + 1;
+    const hutK = Object.keys(S.huts)[0].split(',').map(Number);
+    S.staff.push({
+      id: nextId++, type,
+      x: hutK[0] * 16 + 8 + Math.random() * 12, y: hutK[1] * 16 + 26,
+      dir: 1, frame: 0, anim: 0, state: 'idle', t: 0, carry: [], target: null, say: 0,
+    });
+    emit('hire', { type });
+    return true;
+  }
+  function fireStaff(id) {
+    const i = S.staff.findIndex(w => w.id === id);
+    if (i === -1) return false;
+    const w = S.staff[i];
+    w.carry.forEach(e => spawnEgg(w.x, w.y + 8, e.tier, e.golden, e.rainbow));
+    S.staff.splice(i, 1);
+    S.hired[w.type] = Math.max(0, (S.hired[w.type] || 1) - 1);
+    return true;
+  }
+
+  /* chickens can be flagged for the Cull-Bot */
+  function markChicken(ch, on) {
+    ch.marked = on === undefined ? !ch.marked : !!on;
+    return ch.marked;
+  }
+  function retireChicken(ch) {
+    const i = S.chickens.indexOf(ch);
+    if (i === -1) return 0;
+    const sp = SPECIES[ch.sp];
+    S.chickens.splice(i, 1);
+    const f = Math.max(1, Math.ceil(featherFor(sp.tier, false) * ECON.cullReward));
+    dropPlumes(ch.x + 10, ch.y + 12, f);
+    S.stats.culled++;
+    emit('cull', { sp, x: ch.x + 10, y: ch.y, feathers: f });
+    return f;
+  }
+
+  function walkTo(w, tx, ty, dt) {
+    const dx = tx - w.x, dy = ty - w.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 3) return true;
+    const sp = staffSpeed() * dt;
+    w.dir = dx > 0 ? 1 : -1;
+    let nx = w.x + (dx / d) * sp, ny = w.y + (dy / d) * sp;
+    if (inPond(nx + 6, ny + 8)) ny = w.y;           /* walk around the pond */
+    w.x = Math.max(4, Math.min(WORLD.W - 12, nx));
+    w.y = Math.max(16, Math.min(WORLD.H - 16, ny));
+    w.anim += sp;
+    if (w.anim > 5) { w.anim = 0; w.frame ^= 1; }
+    return false;
+  }
+  function nearest(list, x, y, ok) {
+    let best = null, bd = 1e9;
+    for (const o of list) {
+      if (ok && !ok(o)) continue;
+      const d = (o.x - x) * (o.x - x) + (o.y - y) * (o.y - y);
+      if (d < bd) { bd = d; best = o; }
+    }
+    return best;
+  }
+  function buildingSpots(map, ok) {
+    return Object.keys(map).filter(k => !ok || ok(map[k], k)).map(k => {
+      const [c, r] = k.split(',').map(Number);
+      return { k, x: c * 16 + 16, y: r * 16 + 34 };
+    });
+  }
+
+  function tickStaff(dt) {
+    /* wages first */
+    const due = wagePerSec() * dt;
+    if (due > 0) {
+      if (S.coins >= due) { S.coins -= due; S.stats.wagesPaid += due; S.unpaid = false; }
+      else { S.coins = 0; S.unpaid = true; }
+    } else S.unpaid = false;
+
+    const carryCap = ECON.staffCarry + 2 * lvl('crewcap');
+    for (const w of S.staff) {
+      w.t -= dt;
+      w.say = Math.max(0, w.say - dt);
+      if (S.unpaid) { w.state = 'idle'; continue; }
+
+      if (w.type === 'hand') {
+        if (w.carry.length < carryCap && S.eggs.length) {
+          const e = nearest(S.eggs, w.x, w.y, o => !o.suck);
+          if (e) {
+            if (walkTo(w, e.x - 6, e.y - 10, dt)) {
+              const i = S.eggs.indexOf(e);
+              if (i >= 0) {
+                S.eggs.splice(i, 1);
+                w.carry.push({ tier: e.tier, golden: e.golden, rainbow: e.rainbow });
+                S.stats.collected++;
+                S.stats.staffEggs++;
+                emit('staffpick', { w });
+              }
+            }
+            w.state = 'walk';
+            continue;
+          }
+        }
+        if (w.carry.length) {
+          const spots = buildingSpots(S.silos, s => s.store.length < ECON.siloCap)
+            .concat(buildingSpots(S.incs, inc => inc.queue.length < incCap()));
+          if (S.truck.state === 'parked' && S.truck.load.length < truckCap()) {
+            spots.push({ k: 'truck', x: WORLD.truckHome.x + 26, y: WORLD.truckHome.y - 10 });
+          }
+          const spot = nearest(spots, w.x, w.y);
+          if (spot) {
+            w.state = 'walk';
+            if (walkTo(w, spot.x - 6, spot.y - 10, dt)) {
+              while (w.carry.length) {
+                const e = w.carry.pop();
+                if (spot.k === 'truck') {
+                  if (S.truck.load.length < truckCap()) S.truck.load.push(e);
+                  else { spawnEgg(w.x + 4, w.y + 10, e.tier, e.golden, e.rainbow); }
+                } else if (S.silos[spot.k]) {
+                  if (S.silos[spot.k].store.length < ECON.siloCap) S.silos[spot.k].store.push(e);
+                  else spawnEgg(w.x + 4, w.y + 10, e.tier, e.golden, e.rainbow);
+                } else if (S.incs[spot.k]) {
+                  if (S.incs[spot.k].queue.length < incCap()) S.incs[spot.k].queue.push(e);
+                  else spawnEgg(w.x + 4, w.y + 10, e.tier, e.golden, e.rainbow);
+                }
+              }
+              emit('staffdrop', { w });
+            }
+            continue;
+          }
+        }
+        w.state = 'idle';
+        continue;
+      }
+
+      if (w.type === 'feeder') {
+        if (!w.target || w.t <= 0) {
+          const ch = S.chickens.length ? S.chickens[Math.floor(Math.random() * S.chickens.length)] : null;
+          w.target = ch ? { x: ch.x + 8, y: ch.y + 14 } : null;
+          w.t = 7;
+        }
+        if (w.target) {
+          w.state = 'walk';
+          if (walkTo(w, w.target.x, w.target.y, dt)) {
+            for (let i = 0; i < 4; i++) {
+              S.feed.push({ x: w.x + 6 + (Math.random() * 20 - 10), y: w.y + 12 + (Math.random() * 12 - 6), n: 1 });
+            }
+            if (S.feed.length > 80) S.feed.splice(0, S.feed.length - 80);
+            emit('stafffeed', { w });
+            w.target = null;
+            w.t = 4;
+            w.state = 'work';
+          }
+        } else w.state = 'idle';
+        continue;
+      }
+
+      if (w.type === 'cull') {
+        const ch = nearest(S.chickens, w.x, w.y, o => o.marked);
+        if (ch) {
+          w.state = 'walk';
+          if (walkTo(w, ch.x + 2, ch.y + 4, dt)) { retireChicken(ch); w.t = 0.6; w.state = 'work'; }
+        } else w.state = 'idle';
+        continue;
+      }
+
+      if (w.type === 'match') {
+        const nestSpots = buildingSpots(S.nests, n => n.slots.filter(Boolean).length < 2 && n.cd <= 0);
+        if (!nestSpots.length) { w.state = 'idle'; w.carry = []; continue; }
+        const nest = nearest(nestSpots, w.x, w.y);
+        if (!w.hold) {
+          const ch = nearest(S.chickens, w.x, w.y, o => !o.marked);
+          if (!ch) { w.state = 'idle'; continue; }
+          w.state = 'walk';
+          if (walkTo(w, ch.x + 2, ch.y + 4, dt)) {
+            const i = S.chickens.indexOf(ch);
+            if (i >= 0) { S.chickens.splice(i, 1); w.hold = { sp: ch.sp }; }
+          }
+        } else {
+          w.state = 'walk';
+          if (walkTo(w, nest.x - 8, nest.y - 8, dt)) {
+            const n = S.nests[nest.k];
+            const slot = n.slots[0] ? 1 : 0;
+            if (!n.slots[slot] && n.cd <= 0) {
+              n.slots[slot] = { sp: w.hold.sp };
+              if (n.slots[0] && n.slots[1]) n.prog = 0.0001;
+              w.hold = null;
+              emit('staffmatch', { w });
+            } else {
+              spawnChicken(w.hold.sp, w.x, w.y);
+              w.hold = null;
+            }
+          }
+        }
+        continue;
+      }
+    }
+  }
+
+  /* live production readouts for the inspect panel */
+  function rates() {
+    let eggsPerMin = 60 / layTime(S.mamaTier);
+    S.chickens.forEach(ch => { eggsPerMin += 60 / layTime(SPECIES[ch.sp].tier) * (ch.buffT > 0 ? 2 : 1); });
+    let value = 0, n = 0;
+    S.chickens.forEach(ch => { value += eggValue(SPECIES[ch.sp].tier, false); n++; });
+    const avg = n ? value / n : eggValue(S.mamaTier, false);
+    return {
+      eggsPerMin,
+      coinsPerMin: eggsPerMin * avg,
+      wagePerSec: wagePerSec(),
+      staff: S.staff.length,
+      slots: staffSlots(),
+      stored: Object.values(S.silos).reduce((a, s) => a + s.store.length, 0),
+    };
+  }
+
   /* ---------- building ---------- */
   function build(type, c, r, dir) {
     const cost = buildCost(type, S.built[type]);
@@ -728,6 +1034,11 @@ const GAME = (() => {
     else if (type === 'vacuum') S.vacs[k] = { dir: dir || 0, hold: [], cd: 0 };
     else if (type === 'incubator') S.incs[k] = { queue: [], prog: 0 };
     else if (type === 'lovenest') S.nests[k] = { slots: [null, null], prog: 0, cd: 0 };
+    else if (type === 'staffhut') S.huts[k] = { built: Date.now() };
+    else if (type === 'silo') S.silos[k] = { store: [], t: 0 };
+    else if (type === 'blower') S.blowers[k] = { dir: dir || 0 };
+    else if (type === 'sorter') S.sorters[k] = { dir: dir || 0, thr: ECON.sorterRare };
+    else if (type === 'fence') S.fences[k] = { style: 0 };
     rebuildOcc();
     mark('build');
     return true;
@@ -749,6 +1060,19 @@ const GAME = (() => {
     } else if (o.type === 'lovenest') {
       ejectNest(k);
       delete S.nests[k]; S.built.lovenest = Math.max(0, S.built.lovenest - 1);
+    } else if (o.type === 'staffhut') {
+      delete S.huts[k]; S.built.staffhut = Math.max(0, S.built.staffhut - 1);
+      while (S.staff.length > staffSlots()) fireStaff(S.staff[S.staff.length - 1].id);
+    } else if (o.type === 'silo') {
+      S.silos[k].store.slice(0, 40).forEach((e, i) =>
+        spawnEgg(kc * 16 + 6 + (i % 8) * 3, kr * 16 + 30, e.tier, e.golden, e.rainbow));
+      delete S.silos[k]; S.built.silo = Math.max(0, S.built.silo - 1);
+    } else if (o.type === 'blower') {
+      delete S.blowers[k]; S.built.blower = Math.max(0, S.built.blower - 1);
+    } else if (o.type === 'sorter') {
+      delete S.sorters[k]; S.built.sorter = Math.max(0, S.built.sorter - 1);
+    } else if (o.type === 'fence') {
+      delete S.fences[k]; S.built.fence = Math.max(0, S.built.fence - 1);
     }
     S.coins += BUILDS[o.type].refund;
     S.eggs.forEach(e => { if (e.suck === k) e.suck = null; });
@@ -792,7 +1116,10 @@ const GAME = (() => {
     S.chickens.forEach(ch => tickChicken(ch, dt));
     tickEggs(dt);
     tickVacs(dt);
+    tickBlowers(dt);
     tickBelts(dt);
+    tickSilos(dt);
+    tickStaff(dt);
     tickIncs(dt);
     tickNests(dt);
     tickTruck(dt);
@@ -858,6 +1185,7 @@ const GAME = (() => {
       slim.chickens.forEach(c => { c.x = Math.round(c.x); c.y = Math.round(c.y); c.target = null; });
       slim.items.forEach(i => { i.x = Math.round(i.x); i.y = Math.round(i.y); });
       slim.plumes.forEach(p => { p.x = Math.round(p.x); p.y = Math.round(p.y); p.z = 0; });
+      slim.staff.forEach(w => { w.x = Math.round(w.x); w.y = Math.round(w.y); w.target = null; });
       localStorage.setItem(SAVE_KEY, JSON.stringify(slim));
       return true;
     } catch (e) { return false; }
@@ -876,6 +1204,10 @@ const GAME = (() => {
       S.truck = Object.assign({ state: 'parked', t: 0, load: [] }, d.truck);
       S.held = null;
       S.chickens.forEach(c => { c.target = null; c.state = 'idle'; c.t = Math.random(); });
+      S.staff = (S.staff || []).map(w => Object.assign({ carry: [], frame: 0, anim: 0, say: 0 }, w, { target: null, state: 'idle' }));
+      S.hired = Object.assign({ hand: 0, feeder: 0, cull: 0, match: 0 }, S.hired);
+      ['huts', 'silos', 'blowers', 'sorters', 'fences'].forEach(m => { if (!S[m]) S[m] = {}; });
+      Object.values(S.silos).forEach(si => { if (!si.store) si.store = []; });
       ensureStarterInc();
       nextId = 1 + Math.max(0, ...S.eggs.map(e => e.id || 0), ...S.chickens.map(c => c.id || 0), ...S.plumes.map(p => p.id || 0));
       rebuildOcc();
@@ -927,6 +1259,8 @@ const GAME = (() => {
     buyPlot, petMama, petChicken, grabChicken, grabEgg, dropHeld, hitTruck,
     scoopEgg, collectPlume, basketToTruck, basketToInc, basketToGround, sprinkleFeed,
     sendTruck, build, demolish, setBeltDir, ejectNest, buySkill, upgradeMama,
+    staffSlots, wagePerSec, staffHireCost, canHire, hireStaff, fireStaff,
+    markChicken, retireChicken, rates, beltDirFor,
     tick, applyOffline, save, load, reset, fmt, fmtTime,
   };
 })();
