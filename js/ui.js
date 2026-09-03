@@ -177,10 +177,12 @@
     const nDirt = makeNoise(47, 7, W.W, W.H);
 
     /* dirt paths: polylines through the home plot */
+    /* dirt paths through the home plot, plus a lane along the road */
     const paths = [
-      [[36, 250], [52, 300], [92, 330], [150, 366], [186, 380]],
-      [[92, 330], [118, 292]],
-      [[64, 248], [58, 286]],
+      [[36, 458], [52, 508], [92, 538], [150, 574], [186, 588]],
+      [[92, 538], [118, 500]],
+      [[64, 456], [58, 494]],
+      [[186, 588], [420, 584], [700, 588], [980, 584]],
     ];
     function pathDist(x, y) {
       let best = 1e9;
@@ -246,7 +248,7 @@
     for (let x = 6; x < W.W; x += 22) g.fillRect(x, W.roadY + 15, 8, 1);
 
     /* grass blades everywhere */
-    for (let i = 0; i < 2600; i++) {
+    for (let i = 0; i < 7000; i++) {
       const x = Math.floor(rndG() * W.W), y = Math.floor(rndG() * (W.roadY - 6)) + 4;
       if (GAME.inPond(x, y)) continue;
       g.fillStyle = rndG() < 0.5 ? 'rgba(96,160,60,.55)' : 'rgba(150,214,110,.5)';
@@ -321,14 +323,14 @@
         let x, y, tries = 0;
         do {
           x = x0 + 8 + rnd() * (pw - 26);
-          y = y0 + 10 + rnd() * (ph - (p.tr === 13 ? 46 : 24));
+          y = y0 + 10 + rnd() * (ph - (p.tr === (PLOT_ROWS - 1) * PLOT_H ? 66 : 24));
           tries++;
         } while (tries < 26 && (
           GAME.inPond(x + 6, y + 4) ||
           GAME.inStation(x + 6, y + 4, 16) ||
           (Math.abs(x - W.mama.x) < 36 && Math.abs(y - W.mama.y) < 32) ||
           (y > W.roadY - 46 && Math.abs(x - (W.truckHome.x + 28)) < 56) ||
-          (p.id === 3 && x < 92 && y > 300 && y < 350)
+          (p.id === PLOT_START && x < 92 && y > 508 && y < 558)
         ));
         const spr = SPR.decoSprite(kind, 1, Math.floor(rnd() * 99999));
         if (big) shadow(g, x + spr.width / 2, y + spr.height - 3, spr.width * 0.36);
@@ -343,6 +345,13 @@
       case 'berry': place('bush', 10); place('tree', 2, true); place('tuft', 9); place('flower', 4); break;
       case 'lavender': place('lavender', 18); place('flower', 5); place('tuft', 8); place('bush', 2); break;
       case 'shroom': place('shroom', 11); place('stump', 3); place('pine', 3, true); place('tuft', 7); place('clover', 4); break;
+      case 'orchard': place('apple', 5, true); place('tuft', 10); place('clover', 7); place('flower', 4); break;
+      case 'meadow': place('flower', 14); place('clover', 10); place('tuft', 12); place('bush', 2); break;
+      case 'wetland': place('reed', 16); place('tuft', 9); place('shroom', 4); place('rock', 3); break;
+      case 'pinewood': place('pine', 7, true); place('stump', 4); place('shroom', 5); place('tuft', 8); break;
+      case 'thicket': place('bush', 12); place('tree', 3, true); place('shroom', 4); place('tuft', 9); break;
+      case 'prairie': place('tuft', 18); place('clover', 9); place('sunflower', 4); place('rock', 4); break;
+      default: place('tuft', 12); place('flower', 5); place('bush', 3); break;
     }
   }
 
@@ -663,6 +672,130 @@
     }
   }
 
+  /* a 3x3 bank of incubator drawers: wood cabinet, brass bands, warm glass */
+  function drawHatchery(c, r, h, now) {
+    const x = c * 16, y = r * 16;
+    const busy = h.queue.length > 0;
+    ctx.fillStyle = 'rgba(40,58,26,.28)'; ctx.fillRect(x + 3, y + 44, 42, 4);
+    /* legs */
+    ctx.fillStyle = '#4a3220'; ctx.fillRect(x + 4, y + 42, 5, 5); ctx.fillRect(x + 39, y + 42, 5, 5);
+    /* cabinet */
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 1, y + 7, 46, 36);
+    ctx.fillStyle = '#c9a35f'; ctx.fillRect(x + 2, y + 8, 44, 34);
+    ctx.fillStyle = '#e0bd82'; ctx.fillRect(x + 2, y + 8, 44, 3);
+    ctx.fillStyle = '#a8783f'; ctx.fillRect(x + 2, y + 39, 44, 3);
+    /* brass bands between the drawer rows */
+    for (let i = 1; i < 3; i++) {
+      const by = y + 8 + i * 11;
+      ctx.fillStyle = '#b08d3a'; ctx.fillRect(x + 2, by, 44, 2);
+      ctx.fillStyle = '#e0c070'; ctx.fillRect(x + 2, by, 44, 1);
+      for (let j = 0; j < 8; j++) { ctx.fillStyle = '#fff0c0'; ctx.fillRect(x + 5 + j * 6, by, 1, 1); }
+    }
+    /* gabled roof with a vent pipe */
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 2, y + 2, 44, 5);
+    ctx.fillStyle = '#8fb8d6'; ctx.fillRect(x + 3, y + 3, 42, 3);
+    ctx.fillStyle = '#c2dbe8'; ctx.fillRect(x + 3, y + 3, 42, 1);
+    ctx.fillStyle = '#8a5e2a'; ctx.fillRect(x + 37, y - 2, 5, 5);
+    ctx.fillStyle = '#a8783f'; ctx.fillRect(x + 37, y - 2, 5, 1);
+    if (busy && Math.floor(now / 320) % 2) {
+      ctx.fillStyle = 'rgba(255,255,255,.45)';
+      ctx.fillRect(x + 38, y - 5, 2, 2); ctx.fillRect(x + 40, y - 8, 2, 2);
+    }
+    /* nine drawers */
+    for (let i = 0; i < 9; i++) {
+      const dx = x + 4 + (i % 3) * 14, dy = y + 12 + Math.floor(i / 3) * 11;
+      const egg = h.queue[i];
+      const lane = i < 3 && busy;
+      ctx.fillStyle = '#4a3220'; ctx.fillRect(dx, dy, 12, 8);
+      ctx.fillStyle = egg ? (lane ? '#ffe9c0' : '#d8f2fa') : '#8a6a44';
+      ctx.fillRect(dx + 1, dy + 1, 10, 6);
+      if (egg) {
+        const wob = lane ? Math.sin(now / 130 + i * 1.7) * 0.8 : 0;
+        ctx.fillStyle = EGG_SHELL[egg.tier];
+        ctx.fillRect(Math.round(dx + 4 + wob), dy + 2, 4, 5);
+        ctx.fillStyle = SPR.darken(EGG_SHELL[egg.tier], 0.22);
+        ctx.fillRect(Math.round(dx + 4 + wob), dy + 6, 4, 1);
+        ctx.fillStyle = TIERS[egg.tier].c;
+        ctx.fillRect(Math.round(dx + 5 + wob), dy + 4, 1, 1);
+        if (lane) { ctx.fillStyle = 'rgba(255,180,70,.28)'; ctx.fillRect(dx + 1, dy + 4, 10, 3); }
+      } else {
+        ctx.fillStyle = '#6e5232'; ctx.fillRect(dx + 4, dy + 3, 4, 2);
+      }
+      /* glass glint + handle */
+      ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.fillRect(dx + 2, dy + 1, 2, 1);
+      ctx.fillStyle = '#8a5e2a'; ctx.fillRect(dx + 4, dy + 7, 4, 1);
+    }
+    /* status column: lamp per lane plus a progress rail */
+    for (let i = 0; i < 3; i++) {
+      const on = busy && i < Math.min(3, h.queue.length);
+      ctx.fillStyle = on ? (Math.floor(now / 260 + i) % 2 ? '#ff9f1c' : '#ffd23f') : '#6a6f78';
+      ctx.fillRect(x + 43, y + 14 + i * 11, 3, 3);
+      ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.fillRect(x + 43, y + 14 + i * 11, 1, 1);
+    }
+    ctx.fillStyle = '#2e2216'; ctx.fillRect(x + 4, y + 34, 30, 5);
+    ctx.fillStyle = '#1a2a20'; ctx.fillRect(x + 5, y + 35, 28, 3);
+    if (busy) {
+      const egg = h.queue[0];
+      const need = GAME.incHatchTime(egg.tier, egg.rainbow) / Math.min(3, h.queue.length);
+      const f = Math.max(0, Math.min(1, h.prog / need));
+      ctx.fillStyle = '#7ac74f'; ctx.fillRect(x + 5, y + 35, Math.round(28 * f), 3);
+      ctx.fillStyle = '#aef07a'; ctx.fillRect(x + 5, y + 35, Math.round(28 * f), 1);
+    }
+    SPR.drawTiny(ctx, h.queue.length + '/' + ECON.hatcheryCap, x + 36, y + 35, '#2e2216', 1, '#fff8ec');
+  }
+
+  /* a Y junction that flips a paddle side to side */
+  function drawSplitter(c, r, sp, now) {
+    const x = c * 16, y = r * 16;
+    ctx.fillStyle = 'rgba(40,58,26,.22)'; ctx.fillRect(x + 1, y + 14, 15, 2);
+    ctx.fillStyle = '#3d434e'; ctx.fillRect(x, y, 16, 16);
+    ctx.fillStyle = '#7e8794'; ctx.fillRect(x + 1, y + 1, 14, 14);
+    ctx.fillStyle = '#a6aeba'; ctx.fillRect(x + 1, y + 1, 14, 3);
+    ctx.fillStyle = '#5a626e'; ctx.fillRect(x + 1, y + 12, 14, 3);
+    /* the paddle, leaning whichever way the next egg goes */
+    const lean = (sp.n % 2) ? 1 : -1;
+    ctx.fillStyle = '#ffc72f';
+    for (let i = 0; i < 7; i++) {
+      ctx.fillRect(x + 8 + lean * Math.round(i * 0.7) - 1, y + 4 + i, 2, 1);
+    }
+    ctx.fillStyle = '#e0a416'; ctx.fillRect(x + 7, y + 3, 2, 2);
+    /* both output mouths */
+    const L = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+    [(sp.dir + 1) % 4, (sp.dir + 3) % 4].forEach((d, i) => {
+      const [dx, dy] = L[d];
+      ctx.fillStyle = i === (sp.n % 2) ? '#ffe27a' : '#8d949e';
+      ctx.fillRect(x + 7 + dx * 6, y + 7 + dy * 6, 2, 2);
+    });
+  }
+
+  /* a hopper on legs that tips belt eggs into the truck */
+  function drawLoader(c, r, ld, now) {
+    const x = c * 16, y = r * 16;
+    ctx.fillStyle = 'rgba(40,58,26,.24)'; ctx.fillRect(x + 2, y + 14, 28, 3);
+    /* legs */
+    ctx.fillStyle = '#3d434e'; ctx.fillRect(x + 3, y + 11, 3, 5); ctx.fillRect(x + 26, y + 11, 3, 5);
+    /* hopper body */
+    ctx.fillStyle = '#2e3238'; ctx.fillRect(x + 1, y + 1, 30, 11);
+    ctx.fillStyle = '#8d949e'; ctx.fillRect(x + 2, y + 2, 28, 9);
+    ctx.fillStyle = '#c9ced6'; ctx.fillRect(x + 2, y + 2, 28, 2);
+    ctx.fillStyle = '#5a626e'; ctx.fillRect(x + 2, y + 9, 28, 2);
+    /* window with the buffer inside */
+    ctx.fillStyle = '#23262b'; ctx.fillRect(x + 4, y + 4, 22, 5);
+    for (let i = 0; i < Math.min(ld.store.length, 11); i++) {
+      ctx.fillStyle = EGG_SHELL[ld.store[i].tier];
+      ctx.fillRect(x + 5 + i * 2, y + 6, 2, 2);
+    }
+    /* chute, animated while it is tipping */
+    const on = ld.store.length && S().truck.state === 'parked';
+    ctx.fillStyle = on && Math.floor(now / 200) % 2 ? '#ffc72f' : '#6a7280';
+    ctx.fillRect(x + 27, y + 5, 4, 6);
+    ctx.fillRect(x + 29, y + 10, 2, 4);
+    /* lamp */
+    ctx.fillStyle = on ? (Math.floor(now / 260) % 2 ? '#7ac74f' : '#aef07a') : '#6a6f78';
+    ctx.fillRect(x + 2, y + 3, 2, 2);
+    SPR.drawTiny(ctx, String(ld.store.length), x + 4, y + 11, '#2e2216', 1, '#fff8ec');
+  }
+
   function drawFence(c, r, now) {
     const x = c * 16, y = r * 16;
     ctx.fillStyle = 'rgba(40,58,26,.22)'; ctx.fillRect(x + 1, y + 13, 14, 2);
@@ -803,34 +936,10 @@
     SPR.drawTiny(ctx, String(silo.store.length), x + 7, y + 29, '#2e2216', 1);
   }
 
-  function drawDuck(now) {
-    const d = S().duck;
-    if (!d) return;
-    const def = DUCKS[d.id];
-    const frame = Math.floor(now / 260) % 2;
-    const spr = SPR.duckSprite(def, frame, 1);
-    const bob = Math.sin(now / 420 + d.id) * 0.8;
-    ctx.fillStyle = 'rgba(40,58,26,.26)';
-    ctx.fillRect(Math.round(d.x + 3), Math.round(d.y + 15), 11, 2);
-    ctx.drawImage(spr, Math.round(d.x), Math.round(d.y + bob));
-    /* status bubble above: ! to talk, ? while working, star when done */
-    const q = S().quest;
-    const mine = q && q.duckId === d.id;
-    let glyph = '!', col = '#ffd23f';
-    if (mine) { glyph = GAME.questDone() ? '*' : '?'; col = GAME.questDone() ? '#7ac74f' : '#8fd6ff'; }
-    if (d.state !== 'leaving') {
-      const by = Math.round(d.y - 13 + Math.sin(now / 300) * 1.2);
-      ctx.fillStyle = '#2e2216'; ctx.fillRect(Math.round(d.x + 4), by, 9, 11);
-      ctx.fillStyle = '#fff9ec'; ctx.fillRect(Math.round(d.x + 5), by + 1, 7, 9);
-      ctx.fillStyle = '#2e2216'; ctx.fillRect(Math.round(d.x + 7), by + 11, 2, 2);
-      SPR.drawText(ctx, glyph, Math.round(d.x + 6), by + 2, col === '#ffd23f' ? '#c98f1f' : col, 1);
-    }
-  }
-
   function drawStaff(w, now) {
     if (w.x + 20 < cam().x || w.x > cam().x + W.view.w || w.y + 24 < cam().y || w.y > cam().y + W.view.h) return;
     const moving = w.state === 'walk';
-    const spr = SPR.staffSprite(w.type, moving ? w.frame : 0, 1);
+    const spr = SPR.staffSprite(w, moving ? w.frame : 0, 1);
     const bob = moving ? 0 : Math.sin(now / 600 + w.id) * 0.5;
     ctx.fillStyle = 'rgba(40,58,26,.26)';
     ctx.fillRect(Math.round(w.x + 1), Math.round(w.y + spr.height - 2), 10, 2);
@@ -857,9 +966,30 @@
     /* status marks */
     if (S().unpaid && Math.floor(now / 350) % 2) {
       SPR.drawTiny(ctx, '!', Math.round(w.x + 5), Math.round(w.y - 8), '#c43a2a', 1, '#ffffff');
-    } else if (w.type === 'cull' && w.state === 'work') {
+    } else if (w.state === 'rest') {
+      /* a little snooze bubble while they take five */
+      const zz = Math.floor(now / 500) % 3;
+      SPR.drawTiny(ctx, 'z', Math.round(w.x + 9 + zz), Math.round(w.y - 6 - zz * 2), '#5f7fa8', 1, '#ffffff');
+    } else if (w.role === 'cull' && w.state === 'work') {
       ctx.fillStyle = '#ff6b4a';
       ctx.fillRect(Math.round(w.x + 12), Math.round(w.y + 4), 4, 1);
+    }
+    /* a Technician's aura shows as a faint pulsing ring of sparks */
+    if (w.role === 'tech' && w.state !== 'rest') {
+      const R = GAME.auraR();
+      const t = now / 900;
+      ctx.fillStyle = 'rgba(120,220,255,.5)';
+      for (let i = 0; i < 8; i++) {
+        const a2 = t + i * Math.PI / 4;
+        ctx.fillRect(Math.round(w.x + 6 + Math.cos(a2) * R), Math.round(w.y + 10 + Math.sin(a2) * R * 0.55), 1, 1);
+      }
+    }
+    /* a Keeper trails little hearts */
+    if (w.role === 'keeper' && w.state === 'work' && Math.floor(now / 300) % 2) {
+      ctx.fillStyle = '#ff8ab5';
+      ctx.fillRect(Math.round(w.x + 11), Math.round(w.y - 3), 2, 1);
+      ctx.fillRect(Math.round(w.x + 10), Math.round(w.y - 2), 4, 1);
+      ctx.fillRect(Math.round(w.x + 11), Math.round(w.y - 1), 2, 1);
     }
   }
 
@@ -1279,6 +1409,9 @@
     else if (buildSel === 'lovenest') drawLoveNest(c, r, { slots: [null, null], prog: 0 }, now);
     else if (buildSel === 'staffhut') drawStaffHut(c, r, {}, now);
     else if (buildSel === 'silo') drawSilo(c, r, { store: [] }, now);
+    else if (buildSel === 'splitter') drawSplitter(c, r, { dir: placeDir, n: 0 }, now);
+    else if (buildSel === 'loader') drawLoader(c, r, { store: [] }, now);
+    else if (buildSel === 'hatchery') drawHatchery(c, r, { queue: [], prog: 0 }, now);
     else drawIncubator(c, r, { queue: [], prog: 0 }, now);
     ctx.globalAlpha = 1;
     ctx.fillStyle = ok ? 'rgba(122,199,79,.28)' : 'rgba(232,84,47,.34)';
@@ -1308,28 +1441,33 @@
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(groundCv, 0, 0);
 
-    /* pond ripples + ducks */
+    /* pond ripples */
     const p = W.pond;
     ctx.fillStyle = 'rgba(255,255,255,.45)';
     for (let i = 0; i < 4; i++) {
       const sx = p.x + 6 + ((i * 15 + Math.floor(now / 420)) % (p.w - 14));
       ctx.fillRect(sx, p.y + 5 + i * 6, 4, 1);
     }
+    /* a couple of lily pads drifting on the surface */
     for (let i = 0; i < 2; i++) {
-      const ph = (now / (11000 + i * 3400)) % 1;
-      const dx = p.x + 10 + (ph < 0.5 ? ph * 2 : (1 - ph) * 2) * (p.w - 26);
-      const dy = p.y + 7 + i * 11;
-      const flip = ph >= 0.5;
-      ctx.save();
-      if (flip) { ctx.translate(Math.round(dx) + 9, Math.round(dy)); ctx.scale(-1, 1); }
-      else ctx.translate(Math.round(dx), Math.round(dy));
-      ctx.fillStyle = '#fff8ec'; ctx.fillRect(0, 0, 7, 4);
-      ctx.fillStyle = '#e8dcc8'; ctx.fillRect(0, 3, 7, 1);
-      ctx.fillStyle = '#fff8ec'; ctx.fillRect(5, -3, 3, 4);
-      ctx.fillStyle = '#f2a03f'; ctx.fillRect(8, -2, 2, 1);
-      ctx.fillStyle = '#2e2216'; ctx.fillRect(6, -2, 1, 1);
-      ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.fillRect(-2, 3, 3, 1);
-      ctx.restore();
+      const phase = (now / (13000 + i * 4200)) % 1;
+      const dx = p.x + 10 + (phase < 0.5 ? phase * 2 : (1 - phase) * 2) * (p.w - 26);
+      const dy = p.y + 8 + i * 12 + Math.sin(now / 1400 + i) * 1;
+      ctx.fillStyle = '#3f8a33';
+      ctx.fillRect(Math.round(dx), Math.round(dy) + 1, 7, 3);
+      ctx.fillRect(Math.round(dx) + 1, Math.round(dy), 5, 5);
+      ctx.fillStyle = '#5aa845';
+      ctx.fillRect(Math.round(dx) + 2, Math.round(dy) + 1, 3, 2);
+      if (i === 0) {
+        ctx.fillStyle = '#fff2c4'; ctx.fillRect(Math.round(dx) + 3, Math.round(dy) + 1, 2, 2);
+        ctx.fillStyle = '#ffd23f'; ctx.fillRect(Math.round(dx) + 3, Math.round(dy) + 1, 1, 1);
+      }
+    }
+    /* sun glints */
+    ctx.fillStyle = 'rgba(255,255,255,.6)';
+    for (let i = 0; i < 3; i++) {
+      if (Math.floor(now / 300 + i * 2) % 4) continue;
+      ctx.fillRect(p.x + 12 + i * 17, p.y + 10 + (i % 2) * 9, 2, 1);
     }
 
     drawLab(now); drawStand(now); drawMamaSign(now);
@@ -1343,6 +1481,9 @@
     for (const k of Object.keys(S().nests)) { const [c, r] = k.split(',').map(Number); drawLoveNest(c, r, S().nests[k], now); }
     for (const k of Object.keys(S().huts)) { const [c, r] = k.split(',').map(Number); drawStaffHut(c, r, S().huts[k], now); }
     for (const k of Object.keys(S().silos)) { const [c, r] = k.split(',').map(Number); drawSilo(c, r, S().silos[k], now); }
+    for (const k of Object.keys(S().splitters)) { const [c, r] = k.split(',').map(Number); drawSplitter(c, r, S().splitters[k], now); }
+    for (const k of Object.keys(S().loaders)) { const [c, r] = k.split(',').map(Number); drawLoader(c, r, S().loaders[k], now); }
+    for (const k of Object.keys(S().hatchers)) { const [c, r] = k.split(',').map(Number); drawHatchery(c, r, S().hatchers[k], now); }
 
     S().items.forEach(it => {
       const spr = it.rainbow ? SPR.eggSprite(it.tier, 1, true, Math.floor(now / 120) % 6) : SPR.eggSprite(it.tier, 1);
@@ -1364,7 +1505,6 @@
     drawMama(now);
     S().chickens.forEach(ch => drawChicken(ch, now));
     S().staff.forEach(w => drawStaff(w, now));
-    drawDuck(now);
     drawTruck(now);
     drawSaleSigns(now);
 
@@ -1511,6 +1651,19 @@
       b.appendChild(mkIcon(TOOL_ICON[id], 3));
       el.toolbelt.appendChild(b);
     });
+    if (GAME.lvl('hiring')) {
+      const crew = document.createElement('button');
+      crew.className = 'tool-btn tool-crew';
+      crew.dataset.act = 'crew';
+      crew.title = 'The crew - flyers, applicants and who is on the payroll';
+      crew.appendChild(mkIcon('hands', 3));
+      const badge = document.createElement('i');
+      badge.className = 'tb-badge';
+      badge.hidden = true;
+      crew.appendChild(badge);
+      el.toolbelt.appendChild(crew);
+      crewBadge = badge;
+    } else crewBadge = null;
     const menu = document.createElement('button');
     menu.className = 'tool-btn tool-menu';
     menu.dataset.act = 'menu';
@@ -1518,12 +1671,24 @@
     menu.appendChild(mkIcon('gear', 2));
     el.toolbelt.appendChild(menu);
   }
+  let crewBadge = null;
+  function updateCrewBadge() {
+    if (!crewBadge) return;
+    const st = S();
+    const n = st.applicants.length;
+    const show = n > 0 || st.unpaid;
+    if (crewBadge.hidden === show) crewBadge.hidden = !show;
+    const label = st.unpaid ? '!' : String(n);
+    if (crewBadge.textContent !== label) crewBadge.textContent = label;
+    crewBadge.classList.toggle('warn', st.unpaid);
+  }
 
   /* miniature building render for the palette buttons: reuse the world painters
      by pointing `ctx` at an offscreen canvas for the duration of the call */
   function buildingThumb(type) {
-    const small = ['belt', 'vacuum', 'blower', 'sorter', 'fence'].includes(type);
-    const wpx = small ? 16 : 34, hpx = small ? 16 : 36;
+    const small = ['belt', 'vacuum', 'blower', 'sorter', 'fence', 'splitter'].includes(type);
+    const big = type === 'hatchery';
+    const wpx = small ? 16 : big ? 50 : 34, hpx = small ? 16 : big ? 50 : 36;
     const k = small ? 2 : 1;
     const c = document.createElement('canvas');
     c.width = wpx * k; c.height = hpx * k;
@@ -1543,6 +1708,9 @@
       else if (type === 'lovenest') drawLoveNest(0, 0, { slots: [null, null], prog: 0 }, now);
       else if (type === 'staffhut') drawStaffHut(0, 0, {}, now);
       else if (type === 'silo') drawSilo(0, 0, { store: [] }, now);
+      else if (type === 'splitter') drawSplitter(0, 0, { dir: placeDir, n: 0 }, now);
+      else if (type === 'loader') drawLoader(0, 0, { store: [] }, now);
+      else if (type === 'hatchery') drawHatchery(0, 0, { queue: [], prog: 0 }, now);
       else drawIncubator(0, 0, { queue: [], prog: 0 }, now);
     } finally {
       ctx = saved;
@@ -1554,7 +1722,7 @@
     if (S().tool !== 'build') { el.palette.hidden = true; return; }
     el.palette.hidden = false;
     el.palette.innerHTML = '';
-    ['incubator', 'lovenest', 'staffhut', 'silo', 'vacuum', 'blower', 'sorter', 'belt', 'fence'].forEach(type => {
+    ['incubator', 'hatchery', 'lovenest', 'staffhut', 'silo', 'loader', 'vacuum', 'blower', 'sorter', 'splitter', 'belt', 'fence'].forEach(type => {
       const b = BUILDS[type];
       const locked = b.needs && !GAME.lvl(b.needs);
       const cost = buildCost(type, S().built[type]);
@@ -1635,14 +1803,14 @@
     const full = n >= capn;
     if (el.capPill.classList.contains('full') !== full) el.capPill.classList.toggle('full', full);
     updateCursorChip();
+    updateCrewBadge();
     hintLogic();
     refreshInspect();
-    if (duckOpen) { if (!S().duck) closeDuck(); else renderDuckPanel(); }
     if (!$('#modal-hire').hidden) {
       const sig = S().staff.length + '|' + S().coins.toFixed(0) + '|' + S().autoMark + '|' + GAME.staffSlots();
       if (sig !== hireSig) { hireSig = sig; renderHire(); }
     }
-    if (GAME.dirty.build) renderPalette();
+    if (GAME.dirty.build) { renderPalette(); renderToolbelt(); }
   }
 
   /* ================= TITLE SCREEN ================= */
@@ -1708,15 +1876,19 @@
       tctx.drawImage(SPR.eggSprite(e.tier, 1), Math.round(e.x + Math.sin(e.sw) * 3), Math.round(e.y));
       tctx.globalAlpha = 1;
     });
-    /* a duck flying by */
+    /* a chicken gliding past, wings out */
     const dx = ((now / 26) % (TW + 90)) - 50;
     const dyy = 64 + Math.sin(now / 700) * 8;
-    const duck = SPR.duckSprite(DUCKS[2], Math.floor(now / 180) % 2, 1);
+    const flier = SPR.chickenSprite(SPECIES[6], 1, false);
     tctx.save();
-    tctx.translate(Math.round(dx) + duck.width, Math.round(dyy));
+    tctx.translate(Math.round(dx) + flier.width, Math.round(dyy));
     tctx.scale(-1, 1);
-    tctx.drawImage(duck, 0, 0);
+    tctx.drawImage(flier, 0, 0);
     tctx.restore();
+    tctx.fillStyle = 'rgba(255,255,255,.55)';
+    const wing = Math.floor(now / 180) % 2;
+    tctx.fillRect(Math.round(dx) + 2, Math.round(dyy) + (wing ? 3 : 7), 5, 1);
+    tctx.fillRect(Math.round(dx) + 12, Math.round(dyy) + (wing ? 7 : 3), 5, 1);
     /* hills, back to front, each with a lit rim */
     const layers = [
       { col: '#40614a', rim: '#557a58', base: 58, a: 11, b: 5, ph: 0.6, sc: 44, sc2: 15 },
@@ -1786,363 +1958,233 @@
     const blink = Math.floor(now / 480) % 2;
     SPR.drawText(tctx, line, px0 + 7, py0, blink ? '#fff8ec' : '#e8d5a8', 1, '#1a120a');
   }
-  function showTitle() { titleEl.hidden = false; el.bubble.hidden = true; closeDuck(); setInspect(null); }
+  function showTitle() { titleEl.hidden = false; el.bubble.hidden = true; setInspect(null); }
   function hideTitle() { titleEl.hidden = true; S().seenTitle = true; }
 
-  /* ================= DUCK DIALOGUE ================= */
-  const duckPanel = $('#duck-panel');
-  let duckOpen = false, duckSig = '';
-  function openDuck() { duckOpen = true; duckSig = ''; renderDuckPanel(); }
-  function closeDuck() { duckOpen = false; duckPanel.hidden = true; }
-  function renderDuckPanel() {
-    const d = S().duck;
-    if (!duckOpen || !d) { duckPanel.hidden = true; return; }
-    const def = DUCKS[d.id];
-    const q = S().quest;
-    const mine = q && q.duckId === d.id;
-    const done = mine && GAME.questDone();
-    const sig = d.id + '|' + (mine ? q.type + q.need : 'none') + '|' + (done ? 'done' : GAME.questProgress());
-    if (sig === duckSig) return;
-    duckSig = sig;
-    duckPanel.hidden = false;
-    duckPanel.innerHTML = '';
-    const head = document.createElement('div');
-    head.className = 'dp-head';
-    head.appendChild(cloneCanvas(SPR.duckSprite(def, 0, 2)));
-    const nm = document.createElement('b');
-    nm.textContent = def.name.toUpperCase();
-    head.appendChild(nm);
-    const x = document.createElement('button');
-    x.className = 'btn btn-tiny';
-    x.dataset.act = 'close-duck';
-    x.textContent = 'X';
-    head.appendChild(x);
-    duckPanel.appendChild(head);
-    const line = document.createElement('div');
-    line.className = 'dp-line';
-    line.textContent = done ? def.bye : def.line;
-    duckPanel.appendChild(line);
-    const btns = document.createElement('div');
-    btns.className = 'dp-btns';
-    if (!mine) {
-      const task = document.createElement('div');
-      task.className = 'dp-task';
-      const b = document.createElement('b');
-      b.textContent = 'ODD JOB';
-      task.appendChild(b);
-      task.appendChild(document.createTextNode('Take on a task and I will pay you well for it.'));
-      duckPanel.appendChild(task);
-      const ok = document.createElement('button');
-      ok.className = 'btn btn-green';
-      ok.dataset.act = 'quest-accept';
-      ok.textContent = 'HEAR THE JOB';
-      btns.appendChild(ok);
-      const later = document.createElement('button');
-      later.className = 'btn';
-      later.dataset.act = 'quest-later';
-      later.textContent = 'NOT NOW';
-      btns.appendChild(later);
-    } else {
-      const task = document.createElement('div');
-      task.className = 'dp-task';
-      const b = document.createElement('b');
-      b.textContent = 'TASK';
-      task.appendChild(b);
-      task.appendChild(document.createTextNode(GAME.questText()));
-      const bar = document.createElement('div');
-      bar.className = 'dp-bar';
-      const fill = document.createElement('i');
-      fill.style.width = Math.min(100, GAME.questProgress() / q.need * 100) + '%';
-      bar.appendChild(fill);
-      task.appendChild(bar);
-      const prog = document.createElement('div');
-      prog.textContent = Math.min(GAME.questProgress(), q.need) + ' / ' + q.need;
-      task.appendChild(prog);
-      duckPanel.appendChild(task);
-      const rew = document.createElement('div');
-      rew.className = 'dp-reward';
-      rew.appendChild(document.createTextNode('reward'));
-      rew.appendChild(mkIcon('coin', 2));
-      rew.appendChild(document.createTextNode(GAME.fmt(q.coins)));
-      rew.appendChild(mkIcon('feather', 2));
-      rew.appendChild(document.createTextNode(GAME.fmt(q.feathers)));
-      duckPanel.appendChild(rew);
-      const claim = document.createElement('button');
-      claim.className = 'btn' + (done ? ' btn-green' : '');
-      claim.dataset.act = 'quest-claim';
-      claim.disabled = !done;
-      claim.textContent = done ? 'CLAIM REWARD' : 'STILL WORKING';
-      btns.appendChild(claim);
-      const later = document.createElement('button');
-      later.className = 'btn';
-      later.dataset.act = 'close-duck';
-      later.textContent = 'CLOSE';
-      btns.appendChild(later);
-    }
-    duckPanel.appendChild(btns);
+  /* ================= MODAL PLUMBING ================= */
+  function openModal(sel) {
+    closeModals();
+    $(sel).hidden = false;
+  }
+  function closeModals() {
+    document.querySelectorAll('.modal').forEach(m => m.hidden = true);
   }
 
-  /* ================= MODALS ================= */
-  function openModal(id) { $(id).hidden = false; }
-  function closeModals() { document.querySelectorAll('.modal').forEach(m => m.hidden = true); }
+  /* ================= EGGOS - THE LAB TERMINAL =================
+     The research screen is a little computer. Modules down the
+     left, installable packages on the right, and nothing listed
+     that you cannot install yet - a package appears the moment
+     its prerequisite goes in.
+     ========================================================== */
+  const TERM_W = 760, TERM_H = 400, TK = 2;      /* canvas px, and the pixel scale */
+  const VW = TERM_W / TK, VH = TERM_H / TK;      /* 380 x 200 virtual pixels */
+  let termCv = null, termCtx = null;
+  let termMod = 0, termSel = null, termScroll = 0, termHover = null;
+  let termHits = [];
+  const ROW_H = 21, LIST_X = 92, LIST_Y = 32, LIST_W = VW - LIST_X - 12, ROWS_VIS = 6;
+  const LABEL_Y = 22;
 
-  /* ---------- HEX RESEARCH GRID (canvas) ---------- */
-  const TREE_W = 760, TREE_H = 400, HEX_R = 15;
-  let treeCv = null, treeCtx = null, selSkill = null, hoverSkill = null;
+  function pkgState(sk) {
+    const cur = GAME.lvl(sk.id);
+    if (cur >= sk.max) return 'done';
+    if (S().feathers >= skillCost(sk, cur)) return 'ready';
+    return 'short';
+  }
+  /* a package only shows once its prerequisite is installed */
+  function pkgVisible(sk) {
+    const pre = skillPrereq(sk);
+    return !pre || GAME.lvl(pre.id) > 0;
+  }
+  function modulePkgs(i) { return SKILLS_BY_MODULE[i].filter(pkgVisible); }
+  function moduleHidden(i) { return SKILLS_BY_MODULE[i].length - modulePkgs(i).length; }
+  function moduleReady(i) { return modulePkgs(i).some(sk => pkgState(sk) === 'ready'); }
 
-  function treePos(sk) {
+  function drawTerm(now) {
+    if (!termCv) return;
+    const g = termCtx;
+    const T = SPR.TERM;
+    g.imageSmoothingEnabled = false;
+    g.setTransform(TK, 0, 0, TK, 0, 0);
+    termHits = [];
+
+    SPR.drawBezel(g, 0, 0, VW, VH);
+    const px0 = 6, py0 = 6, pw = VW - 12, ph = VH - 16;
+
+    /* faint grid, like a phosphor mesh */
+    g.fillStyle = T.grid;
+    for (let x = px0; x < px0 + pw; x += 8) g.fillRect(x, py0, 1, ph);
+    for (let y = py0; y < py0 + ph; y += 8) g.fillRect(px0, y, pw, 1);
+
+    /* ---- header ---- */
+    g.fillStyle = T.bg2; g.fillRect(px0, py0, pw, 14);
+    g.fillStyle = T.dim;  g.fillRect(px0, py0 + 14, pw, 1);
+    SPR.drawText(g, 'EGGOS 4.0', px0 + 4, py0 + 4, T.hot, 1);
+    const fx = 'FEATHERS ' + GAME.fmt(S().feathers);
+    SPR.drawText(g, fx, px0 + pw - 4 - SPR.textW(fx, 1), py0 + 4, T.warn, 1);
+    if (Math.floor(now / 420) % 2) {
+      g.fillStyle = T.text;
+      g.fillRect(px0 + 4 + SPR.textW('EGGOS 4.0 ', 1), py0 + 4, 4, 6);
+    }
+
+    /* ---- module column ---- */
+    const modX = px0 + 4, modY = LIST_Y;
+    SPR.drawText(g, 'MODULES', modX, LABEL_Y, T.dim, 1);
+    MODULES.forEach((m, i) => {
+      const y = modY + i * 17;
+      const on = i === termMod;
+      const pkgs = modulePkgs(i);
+      const dead = pkgs.length === 0;
+      SPR.drawBox(g, modX, y, 78, 15, on ? SPR.darken(m.hue, 0.55) : T.bg2,
+                  on ? m.hue : null, on ? m.hue : T.frame);
+      const col = dead ? T.dim : on ? T.hot : T.text;
+      SPR.drawText(g, (on ? '>' : ' ') + m.name, modX + 3, y + 4, col, 1);
+      /* a lamp when something in there is affordable */
+      if (moduleReady(i)) {
+        g.fillStyle = Math.floor(now / 340) % 2 ? T.warn : SPR.darken(T.warn, 0.5);
+        g.fillRect(modX + 72, y + 5, 4, 4);
+      }
+      termHits.push({ kind: 'mod', i, x: modX, y, w: 78, h: 15 });
+    });
+    /* module footer: the code name, like a filename */
+    SPR.drawText(g, MODULES[termMod].code, modX, modY + 7 * 17 + 4, T.dim, 1);
+
+    /* ---- package list ---- */
+    const pkgs = modulePkgs(termMod);
+    const maxScroll = Math.max(0, pkgs.length - ROWS_VIS);
+    termScroll = Math.max(0, Math.min(maxScroll, termScroll));
+    const hue = MODULES[termMod].hue;
+    SPR.drawText(g, 'PACKAGES', LIST_X, LABEL_Y, T.dim, 1);
+    const cnt = pkgs.length + ' AVAILABLE';
+    SPR.drawText(g, cnt, LIST_X + LIST_W - SPR.textW(cnt, 1), LABEL_Y, T.dim, 1);
+
+    if (!pkgs.length) {
+      SPR.drawBox(g, LIST_X, LIST_Y, LIST_W, 30, SPR.TERM.bg2, null, T.frame);
+      SPR.drawText(g, 'NO PACKAGES YET', LIST_X + 6, LIST_Y + 6, T.dim, 1);
+      SPR.drawText(g, 'INSTALL SOMETHING ELSE FIRST', LIST_X + 6, LIST_Y + 16, T.dim, 1);
+    }
+
+    for (let vi = 0; vi < Math.min(ROWS_VIS, pkgs.length); vi++) {
+      const sk = pkgs[vi + termScroll];
+      const y = LIST_Y + vi * ROW_H;
+      const st = pkgState(sk);
+      const sel = termSel === sk.id;
+      const hov = termHover === sk.id;
+      const fill = sel ? SPR.darken(hue, 0.6) : st === 'done' ? '#152a1c' : T.bg2;
+      SPR.drawBox(g, LIST_X, y, LIST_W, ROW_H - 2, fill, sel || hov ? hue : null,
+                  sel ? hue : st === 'ready' ? SPR.darken(T.warn, 0.35) : T.frame);
+      /* icon chip */
+      SPR.drawBox(g, LIST_X + 2, y + 2, 14, 14, SPR.darken(hue, 0.45), hue, T.frame);
+      const icon = SPR.iconSprite(sk.icon, 1);
+      g.globalAlpha = st === 'done' ? 0.7 : 1;
+      g.drawImage(icon, LIST_X + 4, y + 4);
+      g.globalAlpha = 1;
+      /* name + level pips */
+      const cur = GAME.lvl(sk.id);
+      SPR.drawText(g, sk.name.toUpperCase(), LIST_X + 20, y + 3,
+                   st === 'done' ? T.dim : st === 'ready' ? T.hot : T.text, 1);
+      if (sk.max > 1) {
+        SPR.drawPips(g, LIST_X + 20, y + 12, cur, Math.min(sk.max, 12),
+                     st === 'done' ? T.dim : hue, '#20402c');
+        SPR.drawText(g, cur + '/' + sk.max, LIST_X + 24 + Math.min(sk.max, 12) * 3, y + 11, T.dim, 1);
+      } else {
+        SPR.drawText(g, cur ? 'INSTALLED' : 'ONE OFF', LIST_X + 20, y + 11, cur ? T.dim : T.text, 1);
+      }
+      /* the whole row selects; the cost chip on top of it installs */
+      termHits.push({ kind: 'pkg', id: sk.id, x: LIST_X, y, w: LIST_W, h: ROW_H - 2 });
+      /* right side: cost chip, or DONE */
+      if (st === 'done') {
+        const w = SPR.textW('DONE', 1) + 8;
+        SPR.drawBox(g, LIST_X + LIST_W - w - 3, y + 5, w, 10, '#1c3a26', null, T.dim);
+        SPR.drawText(g, 'DONE', LIST_X + LIST_W - w + 1, y + 6, T.dim, 1);
+      } else {
+        const cost = skillCost(sk, cur);
+        const label = GAME.fmt(cost);
+        const w = SPR.textW(label, 1) + 16;
+        const ok = st === 'ready';
+        SPR.drawBox(g, LIST_X + LIST_W - w - 3, y + 4, w, 12,
+                    ok ? SPR.darken(T.warn, 0.35) : '#20262c', ok ? T.warn : null,
+                    ok ? T.warn : T.frame);
+        g.drawImage(SPR.iconSprite('feather', 1), LIST_X + LIST_W - w - 1, y + 5);
+        SPR.drawText(g, label, LIST_X + LIST_W - w + 10, y + 6, ok ? '#fff8ec' : T.dim, 1);
+        termHits.push({ kind: 'buy', id: sk.id, x: LIST_X + LIST_W - w - 3, y: y + 4, w, h: 12 });
+      }
+    }
+
+    /* scroll rail */
+    if (maxScroll > 0) {
+      const railH = ROWS_VIS * ROW_H - 2;
+      g.fillStyle = '#16281e'; g.fillRect(LIST_X + LIST_W + 2, LIST_Y, 3, railH);
+      const th = Math.max(6, railH * ROWS_VIS / pkgs.length);
+      g.fillStyle = hue;
+      g.fillRect(LIST_X + LIST_W + 2, LIST_Y + Math.round((railH - th) * termScroll / maxScroll), 3, Math.round(th));
+    }
+
+    /* locked count - a hint that the tree keeps going */
+    const hid = moduleHidden(termMod);
+    if (hid > 0) {
+      const y = LIST_Y + Math.min(ROWS_VIS, pkgs.length) * ROW_H;
+      SPR.drawText(g, hid + ' MORE ENCRYPTED', LIST_X + 2, y + 2, '#2f5a40', 1);
+    }
+
+    /* ---- footer: the selected package ---- */
+    const fy = py0 + ph - 22;
+    g.fillStyle = T.bg2; g.fillRect(px0, fy, pw, 22);
+    g.fillStyle = T.dim;  g.fillRect(px0, fy, pw, 1);
+    const sel = termSel ? SKILL_BY_ID[termSel] : null;
+    if (sel && pkgVisible(sel)) {
+      SPR.drawText(g, '> ' + sel.name.toUpperCase(), px0 + 4, fy + 4, MODULES[sel.br].hue, 1);
+      SPR.drawText(g, sel.desc.toUpperCase().slice(0, 58), px0 + 4, fy + 13, T.text, 1);
+    } else {
+      SPR.drawText(g, '> SELECT A PACKAGE', px0 + 4, fy + 4, T.dim, 1);
+      SPR.drawText(g, 'TAP THE COST CHIP TO INSTALL IT', px0 + 4, fy + 13, T.dim, 1);
+    }
+
+    SPR.drawScanlines(g, px0, py0, pw, ph, now);
+    g.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
+  function termHitAt(cx, cy) {
+    /* later hits sit on top: walk backwards so buy chips win over rows */
+    for (let i = termHits.length - 1; i >= 0; i--) {
+      const h = termHits[i];
+      if (cx >= h.x && cx <= h.x + h.w && cy >= h.y && cy <= h.y + h.h) return h;
+    }
+    return null;
+  }
+  function termCoords(ev) {
+    const r = termCv.getBoundingClientRect();
     return {
-      x: Math.round(34 + (sk.x / 100) * (TREE_W - 68)),
-      y: Math.round(30 + (sk.y / 100) * (TREE_H - 58)),
+      x: (ev.clientX - r.left) / r.width * VW,
+      y: (ev.clientY - r.top) / r.height * VH,
     };
   }
-  function hexPalFor(state, hue) {
-    if (state === 'root') return { base: '#a8783f', light: '#c9a35f', dark: '#7a5230', out: '#3e2810' };
-    if (state === 'locked') return { base: '#8e8574', light: '#a49a86', dark: '#6e6659', out: '#3a352c' };
-    if (state === 'maxed') return { base: hue, light: SPR.lighten(hue, 0.35), dark: SPR.darken(hue, 0.28), out: SPR.darken(hue, 0.6) };
-    if (state === 'owned') return { base: '#79bf42', light: '#9ada66', dark: '#549b32', out: '#2c5a1c' };
-    if (state === 'can') return { base: '#ffc72f', light: '#ffe27a', dark: '#e0a416', out: '#7a5210' };
-    return { base: '#d9c9a8', light: '#efe2c6', dark: '#b5a583', out: '#5e5341' };
-  }
-  function skillState(sk) {
-    if (sk.id === 'root') return 'root';
-    const cur = GAME.lvl(sk.id);
-    const pre = skillPrereq(sk);
-    if (pre && GAME.lvl(pre.id) < 1) return 'locked';
-    if (cur >= sk.max) return 'maxed';
-    if (S().feathers >= skillCost(sk, cur)) return 'can';
-    if (cur > 0) return 'owned';
-    return 'ready';
-  }
-
-  function thickLine(g, x1, y1, x2, y2, w, col, colTop) {
-    const steps = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1));
-    for (let i = 0; i <= steps; i++) {
-      const t = steps ? i / steps : 0;
-      const x = Math.round(x1 + (x2 - x1) * t), y = Math.round(y1 + (y2 - y1) * t);
-      g.fillStyle = col;
-      g.fillRect(x - (w >> 1), y - (w >> 1), w, w);
-      if (colTop) { g.fillStyle = colTop; g.fillRect(x - (w >> 1), y - (w >> 1), w, 1); }
+  function installPkg(id) {
+    const sk = SKILL_BY_ID[id];
+    if (!sk) return;
+    if (GAME.buySkill(id)) {
+      snd.skill();
+      termSel = id;
+      toast({ icon: sk.icon, title: sk.name.toUpperCase() + ' INSTALLED', body: sk.desc });
+      renderSkillCard();
+      renderToolbelt();
+      GAME.mark('build');
+    } else {
+      snd.error();
     }
-  }
-
-  /* cached hex chips so 40 nodes cost 40 blits, not 40k fills */
-  const hexCache = new Map();
-  function hexChip(state, hue, r) {
-    const key = state + '_' + hue + '_' + r;
-    if (hexCache.has(key)) return hexCache.get(key);
-    const pad = 4;
-    const c = SPR.newCanvas(r * 2 + pad * 2, r * 2 + pad * 2 + 2);
-    const g = c.getContext('2d');
-    const sh = 'rgba(38,28,12,.22)';
-    SPR.drawHex(g, r + pad, r + pad + 2, r, 1, { base: sh, light: sh, dark: sh, out: sh });
-    SPR.drawHex(g, r + pad, r + pad, r, 1, hexPalFor(state, hue), { inner: true });
-    hexCache.set(key, c);
-    return c;
-  }
-  function ringChip(r, col) {
-    const key = 'ring_' + r + '_' + col;
-    if (hexCache.has(key)) return hexCache.get(key);
-    const pad = 4;
-    const c = SPR.newCanvas(r * 2 + pad * 2, r * 2 + pad * 2);
-    const g = c.getContext('2d');
-    const none = 'rgba(0,0,0,0)';
-    SPR.drawHex(g, r + pad, r + pad, r, 1, { base: none, light: none, dark: none, out: col });
-    hexCache.set(key, c);
-    return c;
-  }
-
-  /* the tree background (sky, canopy, trunk, branches) is baked and only
-     rebuilt when an unlock actually changes the shape of the tree */
-  let treeBg = null, treeBgSig = '';
-  function buildTreeBg() {
-    treeBg = SPR.newCanvas(TREE_W, TREE_H);
-    const g = treeBg.getContext('2d');
-    g.imageSmoothingEnabled = false;
-
-    /* sky bands + dithered seams */
-    const sky = ['#bfe8ff', '#cfeeff', '#def4ff'];
-    for (let y = 0; y < TREE_H; y++) {
-      g.fillStyle = sky[y < TREE_H * 0.32 ? 0 : y < TREE_H * 0.58 ? 1 : 2];
-      g.fillRect(0, y, TREE_W, 1);
-    }
-    [TREE_H * 0.32, TREE_H * 0.58].forEach(sy => {
-      for (let y = Math.round(sy) - 3; y < sy + 3; y++)
-        for (let x = (y % 2); x < TREE_W; x += 2) {
-          g.fillStyle = 'rgba(255,255,255,.35)';
-          g.fillRect(x, y, 1, 1);
-        }
-    });
-    /* clouds */
-    const crnd = SPR.mulberry(4242);
-    for (let i = 0; i < 5; i++) {
-      const cx = 30 + crnd() * (TREE_W - 60), cy = 18 + crnd() * 70, cw = 26 + crnd() * 34;
-      for (let b = 0; b < 4; b++) {
-        const bx = cx + (crnd() - 0.5) * cw, by = cy + (crnd() - 0.5) * 8, br = 6 + crnd() * 7;
-        for (let y = -br; y <= br; y++) {
-          const half = Math.round(Math.sqrt(Math.max(0, br * br - y * y)));
-          for (let x = -half; x <= half; x++) {
-            const edge = half - Math.abs(x) < 2;
-            if (edge && ((x + y) & 1)) continue;
-            g.fillStyle = y < -br * 0.3 ? '#ffffff' : '#eef7ff';
-            g.fillRect(Math.round(bx + x), Math.round(by + y), 1, 1);
-          }
-        }
-      }
-    }
-    /* rolling hills */
-    for (let x = 0; x < TREE_W; x++) {
-      const h1 = 34 + Math.sin(x / 46) * 12 + Math.sin(x / 17) * 5;
-      g.fillStyle = '#a9d885'; g.fillRect(x, TREE_H - h1, 1, h1);
-      const h2 = 20 + Math.sin(x / 33 + 2) * 8;
-      g.fillStyle = '#93c96c'; g.fillRect(x, TREE_H - h2, 1, h2);
-    }
-    /* soil */
-    g.fillStyle = '#a8783f'; g.fillRect(0, TREE_H - 13, TREE_W, 13);
-    g.fillStyle = '#8a5e2a';
-    for (let x = 0; x < TREE_W; x += 3) g.fillRect(x, TREE_H - 13 + ((x / 3) % 3), 2, 1);
-    g.fillStyle = '#c9924f';
-    for (let x = 0; x < TREE_W; x += 2) g.fillRect(x, TREE_H - 13, 1, 1);
-
-    /* ---- canopy: a soft blob per branch, drawn behind everything ---- */
-    function blob(cx, cy, r, seedn, unlocked) {
-      const rnd = SPR.mulberry(seedn);
-      const base = unlocked ? '#6fb646' : '#8fae7e';
-      const lite = unlocked ? '#8ccf5e' : '#a6c095';
-      const dark = unlocked ? '#4f9433' : '#71906a';
-      for (let y = -r; y <= r; y++) {
-        const half = Math.round(Math.sqrt(Math.max(0, r * r - y * y)) * (1 + 0.08 * Math.sin(y / 3)));
-        for (let x = -half; x <= half; x++) {
-          const edge = half - Math.abs(x);
-          if (edge < 3 && ((x + y) & 1)) continue;
-          if (edge < 1 && rnd() < 0.5) continue;
-          const n = rnd();
-          g.fillStyle = y < -r * 0.35 || n < 0.12 ? lite : (y > r * 0.4 || n > 0.94 ? dark : base);
-          g.fillRect(Math.round(cx + x), Math.round(cy + y), 1, 1);
-        }
-      }
-    }
-    const byBranch = {};
-    SKILLS.forEach(sk => {
-      if (sk.id === 'root') return;
-      (byBranch[sk.br] = byBranch[sk.br] || []).push(sk);
-    });
-    Object.keys(byBranch).forEach(bi => {
-      const list = byBranch[bi];
-      const pts = list.map(treePos);
-      const cx = pts.reduce((a, p) => a + p.x, 0) / pts.length;
-      const cy = pts.reduce((a, p) => a + p.y, 0) / pts.length;
-      const unlocked = list.some(sk => GAME.lvl(sk.id) > 0);
-      const spread = Math.max(...pts.map(p => Math.hypot(p.x - cx, p.y - cy)));
-      blob(cx, cy, Math.min(74, spread + 26), 900 + bi * 17, unlocked);
-    });
-    /* a fuller crown over the middle */
-    blob(treePos(SKILL_BY_ID.root).x, TREE_H * 0.42, 62, 77, true);
-
-    /* ---- trunk ---- */
-    const root = treePos(SKILL_BY_ID.root);
-    thickLine(g, root.x, TREE_H - 6, root.x, root.y, 18, '#7a5230', '#a8783f');
-    thickLine(g, root.x - 3, TREE_H - 8, root.x - 26, TREE_H - 2, 8, '#6e4a20', '#8a5e2a');
-    thickLine(g, root.x + 3, TREE_H - 8, root.x + 26, TREE_H - 2, 8, '#6e4a20', '#8a5e2a');
-    /* bark texture */
-    const brnd = SPR.mulberry(31);
-    g.fillStyle = '#5e3d18';
-    for (let i = 0; i < 26; i++) {
-      const by = root.y + brnd() * (TREE_H - root.y - 8);
-      const bx = root.x - 7 + brnd() * 14;
-      g.fillRect(Math.round(bx), Math.round(by), 1, 2 + Math.floor(brnd() * 3));
-    }
-
-    /* ---- branches ---- */
-    SKILLS.forEach(sk => {
-      if (!sk.pre) return;
-      const a = treePos(SKILL_BY_ID[sk.pre]), b = treePos(sk);
-      const unlocked = GAME.lvl(sk.pre) > 0;
-      const mid = { x: a.x, y: (a.y + b.y) / 2 };
-      const w = unlocked ? 7 : 4;
-      const col = unlocked ? '#7a5230' : '#b09a78';
-      const top = unlocked ? '#a8783f' : '#c9b89a';
-      thickLine(g, a.x, a.y, mid.x, mid.y, w, col, top);
-      thickLine(g, mid.x, mid.y, b.x, b.y, w, col, top);
-    });
-
-    /* branch legend */
-    let lx = 6;
-    BRANCHES.forEach(br => {
-      g.fillStyle = SPR.darken(br.hue, 0.5); g.fillRect(lx - 1, 5, 8, 8);
-      g.fillStyle = br.hue; g.fillRect(lx, 6, 6, 6);
-      g.fillStyle = SPR.lighten(br.hue, 0.4); g.fillRect(lx, 6, 6, 1);
-      SPR.drawText(g, br.name, lx + 10, 6, '#33552a', 1, 'rgba(255,255,255,.8)');
-      lx += 12 + SPR.textW(br.name, 1) + 10;
-    });
-  }
-
-  const birds = [0, 1, 2].map(i => ({ x: 40 + i * 180, y: 40 + i * 16, v: 9 + i * 3 }));
-
-  function drawTree(now) {
-    if (!treeCv) return;
-    const g = treeCtx;
-    g.imageSmoothingEnabled = false;
-    const sig = SKILLS.map(sk => GAME.lvl(sk.id)).join(',');
-    if (sig !== treeBgSig || !treeBg) { treeBgSig = sig; buildTreeBg(); }
-    g.drawImage(treeBg, 0, 0);
-
-    /* drifting birds */
-    birds.forEach((b, i) => {
-      b.x += b.v * 0.016;
-      if (b.x > TREE_W + 12) b.x = -12;
-      const flap = Math.floor(now / 220 + i) % 2;
-      g.fillStyle = '#5e5341';
-      g.fillRect(Math.round(b.x), Math.round(b.y), 2, 1);
-      g.fillRect(Math.round(b.x - 2), Math.round(b.y - (flap ? 1 : 0)), 2, 1);
-      g.fillRect(Math.round(b.x + 2), Math.round(b.y - (flap ? 1 : 0)), 2, 1);
-    });
-
-    /* hexes */
-    SKILLS.forEach(sk => {
-      const p = treePos(sk);
-      const st = skillState(sk);
-      const r = sk.id === 'root' ? HEX_R + 3 : HEX_R;
-      const chip = hexChip(st, BRANCHES[sk.br].hue, r);
-      g.drawImage(chip, p.x - (r + 4), p.y - (r + 4));
-      if (st === 'can' && Math.floor(now / 320) % 2) {
-        const ring = ringChip(r + 3, 'rgba(255,214,80,.85)');
-        g.drawImage(ring, p.x - (r + 7), p.y - (r + 7));
-      }
-      if (selSkill === sk.id || hoverSkill === sk.id) {
-        const ring = ringChip(r + 2, selSkill === sk.id ? '#ffffff' : 'rgba(255,255,255,.65)');
-        g.drawImage(ring, p.x - (r + 6), p.y - (r + 6));
-      }
-      const icon = SPR.iconSprite(sk.icon, 1);
-      g.globalAlpha = st === 'locked' ? 0.4 : 1;
-      g.drawImage(icon, p.x - 5, p.y - 8);
-      g.globalAlpha = 1;
-      if (sk.id !== 'root') {
-        const cur = GAME.lvl(sk.id);
-        const label = sk.max > 1 ? cur + '/' + sk.max : (cur ? 'ON' : '');
-        if (label) {
-          const tw = SPR.tinyW(label, 1);
-          SPR.drawTiny(g, label, p.x - Math.floor(tw / 2), p.y + 4,
-            st === 'locked' ? '#4a4438' : st === 'can' ? '#5e3d18' : '#2e2216', 1);
-        }
-      }
-    });
   }
 
   function renderSkillCard() {
     const card = $('#skill-card');
     card.innerHTML = '';
-    if (!selSkill) {
+    const sk = termSel ? SKILL_BY_ID[termSel] : null;
+    if (!sk) {
       const hint = document.createElement('span');
       hint.className = 'sk-hint';
-      hint.textContent = 'tap a hexagon to inspect it';
+      hint.textContent = 'pick a package on the screen above';
       card.appendChild(hint);
       return;
     }
-    const sk = SKILL_BY_ID[selSkill];
     const cur = GAME.lvl(sk.id);
-    const pre = skillPrereq(sk);
-    const locked = pre && GAME.lvl(pre.id) < 1;
     const maxed = cur >= sk.max;
     const cost = skillCost(sk, cur);
     card.appendChild(mkIcon(sk.icon, 4));
@@ -2151,24 +2193,16 @@
     const b = document.createElement('b');
     b.textContent = sk.name;
     const small = document.createElement('small');
-    small.textContent = ' ' + cur + '/' + sk.max + '  ' + BRANCHES[sk.br].name;
+    small.textContent = ' ' + cur + '/' + sk.max + '  ' + MODULES[sk.br].code;
     b.appendChild(small);
     mid.appendChild(b);
     const desc = document.createElement('span');
     desc.textContent = sk.desc;
     mid.appendChild(desc);
-    if (locked) {
-      const lock = document.createElement('span');
-      lock.className = 'skc-lock';
-      lock.textContent = 'requires ' + pre.name;
-      mid.appendChild(lock);
-    }
     card.appendChild(mid);
     const btn = document.createElement('button');
     btn.className = 'btn';
-    if (sk.id === 'root') { btn.disabled = true; btn.textContent = 'THE TRUNK'; }
-    else if (maxed) { btn.disabled = true; btn.textContent = 'MAXED'; }
-    else if (locked) { btn.disabled = true; btn.textContent = 'LOCKED'; }
+    if (maxed) { btn.disabled = true; btn.textContent = 'INSTALLED'; }
     else {
       btn.dataset.act = 'buy-skill';
       btn.dataset.id = sk.id;
@@ -2181,181 +2215,45 @@
   }
 
   function renderSkills() {
-    if (!treeCv) {
-      treeCv = $('#tree-canvas');
-      treeCv.width = TREE_W; treeCv.height = TREE_H;
-      treeCtx = treeCv.getContext('2d');
-      treeCv.addEventListener('pointermove', ev => {
-        const r = treeCv.getBoundingClientRect();
-        const x = (ev.clientX - r.left) / r.width * TREE_W;
-        const y = (ev.clientY - r.top) / r.height * TREE_H;
-        let hit = null;
-        for (const sk of SKILLS) {
-          const p = treePos(sk);
-          if (SPR.hexHit(x - p.x, y - p.y, sk.id === 'root' ? HEX_R + 3 : HEX_R)) { hit = sk.id; break; }
-        }
-        hoverSkill = hit;
-        treeCv.style.cursor = hit ? 'pointer' : 'default';
+    if (!termCv) {
+      termCv = $('#tree-canvas');
+      termCv.width = TERM_W; termCv.height = TERM_H;
+      termCtx = termCv.getContext('2d');
+      termCv.addEventListener('pointermove', ev => {
+        const p = termCoords(ev);
+        const h = termHitAt(p.x, p.y);
+        termHover = h && (h.kind === 'pkg' || h.kind === 'buy') ? h.id : null;
+        termCv.style.cursor = h ? 'pointer' : 'default';
       });
-      treeCv.addEventListener('pointerdown', ev => {
-        const r = treeCv.getBoundingClientRect();
-        const x = (ev.clientX - r.left) / r.width * TREE_W;
-        const y = (ev.clientY - r.top) / r.height * TREE_H;
-        for (const sk of SKILLS) {
-          const p = treePos(sk);
-          if (SPR.hexHit(x - p.x, y - p.y, sk.id === 'root' ? HEX_R + 3 : HEX_R)) {
-            selSkill = sk.id;
-            snd.plop();
-            renderSkillCard();
-            return;
-          }
+      termCv.addEventListener('pointerleave', () => { termHover = null; });
+      termCv.addEventListener('pointerdown', ev => {
+        const p = termCoords(ev);
+        const h = termHitAt(p.x, p.y);
+        if (!h) return;
+        if (h.kind === 'mod') {
+          if (termMod !== h.i) { termMod = h.i; termScroll = 0; termSel = null; renderSkillCard(); }
+          snd.plop();
+        } else if (h.kind === 'buy') {
+          installPkg(h.id);
+        } else {
+          termSel = h.id;
+          snd.plop();
+          renderSkillCard();
         }
       });
-      treeCv.addEventListener('pointerleave', () => { hoverSkill = null; });
+      termCv.addEventListener('wheel', ev => {
+        ev.preventDefault();
+        termScroll += ev.deltaY > 0 ? 1 : -1;
+      }, { passive: false });
+    }
+    /* land on a module that has something in it */
+    if (!modulePkgs(termMod).length) {
+      const first = MODULES.findIndex((_, i) => modulePkgs(i).length);
+      if (first >= 0) termMod = first;
     }
     $('#research-sub').textContent = GAME.fmt(S().feathers) + ' FEATHERS';
     renderSkillCard();
     GAME.dirty.skills = false;
-  }
-
-  let indexTab = 'chickens';
-  function renderPedia() {
-    const box = $('#pedia');
-    box.innerHTML = '';
-    document.querySelectorAll('#index-tabs .tab-btn').forEach(b =>
-      b.classList.toggle('active', b.dataset.tab === indexTab));
-
-    if (indexTab === 'chickens') {
-      $('#pedia-sub').textContent = GAME.disc() + ' / ' + SPECIES_TOTAL + ' CHICKENS';
-      TIERS.forEach((tier, t) => {
-        const pool = SPECIES_BY_TIER[t];
-        const found = pool.filter(sp => S().disc.includes(sp.id)).length;
-        const sec = document.createElement('div');
-        sec.className = 'pedia-tier';
-        const head = document.createElement('div');
-        head.className = 'pedia-tier-head';
-        head.style.background = tier.c;
-        const hl = document.createElement('span');
-        hl.textContent = tier.n + (t === TIERS.length - 1 ? ' - bred from two Divine parents' : '');
-        const hr = document.createElement('span');
-        hr.textContent = found + '/' + pool.length;
-        head.appendChild(hl); head.appendChild(hr);
-        sec.appendChild(head);
-        const grid = document.createElement('div');
-        grid.className = 'pedia-grid';
-        pool.forEach(sp => {
-          const known = S().disc.includes(sp.id);
-          const card = document.createElement('div');
-          card.className = 'pedia-card' + (known ? '' : ' unknown');
-          card.appendChild(chickEl(sp, 3, !known));
-          const name = document.createElement('span');
-          name.className = 'p-name';
-          name.textContent = known ? sp.name : '???';
-          card.appendChild(name);
-          const quip = document.createElement('span');
-          quip.className = 'p-quip';
-          quip.textContent = known ? sp.quip : 'not yet hatched';
-          card.appendChild(quip);
-          if (known) {
-            const cnt = document.createElement('span');
-            cnt.className = 'p-count';
-            const inField = S().chickens.filter(c => c.sp === sp.id).length;
-            cnt.textContent = inField ? 'on field: ' + inField : 'met before';
-            card.appendChild(cnt);
-          }
-          grid.appendChild(card);
-        });
-        sec.appendChild(grid);
-        box.appendChild(sec);
-      });
-    } else if (indexTab === 'ducks') {
-      $('#pedia-sub').textContent = S().duckMet.length + ' / ' + DUCKS.length + ' DUCKS';
-      const intro = document.createElement('p');
-      intro.className = 'flavor';
-      intro.textContent = 'Travelling ducks drop by the pond with odd jobs. Help one and it joins your index.';
-      box.appendChild(intro);
-      const grid = document.createElement('div');
-      grid.className = 'duck-grid';
-      DUCKS.forEach(d => {
-        const met = S().duckMet.includes(d.id);
-        const here = S().duck && S().duck.id === d.id;
-        const card = document.createElement('div');
-        card.className = 'duck-card' + (met ? '' : ' unknown');
-        const spr = cloneCanvas(SPR.duckSprite(d, 0, 2));
-        if (!met) {
-          const g = spr.getContext('2d');
-          g.globalCompositeOperation = 'source-in';
-          g.fillStyle = '#7d6a4d';
-          g.fillRect(0, 0, spr.width, spr.height);
-        }
-        card.appendChild(spr);
-        const nm = document.createElement('b');
-        nm.textContent = met ? d.name : '???';
-        card.appendChild(nm);
-        const sub = document.createElement('span');
-        sub.textContent = met ? d.line : (here ? 'waiting at the pond' : 'not met yet');
-        card.appendChild(sub);
-        grid.appendChild(card);
-      });
-      box.appendChild(grid);
-    } else if (indexTab === 'eggs') {
-      $('#pedia-sub').textContent = 'EGG VALUES';
-      const intro = document.createElement('p');
-      intro.className = 'flavor';
-      intro.textContent = 'Every shell your ranch can produce, with what the market pays today.';
-      box.appendChild(intro);
-      const grid = document.createElement('div');
-      grid.className = 'egg-grid';
-      TIERS.forEach((tier, t) => {
-        const card = document.createElement('div');
-        card.className = 'egg-card';
-        card.appendChild(cloneCanvas(SPR.eggSprite(t, 3, t === TIERS.length - 1, 0)));
-        const mid = document.createElement('div');
-        const b = document.createElement('b');
-        b.textContent = tier.n;
-        b.style.color = tier.c;
-        mid.appendChild(b);
-        const v = document.createElement('span');
-        v.textContent = 'worth ' + GAME.fmt(GAME.eggValue(t, false)) + ' coins';
-        mid.appendChild(v);
-        mid.appendChild(document.createElement('br'));
-        const h = document.createElement('span');
-        h.textContent = 'hatches in ' + GAME.fmtTime(GAME.incHatchTime(t, t === TIERS.length - 1));
-        mid.appendChild(h);
-        card.appendChild(mid);
-        grid.appendChild(card);
-      });
-      box.appendChild(grid);
-    } else {
-      const st = S();
-      $('#pedia-sub').textContent = 'DAY ' + st.day + ' - ' + st.diary.length + ' ENTRIES';
-      const list = document.createElement('div');
-      list.className = 'diary-list';
-      if (!st.diary.length) {
-        const p = document.createElement('p');
-        p.className = 'diary-empty';
-        p.textContent = 'Nothing written yet. Pet Mama Hen and the diary starts itself.';
-        list.appendChild(p);
-      }
-      const icons = { species: null, first: null, land: 'house', mama: 'crown', hire: 'hands', quest: 'doc', duck: 'star' };
-      st.diary.slice().reverse().forEach(e => {
-        const row = document.createElement('div');
-        row.className = 'diary-row';
-        const day = document.createElement('span');
-        day.className = 'd-day';
-        day.textContent = 'DAY ' + e.day;
-        row.appendChild(day);
-        if (e.sp !== null && e.sp !== undefined && SPECIES[e.sp]) row.appendChild(chickEl(SPECIES[e.sp], 2, false));
-        else row.appendChild(mkIcon(icons[e.kind] || 'egg', 2));
-        const tx = document.createElement('span');
-        tx.className = 'd-text';
-        tx.textContent = e.text;
-        row.appendChild(tx);
-        list.appendChild(row);
-      });
-      box.appendChild(list);
-    }
-    GAME.dirty.pedia = false;
   }
 
   /* ================= INSPECT PANEL ================= */
@@ -2496,17 +2394,31 @@
     if (kind === 'staff') {
       const w = inspect.ref;
       if (st.staff.indexOf(w) === -1) { setInspect({ kind: 'farm' }); return; }
-      const def = STAFF[w.type];
-      ipanel.appendChild(ipHead(cloneCanvas(SPR.staffSprite(w.type, 0, 2)), def.name, def.robot ? 'robot worker' : 'farmhand'));
-      ipanel.appendChild(ipRow('wage', (def.wage * Math.pow(0.88, GAME.lvl('wages'))).toFixed(2) + '/s'));
-      ipanel.appendChild(ipRow('doing', () => S().unpaid ? 'UNPAID' : w.state));
-      if (w.type === 'hand') ipanel.appendChild(ipRow('carrying', () => w.carry.length + ' eggs'));
-      if (w.type === 'match') ipanel.appendChild(ipRow('holding', () => w.hold ? SPECIES[w.hold.sp].name : 'nobody'));
+      const def = ROLES[w.role] || ROLES.hand;
+      ipanel.appendChild(ipHead(cloneCanvas(SPR.staffSprite(w, 0, 2)), w.name, def.name));
+      STAT_KEYS.forEach(k => {
+        const lead = def.uses.includes(k) ? ' *' : '';
+        ipanel.appendChild(ipRow(STATS[k].name.toLowerCase() + lead, String(GAME.crewStat(w, k))));
+      });
+      ipanel.appendChild(ipRow('wage', (w.wage * Math.pow(0.88, GAME.lvl('wages'))).toFixed(2) + '/s'));
+      ipanel.appendChild(ipRow('stamina', () => Math.round((w.energy === undefined ? 1 : w.energy) * 100) + '%'));
+      ipanel.appendChild(ipRow('doing', () => S().unpaid ? 'UNPAID' : w.state === 'rest' ? 'on a break' : w.state));
+      if (w.role === 'hand' || w.role === 'packer') {
+        ipanel.appendChild(ipRow('carrying', () => w.carry.length + ' / ' + (GAME.crewCarry(w) + (w.role === 'packer' ? 2 : 0))));
+      }
+      if (w.role === 'match') ipanel.appendChild(ipRow('holding', () => w.hold ? SPECIES[w.hold.sp].name : 'nobody'));
+      if (w.role === 'tech') ipanel.appendChild(ipRow('aura boost', '+' + Math.round(GAME.crewStat(w, 'tech') * 6) + '%'));
+      if ((w.traits || []).length) {
+        ipanel.appendChild(ipRow('quirks', w.traits.map(t => TRAIT_BY_ID[t] ? TRAIT_BY_ID[t].name : t).join(', ')));
+      }
       const note = document.createElement('p');
       note.className = 'ip-note';
       note.textContent = def.job;
       ipanel.appendChild(note);
-      ipanel.appendChild(ipBtns([{ label: 'DISMISS', data: { act: 'fire-staff' } }]));
+      ipanel.appendChild(ipBtns([
+        { label: 'CREW BOARD', data: { act: 'open-hire' } },
+        { label: 'DISMISS', data: { act: 'fire-staff' } },
+      ]));
       return;
     }
 
@@ -2625,72 +2537,311 @@
 
   /* ================= HIRING ================= */
   let hireSig = '';
-  function renderHire() {
-    const list = $('#hire-list');
-    const crew = $('#crew-list');
+  /* ================= THE CREW BOARD =================
+     One set of card builders, used by both the Staff Hut and
+     the STAFF tab of the Index, so the crew is always two taps
+     away wherever you are.
+     ================================================ */
+  function statRow(label, v, hue) {
+    const row = document.createElement('div');
+    row.className = 'st-row';
+    const nm = document.createElement('i');
+    nm.textContent = label;
+    row.appendChild(nm);
+    const bar = document.createElement('u');
+    const fill = document.createElement('s');
+    fill.style.width = Math.round(Math.min(10, v) / 10 * 100) + '%';
+    if (hue) fill.style.background = hue;
+    bar.appendChild(fill);
+    row.appendChild(bar);
+    const n = document.createElement('b');
+    n.textContent = String(v);
+    row.appendChild(n);
+    return row;
+  }
+  function traitChips(traits) {
+    const wrap = document.createElement('div');
+    wrap.className = 'trait-row';
+    if (!traits || !traits.length) {
+      const none = document.createElement('em');
+      none.textContent = 'no quirks';
+      wrap.appendChild(none);
+      return wrap;
+    }
+    traits.forEach(id => {
+      const t = TRAIT_BY_ID[id];
+      if (!t) return;
+      const chip = document.createElement('span');
+      chip.className = 'trait' + (t.good ? ' good' : ' bad');
+      chip.textContent = t.name;
+      chip.title = t.desc;
+      wrap.appendChild(chip);
+    });
+    return wrap;
+  }
+  function statBlock(w, uses) {
+    const box = document.createElement('div');
+    box.className = 'st-block';
+    STAT_KEYS.forEach(k => {
+      const lead = uses && uses.includes(k);
+      const row = statRow(STATS[k].name, GAME.crewStat(w, k), lead ? '#ffc72f' : null);
+      if (lead) row.classList.add('lead');
+      box.appendChild(row);
+    });
+    return box;
+  }
+
+  /* a hired worker */
+  function crewCard(w) {
+    const def = ROLES[w.role] || ROLES.hand;
+    const card = document.createElement('div');
+    card.className = 'crew-card' + (def.robot ? ' bot' : '');
+    const head = document.createElement('div');
+    head.className = 'cc-head';
+    head.appendChild(cloneCanvas(SPR.staffSprite(w, 0, 2)));
+    const who = document.createElement('div');
+    who.className = 'cc-who';
+    const nm = document.createElement('b');
+    nm.textContent = w.name;
+    who.appendChild(nm);
+    const rl = document.createElement('span');
+    rl.appendChild(mkIcon(def.icon, 2));
+    rl.appendChild(document.createTextNode(def.name));
+    who.appendChild(rl);
+    head.appendChild(who);
+    const st = document.createElement('span');
+    st.className = 'cc-state';
+    st.textContent = S().unpaid ? 'unpaid' : w.state === 'rest' ? 'on a break' : w.state;
+    head.appendChild(st);
+    card.appendChild(head);
+
+    card.appendChild(statBlock(w, def.uses));
+    card.appendChild(traitChips(w.traits));
+
+    const meta = document.createElement('div');
+    meta.className = 'cc-meta';
+    const wage = document.createElement('span');
+    wage.appendChild(mkIcon('coin', 2));
+    wage.appendChild(document.createTextNode((w.wage * Math.pow(0.88, GAME.lvl('wages'))).toFixed(2) + '/s'));
+    meta.appendChild(wage);
+    const jobs = document.createElement('span');
+    jobs.textContent = GAME.fmt(w.jobs || 0) + ' jobs';
+    meta.appendChild(jobs);
+    const nrg = document.createElement('span');
+    nrg.textContent = 'stamina ' + Math.round((w.energy === undefined ? 1 : w.energy) * 100) + '%';
+    meta.appendChild(nrg);
+    card.appendChild(meta);
+
+    /* role switcher - people can move between people-roles */
+    const roles = document.createElement('div');
+    roles.className = 'cc-roles';
+    ROLE_KEYS.filter(r => ROLES[r].robot === def.robot && GAME.roleOpen(r)).forEach(r => {
+      const b = document.createElement('button');
+      b.className = 'btn btn-tiny' + (r === w.role ? ' on' : '');
+      b.dataset.act = 'set-role';
+      b.dataset.id = String(w.id);
+      b.dataset.role = r;
+      b.disabled = r === w.role;
+      b.title = ROLES[r].job;
+      b.appendChild(mkIcon(ROLES[r].icon, 2));
+      roles.appendChild(b);
+    });
+    const fire = document.createElement('button');
+    fire.className = 'btn btn-tiny cc-fire';
+    fire.dataset.act = 'fire';
+    fire.dataset.id = String(w.id);
+    fire.textContent = def.robot ? 'SCRAP' : 'LET GO';
+    roles.appendChild(fire);
+    card.appendChild(roles);
+    return card;
+  }
+
+  /* somebody who answered a flyer */
+  function applicantCard(ap) {
+    const card = document.createElement('div');
+    card.className = 'crew-card applicant';
+    const head = document.createElement('div');
+    head.className = 'cc-head';
+    head.appendChild(cloneCanvas(SPR.personSprite(ap.look, 0, 2)));
+    const who = document.createElement('div');
+    who.className = 'cc-who';
+    const nm = document.createElement('b');
+    nm.textContent = ap.name;
+    who.appendChild(nm);
+    const q = document.createElement('span');
+    q.textContent = 'rating ' + crewQuality(ap.st) + ' / 50';
+    who.appendChild(q);
+    head.appendChild(who);
+    const t = document.createElement('span');
+    t.className = 'cc-state';
+    t.textContent = 'leaves in ' + GAME.fmtTime(ap.t);
+    head.appendChild(t);
+    card.appendChild(head);
+
+    card.appendChild(statBlock(ap, null));
+    card.appendChild(traitChips(ap.traits));
+
+    const meta = document.createElement('div');
+    meta.className = 'cc-meta';
+    const sign = document.createElement('span');
+    sign.appendChild(mkIcon('coin', 2));
+    sign.appendChild(document.createTextNode(GAME.fmt(ap.sign) + ' to sign'));
+    meta.appendChild(sign);
+    const wage = document.createElement('span');
+    wage.appendChild(mkIcon('coin', 2));
+    wage.appendChild(document.createTextNode((ap.wage * Math.pow(0.88, GAME.lvl('wages'))).toFixed(2) + '/s'));
+    meta.appendChild(wage);
+    card.appendChild(meta);
+
+    const roles = document.createElement('div');
+    roles.className = 'cc-roles';
+    const room = GAME.canHire() && S().coins >= ap.sign;
+    ROLE_KEYS.filter(r => !ROLES[r].robot && GAME.roleOpen(r)).forEach(r => {
+      const b = document.createElement('button');
+      b.className = 'btn btn-tiny' + (room ? ' btn-green' : '');
+      b.dataset.act = 'hire-applicant';
+      b.dataset.id = String(ap.id);
+      b.dataset.role = r;
+      b.disabled = !room;
+      b.title = 'Hire as ' + ROLES[r].name + ' - ' + ROLES[r].job;
+      b.appendChild(mkIcon(ROLES[r].icon, 2));
+      roles.appendChild(b);
+    });
+    const hint = document.createElement('em');
+    hint.className = 'cc-hint';
+    hint.textContent = room ? 'pick a role' : GAME.canHire() ? 'not enough coins' : 'no free slot';
+    roles.appendChild(hint);
+    card.appendChild(roles);
+    return card;
+  }
+
+  /* the noticeboard: flyer button, campaign timer, applicants */
+  function noticeBoard(box) {
     const st = S();
-    $('#hire-sub').textContent = st.staff.length + ' / ' + GAME.staffSlots() + ' SLOTS  -  ' +
-      GAME.wagePerSec().toFixed(2) + ' COINS/SEC';
-    list.innerHTML = '';
-    Object.keys(STAFF).forEach(type => {
-      const def = STAFF[type];
-      const locked = def.needs && !GAME.lvl(def.needs);
-      const cost = GAME.staffHireCost(type);
+    const bar = document.createElement('div');
+    bar.className = 'notice';
+    const spr = cloneCanvas(SPR.flyerSprite(2));
+    bar.appendChild(spr);
+    const mid = document.createElement('div');
+    mid.className = 'no-mid';
+    const b = document.createElement('b');
+    b.textContent = 'HELP WANTED';
+    mid.appendChild(b);
+    const line = document.createElement('span');
+    if (!GAME.lvl('hiring')) line.textContent = 'Research Recruiting in the Lab to start hiring.';
+    else if (!Object.keys(st.huts).length) line.textContent = 'Build a Staff Hut first - the crew needs a base.';
+    else if (st.flyer) line.textContent = 'Flyers are up. Folk should turn up in ' + GAME.fmtTime(st.flyer.t) + '.';
+    else line.textContent = 'Post flyers around the valley and wait for folk to walk in.';
+    mid.appendChild(line);
+    if (st.flyer) {
+      const barr = document.createElement('div');
+      barr.className = 'no-bar';
+      const fill = document.createElement('i');
+      fill.style.width = Math.round((1 - st.flyer.t / st.flyer.need) * 100) + '%';
+      barr.appendChild(fill);
+      mid.appendChild(barr);
+    }
+    bar.appendChild(mid);
+    const btn = document.createElement('button');
+    btn.className = 'btn';
+    btn.dataset.act = 'send-flyers';
+    const cost = GAME.flyerPrice();
+    const ok = GAME.canFlyer() && st.coins >= cost;
+    if (ok) btn.classList.add('btn-green');
+    btn.disabled = !ok;
+    if (st.flyer) btn.textContent = 'OUT THERE';
+    else {
+      btn.appendChild(mkIcon('coin', 2));
+      btn.appendChild(document.createTextNode(GAME.fmt(cost)));
+    }
+    bar.appendChild(btn);
+    box.appendChild(bar);
+
+    if (st.applicants.length) {
+      const grid = document.createElement('div');
+      grid.className = 'crew-grid';
+      st.applicants.forEach(ap => grid.appendChild(applicantCard(ap)));
+      box.appendChild(grid);
+    } else if (!st.flyer && GAME.lvl('hiring') && Object.keys(st.huts).length) {
+      const none = document.createElement('p');
+      none.className = 'crew-none';
+      none.textContent = 'Nobody waiting. Put some flyers up.';
+      box.appendChild(none);
+    }
+  }
+
+  /* robots are built, not recruited */
+  function botBench(box) {
+    const bots = ROLE_KEYS.filter(r => ROLES[r].robot);
+    if (!bots.some(r => GAME.roleOpen(r))) return;
+    const grid = document.createElement('div');
+    grid.className = 'bot-grid';
+    bots.forEach(r => {
+      const def = ROLES[r];
+      const open = GAME.roleOpen(r);
+      const cost = GAME.botPrice(r);
       const card = document.createElement('div');
-      card.className = 'hire-card' + (locked ? ' locked' : '');
-      card.appendChild(cloneCanvas(SPR.staffSprite(type, 0, 2)));
+      card.className = 'bot-card' + (open ? '' : ' locked');
+      card.appendChild(cloneCanvas(SPR.staffSprite({ role: r }, 0, 2)));
       const mid = document.createElement('div');
       mid.className = 'hc-mid';
       const b = document.createElement('b');
       b.textContent = def.name.toUpperCase();
       mid.appendChild(b);
       const job = document.createElement('span');
-      job.textContent = locked ? 'Research required to hire this worker.' : def.job;
+      job.textContent = open ? def.job : 'Research required before you can build this one.';
       mid.appendChild(job);
-      const wage = document.createElement('span');
-      wage.textContent = 'wage ' + (def.wage * Math.pow(0.88, GAME.lvl('wages'))).toFixed(2) + ' coins/sec';
-      mid.appendChild(wage);
       const btn = document.createElement('button');
       btn.className = 'btn';
-      btn.dataset.act = 'hire';
-      btn.dataset.type = type;
-      const canH = !locked && GAME.canHire(type) && st.coins >= cost;
-      if (canH) btn.classList.add('btn-green');
-      btn.disabled = !canH;
+      btn.dataset.act = 'assemble';
+      btn.dataset.role = r;
+      const ok = open && GAME.canHire() && S().coins >= cost;
+      if (ok) btn.classList.add('btn-green');
+      btn.disabled = !ok;
       btn.appendChild(mkIcon('coin', 2));
-      btn.appendChild(document.createTextNode(locked ? 'LOCKED' : GAME.fmt(cost)));
+      btn.appendChild(document.createTextNode(open ? GAME.fmt(cost) : 'LOCKED'));
       mid.appendChild(btn);
       card.appendChild(mid);
-      list.appendChild(card);
+      grid.appendChild(card);
     });
+    box.appendChild(grid);
+  }
+
+  /* both the hut modal and the Index tab show the same crew, so
+     redraw whichever one is open */
+  function refreshCrewViews() {
+    if (!$('#modal-hire').hidden) renderHire();
+    if (!$('#modal-pedia').hidden && indexTab === 'staff') renderPedia();
+    refreshInspect();
+  }
+
+  function crewHeadline() {
+    return S().staff.length + ' / ' + GAME.staffSlots() + ' SLOTS  -  ' +
+      GAME.wagePerSec().toFixed(2) + ' COINS/SEC';
+  }
+
+  /* the Staff Hut modal */
+  function renderHire() {
+    const list = $('#hire-list');
+    const crew = $('#crew-list');
+    const st = S();
+    $('#hire-sub').textContent = crewHeadline();
+    list.innerHTML = '';
+    noticeBoard(list);
+    botBench(list);
     crew.innerHTML = '';
-    if (!Object.keys(st.huts).length) {
-      const warn = document.createElement('p');
-      warn.id = 'hire-warn';
-      warn.textContent = 'Build a Staff Hut first - crews need somewhere to sleep.';
-      crew.appendChild(warn);
-    }
     if (st.staff.length >= GAME.staffSlots() && Object.keys(st.huts).length) {
       const warn = document.createElement('p');
       warn.id = 'hire-warn';
-      warn.textContent = 'All slots full - build another Staff Hut or research Bunkhouse.';
+      warn.textContent = 'All slots full - build another Staff Hut or install Bunkhouse.';
       crew.appendChild(warn);
     }
-    st.staff.forEach(w => {
-      const chip = document.createElement('div');
-      chip.className = 'crew-chip';
-      chip.appendChild(cloneCanvas(SPR.staffSprite(w.type, 0, 1)));
-      const t = document.createElement('span');
-      t.textContent = STAFF[w.type].name;
-      chip.appendChild(t);
-      const b = document.createElement('button');
-      b.className = 'btn';
-      b.dataset.act = 'fire';
-      b.dataset.id = String(w.id);
-      b.textContent = 'DISMISS';
-      chip.appendChild(b);
-      crew.appendChild(chip);
-    });
+    if (st.staff.length) {
+      const grid = document.createElement('div');
+      grid.className = 'crew-grid';
+      st.staff.forEach(w => grid.appendChild(crewCard(w)));
+      crew.appendChild(grid);
+    }
     /* auto-mark rule */
     const rule = document.createElement('div');
     rule.className = 'crew-chip';
@@ -2704,6 +2855,175 @@
     rb.textContent = 'CHANGE';
     rule.appendChild(rb);
     crew.appendChild(rule);
+  }
+
+  /* ================= THE INDEX =================
+     Four tabs: the chickens you have found, the crew on the
+     payroll, what each egg is worth, and the diary.
+     ============================================ */
+  let indexTab = 'chickens';
+  function renderPedia() {
+    const box = $('#pedia');
+    box.innerHTML = '';
+    document.querySelectorAll('#index-tabs .tab-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.tab === indexTab));
+
+    if (indexTab === 'chickens') {
+      $('#pedia-sub').textContent = GAME.disc() + ' / ' + SPECIES_TOTAL + ' CHICKENS';
+      TIERS.forEach((tier, t) => {
+        const pool = SPECIES_BY_TIER[t];
+        const found = pool.filter(sp => S().disc.includes(sp.id)).length;
+        const sec = document.createElement('div');
+        sec.className = 'pedia-sec';
+        const head = document.createElement('div');
+        head.className = 'ps-head';
+        const hl = document.createElement('b');
+        hl.textContent = tier.n.toUpperCase();
+        hl.style.color = tier.c;
+        head.appendChild(hl);
+        const hr = document.createElement('span');
+        hr.textContent = found + ' / ' + pool.length;
+        head.appendChild(hr);
+        sec.appendChild(head);
+        const grid = document.createElement('div');
+        grid.className = 'pedia-grid';
+        pool.forEach(sp => {
+          const known = S().disc.includes(sp.id);
+          const card = document.createElement('div');
+          card.className = 'pedia-card' + (known ? '' : ' unknown');
+          card.appendChild(cloneCanvas(SPR.chickenSprite(sp, 2, !known)));
+          const name = document.createElement('b');
+          name.textContent = known ? sp.name : '???';
+          card.appendChild(name);
+          if (known) {
+            const quip = document.createElement('span');
+            quip.textContent = sp.quip;
+            card.appendChild(quip);
+            const cnt = document.createElement('i');
+            const inField = S().chickens.filter(c => c.sp === sp.id).length;
+            cnt.textContent = inField ? inField + ' on the ranch' : 'none right now';
+            card.appendChild(cnt);
+          }
+          grid.appendChild(card);
+        });
+        sec.appendChild(grid);
+        box.appendChild(sec);
+      });
+
+    } else if (indexTab === 'staff') {
+      const st = S();
+      $('#pedia-sub').textContent = crewHeadline();
+      const intro = document.createElement('p');
+      intro.className = 'pedia-intro';
+      intro.textContent = 'Nobody walks in on their own - print flyers, wait for folk to arrive, then pick the role that suits their stats.';
+      box.appendChild(intro);
+      noticeBoard(box);
+      if (st.staff.length) {
+        const head = document.createElement('div');
+        head.className = 'ps-head crew-head';
+        const hl = document.createElement('b');
+        hl.textContent = 'ON THE PAYROLL';
+        head.appendChild(hl);
+        const hr = document.createElement('span');
+        hr.textContent = st.staff.length + ' / ' + GAME.staffSlots();
+        head.appendChild(hr);
+        box.appendChild(head);
+        const grid = document.createElement('div');
+        grid.className = 'crew-grid';
+        st.staff.forEach(w => grid.appendChild(crewCard(w)));
+        box.appendChild(grid);
+      }
+      botBench(box);
+      /* what each stat actually does */
+      const legend = document.createElement('div');
+      legend.className = 'stat-legend';
+      const lh = document.createElement('b');
+      lh.textContent = 'WHAT THE STATS DO';
+      legend.appendChild(lh);
+      STAT_KEYS.forEach(k => {
+        const row = document.createElement('div');
+        row.appendChild(mkIcon(STATS[k].icon, 2));
+        const nm = document.createElement('i');
+        nm.textContent = STATS[k].name;
+        row.appendChild(nm);
+        const d = document.createElement('span');
+        d.textContent = STATS[k].desc;
+        row.appendChild(d);
+        legend.appendChild(row);
+      });
+      ROLE_KEYS.forEach(r => {
+        const def = ROLES[r];
+        if (!GAME.roleOpen(r)) return;
+        const row = document.createElement('div');
+        row.appendChild(mkIcon(def.icon, 2));
+        const nm = document.createElement('i');
+        nm.textContent = def.name.toUpperCase();
+        row.appendChild(nm);
+        const d = document.createElement('span');
+        d.textContent = def.job + '  Leans on ' + def.uses.map(k => STATS[k].name).join(' and ') + '.';
+        row.appendChild(d);
+        legend.appendChild(row);
+      });
+      box.appendChild(legend);
+
+    } else if (indexTab === 'eggs') {
+      $('#pedia-sub').textContent = 'EGG VALUES';
+      const intro = document.createElement('p');
+      intro.className = 'pedia-intro';
+      intro.textContent = 'Every egg both hatches and sells. Golden ones are worth five times as much.';
+      box.appendChild(intro);
+      const grid = document.createElement('div');
+      grid.className = 'egg-grid';
+      TIERS.forEach((tier, t) => {
+        const card = document.createElement('div');
+        card.className = 'egg-card';
+        card.appendChild(cloneCanvas(SPR.eggSprite(t, 2, t === TIERS.length - 1)));
+        const mid = document.createElement('div');
+        const b = document.createElement('b');
+        b.textContent = tier.n;
+        b.style.color = tier.c;
+        mid.appendChild(b);
+        const v = document.createElement('span');
+        v.appendChild(mkIcon('coin', 2));
+        v.appendChild(document.createTextNode(GAME.fmt(GAME.eggValue(t, false))));
+        mid.appendChild(v);
+        const h = document.createElement('i');
+        h.textContent = 'hatches in ' + GAME.fmtTime(GAME.incHatchTime(t, false));
+        mid.appendChild(h);
+        card.appendChild(mid);
+        grid.appendChild(card);
+      });
+      box.appendChild(grid);
+
+    } else {
+      const list = S().diary.slice().reverse();
+      $('#pedia-sub').textContent = 'DAY ' + S().day + ' - ' + list.length + ' ENTRIES';
+      if (!list.length) {
+        const p = document.createElement('p');
+        p.className = 'pedia-intro';
+        p.textContent = 'Nothing written down yet. Hatch an egg and the diary starts itself.';
+        box.appendChild(p);
+      }
+      const icons = { species: null, first: null, land: 'house', mama: 'crown', hire: 'hands',
+                      flyer: 'doc', applicants: 'hands' };
+      list.forEach(en => {
+        const row = document.createElement('div');
+        row.className = 'diary-row';
+        if (en.sp !== null && en.sp !== undefined && SPECIES[en.sp]) {
+          row.appendChild(cloneCanvas(SPR.chickenSprite(SPECIES[en.sp], 1, false), 2));
+        } else {
+          row.appendChild(mkIcon(icons[en.kind] || 'star', 2));
+        }
+        const day = document.createElement('i');
+        day.textContent = 'day ' + en.day;
+        row.appendChild(day);
+        const tx = document.createElement('span');
+        tx.textContent = en.text;
+        row.appendChild(tx);
+        box.appendChild(row);
+      });
+    }
+    GAME.dirty.pedia = false;
   }
 
   /* ================= INTERACTION ================= */
@@ -2727,11 +3047,6 @@
       if (Math.abs(x - pl.x) < 8 && Math.abs(y - pl.y) < 8) return pl;
     }
     return null;
-  }
-  function duckAt(x, y) {
-    const d = S().duck;
-    if (!d || d.state === 'leaving') return null;
-    return (x > d.x - 4 && x < d.x + 20 && y > d.y - 16 && y < d.y + 18) ? d : null;
   }
   function staffAt(x, y) {
     for (let i = S().staff.length - 1; i >= 0; i--) {
@@ -2784,7 +3099,6 @@
       if (S().tool === 'basket' && S().basket.length) return false;
       if (S().truck.load.length && GAME.sendTruck()) { snd.engine(); return true; }
     }
-    if (duckAt(x, y)) { openDuck(); snd.plop(); return true; }
     const o = GAME.occAt(Math.floor(x / 16), Math.floor(y / 16));
     if (o && o.type === 'staffhut' && S().tool !== 'build') {
       renderHire(); openModal('#modal-hire'); snd.build(); return true;
@@ -2824,7 +3138,7 @@
     if (tool === 'inspect') { ptr.mode = 'inspect'; return; }
     if (tool === 'basket') { ptr.mode = 'sweep'; return; }
     if (S().held) { ptr.mode = 'carry'; return; }
-    cand = { duck: duckAt(p.x, p.y), ch: chickenAt(p.x, p.y), egg: eggAt(p.x, p.y),
+    cand = { ch: chickenAt(p.x, p.y), egg: eggAt(p.x, p.y),
              mama: overMama(p.x, p.y), plume: plumeAt(p.x, p.y) };
     ptr.mode = 'pending';
   });
@@ -2838,8 +3152,7 @@
     if (!ptr.down) return;
     if (ptr.mode === 'inspect' && ptr.moved > 6) ptr.mode = 'pan';
     if (ptr.mode === 'pending' && ptr.moved > 5) {
-      if (cand && cand.duck) ptr.mode = 'pan';
-      else if (cand && cand.ch && GAME.grabChicken(cand.ch)) { snd.squawk(); ptr.mode = 'carry'; heldSince = performance.now(); }
+      if (cand && cand.ch && GAME.grabChicken(cand.ch)) { snd.squawk(); ptr.mode = 'carry'; heldSince = performance.now(); }
       else if (cand && cand.egg && GAME.grabEgg(cand.egg)) { snd.plop(); ptr.mode = 'carry'; heldSince = performance.now(); }
       else ptr.mode = 'pan';
     }
@@ -2869,7 +3182,6 @@
       return;
     }
     if (ptr.mode === 'pending' && wasTap && cand) {
-      if (cand.duck) { openDuck(); snd.plop(); return; }
       if (cand.mama) {
         if (GAME.petMama()) { petFx.set('mama', performance.now()); heart(W.mama.x, W.mama.y - 18, 3); snd.pet(); }
         return;
@@ -3013,20 +3325,45 @@
       case 'close-inspect': setInspect(null); break;
       case 'start-game': hideTitle(); snd.sparkle(); break;
       case 'title': showTitle(); $('#menu-pop').hidden = true; break;
-      case 'close-duck': closeDuck(); break;
-      case 'quest-later': GAME.dismissDuck(); closeDuck(); snd.plop(); break;
-      case 'quest-accept': {
-        if (GAME.acceptQuest()) { snd.skill(); duckSig = ''; renderDuckPanel(); }
+      case 'crew': {
+        indexTab = 'staff';
+        renderPedia();
+        openModal('#modal-pedia');
+        $('#menu-pop').hidden = true;
+        snd.build();
         break;
       }
-      case 'quest-claim': {
-        const r = GAME.turnInQuest();
-        if (r) {
-          snd.grand();
-          coinBurst(S().duck ? S().duck.x + 6 : W.mama.x, S().duck ? S().duck.y : W.mama.y, 12);
-          toast({ icon: 'coin', title: 'JOB DONE', body: 'Paid ' + GAME.fmt(r.coins) + ' coins and ' + r.feathers + ' feathers.' });
-          closeDuck();
+      case 'send-flyers': {
+        if (GAME.sendFlyers()) {
+          snd.build();
+          toast({ icon: 'doc', title: 'FLYERS UP', body: 'Give it a minute and folk will start walking in.' });
         } else snd.error();
+        refreshCrewViews();
+        break;
+      }
+      case 'hire-applicant': {
+        if (GAME.hireApplicant(+btn.dataset.id, btn.dataset.role)) {
+          snd.skill();
+          const w = S().staff[S().staff.length - 1];
+          toast({ icon: ROLES[btn.dataset.role].icon, title: w.name.toUpperCase() + ' HIRED',
+                  body: 'Signed on as a ' + ROLES[btn.dataset.role].name + '.' });
+        } else snd.error();
+        refreshCrewViews();
+        break;
+      }
+      case 'assemble': {
+        if (GAME.assembleBot(btn.dataset.role)) {
+          snd.skill();
+          toast({ icon: ROLES[btn.dataset.role].icon, title: ROLES[btn.dataset.role].name.toUpperCase() + ' BUILT',
+                  body: ROLES[btn.dataset.role].job });
+        } else snd.error();
+        refreshCrewViews();
+        break;
+      }
+      case 'set-role': {
+        if (GAME.setRole(+btn.dataset.id, btn.dataset.role)) snd.plop();
+        else snd.error();
+        refreshCrewViews();
         break;
       }
       case 'index-tab': { indexTab = btn.dataset.tab; renderPedia(); break; }
@@ -3091,20 +3428,12 @@
         if (GAME.demolish(c, r)) { snd.demolish(); setInspect({ kind: 'farm' }); }
         break;
       }
-      case 'hire': {
-        if (GAME.hireStaff(btn.dataset.type)) {
-          snd.skill();
-          toast({ icon: STAFF[btn.dataset.type].icon, title: STAFF[btn.dataset.type].name.toUpperCase() + ' HIRED', body: STAFF[btn.dataset.type].job });
-        } else snd.error();
-        renderHire();
-        break;
-      }
-      case 'fire': { GAME.fireStaff(+btn.dataset.id); snd.demolish(); renderHire(); break; }
+      case 'fire': { GAME.fireStaff(+btn.dataset.id); snd.demolish(); refreshCrewViews(); break; }
       case 'cycle-automark': {
         const st = S();
         st.autoMark = st.autoMark >= TIERS.length - 3 ? -1 : st.autoMark + 1;
         snd.plop();
-        renderHire();
+        refreshCrewViews();
         break;
       }
       case 'buy-skill': {
@@ -3231,7 +3560,7 @@
       if (pdx || pdy) { cam().x += pdx * 150 * dt; cam().y += pdy * 150 * dt; GAME.clampCam(); }
       if (!titleEl.hidden) drawTitleScreen(dt);
       render(now, dt);
-      if (!$('#modal-skills').hidden) drawTree(now);
+      if (!$('#modal-skills').hidden) drawTerm(now);
       hudAcc += dt;
       if (hudAcc > 0.12) {
         hudAcc = 0;

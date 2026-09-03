@@ -60,11 +60,12 @@ const ECON = {
   blowerR: 34,             // blower reach
   blowerPush: 46,          // px/sec push
   sorterRare: 2,           // tier >= this goes straight through a sorter
-  duckCooldown: 75,        // seconds between pond visitors
-  duckStay: 240,           // how long a duck waits around with no answer
-  questCoins: 320,         // base coin reward
-  questFeathers: 18,       // base feather reward
-  diaryMax: 140,
+  diaryMax: 160,
+  staffTireless: 90,       // seconds of work before a worker wants a breather
+  staffRest: 14,           // seconds of breather at a hut
+  techAuraR: 58,           // px a Technician's speed aura reaches
+  loaderRate: 0.35,        // seconds per egg a Loader pushes into the truck
+  hatcheryCap: 24,         // eggs a Grand Hatchery holds
 };
 
 /* buildable things — cost grows with how many you own (belts stay flat) */
@@ -83,6 +84,12 @@ const BUILDS = {
                desc:'Blows loose eggs across the grass in the way it faces.', needs:'blower' },
   sorter:    { name:'Sorter',    w:1, h:1, base:150, growth:1.6, refund:60,
                desc:'On a belt: rare eggs go straight, common ones turn aside.', needs:'sorter' },
+  hatchery:  { name:'Grand Hatchery', w:3, h:3, base:6500, growth:1.9, refund:2600,
+               desc:'A 24-egg incubator bank that hatches twice as fast.', needs:'hatchery' },
+  splitter:  { name:'Splitter', w:1, h:1, base:180, growth:1.5, refund:70,
+               desc:'On a belt: sends eggs left and right in turn to fill two lines.', needs:'splitter' },
+  loader:    { name:'Truck Loader', w:2, h:1, base:1400, growth:1.8, refund:550,
+               desc:'Parks by the road and shovels belt eggs straight into the truck.', needs:'loader' },
   belt:      { name:'Conveyor',  w:1, h:1, base:15, growth:1, refund:7,
                desc:'Carries eggs to the truck, a silo or an incubator.', needs:'belts' },
   fence:     { name:'Fence',     w:1, h:1, base:10, growth:1, refund:5,
@@ -90,22 +97,101 @@ const BUILDS = {
 };
 
 /* ------------------------------------------------------------
-   STAFF - hired workers. Wages are coins per second.
+   CREW - five stats, and roles that each lean on different ones.
+   People answer flyers; robots get assembled at the hut.
    ------------------------------------------------------------ */
-const STAFF = {
-  hand:   { name:'Farmhand',  icon:'hand',   robot:false, hire:260,  grow:1.55, wage:0.6,
-            job:'Gathers loose eggs and runs them to a silo, incubator or the truck.' },
-  feeder: { name:'Feeder',    icon:'seed',   robot:false, hire:420,  grow:1.55, wage:0.5, needs:'feed',
+const STATS = {
+  speed: { key:'speed', name:'SPEED', icon:'wind',   desc:'how fast they cross the field' },
+  carry: { key:'carry', name:'CARRY', icon:'basket', desc:'eggs held per trip' },
+  care:  { key:'care',  name:'CARE',  icon:'heart',  desc:'how well the flock takes to them' },
+  tech:  { key:'tech',  name:'TECH',  icon:'gear',   desc:'machines near them run faster' },
+  grit:  { key:'grit',  name:'GRIT',  icon:'flame',  desc:'how long before they need a breather' },
+};
+const STAT_KEYS = Object.keys(STATS);
+
+const ROLES = {
+  hand:   { id:'hand',   name:'Farmhand',   icon:'hand',   robot:false, uses:['speed','carry'],
+            job:'Gathers loose eggs and runs them to a silo, hatchery or the truck.' },
+  feeder: { id:'feeder', name:'Feeder',     icon:'seed',   robot:false, uses:['care','speed'], needs:'feed',
             job:'Scatters seed so the flock keeps laying at double speed.' },
-  cull:   { name:'Cull-Bot',  icon:'remove', robot:true,  hire:1100, grow:1.7,  wage:0.9, needs:'cullbot',
+  packer: { id:'packer', name:'Packer',     icon:'crate',  robot:false, uses:['carry','grit'], needs:'silo',
+            job:'Shuttles eggs out of silos and packs the truck to the brim.' },
+  tech:   { id:'tech',   name:'Technician', icon:'gear',   robot:false, uses:['tech','grit'], needs:'belts',
+            job:'Walks the line; every machine near them runs faster.' },
+  keeper: { id:'keeper', name:'Keeper',     icon:'hands',  robot:false, uses:['care','grit'], needs:'keeper',
+            job:'Pets the flock all day, so hens lay on their own more often.' },
+  cull:   { id:'cull',   name:'Cull-Bot',   icon:'remove', robot:true,  uses:['speed','grit'], needs:'cullbot',
             job:'Retires chickens you mark as unwanted, recycling them into feathers.' },
-  match:  { name:'Match-Bot', icon:'cupid',  robot:true,  hire:1500, grow:1.7,  wage:1.0, needs:'matchbot',
+  match:  { id:'match',  name:'Match-Bot',  icon:'cupid',  robot:true,  uses:['speed','care'], needs:'matchbot',
             job:'Carries pairs of chickens into any empty love nest.' },
 };
-function staffCost(type, owned) {
-  const s = STAFF[type];
-  return Math.round(s.hire * Math.pow(s.grow, owned));
+const ROLE_KEYS = Object.keys(ROLES);
+
+/* procedural perks - an applicant rolls nought to two */
+const TRAITS = [
+  { id:'early',    name:'Early Bird',    good:true,  desc:'+2 SPEED',                  add:{ speed:2 } },
+  { id:'strong',   name:'Strong Back',   good:true,  desc:'+2 CARRY',                  add:{ carry:2 } },
+  { id:'gentle',   name:'Gentle Hands',  good:true,  desc:'+2 CARE',                   add:{ care:2 } },
+  { id:'tinker',   name:'Tinkerer',      good:true,  desc:'+2 TECH',                   add:{ tech:2 } },
+  { id:'ox',       name:'Built Like An Ox', good:true, desc:'+2 GRIT',                  add:{ grit:2 } },
+  { id:'thrifty',  name:'Thrifty',       good:true,  desc:'works for 30% less',        wage:0.7 },
+  { id:'tireless', name:'Tireless',      good:true,  desc:'never needs a breather',    noRest:true },
+  { id:'lucky',    name:'Four-Leaf',     good:true,  desc:'+10% feathers from their work', luck:0.10 },
+  { id:'keen',     name:'Quick Study',   good:true,  desc:'gains a stat point every 200 jobs', learn:true },
+  { id:'haggler',  name:'Hard Bargain',  good:false, desc:'wants 60% more pay',        wage:1.6 },
+  { id:'butter',   name:'Butterfingers', good:false, desc:'fumbles one egg in eight',  drop:0.12 },
+  { id:'dozy',     name:'Dozy',          good:false, desc:'tires out twice as fast',   restMult:2 },
+];
+const TRAIT_BY_ID = Object.fromEntries(TRAITS.map(t => [t.id, t]));
+
+/* name syllables - a first name is two or three of these, then a farm surname */
+const NAME_A = ['Bram','Mar','Tes','Or','Nim','Sul','Wren','Hol','Fen','Pip','Cor','Del',
+                'Gus','Hes','Jun','Kes','Lark','Mos','Nel','Ost','Per','Quil','Ros','Sen',
+                'Tam','Ull','Ves','Wil','Yar','Zib','Ada','Bex','Cly','Dov','Elm','Fay'];
+const NAME_B = ['a','o','ie','ette','en','is','ard','wyn','ric','ley','ora','us','ina','eth',
+                'ick','ony','ell','iah','ka','na','ph','ta','va','well'];
+const NAME_C = ['Hensworth','Yolkley','Cluckett','Barleycorn','Thistlewood','Meadows','Featherby',
+                'Nestor','Coopwright','Peppercorn','Strawby','Grainger','Bramblewick','Hayloft',
+                'Ryefield','Dovecote','Corncrake','Wattleby','Broodmoor','Shellman','Pullet',
+                'Roostwood','Grubbins','Marrowfield','Applewhite','Chaffinch','Bantam','Downey'];
+
+/* procedural looks */
+const SKINS  = ['#f2c9a0','#e8b184','#d69a66','#b87a4a','#8f5a30','#6b4224','#f7dcc0','#c98f5f'];
+const HAIRS  = ['#3a2a18','#5e3d18','#8a5e2a','#c9a35f','#e8d5a8','#a03f2f','#2e2216','#7a5230',
+                '#d9d9c9','#4a5a6a','#6a4a7a','#2f4f4f'];
+const SHIRTS = ['#7fc4e8','#8fd14f','#ffb84d','#ff8fa8','#c9a3f0','#e8e2d0','#5fa8d6','#f2a03f',
+                '#a8d8b0','#e8607a','#6ab04c','#d0c0f0','#f0d060','#89a8c9'];
+const PANTS  = ['#4a5a7a','#5e3d18','#3f5a3f','#6a5a4a','#7a4a4a','#4a4a5a','#8a6a3a','#3a3a4a'];
+const BOOTS  = ['#5e3d18','#3a2a18','#6a4a2a','#4a3a2a','#2e2216'];
+const HATS   = ['straw','cap','bandana','none','none','beanie','wide'];
+const HAIR_STYLES = ['short','tuft','long','bun','curl','bald','mohawk','braid'];
+
+const RECRUIT = {
+  flyerBase: 220,          // coins for one flyer run
+  flyerGrow: 1.22,         // each run costs a little more
+  flyerTime: 42,           // seconds before the applicants turn up
+  flyerYield: 2,           // applicants per run
+  poolMax: 8,              // applicants that will wait around at once
+  applicantLife: 480,      // seconds before an applicant gives up
+  signBase: 90,            // signing bonus per point of quality
+  wageBase: 0.22,          // coins per second per point of quality
+  botBase: 1200,           // robots are assembled, not recruited
+  botGrow: 1.55,
+  statMin: 1, statMax: 10,
+};
+
+/* a rolled applicant's headline number, 5 to 50 */
+function crewQuality(st) { return STAT_KEYS.reduce((a, k) => a + (st[k] || 0), 0); }
+function crewWage(st, traits) {
+  let w = RECRUIT.wageBase * crewQuality(st) / 5;
+  (traits || []).forEach(id => { const t = TRAIT_BY_ID[id]; if (t && t.wage) w *= t.wage; });
+  return Math.max(0.08, w);
 }
+function crewSignCost(st, traits) {
+  return Math.round(RECRUIT.signBase * crewQuality(st) / 5 * (1 + (traits || []).length * 0.15));
+}
+function flyerCost(runs) { return Math.round(RECRUIT.flyerBase * Math.pow(RECRUIT.flyerGrow, runs || 0)); }
+function botCost(owned) { return Math.round(RECRUIT.botBase * Math.pow(RECRUIT.botGrow, owned || 0)); }
 
 function buildCost(type, owned) {
   const b = BUILDS[type];
@@ -113,62 +199,33 @@ function buildCost(type, owned) {
 }
 
 /* ------------------------------------------------------------
-   SPECIAL DUCKS - travelling quest folk who visit the pond
+   LAND - 4x3 plots of 16x13 tiles = 64x39 tiles = 1024x624 px.
+   You start on the bottom-left plot; buy neighbours from their
+   FOR SALE signs. Row 2 is the road row.
    ------------------------------------------------------------ */
-const DUCKS = [
-  { id:0, name:'Quackers',      body:'#fff8ec', bill:'#f2a03f', acc:'none',
-    line:'Word travels fast on the pond. You make eggs?',
-    bye:'Splendid. I shall tell the other ducks.' },
-  { id:1, name:'Sir Pondsworth', body:'#e8e2d0', bill:'#e0a416', acc:'monocle',
-    line:'One hears this ranch is frightfully productive.',
-    bye:'Most satisfactory. Carry on.' },
-  { id:2, name:'Marigold',      body:'#ffd97d', bill:'#f2a03f', acc:'flower',
-    line:'Your field smells like sunshine and warm straw!',
-    bye:'You are a darling. Take this for your trouble.' },
-  { id:3, name:'Captain Puddle', body:'#8fc8e8', bill:'#e0a416', acc:'cap',
-    line:'Permission to inspect the cargo, farmhand!',
-    bye:'Shipshape. The fleet thanks you.' },
-  { id:4, name:'Mallory',       body:'#c9a35f', bill:'#f2c94c', acc:'scarf', head:'#3f8a5a',
-    line:'Migrating through. Fancy a trade?',
-    bye:'Pleasure doing business. See you next season.' },
-  { id:5, name:'Prof. Webfoot', body:'#c9a8f0', bill:'#e8a52f', acc:'glasses',
-    line:'I study poultry productivity. Care to assist?',
-    bye:'Fascinating data. My thesis thanks you.' },
-  { id:6, name:'Biscuit Bill',  body:'#e8c48f', bill:'#d98a2f', acc:'hat',
-    line:'Howdy. Long way from my puddle, but worth it.',
-    bye:'Much obliged, partner.' },
-  { id:7, name:'Moonquack',     body:'#b8c8f0', bill:'#a8b4d8', acc:'star',
-    line:'I only visit on quiet evenings. This one counts.',
-    bye:'The pond remembers kind farmers.' },
-];
-
-/* quest kinds, measured against a stat snapshot taken on accept */
-const QUESTS = [
-  { id:'collect', stat:'collected', base:12, text:n => 'Sweep up ' + n + ' eggs off the grass.' },
-  { id:'hatch',   stat:'hatched',   base:3,  text:n => 'Hatch ' + n + ' chickens in an incubator.' },
-  { id:'plumes',  stat:'plumes',    base:20, text:n => 'Gather ' + n + ' feathers.' },
-  { id:'sell',    stat:'sold',      base:15, text:n => 'Send ' + n + ' eggs to market.' },
-  { id:'pets',    stat:'pets',      base:14, text:n => 'Pet the flock ' + n + ' times.' },
-  { id:'bred',    stat:'bred',      base:2,  text:n => 'Breed ' + n + ' eggs in a love nest.' },
-];
-function questScale(done) { return 1 + done * 0.75; }
-
-/* ------------------------------------------------------------
-   LAND — 3x2 plots of 16x13 tiles. You start with the
-   bottom-left plot; buy neighbors from their signposts.
-   ------------------------------------------------------------ */
+const PLOT_W = 16, PLOT_H = 13, PLOT_COLS = 4, PLOT_ROWS = 3;
 const PLOTS = [
-  { id:0, tc:0,  tr:0,  price:3000,    theme:'berry'   },
-  { id:1, tc:16, tr:0,  price:200000,  theme:'lavender'},
-  { id:2, tc:32, tr:0,  price:1500000, theme:'shroom'  },
-  { id:3, tc:0,  tr:13, price:0,       theme:'home'    },   /* start */
-  { id:4, tc:16, tr:13, price:400,     theme:'sunflower'},
-  { id:5, tc:32, tr:13, price:25000,   theme:'rocky'   },
+  { id:0,  tc:0,  tr:0,  price:9e7,   theme:'pinewood' },
+  { id:1,  tc:16, tr:0,  price:5e9,   theme:'wetland'  },
+  { id:2,  tc:32, tr:0,  price:4e10,  theme:'thicket'  },
+  { id:3,  tc:48, tr:0,  price:3e11,  theme:'shroom'   },
+  { id:4,  tc:0,  tr:13, price:3000,  theme:'berry'    },
+  { id:5,  tc:16, tr:13, price:25000, theme:'orchard'  },
+  { id:6,  tc:32, tr:13, price:1.5e6, theme:'lavender' },
+  { id:7,  tc:48, tr:13, price:7e8,   theme:'rocky'    },
+  { id:8,  tc:0,  tr:26, price:0,     theme:'home'     },   /* start */
+  { id:9,  tc:16, tr:26, price:400,   theme:'sunflower'},
+  { id:10, tc:32, tr:26, price:200000,theme:'meadow'   },
+  { id:11, tc:48, tr:26, price:1.2e7, theme:'prairie'  },
 ];
-const PLOT_W = 16, PLOT_H = 13;
+const PLOT_START = 8;
 function plotNeighbors(id) {
-  const map = { 0:[1,3], 1:[0,2,4], 2:[1,5], 3:[0,4], 4:[1,3,5], 5:[2,4] };
-  return map[id];
+  const c = id % PLOT_COLS, r = Math.floor(id / PLOT_COLS), out = [];
+  if (c > 0) out.push(id - 1);
+  if (c < PLOT_COLS - 1) out.push(id + 1);
+  if (r > 0) out.push(id - PLOT_COLS);
+  if (r < PLOT_ROWS - 1) out.push(id + PLOT_COLS);
+  return out;
 }
 
 /* ------------------------------------------------------------
@@ -332,86 +389,101 @@ const SPECIES_TOTAL = SPECIES.length;
 const SPECIES_BY_TIER = TIERS.map((_, t) => SPECIES.filter(s => s.tier === t));
 
 /* ------------------------------------------------------------
-   RESEARCH TREE — drawn as an actual tree in the Lab.
-   x,y are % coordinates on the tree canvas (y grows downward;
-   the trunk root sits at the bottom middle). pre: node id.
+   RESEARCH - the Lab runs EGGOS, a little terminal. Packages sit
+   in modules; a package only lists once its prerequisite is
+   installed, so the screen shows exactly what you can do now.
    Cost in feathers: base * growth^level.
    ------------------------------------------------------------ */
-const BRANCHES = [
-  { name:'CREW', icon:'hands', hue:'#9b6bd0' },
-  { name:'GATHER', icon:'basket', hue:'#6ab04c' },
-  { name:'HENS', icon:'chick', hue:'#e8542f' },
-  { name:'HATCHERY', icon:'egg', hue:'#f0a422' },
-  { name:'LOVE', icon:'heart', hue:'#ff5f9e' },
-  { name:'FACTORY', icon:'gear', hue:'#3fa7d6' },
-  { name:'MARKET', icon:'truck', hue:'#b8862f' },
+const MODULES = [
+  { name:'CREW',    code:'crew.sys', icon:'hands',  hue:'#9b6bd0' },
+  { name:'GATHER',  code:'gather.sys',icon:'basket',hue:'#6ab04c' },
+  { name:'HENS',    code:'hens.sys', icon:'chick',  hue:'#e8542f' },
+  { name:'HATCH',   code:'hatch.sys',icon:'egg',    hue:'#f0a422' },
+  { name:'LOVE',    code:'love.sys', icon:'heart',  hue:'#ff5f9e' },
+  { name:'FACTORY', code:'fact.sys', icon:'gear',   hue:'#3fa7d6' },
+  { name:'MARKET',  code:'mrkt.sys', icon:'truck',  hue:'#b8862f' },
 ];
 
 const SKILLS = [
-  { id:'root', br:3, x:50, y:93, pre:null, name:'Egg Science', icon:'egg', max:1, base:0, growth:1, desc:'It all starts with one egg.' },
+  { id:'root', br:3, d:0, pre:null, name:'Egg Science', icon:'egg', max:1, base:0, growth:1, desc:'The kernel. It all starts with one egg.' },
 
-  /* CREW - hire people and robots to work the ranch */
-  { id:'hiring',    br:0, x:11, y:78, pre:'root',      name:'Hire Crew',    icon:'hands',  max:1, base:40,  growth:1,   desc:'Unlock the Staff Hut and start hiring' },
-  { id:'crewspeed', br:0, x:6,  y:64, pre:'hiring',    name:'Sturdy Boots', icon:'wind',   max:5, base:25,  growth:2.2, desc:'+20% staff walking speed' },
-  { id:'wages',     br:0, x:16, y:64, pre:'hiring',    name:'Payroll Deals',icon:'coin',   max:5, base:30,  growth:2.3, desc:'-12% staff wages' },
-  { id:'cullbot',   br:0, x:6,  y:50, pre:'crewspeed', name:'Cull-Bot',     icon:'remove', max:1, base:160, growth:1,   desc:'Unlock the Cull-Bot: retires chickens you mark' },
-  { id:'matchbot',  br:0, x:16, y:50, pre:'wages',     name:'Match-Bot',    icon:'cupid',  max:1, base:220, growth:1,   desc:'Unlock the Match-Bot: fills love nests for you' },
-  { id:'crewcap',   br:0, x:11, y:36, pre:'cullbot',   name:'Bunkhouse',    icon:'house',  max:4, base:140, growth:2.5, desc:'+2 staff slots' },
+  /* ---- CREW: flyers, wages, robots, roles ---- */
+  { id:'hiring',    br:0, d:1, pre:'root',      name:'Recruiting',    icon:'doc',    max:1, base:40,   growth:1,   desc:'Unlock the Staff Hut, flyers and hiring' },
+  { id:'posters',   br:0, d:2, pre:'hiring',    name:'Bigger Posters',icon:'doc',    max:5, base:30,   growth:2.1, desc:'+1 applicant per flyer run' },
+  { id:'wages',     br:0, d:2, pre:'hiring',    name:'Payroll Deals', icon:'coin',   max:6, base:30,   growth:2.3, desc:'-12% crew wages' },
+  { id:'crewspeed', br:0, d:2, pre:'hiring',    name:'Sturdy Boots',  icon:'wind',   max:5, base:25,   growth:2.2, desc:'+15% crew walking speed' },
+  { id:'agency',    br:0, d:3, pre:'posters',   name:'Hiring Agency', icon:'chart',  max:5, base:90,   growth:2.4, desc:'+1 to every stat an applicant rolls' },
+  { id:'overtime',  br:0, d:3, pre:'wages',     name:'Overtime Pay',  icon:'flame',  max:5, base:70,   growth:2.3, desc:'+25% stamina before a breather' },
+  { id:'cullbot',   br:0, d:3, pre:'crewspeed', name:'Cull-Bot',      icon:'remove', max:1, base:160,  growth:1,   desc:'Assemble Cull-Bots: they retire chickens you mark' },
+  { id:'keeper',    br:0, d:4, pre:'agency',    name:'Keeper Role',   icon:'hands',  max:1, base:220,  growth:1,   desc:'Hire Keepers: they pet the flock all day long' },
+  { id:'matchbot',  br:0, d:4, pre:'cullbot',   name:'Match-Bot',     icon:'cupid',  max:1, base:260,  growth:1,   desc:'Assemble Match-Bots: they fill love nests for you' },
+  { id:'crewcap',   br:0, d:4, pre:'overtime',  name:'Bunkhouse',     icon:'house',  max:6, base:140,  growth:2.4, desc:'+2 crew slots' },
+  { id:'foreman',   br:0, d:5, pre:'keeper',    name:'Foreman',       icon:'crown',  max:5, base:400,  growth:2.6, desc:'+35% reach on a Technician aura' },
+  { id:'union',     br:0, d:6, pre:'foreman',   name:'Egg Union',     icon:'star',   max:1, base:3200, growth:1,   desc:'The whole crew works 50% faster' },
 
-  /* GATHER */
-  { id:'basket1',  br:1, x:24, y:78, pre:'root',      name:'Bigger Basket', icon:'basket', max:5, base:4,   growth:2.0, desc:'+8 basket capacity' },
-  { id:'magnet',   br:1, x:19, y:64, pre:'basket1',   name:'Magnet Palm',   icon:'magnet', max:5, base:8,   growth:2.1, desc:'+12px scoop radius' },
-  { id:'feather1', br:1, x:29, y:64, pre:'basket1',   name:'Feather Finder',icon:'feather',max:5, base:10,  growth:2.2, desc:'+3% feathers when scooping eggs' },
-  { id:'feed',     br:1, x:19, y:50, pre:'magnet',    name:'Bird Feed',     icon:'seed',   max:1, base:25,  growth:1,   desc:'Unlock the Feed tool (hens lay 2x)' },
-  { id:'sweepluck',br:1, x:29, y:50, pre:'feather1',  name:'Lucky Sweep',   icon:'clover', max:5, base:30,  growth:2.4, desc:'+2% scooped eggs duplicate' },
-  { id:'feedplus', br:1, x:19, y:36, pre:'feed',      name:'Tasty Mix',     icon:'bowl',   max:3, base:45,  growth:2.5, desc:'feed lasts +50% longer' },
-  { id:'basket2',  br:1, x:29, y:36, pre:'sweepluck', name:'Deep Basket',   icon:'basket2',max:3, base:60,  growth:2.6, desc:'+16 basket capacity' },
+  /* ---- GATHER ---- */
+  { id:'basket1',  br:1, d:1, pre:'root',      name:'Bigger Basket', icon:'basket', max:6, base:4,   growth:2.0, desc:'+8 basket capacity' },
+  { id:'magnet',   br:1, d:2, pre:'basket1',   name:'Magnet Palm',   icon:'magnet', max:6, base:8,   growth:2.1, desc:'+12px scoop radius' },
+  { id:'feather1', br:1, d:2, pre:'basket1',   name:'Feather Finder',icon:'feather',max:6, base:10,  growth:2.2, desc:'+3% feathers when scooping eggs' },
+  { id:'feed',     br:1, d:3, pre:'magnet',    name:'Bird Feed',     icon:'seed',   max:1, base:25,  growth:1,   desc:'Unlock the Feed tool and the Feeder role' },
+  { id:'sweepluck',br:1, d:3, pre:'feather1',  name:'Lucky Sweep',   icon:'clover', max:5, base:30,  growth:2.4, desc:'+2% scooped eggs duplicate' },
+  { id:'feedplus', br:1, d:4, pre:'feed',      name:'Tasty Mix',     icon:'bowl',   max:4, base:45,  growth:2.5, desc:'feed lasts +50% longer' },
+  { id:'basket2',  br:1, d:4, pre:'sweepluck', name:'Deep Basket',   icon:'basket2',max:4, base:60,  growth:2.6, desc:'+16 basket capacity' },
+  { id:'plumage',  br:1, d:5, pre:'basket2',   name:'Plume Press',   icon:'feather',max:5, base:180, growth:2.5, desc:'+25% value from every feather picked up' },
 
-  /* HENS */
-  { id:'happy',   br:2, x:37, y:78, pre:'root',   name:'Happy Hens',    icon:'heart',  max:10, base:4,   growth:1.9, desc:'+10% lay speed' },
-  { id:'flock',   br:2, x:32, y:64, pre:'happy',  name:'Bigger Flock',  icon:'house',  max:8,  base:10,  growth:2.1, desc:'+4 chicken capacity' },
-  { id:'pets',    br:2, x:42, y:64, pre:'happy',  name:'Pet Therapy',   icon:'hands',  max:5,  base:6,   growth:2.2, desc:'-15% pet cooldown' },
-  { id:'golden',  br:2, x:32, y:50, pre:'flock',  name:'Golden Peck',   icon:'sparkle',max:5,  base:25,  growth:2.5, desc:'+3% golden eggs (worth 5x)' },
-  { id:'mutate',  br:2, x:42, y:50, pre:'pets',   name:'Mutation Vats', icon:'dna',    max:8,  base:30,  growth:2.3, desc:'+1.5% egg mutation chance' },
-  { id:'rainbow', br:2, x:37, y:36, pre:'mutate', name:'Rainbow Genome',icon:'rainbow',max:3,  base:300, growth:5.0, desc:'+15% for mutations to jump 2 tiers' },
+  /* ---- HENS ---- */
+  { id:'happy',   br:2, d:1, pre:'root',   name:'Happy Hens',    icon:'heart',  max:12, base:4,   growth:1.9, desc:'+10% lay speed' },
+  { id:'flock',   br:2, d:2, pre:'happy',  name:'Bigger Flock',  icon:'house',  max:10, base:10,  growth:2.1, desc:'+4 chicken capacity' },
+  { id:'pets',    br:2, d:2, pre:'happy',  name:'Pet Therapy',   icon:'hands',  max:6,  base:6,   growth:2.2, desc:'-15% pet cooldown' },
+  { id:'golden',  br:2, d:3, pre:'flock',  name:'Golden Peck',   icon:'sparkle',max:6,  base:25,  growth:2.5, desc:'+3% golden eggs (worth 5x)' },
+  { id:'mutate',  br:2, d:3, pre:'pets',   name:'Mutation Vats', icon:'dna',    max:8,  base:30,  growth:2.3, desc:'+1.5% egg mutation chance' },
+  { id:'coops',   br:2, d:4, pre:'flock',  name:'Tower Coops',   icon:'silo',   max:6,  base:120, growth:2.6, desc:'+10 chicken capacity' },
+  { id:'rainbow', br:2, d:4, pre:'mutate', name:'Rainbow Genome',icon:'rainbow',max:3,  base:300, growth:5.0, desc:'+15% for mutations to jump 2 tiers' },
 
-  /* HATCHERY */
-  { id:'warm',    br:3, x:50, y:78, pre:'root',   name:'Warm Coils',    icon:'flame',  max:10, base:4,   growth:1.9, desc:'+15% incubator speed' },
-  { id:'inccap',  br:3, x:45, y:64, pre:'warm',   name:'Roomy Racks',   icon:'rack',   max:5,  base:20,  growth:2.4, desc:'+3 incubator queue' },
-  { id:'twins',   br:3, x:55, y:64, pre:'warm',   name:'Twin Yolks',    icon:'twins',  max:5,  base:30,  growth:2.4, desc:'+4% twin hatch chance' },
-  { id:'whisper', br:3, x:45, y:50, pre:'inccap', name:'Egg Whisperer', icon:'feather',max:5,  base:25,  growth:2.3, desc:'+20% feathers from hatching' },
-  { id:'miracle', br:3, x:55, y:50, pre:'twins',  name:'Miracle Hatch', icon:'star',   max:3,  base:120, growth:4.0, desc:'+5% hatchling is +1 tier' },
-  { id:'quantum', br:3, x:50, y:36, pre:'whisper',name:'Quantum Coils', icon:'atom',   max:5,  base:220, growth:2.6, desc:'+30% incubator speed' },
+  /* ---- HATCH ---- */
+  { id:'warm',    br:3, d:1, pre:'root',   name:'Warm Coils',    icon:'flame',  max:12, base:4,   growth:1.9, desc:'+15% incubator speed' },
+  { id:'inccap',  br:3, d:2, pre:'warm',   name:'Roomy Racks',   icon:'rack',   max:6,  base:20,  growth:2.4, desc:'+3 incubator queue' },
+  { id:'twins',   br:3, d:2, pre:'warm',   name:'Twin Yolks',    icon:'twins',  max:6,  base:30,  growth:2.4, desc:'+4% twin hatch chance' },
+  { id:'whisper', br:3, d:3, pre:'inccap', name:'Egg Whisperer', icon:'feather',max:6,  base:25,  growth:2.3, desc:'+20% feathers from hatching' },
+  { id:'miracle', br:3, d:3, pre:'twins',  name:'Miracle Hatch', icon:'star',   max:4,  base:120, growth:4.0, desc:'+5% hatchling is +1 tier' },
+  { id:'quantum', br:3, d:4, pre:'whisper',name:'Quantum Coils', icon:'atom',   max:6,  base:220, growth:2.6, desc:'+30% incubator speed' },
+  { id:'hatchery',br:3, d:5, pre:'quantum',name:'Grand Hatchery',icon:'rack',   max:1,  base:900, growth:1,   desc:'Unlock the Grand Hatchery: 24 eggs, double speed' },
 
-  /* LOVE */
-  { id:'court',     br:4, x:63, y:78, pre:'root',       name:'Courtship',      icon:'cupid',     max:1, base:15,  growth:1,   desc:'Unlock the LOVE NEST (breed chickens!)' },
-  { id:'candle',    br:4, x:58, y:64, pre:'court',      name:'Candlelight',    icon:'candle',    max:5, base:20,  growth:2.3, desc:'+20% breeding speed' },
-  { id:'genes',     br:4, x:68, y:64, pre:'court',      name:'Fine Genes',     icon:'flask',     max:5, base:35,  growth:2.5, desc:'+6% bred egg tier-up chance' },
-  { id:'twindate',  br:4, x:58, y:50, pre:'candle',     name:'Double Date',    icon:'hearts',    max:3, base:90,  growth:3.0, desc:'+10% breeding lays 2 eggs' },
-  { id:'rainbowegg',br:4, x:68, y:50, pre:'genes',      name:'Rainbow Clutch', icon:'rainbowegg',max:3, base:250, growth:4.0, desc:'+8% rainbow egg from Divine pairs' },
-  { id:'secretlore',br:4, x:63, y:36, pre:'rainbowegg', name:'Secret Lore',    icon:'scroll',    max:1, base:1200,growth:1,   desc:'Rainbow eggs hatch 3x faster' },
+  /* ---- LOVE ---- */
+  { id:'court',     br:4, d:1, pre:'root',       name:'Courtship',      icon:'cupid',     max:1, base:15,  growth:1,   desc:'Unlock the LOVE NEST (breed chickens!)' },
+  { id:'candle',    br:4, d:2, pre:'court',      name:'Candlelight',    icon:'candle',    max:6, base:20,  growth:2.3, desc:'+20% breeding speed' },
+  { id:'genes',     br:4, d:2, pre:'court',      name:'Fine Genes',     icon:'flask',     max:6, base:35,  growth:2.5, desc:'+6% bred egg tier-up chance' },
+  { id:'twindate',  br:4, d:3, pre:'candle',     name:'Double Date',    icon:'hearts',    max:4, base:90,  growth:3.0, desc:'+10% breeding lays 2 eggs' },
+  { id:'rainbowegg',br:4, d:3, pre:'genes',      name:'Rainbow Clutch', icon:'rainbowegg',max:4, base:250, growth:4.0, desc:'+8% rainbow egg from Divine pairs' },
+  { id:'secretlore',br:4, d:4, pre:'rainbowegg', name:'Secret Lore',    icon:'scroll',    max:1, base:1200,growth:1,   desc:'Rainbow eggs hatch 3x faster' },
 
-  /* FACTORY */
-  { id:'belts',    br:5, x:76, y:78, pre:'root',      name:'Conveyor Tech', icon:'crate',  max:1, base:30,  growth:1,   desc:'Unlock conveyor belts and fences' },
-  { id:'beltspeed',br:5, x:71, y:64, pre:'belts',     name:'Belt Grease',   icon:'oil',    max:5, base:20,  growth:2.2, desc:'+20% belt speed' },
-  { id:'vacuum',   br:5, x:81, y:64, pre:'belts',     name:'Vacuum Bots',   icon:'robot',  max:1, base:80,  growth:1,   desc:'Unlock egg vacuums' },
-  { id:'sorter',   br:5, x:71, y:50, pre:'beltspeed', name:'Egg Sorter',    icon:'sorter', max:1, base:140, growth:1,   desc:'Unlock the Sorter: splits belts by rarity' },
-  { id:'vacradius',br:5, x:81, y:50, pre:'vacuum',    name:'Wide Suction',  icon:'spiral', max:5, base:40,  growth:2.2, desc:'+8px vacuum radius' },
-  { id:'blower',   br:5, x:71, y:36, pre:'sorter',    name:'Air Blower',    icon:'blower', max:1, base:260, growth:1,   desc:'Unlock the Blower: herds loose eggs along' },
-  { id:'vacspeed', br:5, x:81, y:36, pre:'vacradius', name:'Turbo Pumps',   icon:'wind',   max:5, base:40,  growth:2.2, desc:'+25% vacuum speed' },
-  { id:'overclock',br:5, x:76, y:22, pre:'blower',    name:'Overclock',     icon:'bolt',   max:1, base:1500,growth:1,   desc:'ALL machines run 2x faster' },
+  /* ---- FACTORY ---- */
+  { id:'belts',    br:5, d:1, pre:'root',      name:'Conveyor Tech', icon:'crate',  max:1, base:30,  growth:1,   desc:'Unlock conveyors, fences and the Technician role' },
+  { id:'beltspeed',br:5, d:2, pre:'belts',     name:'Belt Grease',   icon:'oil',    max:6, base:20,  growth:2.2, desc:'+20% belt speed' },
+  { id:'vacuum',   br:5, d:2, pre:'belts',     name:'Vacuum Bots',   icon:'robot',  max:1, base:80,  growth:1,   desc:'Unlock egg vacuums' },
+  { id:'sorter',   br:5, d:3, pre:'beltspeed', name:'Egg Sorter',    icon:'sorter', max:1, base:140, growth:1,   desc:'Unlock the Sorter: splits belts by rarity' },
+  { id:'vacradius',br:5, d:3, pre:'vacuum',    name:'Wide Suction',  icon:'spiral', max:6, base:40,  growth:2.2, desc:'+8px vacuum radius' },
+  { id:'splitter', br:5, d:4, pre:'sorter',    name:'Belt Splitter', icon:'sorter', max:1, base:220, growth:1,   desc:'Unlock the Splitter: feeds two lines in turn' },
+  { id:'blower',   br:5, d:4, pre:'sorter',    name:'Air Blower',    icon:'blower', max:1, base:260, growth:1,   desc:'Unlock the Blower: herds loose eggs along' },
+  { id:'vacspeed', br:5, d:4, pre:'vacradius', name:'Turbo Pumps',   icon:'wind',   max:6, base:40,  growth:2.2, desc:'+25% vacuum speed' },
+  { id:'loader',   br:5, d:5, pre:'splitter',  name:'Truck Loader',  icon:'crate',  max:1, base:700, growth:1,   desc:'Unlock the Loader: belts feed the truck directly' },
+  { id:'overclock',br:5, d:6, pre:'loader',    name:'Overclock',     icon:'bolt',   max:1, base:1500,growth:1,   desc:'ALL machines run 2x faster' },
 
-  /* MARKET */
-  { id:'value',    br:6, x:89, y:78, pre:'root',      name:'Egg Polish',       icon:'egg',   max:10, base:5,   growth:1.9, desc:'+15% egg sell value' },
-  { id:'truckcap', br:6, x:84, y:64, pre:'value',     name:'Bigger Bed',       icon:'truck', max:6,  base:15,  growth:2.2, desc:'+5 truck capacity' },
-  { id:'route',    br:6, x:94, y:64, pre:'value',     name:'Express Route',    icon:'road',  max:5,  base:25,  growth:2.3, desc:'truck trips 15% faster' },
-  { id:'silo',     br:6, x:84, y:50, pre:'truckcap',  name:'Egg Silo',         icon:'silo',  max:1,  base:180, growth:1,   desc:'Unlock the Silo: stores eggs, auto-loads the truck' },
-  { id:'fullbonus',br:6, x:94, y:50, pre:'route',     name:'Full Load Deal',   icon:'chart', max:5,  base:30,  growth:2.3, desc:'+6% payout for a full truck' },
-  { id:'autosend', br:6, x:84, y:36, pre:'silo',      name:'Auto-Dispatch',    icon:'key',   max:1,  base:250, growth:1,   desc:'truck departs by itself when full' },
-  { id:'contracts',br:6, x:94, y:36, pre:'fullbonus', name:'Premium Contracts',icon:'doc',   max:3,  base:400, growth:5.0, desc:'+1% value per species discovered' },
-  { id:'tycoon',   br:6, x:89, y:22, pre:'contracts', name:'Egg Empire',       icon:'crown', max:1,  base:5000,growth:1,   desc:'ALL coin gains x2' },
+  /* ---- MARKET ---- */
+  { id:'value',    br:6, d:1, pre:'root',      name:'Egg Polish',       icon:'egg',   max:12, base:5,   growth:1.9, desc:'+15% egg sell value' },
+  { id:'truckcap', br:6, d:2, pre:'value',     name:'Bigger Bed',       icon:'truck', max:8,  base:15,  growth:2.2, desc:'+5 truck capacity' },
+  { id:'route',    br:6, d:2, pre:'value',     name:'Express Route',    icon:'road',  max:6,  base:25,  growth:2.3, desc:'truck trips 15% faster' },
+  { id:'silo',     br:6, d:3, pre:'truckcap',  name:'Egg Silo',         icon:'silo',  max:1,  base:180, growth:1,   desc:'Unlock the Silo and the Packer role' },
+  { id:'fullbonus',br:6, d:3, pre:'route',     name:'Full Load Deal',   icon:'chart', max:6,  base:30,  growth:2.3, desc:'+6% payout for a full truck' },
+  { id:'autosend', br:6, d:4, pre:'silo',      name:'Auto-Dispatch',    icon:'key',   max:1,  base:250, growth:1,   desc:'truck departs by itself when full' },
+  { id:'contracts',br:6, d:4, pre:'fullbonus', name:'Premium Contracts',icon:'doc',   max:4,  base:400, growth:5.0, desc:'+1% value per species discovered' },
+  { id:'fleet',    br:6, d:5, pre:'autosend',  name:'Second Lorry',     icon:'truck', max:3,  base:1400,growth:3.0, desc:'-25% truck round trip' },
+  { id:'tycoon',   br:6, d:6, pre:'fleet',     name:'Egg Empire',       icon:'crown', max:1,  base:5000,growth:1,   desc:'ALL coin gains x2' },
 ];
 
 const SKILL_BY_ID = Object.fromEntries(SKILLS.map(s => [s.id, s]));
 function skillCost(sk, lvl) { return Math.ceil(sk.base * Math.pow(sk.growth, lvl)); }
 function skillPrereq(sk) { return sk.pre ? SKILL_BY_ID[sk.pre] : null; }
+/* modules keep their packages in dependency order */
+const SKILLS_BY_MODULE = MODULES.map((_, i) =>
+  SKILLS.filter(sk => sk.br === i && sk.id !== 'root').sort((a, b) => a.d - b.d || a.name.localeCompare(b.name)));

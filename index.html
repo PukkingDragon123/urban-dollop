@@ -27,13 +27,13 @@
 
     <div id="menu-pop" hidden>
       <button class="btn" id="btn-mute" data-act="mute">SOUND ON</button>
+      <button class="btn" data-act="crew">CREW</button>
       <button class="btn" data-act="save">SAVE</button>
       <button class="btn" data-act="title">TITLE</button>
       <button class="btn" data-act="reset">RESET</button>
     </div>
 
     <div id="inspect-panel" hidden></div>
-    <div id="duck-panel" hidden></div>
     <div id="title-screen">
       <canvas id="title-canvas" width="384" height="208"></canvas>
       <div id="title-buttons">
@@ -44,7 +44,7 @@
     <div id="cursor-chip" hidden></div>
   </div>
 
-  <!-- RESEARCH: the hex grid inside the Lab -->
+  <!-- RESEARCH: the EGGOS terminal inside the Lab -->
   <div class="modal" id="modal-skills" hidden>
     <div class="modal-panel tree-panel">
       <div class="modal-head">
@@ -59,11 +59,11 @@
     </div>
   </div>
 
-  <!-- HIRING -->
+  <!-- THE CREW: flyers, applicants, the payroll -->
   <div class="modal" id="modal-hire" hidden>
     <div class="modal-panel">
       <div class="modal-head">
-        <h2>STAFF HUT</h2>
+        <h2>THE CREW</h2>
         <span class="panel-sub" id="hire-sub"></span>
         <button class="btn btn-tiny" data-act="close-modal">CLOSE</button>
       </div>
@@ -72,7 +72,7 @@
     </div>
   </div>
 
-  <!-- THE INDEX: chickens, ducks, eggs and the diary -->
+  <!-- THE INDEX: chickens, the crew, eggs and the diary -->
   <div class="modal" id="modal-pedia" hidden>
     <div class="modal-panel">
       <div class="modal-head">
@@ -82,7 +82,7 @@
       </div>
       <div id="index-tabs">
         <button class="tab-btn" data-act="index-tab" data-tab="chickens">CHICKENS</button>
-        <button class="tab-btn" data-act="index-tab" data-tab="ducks">DUCKS</button>
+        <button class="tab-btn" data-act="index-tab" data-tab="staff">CREW</button>
         <button class="tab-btn" data-act="index-tab" data-tab="eggs">EGGS</button>
         <button class="tab-btn" data-act="index-tab" data-tab="diary">DIARY</button>
       </div>

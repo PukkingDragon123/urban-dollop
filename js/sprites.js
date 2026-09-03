@@ -1363,115 +1363,128 @@ const SPR = (() => {
   }
 
   /* ---------- special ducks: quest-giving pond folk ---------- */
-  function duckSprite(d, frame, scale) {
-    const key = 'duck' + d.id + '_' + frame + '_' + scale;
-    if (cache.has(key)) return cache.get(key);
-    const k = scale || 1;
-    const c = newCanvas(18 * k, 16 * k);
-    const ctx = c.getContext('2d');
-    const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
-    const body = d.body, dark = darken(body, 0.26), lite = lighten(body, 0.34);
-    const OUT = lum(body) < 0.3 ? '#14141c' : darken(body, 0.55);
-    /* body mask for a plump duck */
-    const m = newMask(18, 16);
-    mCircle(m, 8, 10, 6, 0.72);
-    mCircle(m, 12, 5, 3.4, 1);          /* head */
-    mRect(m, 10, 6, 3, 3);              /* neck */
-    renderMask(ctx, m, k, 0, 0, { base: body, light: lite, dark: dark, out: OUT }, d.id + 3,
-      { lightBand: 2, shadeBand: 2 });
-    /* head cap colour (mallard types) */
-    if (d.head) {
-      const hm = newMask(18, 16);
-      mCircle(hm, 12, 4.4, 3.2, 1);
-      renderMask(ctx, hm, k, 0, 0,
-        { base: d.head, light: lighten(d.head, 0.3), dark: darken(d.head, 0.3), out: darken(d.head, 0.55) },
-        d.id + 9, { lightBand: 1, shadeBand: 1 });
-    }
-    /* tail */
-    R(2, 8, 2, 2, dark);
-    R(1, 9, 2, 2, OUT);
-    /* wing */
-    R(6, 9, 5, 3, dark);
-    R(6, 9, 5, 1, lite);
-    /* bill */
-    R(15, 5, 3, 2, d.bill);
-    R(15, 6, 3, 1, darken(d.bill, 0.25));
-    /* eye */
-    R(13, 4, 1, 1, '#ffffff');
-    R(13, 4, 1, 1, '#2e2216');
-    R(12, 4, 1, 1, '#2e2216');
-    /* feet paddling */
-    const f = frame ? 1 : 0;
-    R(7 + f, 15, 2, 1, '#f2a03f');
-    R(10 - f, 15, 2, 1, '#e0862f');
-    /* accessory */
-    if (d.acc === 'monocle') {
-      R(12, 3, 3, 1, '#ffd23f'); R(12, 5, 3, 1, '#ffd23f');
-      R(11, 4, 1, 1, '#ffd23f'); R(15, 4, 1, 1, '#ffd23f');
-    } else if (d.acc === 'cap') {
-      R(10, 1, 6, 1, '#2f5f9e'); R(10, 2, 6, 1, '#3f7ec0'); R(15, 2, 3, 1, '#2f5f9e');
-    } else if (d.acc === 'flower') {
-      R(11, 1, 1, 1, '#ff8ab5'); R(13, 1, 1, 1, '#ff8ab5');
-      R(12, 0, 1, 1, '#ff8ab5'); R(12, 2, 1, 1, '#ff8ab5'); R(12, 1, 1, 1, '#ffd23f');
-    } else if (d.acc === 'scarf') {
-      R(10, 7, 4, 2, '#e8542f'); R(9, 8, 2, 3, '#c43a2a');
-    } else if (d.acc === 'glasses') {
-      R(11, 3, 6, 1, '#3a3a4a'); R(11, 5, 6, 1, '#3a3a4a');
-      R(11, 4, 1, 1, '#3a3a4a'); R(16, 4, 1, 1, '#3a3a4a'); R(14, 4, 1, 1, '#8fd6ff');
-    } else if (d.acc === 'hat') {
-      R(9, 2, 8, 1, '#7a5230'); R(11, 0, 4, 2, '#8a5e2a'); R(11, 1, 4, 1, '#a8783f');
-    } else if (d.acc === 'star') {
-      R(12, 0, 1, 1, '#ffd23f'); R(11, 1, 3, 1, '#ffd23f'); R(12, 2, 1, 1, '#ffd23f');
-    }
-    cache.set(key, c);
-    return c;
-  }
-
-  /* ---------- staff: little walking workers ---------- */
-  const STAFF_PAL = {
-    hand:   { hat:'#e0bd82', hatDark:'#b89355', shirt:'#5fa8e8', shirtDark:'#2f5f9e',
-              pants:'#6e4a20', boot:'#3a2a16', skin:'#f2c9a0' },
-    feeder: { hat:'#c9a35f', hatDark:'#8a5e2a', shirt:'#7ac74f', shirtDark:'#3f7d32',
-              pants:'#5e3d18', boot:'#3a2a16', skin:'#e8b98c' },
-  };
   const BOT_PAL = {
     cull:  { shell:'#c9ced6', shade:'#8a9099', dark:'#3a3f47', visor:'#e8542f', glow:'#ff9f7a', trim:'#ffd23f' },
     match: { shell:'#f2d8e6', shade:'#d0a8c0', dark:'#5e3a4e', visor:'#ff5f9e', glow:'#ffb0d0', trim:'#fff2b0' },
   };
 
-  function personSprite(type, frame, scale) {
-    const key = 'staffp_' + type + '_' + frame + '_' + scale;
+  /* ============================================================
+     PROCEDURAL FARM FOLK
+     look = { skin, hair, style, shirt, pants, boot, hat }
+     Every hire on the ranch is a different person, built from
+     that little record - no two crews look alike.
+     ============================================================ */
+  function personSprite(look, frame, scale) {
+    const L = look || {};
+    const hat = L.hat || 'straw', style = L.style || 'short';
+    const key = 'per_' + [L.skin, L.hair, style, L.shirt, L.pants, L.boot, hat].join('|')
+              + '_' + frame + '_' + scale;
     if (cache.has(key)) return cache.get(key);
     const k = scale || 1;
-    const P = STAFF_PAL[type] || STAFF_PAL.hand;
-    const c = newCanvas(12 * k, 17 * k);
+    const skin = L.skin || '#f2c9a0', hair = L.hair || '#5e3d18';
+    const shirt = L.shirt || '#5fa8e8', pants = L.pants || '#6e4a20', boot = L.boot || '#3a2a16';
+    const c = newCanvas(12 * k, 18 * k);
     const ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
     const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
     const OUT = '#2e2216';
-    /* straw hat */
-    R(3, 0, 6, 1, OUT); R(3, 1, 6, 2, P.hat);
-    R(1, 3, 10, 1, OUT); R(1, 4, 10, 1, P.hat);
-    R(2, 4, 8, 1, P.hatDark); R(3, 1, 6, 1, lighten(P.hat, 0.3));
-    /* head */
-    R(4, 5, 4, 3, P.skin);
-    R(4, 5, 1, 3, darken(P.skin, 0.18));
-    ctx.fillStyle = OUT; ctx.fillRect(5 * k, 6 * k, k, k); ctx.fillRect(7 * k, 6 * k, k, k);
-    ctx.fillStyle = '#e8917a'; ctx.fillRect(4 * k, 7 * k, k, k);
-    /* body + arms */
-    R(3, 8, 6, 5, OUT);
-    R(3, 8, 6, 4, P.shirt);
-    R(3, 11, 6, 1, P.shirtDark);
-    R(3, 8, 6, 1, lighten(P.shirt, 0.28));
-    const swing = frame ? 1 : -1;
-    R(2, 9 + (frame ? 0 : 1), 1, 3, P.shirt);
-    R(9, 9 + (frame ? 1 : 0), 1, 3, P.shirt);
-    R(2, 12 + (frame ? 0 : 1), 1, 1, P.skin);
-    R(9, 12 + (frame ? 1 : 0), 1, 1, P.skin);
-    /* legs, alternating */
-    R(4, 13, 2, 2 + (frame ? 1 : 0), P.pants);
-    R(7, 13, 2, 2 + (frame ? 0 : 1), P.pants);
-    R(3 + (frame ? 0 : 1), 15 + (frame ? 1 : 0), 3, 2, P.boot);
-    R(7, 15 + (frame ? 0 : 1), 3, 2, P.boot);
+
+    /* ---- hair, behind the head ---- */
+    const hd = darken(hair, 0.3), hl = lighten(hair, 0.3);
+    if (style !== 'bald') {
+      R(3, 3, 6, 4, hair);
+      R(3, 3, 6, 1, hl);
+      R(3, 6, 1, 2, hd); R(8, 6, 1, 2, hd);
+    }
+    if (style === 'long')  { R(2, 6, 1, 6, hair); R(9, 6, 1, 6, hair); R(2, 6, 1, 3, hl); }
+    if (style === 'braid') { R(9, 6, 1, 7, hair); R(9, 12, 2, 1, hd); }
+    if (style === 'bun')   { R(4, 1, 4, 2, hair); R(4, 1, 4, 1, hl); }
+    if (style === 'tuft')  { R(5, 1, 2, 2, hair); R(5, 1, 1, 1, hl); }
+    if (style === 'curl')  { R(2, 4, 1, 2, hair); R(9, 4, 1, 2, hair); R(4, 2, 4, 1, hair); }
+    if (style === 'mohawk'){ R(5, 0, 2, 4, hair); R(5, 0, 1, 2, hl); }
+
+    /* ---- head ---- */
+    R(4, 5, 4, 4, skin);
+    R(4, 5, 1, 4, darken(skin, 0.16));
+    R(7, 5, 1, 4, lighten(skin, 0.12));
+    ctx.fillStyle = OUT;
+    ctx.fillRect(5 * k, 6 * k, k, k); ctx.fillRect(7 * k, 6 * k, k, k);
+    ctx.fillStyle = '#e8917a'; ctx.fillRect(4 * k, 8 * k, k, k); ctx.fillRect(8 * k, 8 * k, k, k);
+
+    /* ---- headwear ---- */
+    if (hat === 'straw' || hat === 'wide') {
+      const brim = hat === 'wide' ? 11 : 10, bx = hat === 'wide' ? 0 : 1;
+      R(3, 0, 6, 1, OUT); R(3, 1, 6, 2, '#e0bd82');
+      R(bx, 3, brim, 1, OUT); R(bx, 4, brim, 1, '#e0bd82');
+      R(bx + 1, 4, brim - 2, 1, '#b89355');
+      R(3, 1, 6, 1, '#f2dcb0');
+      R(4, 2, 4, 1, '#c9a35f');
+    } else if (hat === 'cap') {
+      R(3, 1, 6, 1, OUT); R(3, 2, 6, 2, shirt);
+      R(3, 2, 6, 1, lighten(shirt, 0.3));
+      R(8, 4, 3, 1, darken(shirt, 0.25));
+    } else if (hat === 'bandana') {
+      R(3, 2, 6, 2, '#e8542f');
+      R(3, 2, 6, 1, '#ff8f6a');
+      R(2, 3, 1, 3, '#c93f22');
+    } else if (hat === 'beanie') {
+      R(3, 1, 6, 3, '#6a7ac9');
+      R(3, 1, 6, 1, '#8f9ee0');
+      R(3, 4, 6, 1, '#4a5a9e');
+    }
+
+    /* ---- body, arms, legs ---- */
+    const sd = darken(shirt, 0.28), sl = lighten(shirt, 0.28);
+    R(3, 9, 6, 5, OUT);
+    R(3, 9, 6, 4, shirt);
+    R(3, 12, 6, 1, sd);
+    R(3, 9, 6, 1, sl);
+    R(5, 10, 2, 1, sl);
+    R(2, 10 + (frame ? 0 : 1), 1, 3, shirt);
+    R(9, 10 + (frame ? 1 : 0), 1, 3, shirt);
+    R(2, 13 + (frame ? 0 : 1), 1, 1, skin);
+    R(9, 13 + (frame ? 1 : 0), 1, 1, skin);
+    R(4, 14, 2, 2 + (frame ? 1 : 0), pants);
+    R(7, 14, 2, 2 + (frame ? 0 : 1), pants);
+    R(4, 14, 1, 2, lighten(pants, 0.2));
+    R(3 + (frame ? 0 : 1), 16 + (frame ? 1 : 0), 3, 2, boot);
+    R(7, 16 + (frame ? 0 : 1), 3, 2, boot);
+    cache.set(key, c);
+    return c;
+  }
+
+  /* a portrait bust for the crew cards - same look, twice the head */
+  function faceSprite(look, scale) {
+    const L = look || {};
+    const key = 'face_' + [L.skin, L.hair, L.style, L.shirt, L.hat].join('|') + '_' + scale;
+    if (cache.has(key)) return cache.get(key);
+    const k = scale || 1;
+    const c = newCanvas(14 * k, 14 * k);
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    const body = personSprite(L, 0, 1);
+    /* crop the head and shoulders, then scale up inside the tile */
+    ctx.drawImage(body, 0, 0, 12, 14, k, 0, 12 * k, 14 * k);
+    cache.set(key, c);
+    return c;
+  }
+
+  /* a paper flyer - "HELP WANTED" pinned to the hut */
+  function flyerSprite(scale) {
+    const key = 'flyer_' + scale;
+    if (cache.has(key)) return cache.get(key);
+    const k = scale || 1;
+    const c = newCanvas(9 * k, 11 * k);
+    const ctx = c.getContext('2d');
+    const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
+    R(0, 0, 9, 11, '#2e2216');
+    R(1, 1, 7, 9, '#fff8ec');
+    R(1, 1, 7, 1, '#ffffff');
+    R(2, 2, 5, 1, '#e8542f');
+    R(2, 4, 5, 1, '#8a8070');
+    R(2, 6, 4, 1, '#8a8070');
+    R(2, 8, 5, 1, '#8a8070');
+    R(4, 0, 1, 1, '#c93f22');
     cache.set(key, c);
     return c;
   }
@@ -1516,10 +1529,11 @@ const SPR = (() => {
     return c;
   }
 
-  function staffSprite(type, frame, scale) {
-    return (type === 'cull' || type === 'match')
-      ? botSprite(type, frame, scale)
-      : personSprite(type, frame, scale);
+  /* w is a crew record: robots by role, people by their look */
+  function staffSprite(w, frame, scale) {
+    const role = typeof w === 'string' ? w : (w && w.role);
+    if (role === 'cull' || role === 'match') return botSprite(role, frame, scale);
+    return personSprite(w && w.look, frame, scale);
   }
 
   /* wooden sign board — text drawn by the caller */
@@ -1550,48 +1564,70 @@ const SPR = (() => {
   }
 
   /* ============================================================
-     BLOCKY HEXAGON (research grid)
+     EGGOS TERMINAL - the Lab computer. Blocky CRT chrome drawn
+     the same way as everything else: one pixel at a time.
      ============================================================ */
-  function hexRows(r) {
-    /* flat-top blocky hexagon: array of half-widths per row, height 2r+1 */
-    const rows = [];
-    for (let y = -r; y <= r; y++) {
-      const t = Math.abs(y) / r;
-      const half = Math.round(r * (1 - 0.5 * t));
-      rows.push(half);
-    }
-    return rows;
+  const TERM = {
+    bg:'#0d1a12', bg2:'#12241a', grid:'#183324', dim:'#2f6a48',
+    text:'#7ef2a8', hot:'#d8ffe8', warn:'#ffd23f', bad:'#e8607a',
+    frame:'#2a3a30', frameLit:'#4a6a56', shell:'#c9a35f', shellDark:'#8a5e2a',
+  };
+
+  /* the screen bezel: a chunky plastic case around a dark panel */
+  function drawBezel(ctx, x, y, w, h) {
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = TERM.shell; ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
+    ctx.fillStyle = lighten(TERM.shell, 0.24); ctx.fillRect(x + 1, y + 1, w - 2, 2);
+    ctx.fillStyle = TERM.shellDark; ctx.fillRect(x + 1, y + h - 4, w - 2, 3);
+    /* inner well */
+    ctx.fillStyle = '#1d1508'; ctx.fillRect(x + 5, y + 5, w - 10, h - 14);
+    ctx.fillStyle = TERM.bg; ctx.fillRect(x + 6, y + 6, w - 12, h - 16);
+    /* corner screws */
+    [[x + 3, y + 3], [x + w - 5, y + 3], [x + 3, y + h - 6], [x + w - 5, y + h - 6]].forEach(([sx, sy]) => {
+      ctx.fillStyle = TERM.shellDark; ctx.fillRect(sx, sy, 2, 2);
+      ctx.fillStyle = lighten(TERM.shell, 0.4); ctx.fillRect(sx, sy, 1, 1);
+    });
   }
-  function drawHex(ctx, cx, cy, r, k, pal, opts) {
-    opts = opts || {};
-    const rows = hexRows(r);
-    for (let i = 0; i < rows.length; i++) {
-      const y = -r + i, half = rows[i];
-      for (let x = -half; x <= half; x++) {
-        const edge = x === -half || x === half || i === 0 || i === rows.length - 1 ||
-          Math.abs(x) > rows[i - 1 >= 0 ? i - 1 : 0] || Math.abs(x) > rows[Math.min(rows.length - 1, i + 1)];
-        let col;
-        if (edge) col = pal.out;
-        else if (y < -r * 0.45) col = pal.light;
-        else if (y > r * 0.45) col = pal.dark;
-        else col = pal.base;
-        if (!edge && opts.inner && y > -r * 0.45 && y < r * 0.45 && Math.abs(x) > half - 2) col = pal.dark;
-        ctx.fillStyle = col;
-        ctx.fillRect((cx + x) * k, (cy + y) * k, k, k);
-      }
+
+  /* phosphor scanlines plus a soft vignette, stamped over the panel */
+  function drawScanlines(ctx, x, y, w, h, t) {
+    ctx.fillStyle = 'rgba(0,0,0,.22)';
+    for (let sy = y; sy < y + h; sy += 2) ctx.fillRect(x, sy, w, 1);
+    /* a single bright band rolling down the tube */
+    const band = y + Math.floor(((t || 0) / 26) % (h + 40)) - 20;
+    if (band > y && band < y + h) {
+      ctx.fillStyle = 'rgba(126,242,168,.07)';
+      ctx.fillRect(x, band, w, 3);
     }
+    ctx.fillStyle = 'rgba(0,0,0,.16)';
+    ctx.fillRect(x, y, w, 2); ctx.fillRect(x, y + h - 2, w, 2);
+    ctx.fillRect(x, y, 2, h); ctx.fillRect(x + w - 2, y, 2, h);
   }
-  function hexHit(dx, dy, r) {
-    if (Math.abs(dy) > r) return false;
-    const t = Math.abs(dy) / r;
-    return Math.abs(dx) <= r * (1 - 0.5 * t);
+
+  /* a bracketed row: [ ==== ] used for level pips and progress */
+  function drawPips(ctx, x, y, n, of, colOn, colOff) {
+    for (let i = 0; i < of; i++) {
+      ctx.fillStyle = i < n ? colOn : colOff;
+      ctx.fillRect(x + i * 3, y, 2, 4);
+      if (i < n) { ctx.fillStyle = lighten(colOn, 0.4); ctx.fillRect(x + i * 3, y, 2, 1); }
+    }
+    return of * 3 - 1;
+  }
+
+  /* a hard-edged panel box with a lit top-left rim */
+  function drawBox(ctx, x, y, w, h, fill, rim, out) {
+    ctx.fillStyle = out || TERM.frame; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = fill; ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
+    if (rim) { ctx.fillStyle = rim; ctx.fillRect(x + 1, y + 1, w - 2, 1); ctx.fillRect(x + 1, y + 1, 1, h - 2); }
   }
 
   return {
     chickenSprite, eggSprite, nestSprite, mamaSprite, decoSprite,
     uiSprite, iconSprite, basketSprite, feedbagSprite, hammerSprite, staffSprite,
-    plumeSprite, signSprite, treeSprite, duckSprite, eggCrackSprite, shellHalfSprite,
-    drawText, textW, drawTiny, tinyW, drawTitle, drawHex, hexHit, hexRows,
+    personSprite, faceSprite, flyerSprite,
+    plumeSprite, signSprite, treeSprite, eggCrackSprite, shellHalfSprite,
+    drawText, textW, drawTiny, tinyW, drawTitle,
+    drawBezel, drawScanlines, drawPips, drawBox, TERM,
     newMask, mRect, mCircle, renderMask, mulberry, newCanvas,
     darken, lighten, warm, cool, lum, px, CELL, ICONS,
   };
