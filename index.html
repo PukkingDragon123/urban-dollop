@@ -19,11 +19,16 @@
     <div id="res-float">
       <span class="pill" id="pill-coins"><b id="r-coins">0</b></span>
       <span class="pill" id="pill-feathers"><b id="r-feathers">0</b></span>
+      <span class="pill" id="pill-feed" title="Feed pellets in the barn"><b id="r-feed">0/40</b></span>
       <span class="pill" id="pill-cap" title="Chickens on the ranch"><b id="r-cap">0/10</b></span>
     </div>
 
     <div id="toolbelt"></div>
     <div id="build-palette" hidden></div>
+    <div id="farm-palette" hidden></div>
+    <div id="trip-view" hidden>
+      <canvas id="trip-canvas" width="480" height="168"></canvas>
+    </div>
 
     <div id="menu-pop" hidden>
       <button class="btn" id="btn-mute" data-act="mute">SOUND ON</button>
@@ -44,8 +49,8 @@
     <div id="cursor-chip" hidden></div>
   </div>
 
-  <!-- RESEARCH: the EGGOS terminal inside the Lab -->
-  <div class="modal" id="modal-skills" hidden>
+  <!-- RESEARCH: the computer on the Lab desk -->
+  <div class="modal lab" id="modal-skills" hidden>
     <div class="modal-panel tree-panel">
       <div class="modal-head">
         <h2>THE LAB</h2>
@@ -53,9 +58,21 @@
         <button class="btn btn-tiny" data-act="close-modal">CLOSE</button>
       </div>
       <div id="tree-wrap">
-        <canvas id="tree-canvas" width="760" height="400"></canvas>
+        <canvas id="tree-canvas" width="760" height="440"></canvas>
       </div>
       <div id="skill-card"></div>
+    </div>
+  </div>
+
+  <!-- THE DEPOT: wheels and routes -->
+  <div class="modal" id="modal-depot" hidden>
+    <div class="modal-panel">
+      <div class="modal-head">
+        <h2>THE DEPOT</h2>
+        <span class="panel-sub" id="depot-sub"></span>
+        <button class="btn btn-tiny" data-act="close-modal">CLOSE</button>
+      </div>
+      <div id="depot-body"></div>
     </div>
   </div>
 
@@ -72,9 +89,10 @@
     </div>
   </div>
 
-  <!-- THE INDEX: chickens, the crew, eggs and the diary -->
+  <!-- THE INDEX: a book of chickens, crew, crops, routes, eggs and the diary -->
   <div class="modal" id="modal-pedia" hidden>
-    <div class="modal-panel">
+    <div class="modal-panel book">
+      <div class="book-spine"></div>
       <div class="modal-head">
         <h2>THE INDEX</h2>
         <span class="panel-sub" id="pedia-sub"></span>
@@ -83,10 +101,13 @@
       <div id="index-tabs">
         <button class="tab-btn" data-act="index-tab" data-tab="chickens">CHICKENS</button>
         <button class="tab-btn" data-act="index-tab" data-tab="staff">CREW</button>
+        <button class="tab-btn" data-act="index-tab" data-tab="crops">CROPS</button>
+        <button class="tab-btn" data-act="index-tab" data-tab="routes">ROUTES</button>
         <button class="tab-btn" data-act="index-tab" data-tab="eggs">EGGS</button>
         <button class="tab-btn" data-act="index-tab" data-tab="diary">DIARY</button>
       </div>
       <div id="pedia"></div>
+      <div class="book-corner"></div>
     </div>
   </div>
 

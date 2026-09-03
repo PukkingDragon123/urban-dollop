@@ -1076,6 +1076,27 @@ const SPR = (() => {
     c: '#7fe8d0', v: '#a58ae0', k: '#3a3a4a', s: '#f2e2c8', m: '#e8e8f0',
   };
   const ICONS = {
+    hoe: [
+      '.......oo.', '......onno', '.....onno.', '....onno..', '...onno...',
+      '..onno....', '.oooo.....', 'ogggo.....', 'oggo......', '.oo.......'],
+    water: [
+      '....oo....', '...ogbo...', 'oo.oggo.oo', 'obooggoobo', 'obogggggbo',
+      'oboggggggo', '.ooggggggo', '..ogggggo.', '..ogggggo.', '...ooooo..'],
+    scythe: [
+      '..ooooo...', '.oWWWWWo..', 'oWWo..oWo.', 'oWo...onno', 'oo...onno.',
+      '....onno..', '...onno...', '..onno....', '.onno.....', 'ooo.......'],
+    sprout: [
+      '..........', '....oo....', '.oo.oGo.oo', 'oGGooGooGo', '.oGGoGoGG.',
+      '..oGGGGG..', '...oGGo...', '....oGo...', '..oooooo..', '.onnnnnno.'],
+    bike: [
+      '..oo....oo', '.o..o..o..', '..oooooo..', '.o.oo..o..', 'ooooo.oooo',
+      'o...o.o..o', 'o.o.o.o.oo', 'o...ooo..o', 'ooooo.oooo', '..........'],
+    city: [
+      '.....oo...', '..oo.oWo..', '.oWoooWo..', '.oWoWoWooo', 'ooWoWoWoWo',
+      'oWWoWoWoWo', 'oWWoWoWoWo', 'oWWoWoWoWo', 'oooooooooo', '..........'],
+    mouse: [
+      'o.........', 'oo........', 'owo.......', 'owwo......', 'owwwo.....',
+      'owwwwo....', 'owwooo....', 'owo.......', 'oo........', '..........'],
     coin: [
       '..oooooo..', '.oyyyyyyo.', 'oyYyyyyYyo', 'oyywwwyyyo', 'oyywwwyyyo',
       'oyYyyyyYyo', 'oyyyyyyyyo', '.oyyyyyyo.', '..oooooo..', '..........'],
@@ -1621,13 +1642,356 @@ const SPR = (() => {
     if (rim) { ctx.fillStyle = rim; ctx.fillRect(x + 1, y + 1, w - 2, 1); ctx.fillRect(x + 1, y + 1, 1, h - 2); }
   }
 
+
+  /* ============================================================
+     FARMING - tilled soil and five crops in three or four stages
+     ============================================================ */
+  function soilSprite(seed, watered, scale) {
+    const key = 'soil_' + seed + '_' + (watered ? 'w' : 'd') + '_' + scale;
+    if (cache.has(key)) return cache.get(key);
+    const k = scale || 1;
+    const c = newCanvas(16 * k, 16 * k);
+    const ctx = c.getContext('2d');
+    const rnd = mulberry(900 + seed);
+    const base = watered ? '#6b4a2a' : '#a07444', dark = watered ? '#523620' : '#8a5e2a', lite = watered ? '#7f5c36' : '#b58a4f';
+    ctx.fillStyle = base; ctx.fillRect(0, 0, 16 * k, 16 * k);
+    /* furrows */
+    for (let y = 2; y < 16; y += 4) {
+      ctx.fillStyle = dark; ctx.fillRect(0, y * k, 16 * k, k);
+      ctx.fillStyle = lite; ctx.fillRect(0, (y + 2) * k, 16 * k, k);
+    }
+    /* clods */
+    for (let i = 0; i < 9; i++) {
+      const x = Math.floor(rnd() * 16), y = Math.floor(rnd() * 16);
+      ctx.fillStyle = rnd() < 0.5 ? dark : lite;
+      ctx.fillRect(x * k, y * k, k, k);
+    }
+    /* a soft edge so tiles read as one bed */
+    ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.fillRect(0, 0, 16 * k, k); ctx.fillRect(0, 0, k, 16 * k);
+    if (watered) {
+      ctx.fillStyle = 'rgba(120,180,255,.18)';
+      for (let i = 0; i < 6; i++) ctx.fillRect(Math.floor(rnd() * 15) * k, Math.floor(rnd() * 15) * k, 2 * k, k);
+    }
+    cache.set(key, c);
+    return c;
+  }
+
+  function cropSprite(kind, stage, seed, scale) {
+    const def = CROPS[kind] || CROPS.wheat;
+    const key = 'crop_' + kind + '_' + stage + '_' + (seed % 7) + '_' + scale;
+    if (cache.has(key)) return cache.get(key);
+    const k = scale || 1;
+    const c = newCanvas(16 * k, 20 * k);
+    const ctx = c.getContext('2d');
+    const rnd = mulberry(500 + seed);
+    const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, (y + 4) * k, w * k, h * k); };
+    const green = '#5aa845', gd = '#3f8a33', gl = '#8fd14f';
+    const ripe = stage >= def.stages - 1;
+    if (stage === 0) {
+      /* sprouts */
+      [3, 8, 12].forEach((x, i) => { R(x, 13 - (i % 2), 1, 3, green); R(x - 1, 12 - (i % 2), 3, 1, gl); });
+    } else if (kind === 'wheat') {
+      const h = stage === 1 ? 6 : stage === 2 ? 9 : 11;
+      for (let i = 0; i < 5; i++) {
+        const x = 2 + i * 3 + Math.floor(rnd() * 1.5);
+        R(x, 16 - h, 1, h, ripe ? '#b8a040' : green);
+        if (ripe) { R(x - 1, 16 - h - 3, 3, 4, def.col); R(x, 16 - h - 4, 1, 1, def.col); R(x - 1, 16 - h - 2, 1, 1, '#c99a1f'); }
+        else if (stage === 2) R(x - 1, 16 - h, 3, 1, gl);
+      }
+    } else if (kind === 'corn') {
+      const h = stage === 1 ? 6 : stage === 2 ? 11 : 15;
+      [4, 11].forEach((x, i) => {
+        R(x, 16 - h, 2, h, gd);
+        R(x, 16 - h, 1, h, green);
+        for (let l = 0; l < Math.floor(h / 3); l++) {
+          const ly = 15 - l * 3;
+          R(x - 3 + (l % 2) * 5, ly, 3, 1, green);
+          R(x - 3 + (l % 2) * 5, ly - 1, 1, 1, gl);
+        }
+        if (ripe) { R(x + 2, 16 - h + 4, 2, 5, def.col); R(x + 2, 16 - h + 4, 1, 5, '#e0b830'); R(x + 2, 16 - h + 2, 2, 2, gl); }
+      });
+    } else if (kind === 'sunseed') {
+      const h = stage === 1 ? 6 : stage === 2 ? 11 : 15;
+      [5, 11].forEach((x, i) => {
+        R(x, 16 - h, 1, h, gd);
+        R(x - 2, 14, 2, 1, green); R(x + 1, 12, 2, 1, green);
+        if (ripe) {
+          R(x - 3, 16 - h - 3, 7, 7, def.col);
+          R(x - 3, 16 - h - 3, 1, 1, '#0000'); 
+          R(x - 2, 16 - h - 2, 5, 5, '#5e3d18');
+          R(x - 1, 16 - h - 1, 3, 3, '#3a2a16');
+          R(x - 2, 16 - h - 3, 5, 1, '#ffd23f'); R(x - 3, 16 - h - 2, 1, 5, '#ffd23f');
+        } else if (stage === 2) R(x - 1, 16 - h - 1, 3, 2, '#7fbf4f');
+      });
+    } else if (kind === 'berry') {
+      const w = stage === 1 ? 6 : stage === 2 ? 10 : 12, h = stage === 1 ? 5 : stage === 2 ? 8 : 10;
+      const x0 = 8 - w / 2;
+      R(x0 + 1, 16 - h, w - 2, h, gd);
+      R(x0, 16 - h + 1, w, h - 2, gd);
+      R(x0 + 1, 16 - h, w - 2, 2, green);
+      R(x0 + 2, 16 - h, 3, 1, gl);
+      if (ripe) for (let i = 0; i < 6; i++) {
+        const bx = x0 + 1 + Math.floor(rnd() * (w - 2)), by = 16 - h + 1 + Math.floor(rnd() * (h - 2));
+        R(bx, by, 1, 1, def.col); R(bx, by, 1, 1, i % 2 ? def.col : '#ff7a9a');
+      }
+    } else {
+      /* clover */
+      const n = stage === 1 ? 3 : 6;
+      for (let i = 0; i < n; i++) {
+        const x = 2 + Math.floor(rnd() * 12), y = 11 + Math.floor(rnd() * 4);
+        R(x, y, 1, 1, green); R(x - 1, y - 1, 3, 1, green); R(x, y - 2, 1, 1, gl);
+        if (ripe && i % 2) R(x, y - 3, 1, 1, '#fff8ec');
+      }
+    }
+    cache.set(key, c);
+    return c;
+  }
+
+  /* a baby version of any species: round, small, all fluff */
+  function chickSprite(sp, scale) {
+    const key = 'chick_' + sp.id + '_' + scale;
+    if (cache.has(key)) return cache.get(key);
+    const k = scale || 1;
+    const c = newCanvas(12 * k, 12 * k);
+    const ctx = c.getContext('2d');
+    const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
+    const body = sp.body, acc = sp.accent, OUT = '#2e2216';
+    /* body blob */
+    R(3, 3, 6, 1, OUT); R(2, 4, 8, 5, OUT); R(3, 9, 6, 1, OUT);
+    R(3, 4, 6, 5, body); R(4, 3, 4, 1, body);
+    R(4, 4, 3, 1, lighten(body, 0.3));
+    R(3, 8, 6, 1, darken(body, 0.22));
+    /* wing nub */
+    R(2, 6, 1, 2, darken(body, 0.3));
+    /* eye + beak */
+    R(7, 5, 1, 1, OUT);
+    R(9, 6, 2, 1, '#f2a03f'); R(9, 6, 1, 1, '#ffbf5f');
+    /* head tuft */
+    R(5, 2, 1, 1, acc); R(6, 1, 1, 2, acc);
+    /* feet */
+    R(4, 10, 1, 1, '#f2a03f'); R(7, 10, 1, 1, '#f2a03f');
+    R(3, 11, 2, 1, '#f2a03f'); R(7, 11, 2, 1, '#f2a03f');
+    cache.set(key, c);
+    return c;
+  }
+
+  /* ============================================================
+     VEHICLES - from a bicycle to a private railcar
+     ============================================================ */
+  function vehicleSprite(id, frame, scale) {
+    const key = 'veh_' + id + '_' + frame + '_' + scale;
+    if (cache.has(key)) return cache.get(key);
+    const k = scale || 1;
+    const dims = { bike: [26, 20], cart: [38, 22], van: [46, 26], truck: [60, 30], lorry: [78, 32], train: [92, 34] }[id] || [60, 30];
+    const c = newCanvas(dims[0] * k, dims[1] * k);
+    const ctx = c.getContext('2d');
+    const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
+    const OUT = '#2e2216';
+    const wheel = (x, y, r) => {
+      R(x - r, y - r + 1, r * 2 + 1, r * 2 - 1, OUT); R(x - r + 1, y - r, r * 2 - 1, r * 2 + 1, OUT);
+      R(x - r + 1, y - r + 1, r * 2 - 1, r * 2 - 1, '#3a3a4a');
+      R(x - 1, y - 1, 3, 3, '#c9ced6');
+      const sp = frame ? 1 : 0;
+      R(x - r + 1 + sp, y, r * 2 - 1 - sp, 1, '#8a9099');
+    };
+    const spokeWheel = (x, y, r) => {
+      for (let a = 0; a < 16; a++) {
+        const px2 = Math.round(x + Math.cos(a / 16 * Math.PI * 2) * r), py2 = Math.round(y + Math.sin(a / 16 * Math.PI * 2) * r);
+        R(px2, py2, 1, 1, OUT);
+      }
+      R(x, y, 1, 1, OUT);
+      const s2 = frame ? 1 : 0;
+      R(x - r + 1, y + s2, r * 2 - 1, 1, '#8a9099'); R(x + s2, y - r + 1, 1, r * 2 - 1, '#8a9099');
+    };
+    if (id === 'bike') {
+      spokeWheel(5, 14, 5); spokeWheel(20, 14, 5);
+      /* frame */
+      R(5, 14, 1, 1, OUT); R(6, 9, 8, 1, OUT); R(9, 9, 1, 5, OUT); R(13, 8, 1, 6, OUT); R(5, 13, 5, 1, OUT);
+      R(6, 8, 8, 1, '#e8542f'); R(9, 10, 1, 4, '#e8542f'); R(5, 12, 5, 1, '#e8542f');
+      /* saddle, bars, basket of eggs */
+      R(8, 7, 3, 1, OUT); R(13, 6, 3, 1, OUT); R(15, 5, 1, 2, OUT);
+      R(17, 3, 8, 5, OUT); R(18, 4, 6, 3, '#c9924f'); R(18, 4, 6, 1, '#e0bd82');
+      R(19, 2, 2, 2, '#fff8ee'); R(22, 2, 2, 2, '#dcf2c8');
+    } else if (id === 'cart') {
+      spokeWheel(5, 16, 5); spokeWheel(17, 16, 4);
+      R(5, 16, 1, 1, OUT); R(6, 11, 6, 1, OUT); R(8, 11, 1, 5, OUT); R(5, 15, 4, 1, OUT);
+      R(6, 10, 6, 1, '#e8542f'); R(8, 12, 1, 4, '#e8542f');
+      R(7, 9, 3, 1, OUT); R(11, 8, 3, 1, OUT);
+      /* trailer crate */
+      R(21, 8, 16, 10, OUT); R(22, 9, 14, 8, '#c9924f'); R(22, 9, 14, 1, '#e0bd82');
+      R(25, 9, 1, 8, '#8a5e2a'); R(31, 9, 1, 8, '#8a5e2a');
+      R(23, 6, 3, 3, '#fff8ee'); R(27, 6, 3, 3, '#dcf2c8'); R(31, 6, 3, 3, '#cfe9fb');
+      R(14, 12, 8, 1, OUT);
+      wheel(30, 18, 3);
+    } else if (id === 'van') {
+      /* body */
+      R(1, 8, 44, 14, OUT); R(2, 9, 42, 12, '#7fc4e8'); R(2, 9, 42, 2, '#b5e0f5'); R(2, 19, 42, 2, '#4a86a8');
+      /* cab window */
+      R(33, 10, 9, 6, OUT); R(34, 11, 7, 4, '#d8f2fa'); R(34, 11, 3, 1, '#ffffff');
+      R(2, 11, 28, 6, '#fff8ee'); R(3, 12, 26, 4, '#5fa8e8');
+      /* egg logo */
+      R(12, 12, 4, 4, '#fff8ee'); R(13, 11, 2, 1, '#fff8ee'); R(13, 16, 2, 1, '#fff8ee');
+      R(38, 16, 6, 3, '#ffd23f');
+      wheel(9, 22, 3); wheel(36, 22, 3);
+    } else if (id === 'truck') {
+      /* cargo bed (wood planks) */
+      R(0, 4, 34, 21, OUT);
+      for (let i = 0; i < 5; i++) R(1, 5 + i * 4, 32, 4, i % 2 ? '#c9924f' : '#b8843f');
+      R(1, 5, 32, 1, '#e0bd82'); R(1, 23, 32, 2, '#7a5230');
+      for (let i = 0; i < 4; i++) R(3 + i * 9, 5, 1, 20, '#8a5e2a');
+      /* cab */
+      R(34, 9, 24, 16, OUT); R(35, 10, 22, 14, '#3f6fd6'); R(35, 10, 22, 2, '#6f9af0'); R(35, 22, 22, 2, '#2a4a9e');
+      R(37, 11, 12, 7, OUT); R(38, 12, 10, 5, '#d8f2fa'); R(38, 12, 4, 1, '#ffffff');
+      R(55, 19, 3, 3, '#ffd23f'); R(52, 16, 4, 1, '#c9ced6');
+      wheel(8, 26, 3); wheel(26, 26, 3); wheel(50, 26, 3);
+    } else if (id === 'lorry') {
+      R(0, 2, 52, 24, OUT); R(1, 3, 50, 22, '#e8e2d0'); R(1, 3, 50, 2, '#fff8ee'); R(1, 23, 50, 2, '#b8b0a0');
+      R(4, 8, 44, 8, '#e8542f'); R(4, 8, 44, 1, '#ff8f6a');
+      R(20, 10, 6, 5, '#fff8ee'); R(21, 9, 4, 1, '#fff8ee');
+      R(52, 10, 25, 16, OUT); R(53, 11, 23, 14, '#e8542f'); R(53, 11, 23, 2, '#ff8f6a'); R(53, 23, 23, 2, '#a83a22');
+      R(56, 12, 12, 7, OUT); R(57, 13, 10, 5, '#d8f2fa'); R(57, 13, 4, 1, '#ffffff');
+      R(74, 20, 3, 3, '#ffd23f'); R(52, 2, 3, 8, '#8a9099');
+      wheel(8, 28, 3); wheel(18, 28, 3); wheel(40, 28, 3); wheel(66, 28, 3);
+    } else {
+      /* railcar */
+      R(0, 30, 92, 2, '#8a9099'); for (let i = 0; i < 92; i += 6) R(i, 32, 3, 1, '#5e3d18');
+      R(2, 4, 62, 24, OUT); R(3, 5, 60, 22, '#3f6fd6'); R(3, 5, 60, 2, '#6f9af0'); R(3, 25, 60, 2, '#2a4a9e');
+      for (let i = 0; i < 6; i++) { R(6 + i * 10, 9, 7, 7, OUT); R(7 + i * 10, 10, 5, 5, '#d8f2fa'); R(7 + i * 10, 10, 2, 1, '#ffffff'); }
+      R(3, 18, 60, 3, '#ffd23f');
+      R(64, 8, 26, 20, OUT); R(65, 9, 24, 18, '#2e2216'); R(66, 10, 22, 16, '#3a3a4a'); R(66, 10, 22, 2, '#6a6f78');
+      R(70, 2, 8, 7, OUT); R(71, 3, 6, 5, '#3a3a4a'); R(72, 0, 4, 3, '#8a9099');
+      R(80, 12, 8, 8, OUT); R(81, 13, 6, 6, '#d8f2fa');
+      R(86, 22, 4, 4, '#ffd23f');
+      wheel(10, 28, 3); wheel(22, 28, 3); wheel(46, 28, 3); wheel(58, 28, 3); wheel(72, 28, 3); wheel(84, 28, 3);
+    }
+    cache.set(key, c);
+    return c;
+  }
+
+  /* ============================================================
+     CITY SKYLINES - what the delivery drives into. sky 0 is a
+     village, 4 is a port. Width w, drawn on a transparent strip.
+     ============================================================ */
+  function skylineSprite(sky, w, h, scale) {
+    const key = 'sky_' + sky + '_' + w + '_' + h + '_' + scale;
+    if (cache.has(key)) return cache.get(key);
+    const k = scale || 1;
+    const c = newCanvas(w * k, h * k);
+    const ctx = c.getContext('2d');
+    const rnd = mulberry(4000 + sky * 17);
+    const R = (x, y, ww, hh, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, y * k, ww * k, hh * k); };
+    const OUT = '#2e2216';
+    const palettes = [
+      ['#e8c48f', '#c99a5b', '#d9b98c'],            /* thatch and timber */
+      ['#e8e2d0', '#c9a35f', '#b58a4f'],            /* market town */
+      ['#8a9099', '#b8c0cc', '#5a626e', '#e8e2d0'], /* city */
+      ['#c9ced6', '#e8e2d0', '#8fb8d6', '#5a626e'], /* capital */
+      ['#5a626e', '#8a9099', '#b8c0cc', '#e8542f'], /* port */
+    ][Math.min(4, sky)];
+    const maxH = [16, 26, 44, 58, 50][Math.min(4, sky)];
+    const minH = [8, 12, 18, 24, 14][Math.min(4, sky)];
+    let x = 0;
+    while (x < w) {
+      const bw = 8 + Math.floor(rnd() * (sky >= 2 ? 14 : 10));
+      const bh = minH + Math.floor(rnd() * (maxH - minH));
+      const col = palettes[Math.floor(rnd() * palettes.length)];
+      R(x, h - bh - 1, bw, bh + 1, OUT);
+      R(x + 1, h - bh, bw - 2, bh, col);
+      R(x + 1, h - bh, bw - 2, 1, lighten(col, 0.3));
+      R(x + 1, h - 1, bw - 2, 1, darken(col, 0.3));
+      /* roofs */
+      if (sky <= 1 || rnd() < 0.3) {
+        const rc = sky === 0 ? '#a8783f' : rnd() < 0.5 ? '#c94a3a' : '#7a5230';
+        for (let i = 0; i < Math.floor(bw / 2); i++) R(x + i, h - bh - 1 - Math.min(i, bw - 1 - i), bw - i * 2, 1, i === 0 ? OUT : rc);
+        R(x + 1, h - bh - 1, bw - 2, 1, OUT);
+      } else if (rnd() < 0.5) {
+        R(x + 2, h - bh - 3, bw - 4, 2, darken(col, 0.2)); R(x + 3, h - bh - 4, 1, 1, OUT);
+      }
+      /* windows */
+      for (let wy = h - bh + 2; wy < h - 4; wy += 4) for (let wx = x + 2; wx < x + bw - 2; wx += 3) {
+        if (rnd() < 0.25) continue;
+        R(wx, wy, 1, 2, rnd() < 0.7 ? '#ffe9a0' : '#7a5230');
+      }
+      /* doors */
+      if (sky <= 1) { R(x + Math.floor(bw / 2) - 1, h - 4, 2, 3, '#5e3d18'); }
+      x += bw + (sky >= 2 ? 0 : 1 + Math.floor(rnd() * 3));
+    }
+    /* landmarks */
+    if (sky === 0) { R(4, h - 30, 5, 30, OUT); R(5, h - 29, 3, 28, '#e8e2d0'); R(4, h - 33, 5, 4, '#7a5230'); R(6, h - 26, 1, 3, '#7a5230'); }
+    if (sky === 1) { R(w - 14, h - 34, 6, 34, OUT); R(w - 13, h - 33, 4, 32, '#c9a35f'); R(w - 12, h - 30, 2, 2, '#fff8ee'); R(w - 15, h - 36, 8, 3, '#7a5230'); }
+    if (sky === 3) { R(Math.floor(w / 2) - 5, h - 70, 10, 70, OUT); R(Math.floor(w / 2) - 4, h - 69, 8, 68, '#e8e2d0'); R(Math.floor(w / 2) - 2, h - 74, 4, 5, '#ffd23f'); }
+    if (sky === 4) { for (let i = 0; i < 3; i++) { const cx = 10 + i * 30; R(cx, h - 40, 2, 40, OUT); R(cx, h - 40, 18, 2, OUT); R(cx + 14, h - 38, 1, 8, OUT); } }
+    cache.set(key, c);
+    return c;
+  }
+
+  /* the pixel mouse pointer that lives on the Lab screen */
+  function cursorSprite(kind, scale) {
+    const key = 'cur_' + kind + '_' + scale;
+    if (cache.has(key)) return cache.get(key);
+    const k = scale || 1;
+    const rows = kind === 'hand' ? [
+      '...oo.....', '..owwo.oo.', '..owwooww.', '..owwowwwo', 'ooowwwwwwo',
+      'owowwwwwwo', 'owwwwwwwwo', '.owwwwwwo.', '..owwwwwo.', '...oooooo.'] : [
+      'o.........', 'oo........', 'owo.......', 'owwo......', 'owwwo.....',
+      'owwwwo....', 'owwwwwo...', 'owwooooo..', 'owo.......', 'oo........'];
+    const c = newCanvas(10 * k, 10 * k);
+    const ctx = c.getContext('2d');
+    drawGrid(ctx, rows, { '.': null, o: '#1a1410', w: '#fff8ee' }, 0, 0, k);
+    cache.set(key, c);
+    return c;
+  }
+
+  /* ============================================================
+     BLOCKY FLAT-TOP HEXAGON - the tiles of the research map
+     ============================================================ */
+  function hexRows(size) {
+    /* flat-top: height = sqrt(3)*size, width = 2*size; half-widths per row */
+    const h = Math.round(Math.sqrt(3) * size);
+    const rows = [];
+    for (let y = 0; y < h; y++) {
+      const t = Math.abs((y + 0.5) / h - 0.5) * 2;      /* 0 middle .. 1 edge */
+      rows.push(Math.round(size * (1 - t * 0.5)));
+    }
+    return rows;
+  }
+  function drawHex(ctx, cx, cy, size, pal, opts) {
+    opts = opts || {};
+    const rows = hexRows(size);
+    const h = rows.length;
+    for (let i = 0; i < h; i++) {
+      const y = cy - Math.floor(h / 2) + i;
+      const half = rows[i];
+      const prev = rows[Math.max(0, i - 1)], next = rows[Math.min(h - 1, i + 1)];
+      for (let x = -half; x < half; x++) {
+        const edge = x === -half || x === half - 1 || i === 0 || i === h - 1 ||
+                     x < -prev || x >= prev || x < -next || x >= next;
+        let col;
+        if (edge) col = pal.out;
+        else if (i < h * 0.3) col = pal.light;
+        else if (i > h * 0.72) col = pal.dark;
+        else col = pal.base;
+        if (!edge && opts.rim && (x === -half + 1 || x === half - 2)) col = pal.dark;
+        ctx.fillStyle = col;
+        ctx.fillRect(cx + x, y, 1, 1);
+      }
+    }
+  }
+  function hexHit(dx, dy, size) {
+    const h = Math.sqrt(3) * size;
+    if (Math.abs(dy) > h / 2) return false;
+    const t = Math.abs(dy) / (h / 2);
+    return Math.abs(dx) <= size * (1 - t * 0.5);
+  }
+
   return {
     chickenSprite, eggSprite, nestSprite, mamaSprite, decoSprite,
     uiSprite, iconSprite, basketSprite, feedbagSprite, hammerSprite, staffSprite,
     personSprite, faceSprite, flyerSprite,
+    soilSprite, cropSprite, chickSprite, vehicleSprite, skylineSprite, cursorSprite,
     plumeSprite, signSprite, treeSprite, eggCrackSprite, shellHalfSprite,
     drawText, textW, drawTiny, tinyW, drawTitle,
-    drawBezel, drawScanlines, drawPips, drawBox, TERM,
+    drawBezel, drawScanlines, drawPips, drawBox, TERM, drawHex, hexHit, hexRows,
     newMask, mRect, mCircle, renderMask, mulberry, newCanvas,
     darken, lighten, warm, cool, lum, px, CELL, ICONS,
   };

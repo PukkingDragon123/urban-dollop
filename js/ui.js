@@ -796,6 +796,189 @@
     SPR.drawTiny(ctx, String(ld.store.length), x + 4, y + 11, '#2e2216', 1, '#fff8ec');
   }
 
+  /* a red feed barn with a hayloft door */
+  function drawBarn(c, r, barn, now) {
+    const x = c * 16, y = r * 16;
+    ctx.fillStyle = 'rgba(40,58,26,.25)'; ctx.fillRect(x + 2, y + 29, 28, 3);
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 1, y + 10, 30, 20);
+    ctx.fillStyle = '#c94a3a'; ctx.fillRect(x + 2, y + 11, 28, 18);
+    ctx.fillStyle = '#e06a58'; ctx.fillRect(x + 2, y + 11, 28, 2);
+    ctx.fillStyle = '#a83a2a'; ctx.fillRect(x + 2, y + 26, 28, 3);
+    /* white trim + big door */
+    ctx.fillStyle = '#fff8ec'; ctx.fillRect(x + 2, y + 11, 1, 18); ctx.fillRect(x + 29, y + 11, 1, 18);
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 11, y + 17, 10, 12);
+    ctx.fillStyle = '#7a5230'; ctx.fillRect(x + 12, y + 18, 8, 11);
+    ctx.fillStyle = '#fff8ec'; ctx.fillRect(x + 12, y + 18, 8, 1); ctx.fillRect(x + 15, y + 18, 1, 11);
+    ctx.fillRect(x + 12, y + 18, 1, 11); ctx.fillRect(x + 19, y + 18, 1, 11);
+    /* roof */
+    for (let i = 0; i < 6; i++) {
+      ctx.fillStyle = i === 0 ? '#3a2a16' : (i % 2 ? '#8a5e2a' : '#a8783f');
+      ctx.fillRect(x + 1 + i, y + 10 - i, 30 - i * 2, 1);
+    }
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 6, y + 4, 20, 1);
+    /* loft hatch with hay poking out */
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 13, y + 7, 6, 4);
+    ctx.fillStyle = '#e0bd82'; ctx.fillRect(x + 14, y + 8, 4, 2);
+    ctx.fillStyle = '#c9a35f'; ctx.fillRect(x + 12, y + 9, 2, 1); ctx.fillRect(x + 18, y + 9, 2, 1);
+    /* feed gauge */
+    const f = Math.min(1, S().feedStore / Math.max(1, GAME.feedCap()));
+    ctx.fillStyle = '#2e2216'; ctx.fillRect(x + 4, y + 21, 5, 7);
+    ctx.fillStyle = '#1a2a20'; ctx.fillRect(x + 5, y + 22, 3, 5);
+    ctx.fillStyle = f > 0.85 ? '#ffd23f' : '#7ac74f'; ctx.fillRect(x + 5, y + 27 - Math.round(5 * f), 3, Math.round(5 * f));
+  }
+
+  /* a wooden trough with pellets in it */
+  function drawTrough(c, r, t, now) {
+    const x = c * 16, y = r * 16;
+    ctx.fillStyle = 'rgba(40,58,26,.22)'; ctx.fillRect(x + 1, y + 14, 14, 2);
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 1, y + 6, 14, 8);
+    ctx.fillStyle = '#a8783f'; ctx.fillRect(x + 2, y + 7, 12, 6);
+    ctx.fillStyle = '#c9a35f'; ctx.fillRect(x + 2, y + 7, 12, 1);
+    ctx.fillStyle = '#5e3d18'; ctx.fillRect(x + 2, y + 12, 12, 1);
+    ctx.fillStyle = '#5e3d18'; ctx.fillRect(x + 2, y + 14, 2, 2); ctx.fillRect(x + 12, y + 14, 2, 2);
+    const n = Math.min(t.n, ECON.troughCap);
+    for (let i = 0; i < n; i++) {
+      ctx.fillStyle = i % 2 ? '#e8c458' : '#d9a066';
+      ctx.fillRect(x + 3 + (i % 6) * 2, y + 10 - Math.floor(i / 6), 1, 1);
+    }
+    if (!t.n && Math.floor(now / 600) % 2) SPR.drawTiny(ctx, '!', x + 6, y - 1, '#c43a2a', 1, '#ffffff');
+  }
+
+  /* a stone well with a bucket on a beam */
+  function drawWell(c, r, w, now) {
+    const x = c * 16, y = r * 16;
+    ctx.fillStyle = 'rgba(40,58,26,.25)'; ctx.fillRect(x + 1, y + 14, 14, 2);
+    ctx.fillStyle = '#3a3a4a'; ctx.fillRect(x + 1, y + 6, 14, 9);
+    ctx.fillStyle = '#8a9099'; ctx.fillRect(x + 2, y + 7, 12, 7);
+    ctx.fillStyle = '#b8c0cc'; ctx.fillRect(x + 2, y + 7, 12, 1);
+    ctx.fillStyle = '#5a626e'; for (let i = 0; i < 4; i++) ctx.fillRect(x + 3 + i * 3, y + 9 + (i % 2) * 2, 2, 1);
+    ctx.fillStyle = '#2f86ad'; ctx.fillRect(x + 4, y + 8, 8, 2);
+    ctx.fillStyle = '#63c1e2'; ctx.fillRect(x + 5 + (Math.floor(now / 500) % 3), y + 8, 2, 1);
+    /* posts + beam + bucket */
+    ctx.fillStyle = '#5e3d18'; ctx.fillRect(x + 2, y, 2, 7); ctx.fillRect(x + 12, y, 2, 7); ctx.fillRect(x + 2, y, 12, 1);
+    ctx.fillStyle = '#a8783f'; ctx.fillRect(x + 2, y, 1, 7); ctx.fillRect(x + 12, y, 1, 7);
+    const bob = Math.round(Math.sin(now / 900) * 1);
+    ctx.fillStyle = '#8a9099'; ctx.fillRect(x + 7, y + 1, 1, 3 + bob);
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 6, y + 4 + bob, 4, 3);
+    ctx.fillStyle = '#7a5230'; ctx.fillRect(x + 7, y + 5 + bob, 2, 1);
+    /* drips */
+    if (Math.floor(now / 300) % 3 === 0) { ctx.fillStyle = '#7fc4e8'; ctx.fillRect(x - 2, y + 10, 1, 1); ctx.fillRect(x + 16, y + 12, 1, 1); }
+  }
+
+  /* a sprinkler head on a pipe, spraying */
+  function drawSprinkler(c, r, sp, now) {
+    const x = c * 16, y = r * 16;
+    ctx.fillStyle = 'rgba(40,58,26,.2)'; ctx.fillRect(x + 4, y + 14, 8, 2);
+    ctx.fillStyle = '#3a3a4a'; ctx.fillRect(x + 7, y + 6, 2, 9);
+    ctx.fillStyle = '#8a9099'; ctx.fillRect(x + 7, y + 6, 1, 9);
+    ctx.fillStyle = '#23262b'; ctx.fillRect(x + 5, y + 4, 6, 3);
+    ctx.fillStyle = '#c9ced6'; ctx.fillRect(x + 6, y + 5, 4, 1);
+    const a = now / 400;
+    ctx.fillStyle = 'rgba(127,196,232,.85)';
+    for (let i = 0; i < 5; i++) {
+      const ang = a + i * 1.25;
+      const d = 4 + ((now / 60 + i * 7) % 9);
+      ctx.fillRect(Math.round(x + 8 + Math.cos(ang) * d), Math.round(y + 5 + Math.sin(ang) * d * 0.5 - d * 0.3), 1, 1);
+    }
+  }
+
+  /* a windmill: stone base, turning sails */
+  function drawMill(c, r, m, now) {
+    const x = c * 16, y = r * 16;
+    ctx.fillStyle = 'rgba(40,58,26,.25)'; ctx.fillRect(x + 4, y + 29, 24, 3);
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 6, y + 8, 20, 22);
+    ctx.fillStyle = '#e8e2d0'; ctx.fillRect(x + 7, y + 9, 18, 20);
+    ctx.fillStyle = '#fff8ec'; ctx.fillRect(x + 7, y + 9, 18, 1);
+    ctx.fillStyle = '#c9c0a8'; ctx.fillRect(x + 7, y + 26, 18, 3);
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 13, y + 20, 6, 9);
+    ctx.fillStyle = '#7a5230'; ctx.fillRect(x + 14, y + 21, 4, 8);
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 11, y + 12, 4, 4);
+    ctx.fillStyle = '#d8f2fa'; ctx.fillRect(x + 12, y + 13, 2, 2);
+    /* cap */
+    ctx.fillStyle = '#5e3d18'; ctx.fillRect(x + 5, y + 5, 22, 4);
+    ctx.fillStyle = '#8a5e2a'; ctx.fillRect(x + 8, y + 3, 16, 2);
+    /* sails */
+    const cx = x + 16, cy = y + 7, ang = now / 900;
+    for (let k = 0; k < 4; k++) {
+      const a = ang + k * Math.PI / 2;
+      for (let d = 2; d < 11; d++) {
+        const sx = Math.round(cx + Math.cos(a) * d), sy = Math.round(cy + Math.sin(a) * d);
+        ctx.fillStyle = d % 2 ? '#e8e2d0' : '#c9a35f';
+        ctx.fillRect(sx, sy, 1, 1);
+        if (d > 4) { ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.fillRect(sx + Math.round(Math.cos(a + 1.57)), sy + Math.round(Math.sin(a + 1.57)), 1, 1); }
+      }
+    }
+    ctx.fillStyle = '#2e2216'; ctx.fillRect(cx, cy, 1, 1);
+  }
+
+  /* a coop: little house on stilts with a ramp */
+  function drawCoop(c, r, cp, now) {
+    const x = c * 16, y = r * 16;
+    ctx.fillStyle = 'rgba(40,58,26,.25)'; ctx.fillRect(x + 3, y + 29, 26, 3);
+    ctx.fillStyle = '#4a3220'; ctx.fillRect(x + 5, y + 22, 3, 7); ctx.fillRect(x + 24, y + 22, 3, 7);
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 2, y + 10, 28, 13);
+    ctx.fillStyle = '#e0bd82'; ctx.fillRect(x + 3, y + 11, 26, 11);
+    ctx.fillStyle = '#c9a35f'; for (let i = 0; i < 26; i += 4) ctx.fillRect(x + 3 + i, y + 11, 1, 11);
+    ctx.fillStyle = '#a8783f'; ctx.fillRect(x + 3, y + 20, 26, 2);
+    /* door with a chick peeking out */
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 12, y + 13, 8, 9);
+    ctx.fillStyle = '#5e3d18'; ctx.fillRect(x + 13, y + 14, 6, 8);
+    if (Math.floor(now / 1400) % 2) { ctx.fillStyle = '#ffe08a'; ctx.fillRect(x + 14, y + 17, 4, 4); ctx.fillStyle = '#2e2216'; ctx.fillRect(x + 17, y + 18, 1, 1); ctx.fillStyle = '#f2a03f'; ctx.fillRect(x + 18, y + 19, 1, 1); }
+    /* ramp */
+    ctx.fillStyle = '#8a5e2a'; for (let i = 0; i < 7; i++) ctx.fillRect(x + 12 + i, y + 22 + i, 8 - i, 1);
+    /* roof */
+    for (let i = 0; i < 6; i++) { ctx.fillStyle = i === 0 ? '#3a2a16' : (i % 2 ? '#c94a3a' : '#e06a58'); ctx.fillRect(x + 2 + i, y + 10 - i, 28 - i * 2, 1); }
+    /* nest window */
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 5, y + 13, 5, 4);
+    ctx.fillStyle = '#ffe9c0'; ctx.fillRect(x + 6, y + 14, 3, 2);
+  }
+
+  /* the noticeboard where flyers get pinned */
+  function drawBoard(c, r, bd, now) {
+    const x = c * 16, y = r * 16;
+    ctx.fillStyle = 'rgba(40,58,26,.25)'; ctx.fillRect(x + 2, y + 14, 12, 2);
+    ctx.fillStyle = '#5e3d18'; ctx.fillRect(x + 2, y + 8, 2, 7); ctx.fillRect(x + 12, y + 8, 2, 7);
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x, y, 16, 10);
+    ctx.fillStyle = '#c9a35f'; ctx.fillRect(x + 1, y + 1, 14, 8);
+    ctx.fillStyle = '#e0bd82'; ctx.fillRect(x + 1, y + 1, 14, 1);
+    /* pinned flyers */
+    const st = S();
+    const n = st.flyer ? 3 : st.applicants.length ? 1 : 0;
+    for (let i = 0; i < 3; i++) {
+      ctx.fillStyle = i < n ? '#fff8ec' : '#b89355';
+      ctx.fillRect(x + 2 + i * 4, y + 2 + (i % 2), 3, 5);
+      if (i < n) { ctx.fillStyle = '#e8542f'; ctx.fillRect(x + 3 + i * 4, y + 3 + (i % 2), 1, 1); ctx.fillStyle = '#8a8070'; ctx.fillRect(x + 2 + i * 4, y + 5 + (i % 2), 3, 1); }
+    }
+    ctx.fillStyle = '#ffd23f'; ctx.fillRect(x + 3, y + 1, 1, 1); ctx.fillRect(x + 11, y + 2, 1, 1);
+    if (st.flyer && Math.floor(now / 600) % 2) { ctx.fillStyle = '#fff8ec'; ctx.fillRect(x + 14, y - 3, 2, 2); }
+  }
+
+  /* somebody who answered a flyer, standing by the board */
+  function drawApplicant(a, now) {
+    if (a.x === undefined) return;
+    if (a.x + 20 < cam().x || a.x > cam().x + W.view.w || a.y + 24 < cam().y || a.y > cam().y + W.view.h) return;
+    const moving = a.state !== 'waiting';
+    const spr = SPR.personSprite(a.look, moving ? a.frame : 0, 1);
+    const bob = moving ? 0 : Math.abs(Math.sin(now / 420 + a.id)) * (Math.floor((now + a.id * 300) / 2600) % 3 === 0 ? 2 : 0);
+    ctx.fillStyle = 'rgba(40,58,26,.26)';
+    ctx.fillRect(Math.round(a.x + 1), Math.round(a.y + spr.height - 2), 10, 2);
+    ctx.save();
+    if (a.dir === 1) { ctx.translate(Math.round(a.x) + spr.width, Math.round(a.y - bob)); ctx.scale(-1, 1); ctx.drawImage(spr, 0, 0); }
+    else ctx.drawImage(spr, Math.round(a.x), Math.round(a.y - bob));
+    ctx.restore();
+    if (a.state === 'waiting') {
+      /* a little speech bubble: they want a job */
+      const by = Math.round(a.y - 11 + Math.sin(now / 300 + a.id) * 1);
+      ctx.fillStyle = '#2e2216'; ctx.fillRect(Math.round(a.x + 3), by, 9, 9);
+      ctx.fillStyle = '#fff9ec'; ctx.fillRect(Math.round(a.x + 4), by + 1, 7, 7);
+      ctx.fillStyle = '#2e2216'; ctx.fillRect(Math.round(a.x + 6), by + 9, 2, 2);
+      ctx.drawImage(SPR.iconSprite('doc', 1), Math.round(a.x + 3), by - 1);
+      /* patience bar */
+      ctx.fillStyle = '#2e2216'; ctx.fillRect(Math.round(a.x), Math.round(a.y + spr.height), 12, 2);
+      ctx.fillStyle = a.t < 90 ? '#e8542f' : '#7ac74f'; ctx.fillRect(Math.round(a.x + 1), Math.round(a.y + spr.height), Math.round(10 * Math.max(0, a.t) / RECRUIT.applicantLife), 1);
+    }
+  }
+
   function drawFence(c, r, now) {
     const x = c * 16, y = r * 16;
     ctx.fillStyle = 'rgba(40,58,26,.22)'; ctx.fillRect(x + 1, y + 13, 14, 2);
@@ -1183,85 +1366,76 @@
     const tr = S().truck;
     const x = Math.round(truckX(now));
     if (x > W.W + 90) return;
-    const y = W.roadY - 4;
+    const v = GAME.vehicle();
     const moving = tr.state !== 'parked';
+    const spr = SPR.vehicleSprite(v.id, moving ? Math.floor(now / 90) % 2 : 0, 1);
+    const y = W.roadY + 12 - spr.height;
     const bounce = moving ? Math.round(Math.sin(now / 45) * 1) : 0;
-    ctx.fillStyle = 'rgba(40,58,26,.28)'; ctx.fillRect(x + 2, y + 13, 48, 3);
-    /* --- cargo bed (wood planks) --- */
-    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x, y - 13 + bounce, 34, 21);
-    for (let i = 0; i < 5; i++) {
-      ctx.fillStyle = i % 2 ? '#c9924f' : '#b8843f';
-      ctx.fillRect(x + 1, y - 12 + i * 4 + bounce, 32, 4);
-    }
-    ctx.fillStyle = '#e0bd82'; ctx.fillRect(x + 1, y - 12 + bounce, 32, 1);
-    ctx.fillStyle = '#7a5230'; ctx.fillRect(x + 1, y + 6 + bounce, 32, 2);
-    /* bed slats */
-    ctx.fillStyle = '#8a5e2a';
-    for (let i = 0; i < 4; i++) ctx.fillRect(x + 3 + i * 9, y - 12 + bounce, 1, 20);
-    /* eggs piled in the bed */
-    const n = Math.min(tr.load.length, 15);
+    ctx.fillStyle = 'rgba(40,58,26,.28)'; ctx.fillRect(x + 2, W.roadY + 9, spr.width - 4, 3);
+    ctx.drawImage(spr, x, y + bounce);
+    /* the load rides on top of whatever you drive */
+    const n = Math.min(tr.load.length, v.id === 'bike' ? 4 : v.id === 'cart' ? 6 : 15);
+    const bedX = x + (v.id === 'bike' ? 17 : v.id === 'cart' ? 22 : 3), bedY = y + bounce + (v.id === 'bike' ? -1 : v.id === 'cart' ? 4 : 2);
+    const perRow = v.id === 'bike' ? 2 : v.id === 'cart' ? 3 : 5;
     for (let i = 0; i < n; i++) {
-      const row = Math.floor(i / 5);
-      const ex = x + 3 + (i % 5) * 6, ey = y - 2 + bounce - row * 4;
+      const row = Math.floor(i / perRow);
+      const ex = bedX + (i % perRow) * 4, ey = bedY - row * 3;
       const egg = tr.load[i];
-      ctx.fillStyle = EGG_SHELL[egg.tier];
-      ctx.fillRect(ex, ey, 4, 5);
-      ctx.fillStyle = SPR.lighten(EGG_SHELL[egg.tier], 0.5);
-      ctx.fillRect(ex, ey, 2, 2);
-      ctx.fillStyle = SPR.darken(EGG_SHELL[egg.tier], 0.32);
-      ctx.fillRect(ex, ey + 4, 4, 1);
-      if (egg.golden) { ctx.fillStyle = '#ffd23f'; ctx.fillRect(ex + 2, ey + 2, 1, 1); }
+      ctx.fillStyle = EGG_SHELL[egg.tier]; ctx.fillRect(ex, ey, 3, 4);
+      ctx.fillStyle = SPR.lighten(EGG_SHELL[egg.tier], 0.5); ctx.fillRect(ex, ey, 1, 1);
+      if (egg.golden) { ctx.fillStyle = '#ffd23f'; ctx.fillRect(ex + 1, ey + 2, 1, 1); }
     }
-    /* --- cab --- */
-    ctx.fillStyle = '#1e3450'; ctx.fillRect(x + 34, y - 17 + bounce, 19, 25);
-    ctx.fillStyle = '#2f5f9e'; ctx.fillRect(x + 35, y - 16 + bounce, 17, 23);
-    ctx.fillStyle = '#5fa8e8'; ctx.fillRect(x + 35, y - 16 + bounce, 17, 3);
-    /* windshield */
-    ctx.fillStyle = '#1e3450'; ctx.fillRect(x + 36, y - 13 + bounce, 12, 9);
-    ctx.fillStyle = '#bfe8f5'; ctx.fillRect(x + 37, y - 12 + bounce, 10, 7);
-    ctx.fillStyle = '#ffffff'; ctx.fillRect(x + 37, y - 12 + bounce, 4, 3);
-    /* mirror */
-    ctx.fillStyle = '#1e3450'; ctx.fillRect(x + 52, y - 11 + bounce, 2, 3);
-    /* grille + bumper + headlight */
-    ctx.fillStyle = '#23262b'; ctx.fillRect(x + 48, y + 1 + bounce, 5, 5);
-    ctx.fillStyle = '#8d949e';
-    ctx.fillRect(x + 49, y + 2 + bounce, 3, 1); ctx.fillRect(x + 49, y + 4 + bounce, 3, 1);
-    ctx.fillStyle = '#ffe9a0'; ctx.fillRect(x + 51, y - 2 + bounce, 2, 3);
-    ctx.fillStyle = '#c9ced6'; ctx.fillRect(x + 34, y + 7 + bounce, 19, 2);
-    /* wheels with hubcaps */
-    [x + 5, x + 38].forEach(wx => {
-      ctx.fillStyle = '#191c21'; ctx.fillRect(wx, y + 5, 10, 9);
-      ctx.fillStyle = '#2e333a'; ctx.fillRect(wx + 1, y + 6, 8, 7);
-      ctx.fillStyle = '#c9ced6'; ctx.fillRect(wx + 3, y + 8, 4, 3);
-      ctx.fillStyle = '#8d949e'; ctx.fillRect(wx + 4, y + 9, 2, 1);
-    });
-    /* exhaust */
+    /* exhaust for engines, sweat for pedals */
     if (moving && Math.floor(now / 120) % 2) {
-      ctx.fillStyle = 'rgba(200,190,175,.6)';
-      ctx.fillRect(x - 4, y + 2 + bounce, 3, 3);
-      ctx.fillRect(x - 8, y - 1 + bounce, 2, 2);
+      ctx.fillStyle = v.cost >= 4000 ? 'rgba(200,190,175,.6)' : 'rgba(150,200,255,.7)';
+      ctx.fillRect(x - 4, y + spr.height - 8 + bounce, 3, 3);
+      ctx.fillRect(x - 8, y + spr.height - 11 + bounce, 2, 2);
     }
     /* load counter plate */
     if (!moving) {
       const label = tr.load.length + '/' + GAME.truckCap();
       const w = SPR.tinyW(label, 1) + 6;
-      const px0 = x + 34, py0 = y - 26;
+      const px0 = x + spr.width - w, py0 = y - 12;
       ctx.fillStyle = '#3a2a16'; ctx.fillRect(px0, py0, w, 9);
       ctx.fillStyle = '#e8d5a8'; ctx.fillRect(px0 + 1, py0 + 1, w - 2, 7);
-      ctx.fillStyle = '#c9b48a'; ctx.fillRect(px0 + 1, py0 + 6, w - 2, 2);
-      SPR.drawTiny(ctx, label, px0 + 3, py0 + 2, '#3a2a16', 1);
-      const full = tr.load.length >= GAME.truckCap();
-      if (tr.load.length > 0 && Math.floor(now / 460) % 2) {
-        const msg = full ? 'FULL - TAP' : 'TAP TO SEND';
-        SPR.drawText(ctx, msg, x + 1, y - 40, full ? '#c43a2a' : '#2e6e2e', 1, '#ffffff');
+      SPR.drawTiny(ctx, label, px0 + 3, py0 + 2, tr.load.length >= GAME.truckCap() ? '#c43a2a' : '#2e2216', 1);
+      if (tr.load.length >= GAME.truckCap() && Math.floor(now / 400) % 2) {
+        SPR.drawTiny(ctx, 'FULL', px0 - 18, py0 + 2, '#c43a2a', 1, '#fff8ec');
       }
     }
   }
+  /* the road sign by the parking spot: tap for vehicles and routes */
+  function drawDepot(now) {
+    const st = W.stations.depot;
+    const x = st.x, y = st.y;
+    ctx.fillStyle = 'rgba(40,58,26,.25)'; ctx.fillRect(x + 2, y + 24, 12, 2);
+    ctx.fillStyle = '#5e3d18'; ctx.fillRect(x + 7, y + 8, 3, 18);
+    ctx.fillStyle = '#a8783f'; ctx.fillRect(x + 7, y + 8, 1, 18);
+    /* two arrow boards pointing down the road */
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x, y, 17, 8); ctx.fillRect(x + 17, y + 2, 2, 4);
+    ctx.fillStyle = '#3f6fd6'; ctx.fillRect(x + 1, y + 1, 15, 6); ctx.fillRect(x + 16, y + 3, 2, 2);
+    ctx.fillStyle = '#6f9af0'; ctx.fillRect(x + 1, y + 1, 15, 1);
+    SPR.drawTiny(ctx, GAME.city().name.slice(0, 5).toUpperCase(), x + 2, y + 2, '#ffffff', 1);
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x - 2, y + 9, 17, 8); ctx.fillRect(x - 4, y + 11, 2, 4);
+    ctx.fillStyle = '#e8542f'; ctx.fillRect(x - 1, y + 10, 15, 6); ctx.fillRect(x - 3, y + 12, 2, 2);
+    ctx.fillStyle = '#ff8f6a'; ctx.fillRect(x - 1, y + 10, 15, 1);
+    SPR.drawTiny(ctx, 'DEPOT', x + 1, y + 11, '#ffffff', 1);
+    /* a lamp that blinks when you can afford the next vehicle or route */
+    const nextV = VEHICLES[S().vehicle + 1];
+    const nextC = CITIES.find(c => !S().routes.includes(c.id));
+    const can = (nextV && S().coins >= nextV.cost) || (nextC && S().coins >= nextC.cost);
+    if (can && Math.floor(now / 380) % 2) {
+      ctx.fillStyle = '#ffd23f'; ctx.fillRect(x + 6, y - 4, 4, 3);
+      ctx.fillStyle = '#fff8ec'; ctx.fillRect(x + 7, y - 4, 1, 1);
+    }
+  }
+
 
   function drawChicken(ch, now) {
     if (ch.x + 24 < cam().x || ch.x > cam().x + W.view.w || ch.y + 24 < cam().y || ch.y > cam().y + W.view.h) return;
     const sp = SPECIES[ch.sp];
-    const spr = SPR.chickenSprite(sp, 1, false);
+    const chick = GAME.isChick(ch);
+    const spr = chick ? SPR.chickSprite(sp, 1) : SPR.chickenSprite(sp, 1, false);
     const walking = ch.state === 'walk' || ch.state === 'seek';
     const bob = walking ? Math.abs(Math.sin(now / 110 + ch.id)) * 1.6
               : ch.state === 'peck' ? Math.abs(Math.sin(now / 200)) * 1.2 : Math.sin(now / 500 + ch.id) * 0.6;
@@ -1275,7 +1449,7 @@
       if (bp >= 1) bornFx.delete(ch.id);
       else { grow = 0.45 + 0.55 * bp; hop += Math.sin(bp * Math.PI) * 3; }
     }
-    const yy = Math.round(ch.y - bob - hop);
+    const yy = Math.round(ch.y - bob - hop) + (chick ? 7 : 0);
     /* soft shadow that shrinks as it hops */
     const sw = 12 - Math.round(hop * 0.6);
     ctx.fillStyle = 'rgba(40,58,26,.26)';
@@ -1291,6 +1465,16 @@
       ctx.drawImage(spr, 0, 0);
     } else ctx.drawImage(spr, Math.round(ch.x), yy);
     ctx.restore();
+    /* a chick shows how far it has to grow; a hungry hen asks for food */
+    if (chick) {
+      ctx.fillStyle = '#2e2216'; ctx.fillRect(Math.round(ch.x + 5), yy - 4, 12, 3);
+      ctx.fillStyle = '#7ac74f'; ctx.fillRect(Math.round(ch.x + 6), yy - 3, Math.round(10 * ch.age), 1);
+    } else if (ch.food <= 0 && Math.floor(now / 500) % 2) {
+      ctx.fillStyle = '#fff9ec'; ctx.fillRect(Math.round(ch.x + 6), yy - 9, 9, 8);
+      ctx.fillStyle = '#2e2216'; ctx.fillRect(Math.round(ch.x + 6), yy - 9, 9, 1); ctx.fillRect(Math.round(ch.x + 6), yy - 1, 9, 1);
+      ctx.fillRect(Math.round(ch.x + 5), yy - 8, 1, 7); ctx.fillRect(Math.round(ch.x + 15), yy - 8, 1, 7);
+      ctx.drawImage(SPR.iconSprite('seed', 1), Math.round(ch.x + 6), yy - 9);
+    }
     /* marked for the cull-bot */
     if (ch.marked) {
       const blink = Math.floor(now / 380) % 2;
@@ -1372,6 +1556,18 @@
       ctx.drawImage(b, Math.round(x - 7), Math.round(y - 3 + (ptr.down ? 2 : 0)));
     } else if (tool === 'feed') {
       ctx.drawImage(SPR.feedbagSprite(1), Math.round(x - 6), Math.round(y - 4));
+    } else if (tool === 'farm') {
+      const icon = farmSel === 'hoe' ? 'hoe' : farmSel === 'water' ? 'water' : farmSel === 'harvest' ? 'scythe' : 'sprout';
+      ctx.drawImage(SPR.iconSprite(icon, 1), Math.round(x - 4), Math.round(y - 6 + (ptr.down ? 2 : 0)));
+      /* tile highlight */
+      const tc = Math.floor(x / 16), trr = Math.floor(y / 16);
+      const soil = S().soil[tc + ',' + trr];
+      let ok = farmSel === 'hoe' ? GAME.canTill(tc, trr)
+             : farmSel === 'water' ? !!soil
+             : farmSel === 'harvest' ? !!(soil && GAME.ripe(soil))
+             : GAME.canPlant(tc, trr, farmSel);
+      ctx.fillStyle = ok ? 'rgba(122,199,79,.30)' : 'rgba(0,0,0,.14)';
+      ctx.fillRect(tc * 16, trr * 16, 16, 16);
     } else if (tool === 'inspect') {
       const g = SPR.iconSprite('magnify', 1);
       ctx.drawImage(g, Math.round(x - 4), Math.round(y - 4));
@@ -1412,8 +1608,21 @@
     else if (buildSel === 'splitter') drawSplitter(c, r, { dir: placeDir, n: 0 }, now);
     else if (buildSel === 'loader') drawLoader(c, r, { store: [] }, now);
     else if (buildSel === 'hatchery') drawHatchery(c, r, { queue: [], prog: 0 }, now);
+    else if (buildSel === 'barn') drawBarn(c, r, {}, now);
+    else if (buildSel === 'trough') drawTrough(c, r, { n: 6 }, now);
+    else if (buildSel === 'well') drawWell(c, r, {}, now);
+    else if (buildSel === 'sprinkler') drawSprinkler(c, r, {}, now);
+    else if (buildSel === 'mill') drawMill(c, r, {}, now);
+    else if (buildSel === 'coop') drawCoop(c, r, {}, now);
+    else if (buildSel === 'board') drawBoard(c, r, {}, now);
     else drawIncubator(c, r, { queue: [], prog: 0 }, now);
     ctx.globalAlpha = 1;
+    if (buildSel === 'well' || buildSel === 'sprinkler' || buildSel === 'coop') {
+      const R = buildSel === 'well' ? ECON.wellR : buildSel === 'sprinkler' ? ECON.sprinklerR : ECON.coopR;
+      ctx.fillStyle = buildSel === 'coop' ? 'rgba(255,210,63,.14)' : 'rgba(120,180,255,.16)';
+      const cx = c * 16 + b.w * 8, cy = r * 16 + b.h * 8;
+      for (let dy = -R; dy <= R; dy += 2) { const half = Math.round(Math.sqrt(R * R - dy * dy)); ctx.fillRect(cx - half, cy + dy, half * 2, 1); }
+    }
     ctx.fillStyle = ok ? 'rgba(122,199,79,.28)' : 'rgba(232,84,47,.34)';
     ctx.fillRect(c * 16, r * 16, b.w * 16, b.h * 16);
     /* corner brackets */
@@ -1470,7 +1679,30 @@
       ctx.fillRect(p.x + 12 + i * 17, p.y + 10 + (i % 2) * 9, 2, 1);
     }
 
-    drawLab(now); drawStand(now); drawMamaSign(now);
+    /* tilled soil and whatever is growing in it */
+    for (const k of Object.keys(S().soil)) {
+      const [c, r] = k.split(',').map(Number);
+      const t = S().soil[k];
+      if (c * 16 + 16 < cam().x || c * 16 > cam().x + W.view.w || r * 16 + 20 < cam().y || r * 16 > cam().y + W.view.h) continue;
+      ctx.drawImage(SPR.soilSprite(t.seed, t.water > 0, 1), c * 16, r * 16);
+      if (t.crop) {
+        const stage = GAME.cropStage(t);
+        const sway = t.growth > 0.3 ? Math.round(Math.sin(now / 700 + c * 1.3 + r) * 0.6) : 0;
+        ctx.drawImage(SPR.cropSprite(t.crop, stage, t.seed, 1), c * 16 + sway, r * 16 - 4);
+        if (GAME.ripe(t) && Math.floor(now / 420) % 2) {
+          ctx.fillStyle = '#fff8ec'; ctx.fillRect(c * 16 + 12, r * 16 - 6, 2, 2);
+          ctx.fillStyle = '#ffd23f'; ctx.fillRect(c * 16 + 3, r * 16 - 3, 1, 1);
+        }
+      }
+    }
+    /* watered circles from wells and sprinklers, faint */
+    if (S().tool === 'farm') {
+      ctx.fillStyle = 'rgba(120,180,255,.10)';
+      const ring = (x, y, R) => { for (let dy = -R; dy <= R; dy += 2) { const half = Math.round(Math.sqrt(R * R - dy * dy)); ctx.fillRect(x - half, y + dy, half * 2, 1); } };
+      Object.keys(S().wells).forEach(k => { const [c, r] = k.split(',').map(Number); ring(c * 16 + 8, r * 16 + 8, ECON.wellR); });
+      Object.keys(S().sprinklers).forEach(k => { const [c, r] = k.split(',').map(Number); ring(c * 16 + 8, r * 16 + 8, ECON.sprinklerR); });
+    }
+    drawLab(now); drawStand(now); drawMamaSign(now); drawDepot(now);
 
     for (const k of Object.keys(S().belts)) { const [c, r] = k.split(',').map(Number); drawBelt(c, r, S().belts[k].dir, now); }
     for (const k of Object.keys(S().sorters)) { const [c, r] = k.split(',').map(Number); drawSorter(c, r, S().sorters[k], now); }
@@ -1484,6 +1716,14 @@
     for (const k of Object.keys(S().splitters)) { const [c, r] = k.split(',').map(Number); drawSplitter(c, r, S().splitters[k], now); }
     for (const k of Object.keys(S().loaders)) { const [c, r] = k.split(',').map(Number); drawLoader(c, r, S().loaders[k], now); }
     for (const k of Object.keys(S().hatchers)) { const [c, r] = k.split(',').map(Number); drawHatchery(c, r, S().hatchers[k], now); }
+    for (const k of Object.keys(S().troughs)) { const [c, r] = k.split(',').map(Number); drawTrough(c, r, S().troughs[k], now); }
+    for (const k of Object.keys(S().wells)) { const [c, r] = k.split(',').map(Number); drawWell(c, r, S().wells[k], now); }
+    for (const k of Object.keys(S().sprinklers)) { const [c, r] = k.split(',').map(Number); drawSprinkler(c, r, S().sprinklers[k], now); }
+    for (const k of Object.keys(S().boards)) { const [c, r] = k.split(',').map(Number); drawBoard(c, r, S().boards[k], now); }
+    for (const k of Object.keys(S().barns)) { const [c, r] = k.split(',').map(Number); drawBarn(c, r, S().barns[k], now); }
+    for (const k of Object.keys(S().mills)) { const [c, r] = k.split(',').map(Number); drawMill(c, r, S().mills[k], now); }
+    for (const k of Object.keys(S().coops)) { const [c, r] = k.split(',').map(Number); drawCoop(c, r, S().coops[k], now); }
+    S().applicants.forEach(a => drawApplicant(a, now));
 
     S().items.forEach(it => {
       const spr = it.rainbow ? SPR.eggSprite(it.tier, 1, true, Math.floor(now / 120) % 6) : SPR.eggSprite(it.tier, 1);
@@ -1610,10 +1850,10 @@
 
   /* ================= HUD ================= */
   const el = {
-    coins: $('#r-coins'), feathers: $('#r-feathers'),
+    coins: $('#r-coins'), feathers: $('#r-feathers'), feed: $('#r-feed'), feedPill: $('#pill-feed'),
     cap: $('#r-cap'), capPill: $('#pill-cap'),
     cursorChip: $('#cursor-chip'), bubble: $('#bubble'),
-    toolbelt: $('#toolbelt'), palette: $('#build-palette'),
+    toolbelt: $('#toolbelt'), palette: $('#build-palette'), farmPalette: $('#farm-palette'),
   };
   /* prepend pixel icons to the resource pills once */
   (function seedPills() {
@@ -1633,22 +1873,27 @@
     el.cursorChip.style.top = (ev.clientY + 12) + 'px';
   });
 
-  const TOOL_ICON = { hand: 'hand', basket: 'basket', feed: 'seed', build: 'hammer', inspect: 'magnify' };
+  const TOOL_ICON = { hand: 'hand', basket: 'basket', feed: 'bowl', farm: 'hoe', build: 'hammer', inspect: 'magnify' };
+  const TOOL_LABEL = { hand: 'HAND', basket: 'BASKET', feed: 'FEED', farm: 'FARM', build: 'BUILD', inspect: 'LOOK' };
+  let farmSel = 'hoe', palSec = 'ranch';
   function renderToolbelt() {
     el.toolbelt.innerHTML = '';
-    ['hand', 'basket', 'feed', 'build', 'inspect'].forEach(id => {
-      if (id === 'feed' && !GAME.lvl('feed')) return;
+    ['hand', 'basket', 'feed', 'farm', 'build', 'inspect'].forEach(id => {
       const b = document.createElement('button');
       b.className = 'tool-btn' + (S().tool === id ? ' active' : '');
       b.dataset.tool = id;
       b.title = {
-        hand: 'Hand - pet, carry chickens and eggs, drag to pan',
+        hand: 'Hand - pet, carry chickens and eggs, pick ripe crops, drag to pan',
         basket: 'Basket - sweep up eggs and feathers',
-        feed: 'Feed - sprinkle seed, hens lay twice as fast',
-        build: 'Build - place machines',
+        feed: 'Feed - scatter pellets from the barn; chicks grow, hens lay faster',
+        farm: 'Farm - till, plant, water and harvest',
+        build: 'Build - place machines and buildings',
         inspect: 'Inspect - tap anything for its stats',
       }[id];
       b.appendChild(mkIcon(TOOL_ICON[id], 3));
+      const lab = document.createElement('small');
+      lab.textContent = TOOL_LABEL[id];
+      b.appendChild(lab);
       el.toolbelt.appendChild(b);
     });
     if (GAME.lvl('hiring')) {
@@ -1686,7 +1931,7 @@
   /* miniature building render for the palette buttons: reuse the world painters
      by pointing `ctx` at an offscreen canvas for the duration of the call */
   function buildingThumb(type) {
-    const small = ['belt', 'vacuum', 'blower', 'sorter', 'fence', 'splitter'].includes(type);
+    const small = ['belt', 'vacuum', 'blower', 'sorter', 'fence', 'splitter', 'trough', 'well', 'sprinkler', 'board'].includes(type);
     const big = type === 'hatchery';
     const wpx = small ? 16 : big ? 50 : 34, hpx = small ? 16 : big ? 50 : 36;
     const k = small ? 2 : 1;
@@ -1711,6 +1956,13 @@
       else if (type === 'splitter') drawSplitter(0, 0, { dir: placeDir, n: 0 }, now);
       else if (type === 'loader') drawLoader(0, 0, { store: [] }, now);
       else if (type === 'hatchery') drawHatchery(0, 0, { queue: [], prog: 0 }, now);
+      else if (type === 'barn') drawBarn(0, 0, {}, now);
+      else if (type === 'trough') drawTrough(0, 0, { n: 6 }, now);
+      else if (type === 'well') drawWell(0, 0, {}, now);
+      else if (type === 'sprinkler') drawSprinkler(0, 0, {}, now);
+      else if (type === 'mill') drawMill(0, 0, {}, now);
+      else if (type === 'coop') drawCoop(0, 0, {}, now);
+      else if (type === 'board') drawBoard(0, 0, {}, now);
       else drawIncubator(0, 0, { queue: [], prog: 0 }, now);
     } finally {
       ctx = saved;
@@ -1719,10 +1971,27 @@
   }
 
   function renderPalette() {
-    if (S().tool !== 'build') { el.palette.hidden = true; return; }
-    el.palette.hidden = false;
+    el.palette.hidden = S().tool !== 'build';
+    el.farmPalette.hidden = S().tool !== 'farm';
+    renderFarmPalette();
+    if (el.palette.hidden) { GAME.dirty.build = false; return; }
     el.palette.innerHTML = '';
-    ['incubator', 'hatchery', 'lovenest', 'staffhut', 'silo', 'loader', 'vacuum', 'blower', 'sorter', 'splitter', 'belt', 'fence'].forEach(type => {
+    /* section tabs across the top */
+    const tabs = document.createElement('div');
+    tabs.className = 'pal-tabs';
+    BUILD_SECTIONS.forEach(sec => {
+      const anyOpen = Object.keys(BUILDS).some(t => BUILDS[t].sec === sec.id && (!BUILDS[t].needs || GAME.lvl(BUILDS[t].needs)));
+      const b = document.createElement('button');
+      b.className = 'pal-tab' + (palSec === sec.id ? ' active' : '') + (anyOpen ? '' : ' dim');
+      b.dataset.palsec = sec.id;
+      b.appendChild(mkIcon(sec.icon, 2));
+      b.appendChild(document.createTextNode(sec.name));
+      tabs.appendChild(b);
+    });
+    el.palette.appendChild(tabs);
+    const row = document.createElement('div');
+    row.className = 'pal-row';
+    Object.keys(BUILDS).filter(t => BUILDS[t].sec === palSec).forEach(type => {
       const b = BUILDS[type];
       const locked = b.needs && !GAME.lvl(b.needs);
       const cost = buildCost(type, S().built[type]);
@@ -1731,15 +2000,18 @@
       btn.dataset.build = type;
       btn.disabled = locked;
       btn.appendChild(buildingThumb(type));
+      const nm = document.createElement('b');
+      nm.textContent = b.name.toUpperCase();
+      btn.appendChild(nm);
       const tag = document.createElement('small');
-      if (locked) tag.textContent = 'LOCKED';
+      if (locked) tag.textContent = 'RESEARCH';
       else {
         tag.appendChild(mkIcon('coin', 1));
         tag.appendChild(document.createTextNode(GAME.fmt(cost)));
       }
       btn.appendChild(tag);
       btn.title = b.name + ' - ' + b.desc + (locked ? ' (research first)' : '');
-      el.palette.appendChild(btn);
+      row.appendChild(btn);
     });
     const rot = document.createElement('button');
     rot.className = 'pal-btn small';
@@ -1749,7 +2021,7 @@
     rtag.textContent = ['EAST', 'SOUTH', 'WEST', 'NORTH'][placeDir];
     rot.appendChild(rtag);
     rot.title = 'Rotate (R)';
-    el.palette.appendChild(rot);
+    row.appendChild(rot);
     const rem = document.createElement('button');
     rem.className = 'pal-btn small' + (buildSel === 'remove' ? ' active' : '');
     rem.dataset.build = 'remove';
@@ -1757,9 +2029,56 @@
     const dtag = document.createElement('small');
     dtag.textContent = 'REMOVE';
     rem.appendChild(dtag);
-    el.palette.appendChild(rem);
+    row.appendChild(rem);
+    el.palette.appendChild(row);
     GAME.dirty.build = false;
   }
+
+  /* the farm tool's sub-palette: hoe, seed packets, watering can, scythe */
+  function renderFarmPalette() {
+    if (el.farmPalette.hidden) return;
+    el.farmPalette.innerHTML = '';
+    const items = [{ id: 'hoe', icon: 'hoe', name: 'HOE', tip: 'Till grass into soil' }];
+    CROP_KEYS.forEach(k => items.push({ id: k, icon: 'sprout', name: CROPS[k].name.toUpperCase(), crop: k }));
+    items.push({ id: 'water', icon: 'water', name: 'WATER', tip: 'Watered crops grow twice as fast' });
+    items.push({ id: 'harvest', icon: 'scythe', name: 'HARVEST', tip: 'Cut ripe crops into feed' });
+    items.forEach(it => {
+      const btn = document.createElement('button');
+      const open = !it.crop || GAME.cropOpen(it.crop);
+      btn.className = 'pal-btn farm' + (farmSel === it.id ? ' active' : '') + (it.crop ? ' crop-' + it.crop : '');
+      btn.dataset.farm = it.id;
+      btn.disabled = !open;
+      if (it.crop) {
+        const cv2 = cloneCanvas(SPR.cropSprite(it.crop, CROPS[it.crop].stages - 1, 3, 2));
+        btn.appendChild(cv2);
+      } else btn.appendChild(mkIcon(it.icon, 3));
+      const nm = document.createElement('b');
+      nm.textContent = it.name;
+      btn.appendChild(nm);
+      const tag = document.createElement('small');
+      if (it.crop) {
+        const d = CROPS[it.crop];
+        if (!open) tag.textContent = 'RESEARCH';
+        else {
+          const have = GAME.seedCount(it.crop);
+          if (have > 0) tag.textContent = 'x' + have + ' SEEDS';
+          else { tag.appendChild(mkIcon('coin', 1)); tag.appendChild(document.createTextNode(GAME.fmt(d.seed))); }
+        }
+        btn.title = d.name + ' - ' + d.desc + ' Grows in ' + GAME.fmtTime(d.grow) + ', ' + GAME.harvestYield(it.crop) + ' feed.';
+      } else { tag.textContent = it.tip.split(' ').slice(0, 2).join(' ').toUpperCase(); btn.title = it.tip; }
+      btn.appendChild(tag);
+      el.farmPalette.appendChild(btn);
+    });
+    /* a feed readout so you know why you are farming */
+    const info = document.createElement('div');
+    info.className = 'farm-info';
+    const st = S();
+    const soil = Object.keys(st.soil).length, crops = Object.values(st.soil).filter(t => t.crop).length;
+    const ripeN = Object.values(st.soil).filter(t => GAME.ripe(t)).length;
+    info.textContent = soil + ' tilled, ' + crops + ' growing, ' + ripeN + ' ripe';
+    el.farmPalette.appendChild(info);
+  }
+
 
   /* ---------- speech-bubble hints ---------- */
   let bubbleText = '';
@@ -1798,6 +2117,9 @@
     const set = (node, v) => { if (node.textContent !== v) node.textContent = v; };
     set(el.coins, GAME.fmt(S().coins));
     set(el.feathers, GAME.fmt(S().feathers));
+    set(el.feed, Math.floor(S().feedStore) + '/' + GAME.feedCap());
+    const nofeed = S().feedStore < 1;
+    if (el.feedPill.classList.contains('full') !== nofeed) el.feedPill.classList.toggle('full', nofeed);
     const n = S().chickens.length, capn = GAME.chickenCap();
     set(el.cap, n + '/' + capn);
     const full = n >= capn;
@@ -1806,6 +2128,10 @@
     updateCrewBadge();
     hintLogic();
     refreshInspect();
+    if (!$('#modal-depot').hidden) {
+      const dsig = S().truck.state + '|' + S().truck.load.length + '|' + S().coins.toFixed(0) + '|' + S().vehicle + '|' + S().routes.length + '|' + S().route;
+      if (dsig !== depotSig) { depotSig = dsig; renderDepot(); }
+    }
     if (!$('#modal-hire').hidden) {
       const sig = S().staff.length + '|' + S().coins.toFixed(0) + '|' + S().autoMark + '|' + GAME.staffSlots();
       if (sig !== hireSig) { hireSig = sig; renderHire(); }
@@ -1970,19 +2296,24 @@
     document.querySelectorAll('.modal').forEach(m => m.hidden = true);
   }
 
-  /* ================= EGGOS - THE LAB TERMINAL =================
-     The research screen is a little computer. Modules down the
-     left, installable packages on the right, and nothing listed
-     that you cannot install yet - a package appears the moment
-     its prerequisite goes in.
-     ========================================================== */
-  const TERM_W = 760, TERM_H = 400, TK = 2;      /* canvas px, and the pixel scale */
-  const VW = TERM_W / TK, VH = TERM_H / TK;      /* 380 x 200 virtual pixels */
+  /* ================= THE LAB - A COMPUTER ON A DESK =================
+     Open the Lab and you are looking at a monitor: a desk, a
+     keyboard, a mug, and on the screen an operating system called
+     EGGOS running SKILLMAP.EXE - a hex map of research. Only hexes
+     you have installed or could install right now are on the map;
+     the rest is dark. A pixel mouse pointer follows your finger.
+     ============================================================ */
+  const TERM_W = 760, TERM_H = 440, TK = 2;
+  const VW = TERM_W / TK, VH = TERM_H / TK;         /* 380 x 220 */
+  const SCR = { x: 18, y: 10, w: 344, h: 166 };     /* the glass */
+  const MAPW = { x: SCR.x + 4, y: SCR.y + 4, w: 236, h: 146 };
+  const RDW = { x: SCR.x + 244, y: SCR.y + 4, w: 96, h: 146 };
+  const HEXR = 11;
   let termCv = null, termCtx = null;
-  let termMod = 0, termSel = null, termScroll = 0, termHover = null;
-  let termHits = [];
-  const ROW_H = 21, LIST_X = 92, LIST_Y = 32, LIST_W = VW - LIST_X - 12, ROWS_VIS = 6;
-  const LABEL_Y = 22;
+  let termSel = null, termHover = null, termHits = [];
+  let mapPan = { x: 0, y: 0 }, mapDrag = null;
+  let termMouse = { x: 0, y: 0, inside: false };
+  let labOpenedAt = 0, installFx = null, termKeys = 0;
 
   function pkgState(sk) {
     const cur = GAME.lvl(sk.id);
@@ -1990,14 +2321,27 @@
     if (S().feathers >= skillCost(sk, cur)) return 'ready';
     return 'short';
   }
-  /* a package only shows once its prerequisite is installed */
   function pkgVisible(sk) {
+    if (sk.id === 'root') return true;
     const pre = skillPrereq(sk);
     return !pre || GAME.lvl(pre.id) > 0;
   }
-  function modulePkgs(i) { return SKILLS_BY_MODULE[i].filter(pkgVisible); }
-  function moduleHidden(i) { return SKILLS_BY_MODULE[i].length - modulePkgs(i).length; }
-  function moduleReady(i) { return modulePkgs(i).some(sk => pkgState(sk) === 'ready'); }
+  function hexCenter(sk) {
+    const p = HEX_POS[sk.id] || { q: 0, r: 0 };
+    const px2 = hexToPx(p.q, p.r, HEXR);
+    return { x: Math.round(MAPW.x + MAPW.w / 2 + px2.x + mapPan.x), y: Math.round(MAPW.y + 9 + (MAPW.h - 9) / 2 + px2.y + mapPan.y) };
+  }
+  function centerOn(id) {
+    const p = HEX_POS[id] || { q: 0, r: 0 };
+    const px2 = hexToPx(p.q, p.r, HEXR);
+    mapPan = { x: -px2.x, y: -px2.y };
+  }
+  function hexPal(state, hue) {
+    if (state === 'root') return { base: '#a8783f', light: '#c9a35f', dark: '#7a5230', out: '#3e2810' };
+    if (state === 'done') return { base: hue, light: SPR.lighten(hue, 0.35), dark: SPR.darken(hue, 0.3), out: SPR.darken(hue, 0.65) };
+    if (state === 'ready') return { base: '#ffc72f', light: '#ffe27a', dark: '#e0a416', out: '#7a5210' };
+    return { base: '#2a4a3a', light: '#3a5e4a', dark: '#1d3628', out: '#0f1f16' };
+  }
 
   function drawTerm(now) {
     if (!termCv) return;
@@ -2007,156 +2351,279 @@
     g.setTransform(TK, 0, 0, TK, 0, 0);
     termHits = [];
 
-    SPR.drawBezel(g, 0, 0, VW, VH);
-    const px0 = 6, py0 = 6, pw = VW - 12, ph = VH - 16;
+    /* ---------- the desk ---------- */
+    g.fillStyle = '#2a1e12'; g.fillRect(0, 0, VW, VH);
+    g.fillStyle = '#8a5e2a'; g.fillRect(0, 184, VW, 36);
+    g.fillStyle = '#a8783f'; g.fillRect(0, 184, VW, 2);
+    g.fillStyle = '#7a5230';
+    for (let y = 190; y < VH; y += 6) for (let x = (y % 12) ? 0 : 7; x < VW; x += 14) g.fillRect(x, y, 9, 1);
+    /* monitor glow on the desk */
+    g.fillStyle = 'rgba(126,242,168,.10)'; g.fillRect(40, 186, 300, 30);
 
-    /* faint grid, like a phosphor mesh */
-    g.fillStyle = T.grid;
-    for (let x = px0; x < px0 + pw; x += 8) g.fillRect(x, py0, 1, ph);
-    for (let y = py0; y < py0 + ph; y += 8) g.fillRect(px0, y, pw, 1);
+    /* ---------- monitor ---------- */
+    g.fillStyle = '#1a1410'; g.fillRect(10, 2, 360, 184);
+    g.fillStyle = '#d9d2c0'; g.fillRect(11, 3, 358, 182);
+    g.fillStyle = '#f2ece0'; g.fillRect(11, 3, 358, 2);
+    g.fillStyle = '#a89e8c'; g.fillRect(11, 180, 358, 5);
+    g.fillStyle = '#8c8270'; g.fillRect(11, 3, 2, 182); g.fillRect(367, 3, 2, 182);
+    /* glass well */
+    g.fillStyle = '#1a1410'; g.fillRect(SCR.x - 2, SCR.y - 2, SCR.w + 4, SCR.h + 4);
+    /* badge, power lamp, stand */
+    SPR.drawTiny(g, 'EGGTRON 3000', 150, 179, '#6e6656', 1);
+    g.fillStyle = Math.floor(now / 900) % 2 ? '#7ac74f' : '#4f9b3f'; g.fillRect(352, 180, 4, 3);
+    g.fillStyle = '#8c8270'; g.fillRect(170, 186, 40, 5); g.fillStyle = '#a89e8c'; g.fillRect(150, 190, 80, 3);
+    /* sticky notes on the bezel */
+    const note = (x, y, col, lines, tilt) => {
+      g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(x + 1, y + 1, 26, 22);
+      g.fillStyle = col; g.fillRect(x, y, 26, 22);
+      g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(x, y, 26, 2);
+      lines.forEach((l, i) => SPR.drawTiny(g, l, x + 2 + tilt, y + 4 + i * 6, '#3a2a16', 1));
+    };
+    note(8, 190, '#ffe27a', ['FEED THE', 'CHICKS', 'FIRST'], 0);
+    note(38, 196, '#ffb0d0', ['PLANT', 'BEFORE', 'NOON'], 1);
+    note(346, 194, '#b8f0c8', ['PET MAMA', 'SHE IS', 'SLOW NOW'], 0);
 
-    /* ---- header ---- */
-    g.fillStyle = T.bg2; g.fillRect(px0, py0, pw, 14);
-    g.fillStyle = T.dim;  g.fillRect(px0, py0 + 14, pw, 1);
-    SPR.drawText(g, 'EGGOS 4.0', px0 + 4, py0 + 4, T.hot, 1);
-    const fx = 'FEATHERS ' + GAME.fmt(S().feathers);
-    SPR.drawText(g, fx, px0 + pw - 4 - SPR.textW(fx, 1), py0 + 4, T.warn, 1);
-    if (Math.floor(now / 420) % 2) {
-      g.fillStyle = T.text;
-      g.fillRect(px0 + 4 + SPR.textW('EGGOS 4.0 ', 1), py0 + 4, 4, 6);
+    /* ---------- keyboard ---------- */
+    g.fillStyle = '#1a1410'; g.fillRect(70, 196, 200, 20);
+    g.fillStyle = '#d9d2c0'; g.fillRect(71, 197, 198, 18);
+    g.fillStyle = '#a89e8c'; g.fillRect(71, 212, 198, 3);
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 22; c++) {
+      const kx = 74 + c * 9 + (r % 2) * 3, ky = 199 + r * 4;
+      if (kx + 8 > 268) continue;
+      const lit = installFx && (now - installFx.t) < 600 && ((c + r * 3) % 7) === Math.floor((now - installFx.t) / 60) % 7;
+      g.fillStyle = lit ? '#7ef2a8' : '#f2ece0'; g.fillRect(kx, ky, 7, 3);
+      g.fillStyle = lit ? '#4fb072' : '#b8b0a0'; g.fillRect(kx, ky + 2, 7, 1);
     }
+    g.fillStyle = '#f2ece0'; g.fillRect(120, 211, 90, 3); g.fillStyle = '#b8b0a0'; g.fillRect(120, 213, 90, 1);
+    /* mouse on its pad */
+    g.fillStyle = '#3a5a8a'; g.fillRect(282, 194, 34, 22);
+    g.fillStyle = '#4a6a9a'; g.fillRect(282, 194, 34, 2);
+    g.fillStyle = '#1a1410'; g.fillRect(292, 198, 14, 16);
+    g.fillStyle = '#f2ece0'; g.fillRect(293, 199, 12, 14);
+    g.fillStyle = '#c9c0a8'; g.fillRect(293, 205, 12, 1); g.fillRect(299, 199, 1, 6);
+    g.fillStyle = termMouse.inside ? '#7ef2a8' : '#8c8270'; g.fillRect(298, 201, 2, 2);
+    /* mug with steam */
+    g.fillStyle = '#1a1410'; g.fillRect(324, 190, 15, 19); g.fillRect(338, 194, 4, 9);
+    g.fillStyle = '#e8542f'; g.fillRect(325, 191, 13, 17); g.fillRect(339, 195, 2, 7);
+    g.fillStyle = '#ff8f6a'; g.fillRect(325, 191, 13, 2);
+    g.fillStyle = '#5e3d18'; g.fillRect(326, 192, 11, 2);
+    g.fillStyle = '#fff8ec'; g.fillRect(330, 197, 3, 3); g.fillRect(331, 198, 1, 1);
+    g.fillStyle = 'rgba(255,255,255,.45)';
+    for (let i = 0; i < 3; i++) { const sy = 186 - ((now / 120 + i * 9) % 14); g.fillRect(328 + i * 3 + Math.round(Math.sin(now / 300 + i) * 1), Math.round(sy), 1, 2); }
 
-    /* ---- module column ---- */
-    const modX = px0 + 4, modY = LIST_Y;
-    SPR.drawText(g, 'MODULES', modX, LABEL_Y, T.dim, 1);
-    MODULES.forEach((m, i) => {
-      const y = modY + i * 17;
-      const on = i === termMod;
-      const pkgs = modulePkgs(i);
-      const dead = pkgs.length === 0;
-      SPR.drawBox(g, modX, y, 78, 15, on ? SPR.darken(m.hue, 0.55) : T.bg2,
-                  on ? m.hue : null, on ? m.hue : T.frame);
-      const col = dead ? T.dim : on ? T.hot : T.text;
-      SPR.drawText(g, (on ? '>' : ' ') + m.name, modX + 3, y + 4, col, 1);
-      /* a lamp when something in there is affordable */
-      if (moduleReady(i)) {
-        g.fillStyle = Math.floor(now / 340) % 2 ? T.warn : SPR.darken(T.warn, 0.5);
-        g.fillRect(modX + 72, y + 5, 4, 4);
-      }
-      termHits.push({ kind: 'mod', i, x: modX, y, w: 78, h: 15 });
-    });
-    /* module footer: the code name, like a filename */
-    SPR.drawText(g, MODULES[termMod].code, modX, modY + 7 * 17 + 4, T.dim, 1);
+    /* ---------- the screen ---------- */
+    const boot = (now - labOpenedAt) / 1000;
+    if (boot < 1.15) { drawBoot(g, boot, now); }
+    else drawDesktop(g, now);
 
-    /* ---- package list ---- */
-    const pkgs = modulePkgs(termMod);
-    const maxScroll = Math.max(0, pkgs.length - ROWS_VIS);
-    termScroll = Math.max(0, Math.min(maxScroll, termScroll));
-    const hue = MODULES[termMod].hue;
-    SPR.drawText(g, 'PACKAGES', LIST_X, LABEL_Y, T.dim, 1);
-    const cnt = pkgs.length + ' AVAILABLE';
-    SPR.drawText(g, cnt, LIST_X + LIST_W - SPR.textW(cnt, 1), LABEL_Y, T.dim, 1);
+    /* glass: scanlines, band, reflection */
+    SPR.drawScanlines(g, SCR.x, SCR.y, SCR.w, SCR.h, now);
+    g.fillStyle = 'rgba(255,255,255,.05)'; g.fillRect(SCR.x + 6, SCR.y + 4, 40, 2); g.fillRect(SCR.x + 6, SCR.y + 7, 20, 1);
 
-    if (!pkgs.length) {
-      SPR.drawBox(g, LIST_X, LIST_Y, LIST_W, 30, SPR.TERM.bg2, null, T.frame);
-      SPR.drawText(g, 'NO PACKAGES YET', LIST_X + 6, LIST_Y + 6, T.dim, 1);
-      SPR.drawText(g, 'INSTALL SOMETHING ELSE FIRST', LIST_X + 6, LIST_Y + 16, T.dim, 1);
+    /* ---------- the pointer ---------- */
+    if (termMouse.inside) {
+      const over = termHitAt(termMouse.x, termMouse.y);
+      const kind = over && (over.kind === 'hex' || over.kind === 'install' || over.kind === 'mod' || over.kind === 'home' || over.kind === 'close') ? 'hand' : 'arrow';
+      const cur = SPR.cursorSprite(kind, 1);
+      g.drawImage(cur, Math.round(termMouse.x) - (kind === 'hand' ? 4 : 0), Math.round(termMouse.y) - (kind === 'hand' ? 2 : 0));
     }
-
-    for (let vi = 0; vi < Math.min(ROWS_VIS, pkgs.length); vi++) {
-      const sk = pkgs[vi + termScroll];
-      const y = LIST_Y + vi * ROW_H;
-      const st = pkgState(sk);
-      const sel = termSel === sk.id;
-      const hov = termHover === sk.id;
-      const fill = sel ? SPR.darken(hue, 0.6) : st === 'done' ? '#152a1c' : T.bg2;
-      SPR.drawBox(g, LIST_X, y, LIST_W, ROW_H - 2, fill, sel || hov ? hue : null,
-                  sel ? hue : st === 'ready' ? SPR.darken(T.warn, 0.35) : T.frame);
-      /* icon chip */
-      SPR.drawBox(g, LIST_X + 2, y + 2, 14, 14, SPR.darken(hue, 0.45), hue, T.frame);
-      const icon = SPR.iconSprite(sk.icon, 1);
-      g.globalAlpha = st === 'done' ? 0.7 : 1;
-      g.drawImage(icon, LIST_X + 4, y + 4);
-      g.globalAlpha = 1;
-      /* name + level pips */
-      const cur = GAME.lvl(sk.id);
-      SPR.drawText(g, sk.name.toUpperCase(), LIST_X + 20, y + 3,
-                   st === 'done' ? T.dim : st === 'ready' ? T.hot : T.text, 1);
-      if (sk.max > 1) {
-        SPR.drawPips(g, LIST_X + 20, y + 12, cur, Math.min(sk.max, 12),
-                     st === 'done' ? T.dim : hue, '#20402c');
-        SPR.drawText(g, cur + '/' + sk.max, LIST_X + 24 + Math.min(sk.max, 12) * 3, y + 11, T.dim, 1);
-      } else {
-        SPR.drawText(g, cur ? 'INSTALLED' : 'ONE OFF', LIST_X + 20, y + 11, cur ? T.dim : T.text, 1);
-      }
-      /* the whole row selects; the cost chip on top of it installs */
-      termHits.push({ kind: 'pkg', id: sk.id, x: LIST_X, y, w: LIST_W, h: ROW_H - 2 });
-      /* right side: cost chip, or DONE */
-      if (st === 'done') {
-        const w = SPR.textW('DONE', 1) + 8;
-        SPR.drawBox(g, LIST_X + LIST_W - w - 3, y + 5, w, 10, '#1c3a26', null, T.dim);
-        SPR.drawText(g, 'DONE', LIST_X + LIST_W - w + 1, y + 6, T.dim, 1);
-      } else {
-        const cost = skillCost(sk, cur);
-        const label = GAME.fmt(cost);
-        const w = SPR.textW(label, 1) + 16;
-        const ok = st === 'ready';
-        SPR.drawBox(g, LIST_X + LIST_W - w - 3, y + 4, w, 12,
-                    ok ? SPR.darken(T.warn, 0.35) : '#20262c', ok ? T.warn : null,
-                    ok ? T.warn : T.frame);
-        g.drawImage(SPR.iconSprite('feather', 1), LIST_X + LIST_W - w - 1, y + 5);
-        SPR.drawText(g, label, LIST_X + LIST_W - w + 10, y + 6, ok ? '#fff8ec' : T.dim, 1);
-        termHits.push({ kind: 'buy', id: sk.id, x: LIST_X + LIST_W - w - 3, y: y + 4, w, h: 12 });
-      }
-    }
-
-    /* scroll rail */
-    if (maxScroll > 0) {
-      const railH = ROWS_VIS * ROW_H - 2;
-      g.fillStyle = '#16281e'; g.fillRect(LIST_X + LIST_W + 2, LIST_Y, 3, railH);
-      const th = Math.max(6, railH * ROWS_VIS / pkgs.length);
-      g.fillStyle = hue;
-      g.fillRect(LIST_X + LIST_W + 2, LIST_Y + Math.round((railH - th) * termScroll / maxScroll), 3, Math.round(th));
-    }
-
-    /* locked count - a hint that the tree keeps going */
-    const hid = moduleHidden(termMod);
-    if (hid > 0) {
-      const y = LIST_Y + Math.min(ROWS_VIS, pkgs.length) * ROW_H;
-      SPR.drawText(g, hid + ' MORE ENCRYPTED', LIST_X + 2, y + 2, '#2f5a40', 1);
-    }
-
-    /* ---- footer: the selected package ---- */
-    const fy = py0 + ph - 22;
-    g.fillStyle = T.bg2; g.fillRect(px0, fy, pw, 22);
-    g.fillStyle = T.dim;  g.fillRect(px0, fy, pw, 1);
-    const sel = termSel ? SKILL_BY_ID[termSel] : null;
-    if (sel && pkgVisible(sel)) {
-      SPR.drawText(g, '> ' + sel.name.toUpperCase(), px0 + 4, fy + 4, MODULES[sel.br].hue, 1);
-      SPR.drawText(g, sel.desc.toUpperCase().slice(0, 58), px0 + 4, fy + 13, T.text, 1);
-    } else {
-      SPR.drawText(g, '> SELECT A PACKAGE', px0 + 4, fy + 4, T.dim, 1);
-      SPR.drawText(g, 'TAP THE COST CHIP TO INSTALL IT', px0 + 4, fy + 13, T.dim, 1);
-    }
-
-    SPR.drawScanlines(g, px0, py0, pw, ph, now);
     g.setTransform(1, 0, 0, 1, 0, 0);
   }
 
+  function drawBoot(g, t, now) {
+    g.fillStyle = '#05100a'; g.fillRect(SCR.x, SCR.y, SCR.w, SCR.h);
+    const lines = ['EGGTRON BIOS v3.0', 'MEMORY 640 EGGS OK', 'CHECKING COOPS.... OK', 'MOUNTING FEATHERS.. OK',
+                   'LOADING EGGOS 5.0', 'RUNNING SKILLMAP.EXE'];
+    const n = Math.min(lines.length, Math.floor(t / 0.16));
+    for (let i = 0; i < n; i++) SPR.drawText(g, lines[i], SCR.x + 6, SCR.y + 6 + i * 9, i === n - 1 ? '#d8ffe8' : '#7ef2a8', 1);
+    if (n < lines.length && Math.floor(now / 120) % 2) { g.fillStyle = '#7ef2a8'; g.fillRect(SCR.x + 6 + SPR.textW(lines[n] || '', 1) * 0, SCR.y + 6 + n * 9, 4, 6); }
+    if (t > 1.0) { g.fillStyle = 'rgba(200,255,220,' + ((t - 1.0) / 0.15) + ')'; g.fillRect(SCR.x, SCR.y, SCR.w, SCR.h); }
+  }
+
+  function drawDesktop(g, now) {
+    const T = SPR.TERM;
+    /* wallpaper */
+    g.fillStyle = '#0f2a24'; g.fillRect(SCR.x, SCR.y, SCR.w, SCR.h);
+    g.fillStyle = '#123229';
+    for (let y = SCR.y; y < SCR.y + SCR.h; y += 12) for (let x = SCR.x + ((y / 12) % 2) * 8; x < SCR.x + SCR.w; x += 16) { g.fillRect(x + 2, y + 3, 3, 4); g.fillRect(x + 1, y + 4, 5, 2); }
+
+    /* ---- SKILLMAP window ---- */
+    drawWindow(g, MAPW, 'SKILLMAP.EXE', now);
+    const inner = { x: MAPW.x + 1, y: MAPW.y + 10, w: MAPW.w - 2, h: MAPW.h - 11 };
+    g.save();
+    g.beginPath(); g.rect(inner.x * TK, inner.y * TK, inner.w * TK, inner.h * TK); g.clip();
+    /* the drag area goes in first so every hex drawn on top of it wins the hit test */
+    termHits.push({ kind: 'map', x: inner.x, y: inner.y, w: inner.w, h: inner.h });
+    /* map background grid */
+    g.fillStyle = '#081a14'; g.fillRect(inner.x, inner.y, inner.w, inner.h);
+    g.fillStyle = '#0d2a1f';
+    for (let x = inner.x + ((mapPan.x % 12) + 12) % 12; x < inner.x + inner.w; x += 12) g.fillRect(x, inner.y, 1, inner.h);
+    for (let y = inner.y + ((mapPan.y % 12) + 12) % 12; y < inner.y + inner.h; y += 12) g.fillRect(inner.x, y, inner.w, 1);
+
+    const visible = SKILLS.filter(pkgVisible);
+    /* paths first: installed -> child */
+    visible.forEach(sk => {
+      if (!sk.pre) return;
+      const a2 = hexCenter(SKILL_BY_ID[sk.pre]), b2 = hexCenter(sk);
+      const st = pkgState(sk);
+      const hue = MODULES[sk.br].hue;
+      const steps = Math.max(Math.abs(b2.x - a2.x), Math.abs(b2.y - a2.y));
+      for (let i = 0; i <= steps; i++) {
+        const t = steps ? i / steps : 0;
+        if (st !== 'done' && (i % 4 > 1)) continue;             /* dotted when not yet installed */
+        const x = Math.round(a2.x + (b2.x - a2.x) * t), y = Math.round(a2.y + (b2.y - a2.y) * t);
+        g.fillStyle = st === 'done' ? hue : st === 'ready' ? '#ffc72f' : '#2f6a48';
+        g.fillRect(x - 1, y - 1, 2, 2);
+      }
+    });
+    /* hidden children hint: short stubs with a ? */
+    visible.forEach(sk => {
+      SKILLS.filter(c2 => c2.pre === sk.id && !pkgVisible(c2)).forEach(c2 => {
+        const a2 = hexCenter(sk), b2 = hexCenter(c2);
+        const dx = b2.x - a2.x, dy = b2.y - a2.y, d = Math.hypot(dx, dy) || 1;
+        for (let i = 12; i < 22; i += 3) { g.fillStyle = 'rgba(126,242,168,.22)'; g.fillRect(Math.round(a2.x + dx / d * i), Math.round(a2.y + dy / d * i), 1, 1); }
+        if (Math.floor(now / 700 + c2.d) % 2) SPR.drawTiny(g, '?', Math.round(a2.x + dx / d * 25) - 1, Math.round(a2.y + dy / d * 25) - 2, 'rgba(126,242,168,.5)', 1);
+      });
+    });
+    /* hexes */
+    visible.forEach(sk => {
+      const c2 = hexCenter(sk);
+      if (c2.x < inner.x - 14 || c2.x > inner.x + inner.w + 14 || c2.y < inner.y - 14 || c2.y > inner.y + inner.h + 14) return;
+      const st = sk.id === 'root' ? 'root' : pkgState(sk);
+      const hue = MODULES[sk.br].hue;
+      const sel = termSel === sk.id, hov = termHover === sk.id;
+      /* shadow */
+      SPR.drawHex(g, c2.x, c2.y + 2, HEXR, { base: '#03110a', light: '#03110a', dark: '#03110a', out: '#03110a' });
+      SPR.drawHex(g, c2.x, c2.y, HEXR, hexPal(st, hue), { rim: true });
+      if (sel || hov) SPR.drawHex(g, c2.x, c2.y, HEXR + 2, { base: 'rgba(0,0,0,0)', light: 'rgba(0,0,0,0)', dark: 'rgba(0,0,0,0)', out: sel ? '#ffffff' : 'rgba(255,255,255,.55)' });
+      if (st === 'ready' && Math.floor(now / 340) % 2) {
+        SPR.drawHex(g, c2.x, c2.y, HEXR + 3, { base: 'rgba(0,0,0,0)', light: 'rgba(0,0,0,0)', dark: 'rgba(0,0,0,0)', out: 'rgba(255,214,80,.8)' });
+      }
+      if (installFx && installFx.id === sk.id && now - installFx.t < 600) {
+        const f = (now - installFx.t) / 600;
+        SPR.drawHex(g, c2.x, c2.y, HEXR + 3 + Math.round(f * 10), { base: 'rgba(0,0,0,0)', light: 'rgba(0,0,0,0)', dark: 'rgba(0,0,0,0)', out: 'rgba(255,255,255,' + (1 - f) + ')' });
+      }
+      const icon = SPR.iconSprite(sk.icon, 1);
+      g.globalAlpha = st === 'short' ? 0.55 : 1;
+      g.drawImage(icon, c2.x - 5, c2.y - 7);
+      g.globalAlpha = 1;
+      if (sk.id !== 'root' && sk.max > 1) {
+        const lab = GAME.lvl(sk.id) + '/' + sk.max;
+        SPR.drawTiny(g, lab, c2.x - Math.floor(SPR.tinyW(lab, 1) / 2), c2.y + 3, st === 'short' ? '#7ef2a8' : '#1a1410', 1);
+      } else if (sk.id !== 'root' && GAME.lvl(sk.id)) {
+        SPR.drawTiny(g, 'ON', c2.x - 3, c2.y + 3, '#1a1410', 1);
+      }
+      termHits.push({ kind: 'hex', id: sk.id, x: c2.x - HEXR, y: c2.y - 9, w: HEXR * 2, h: 18, cx: c2.x, cy: c2.y });
+    });
+    g.restore();
+    /* window status line */
+    const vis = visible.length - 1, tot = SKILLS.length - 1;
+    const status = vis + ' ON MAP  ' + (tot - vis) + ' DARK  DRAG TO PAN';
+    g.fillStyle = 'rgba(8,26,20,.85)'; g.fillRect(inner.x + 1, inner.y + inner.h - 9, SPR.tinyW(status, 1) + 4, 8);
+    SPR.drawTiny(g, status, inner.x + 3, inner.y + inner.h - 7, '#4fb072', 1);
+
+    /* ---- README window ---- */
+    drawWindow(g, RDW, 'README.TXT', now);
+    const rx = RDW.x + 4, ry = RDW.y + 14;
+    g.fillStyle = '#0b1f18'; g.fillRect(RDW.x + 1, RDW.y + 10, RDW.w - 2, RDW.h - 11);
+    const sk = termSel ? SKILL_BY_ID[termSel] : null;
+    if (sk) {
+      const st = sk.id === 'root' ? 'root' : pkgState(sk);
+      const hue = MODULES[sk.br].hue;
+      SPR.drawBox(g, rx, ry, 18, 18, SPR.darken(hue, 0.45), hue, '#0f1f16');
+      g.drawImage(SPR.iconSprite(sk.icon, 1), rx + 4, ry + 4);
+      const words = sk.name.toUpperCase().split(' ');
+      words.slice(0, 2).forEach((w, i) => SPR.drawTiny(g, w, rx + 21, ry + 1 + i * 7, '#d8ffe8', 1));
+      SPR.drawTiny(g, MODULES[sk.br].code, rx + 21, ry + 15, '#4fb072', 1);
+      /* description wrapped */
+      const desc = sk.desc.toUpperCase();
+      let line = '', y2 = ry + 24;
+      desc.split(' ').forEach(w => {
+        if (SPR.tinyW(line + ' ' + w, 1) > RDW.w - 10) { SPR.drawTiny(g, line, rx, y2, '#7ef2a8', 1); y2 += 7; line = w; }
+        else line = line ? line + ' ' + w : w;
+      });
+      if (line) { SPR.drawTiny(g, line, rx, y2, '#7ef2a8', 1); y2 += 7; }
+      y2 += 4;
+      const cur = GAME.lvl(sk.id);
+      if (sk.id !== 'root') {
+        SPR.drawTiny(g, 'LEVEL ' + cur + ' / ' + sk.max, rx, y2, '#d8ffe8', 1); y2 += 7;
+        if (sk.max > 1) { SPR.drawPips(g, rx, y2, cur, Math.min(sk.max, 12), hue, '#1d3628'); y2 += 8; }
+        if (st !== 'done') {
+          const cost = skillCost(sk, cur);
+          SPR.drawTiny(g, 'COST ' + GAME.fmt(cost) + ' FEATHERS', rx, y2, st === 'ready' ? '#ffd23f' : '#e8607a', 1); y2 += 9;
+          /* the INSTALL button */
+          const bw = RDW.w - 10, bh = 13, bx = rx, by = RDW.y + RDW.h - 20;
+          const busy = installFx && now - installFx.t < 500;
+          SPR.drawBox(g, bx, by, bw, bh, st === 'ready' ? SPR.darken('#ffc72f', 0.35) : '#1d2a22', st === 'ready' ? '#ffc72f' : null, st === 'ready' ? '#ffc72f' : '#2f6a48');
+          if (busy) {
+            const f = (now - installFx.t) / 500;
+            g.fillStyle = '#7ef2a8'; g.fillRect(bx + 2, by + 2, Math.round((bw - 4) * f), bh - 4);
+            SPR.drawTiny(g, 'INSTALLING', bx + 6, by + 4, '#03110a', 1);
+          } else {
+            const lab2 = st === 'ready' ? '> INSTALL' : 'NEED MORE';
+            SPR.drawTiny(g, lab2, bx + Math.round(bw / 2 - SPR.tinyW(lab2, 1) / 2), by + 4, st === 'ready' ? '#fff8ec' : '#4fb072', 1);
+          }
+          if (st === 'ready') termHits.push({ kind: 'install', id: sk.id, x: bx, y: by, w: bw, h: bh });
+        } else {
+          SPR.drawTiny(g, 'INSTALLED', rx, RDW.y + RDW.h - 16, '#4fb072', 1);
+        }
+      } else {
+        SPR.drawTiny(g, 'THE KERNEL.', rx, y2, '#d8ffe8', 1);
+        SPR.drawTiny(g, 'EVERY PATH STARTS HERE.', rx, y2 + 7, '#7ef2a8', 1);
+      }
+    } else {
+      ['CLICK A HEX', 'TO READ IT.', '', 'GOLD HEXES', 'CAN BE', 'INSTALLED', 'RIGHT NOW.', '', 'DARK PATHS', 'LEAD ON TO', 'MORE.'].forEach((l, i) => SPR.drawTiny(g, l, rx, ry + i * 7, i < 2 ? '#d8ffe8' : '#7ef2a8', 1));
+    }
+
+    /* ---- taskbar ---- */
+    const tb = { x: SCR.x, y: SCR.y + SCR.h - 14, w: SCR.w, h: 14 };
+    g.fillStyle = '#1d3628'; g.fillRect(tb.x, tb.y, tb.w, tb.h);
+    g.fillStyle = '#2f6a48'; g.fillRect(tb.x, tb.y, tb.w, 1);
+    SPR.drawBox(g, tb.x + 3, tb.y + 2, 34, 10, '#2a4a3a', '#4fb072', '#0f1f16');
+    g.drawImage(SPR.iconSprite('egg', 1), tb.x + 5, tb.y + 2);
+    SPR.drawTiny(g, 'EGGOS', tb.x + 16, tb.y + 4, '#d8ffe8', 1);
+    termHits.push({ kind: 'home', x: tb.x + 3, y: tb.y + 2, w: 34, h: 10 });
+    /* module chips: click to pan there */
+    MODULES.forEach((m, i) => {
+      const cx = tb.x + 42 + i * 14;
+      const has = SKILLS_BY_MODULE[i].some(pkgVisible);
+      const ready = SKILLS_BY_MODULE[i].some(sk => pkgVisible(sk) && pkgState(sk) === 'ready');
+      SPR.drawBox(g, cx, tb.y + 2, 12, 10, has ? SPR.darken(m.hue, 0.5) : '#142a20', has ? m.hue : null, '#0f1f16');
+      g.globalAlpha = has ? 1 : 0.4;
+      g.drawImage(SPR.iconSprite(m.icon, 1), cx + 1, tb.y + 2);
+      g.globalAlpha = 1;
+      if (ready && Math.floor(now / 340) % 2) { g.fillStyle = '#ffd23f'; g.fillRect(cx + 9, tb.y + 2, 3, 3); }
+      termHits.push({ kind: 'mod', i, x: cx, y: tb.y + 2, w: 12, h: 10 });
+    });
+    const fx = 'FEATHERS ' + GAME.fmt(S().feathers);
+    SPR.drawTiny(g, fx, tb.x + tb.w - 4 - SPR.tinyW(fx, 1), tb.y + 4, '#ffd23f', 1);
+    const clock = 'DAY ' + S().day;
+    SPR.drawTiny(g, clock, tb.x + tb.w - 60 - SPR.tinyW(fx, 1), tb.y + 4, '#7ef2a8', 1);
+  }
+
+  function drawWindow(g, r, title, now) {
+    g.fillStyle = '#0f1f16'; g.fillRect(r.x - 1, r.y - 1, r.w + 2, r.h + 2);
+    g.fillStyle = '#2a4a3a'; g.fillRect(r.x, r.y, r.w, 9);
+    g.fillStyle = '#4fb072'; g.fillRect(r.x, r.y, r.w, 1);
+    SPR.drawTiny(g, title, r.x + 3, r.y + 2, '#d8ffe8', 1);
+    /* buttons */
+    g.fillStyle = '#7ef2a8'; g.fillRect(r.x + r.w - 15, r.y + 2, 5, 5);
+    g.fillStyle = '#e8607a'; g.fillRect(r.x + r.w - 8, r.y + 2, 5, 5);
+    g.fillStyle = '#0f1f16'; g.fillRect(r.x + r.w - 14, r.y + 5, 3, 1); g.fillRect(r.x + r.w - 7, r.y + 3, 1, 1); g.fillRect(r.x + r.w - 5, r.y + 3, 1, 1); g.fillRect(r.x + r.w - 6, r.y + 4, 1, 1); g.fillRect(r.x + r.w - 7, r.y + 5, 1, 1); g.fillRect(r.x + r.w - 5, r.y + 5, 1, 1);
+    termHits.push({ kind: 'close', x: r.x + r.w - 9, y: r.y + 1, w: 8, h: 8 });
+  }
+
   function termHitAt(cx, cy) {
-    /* later hits sit on top: walk backwards so buy chips win over rows */
     for (let i = termHits.length - 1; i >= 0; i--) {
       const h = termHits[i];
+      if (h.kind === 'hex') { if (SPR.hexHit(cx - h.cx, cy - h.cy, HEXR)) return h; continue; }
       if (cx >= h.x && cx <= h.x + h.w && cy >= h.y && cy <= h.y + h.h) return h;
     }
     return null;
   }
   function termCoords(ev) {
     const r = termCv.getBoundingClientRect();
-    return {
-      x: (ev.clientX - r.left) / r.width * VW,
-      y: (ev.clientY - r.top) / r.height * VH,
-    };
+    return { x: (ev.clientX - r.left) / r.width * VW, y: (ev.clientY - r.top) / r.height * VH };
   }
   function installPkg(id) {
     const sk = SKILL_BY_ID[id];
@@ -2164,13 +2631,12 @@
     if (GAME.buySkill(id)) {
       snd.skill();
       termSel = id;
+      installFx = { t: performance.now(), id };
       toast({ icon: sk.icon, title: sk.name.toUpperCase() + ' INSTALLED', body: sk.desc });
       renderSkillCard();
       renderToolbelt();
       GAME.mark('build');
-    } else {
-      snd.error();
-    }
+    } else snd.error();
   }
 
   function renderSkillCard() {
@@ -2180,7 +2646,7 @@
     if (!sk) {
       const hint = document.createElement('span');
       hint.className = 'sk-hint';
-      hint.textContent = 'pick a package on the screen above';
+      hint.textContent = 'click a hex on the screen. gold ones install right now; dark paths lead on to more.';
       card.appendChild(hint);
       return;
     }
@@ -2202,7 +2668,8 @@
     card.appendChild(mid);
     const btn = document.createElement('button');
     btn.className = 'btn';
-    if (maxed) { btn.disabled = true; btn.textContent = 'INSTALLED'; }
+    if (sk.id === 'root') { btn.disabled = true; btn.textContent = 'KERNEL'; }
+    else if (maxed) { btn.disabled = true; btn.textContent = 'INSTALLED'; }
     else {
       btn.dataset.act = 'buy-skill';
       btn.dataset.id = sk.id;
@@ -2221,39 +2688,127 @@
       termCtx = termCv.getContext('2d');
       termCv.addEventListener('pointermove', ev => {
         const p = termCoords(ev);
+        termMouse = { x: p.x, y: p.y, inside: true };
+        if (mapDrag) {
+          mapPan = { x: mapDrag.px + (p.x - mapDrag.x), y: mapDrag.py + (p.y - mapDrag.y) };
+          mapPan.x = Math.max(-260, Math.min(260, mapPan.x)); mapPan.y = Math.max(-260, Math.min(260, mapPan.y));
+          return;
+        }
         const h = termHitAt(p.x, p.y);
-        termHover = h && (h.kind === 'pkg' || h.kind === 'buy') ? h.id : null;
-        termCv.style.cursor = h ? 'pointer' : 'default';
+        termHover = h && h.kind === 'hex' ? h.id : null;
       });
-      termCv.addEventListener('pointerleave', () => { termHover = null; });
+      termCv.addEventListener('pointerleave', () => { termMouse.inside = false; termHover = null; mapDrag = null; });
       termCv.addEventListener('pointerdown', ev => {
+        ev.preventDefault();
+        termCv.setPointerCapture(ev.pointerId);
         const p = termCoords(ev);
+        termMouse = { x: p.x, y: p.y, inside: true };
         const h = termHitAt(p.x, p.y);
         if (!h) return;
-        if (h.kind === 'mod') {
-          if (termMod !== h.i) { termMod = h.i; termScroll = 0; termSel = null; renderSkillCard(); }
-          snd.plop();
-        } else if (h.kind === 'buy') {
-          installPkg(h.id);
-        } else {
-          termSel = h.id;
-          snd.plop();
-          renderSkillCard();
-        }
+        if (h.kind === 'hex') { termSel = h.id; snd.plop(); renderSkillCard(); mapDrag = null; return; }
+        if (h.kind === 'install') { installPkg(h.id); return; }
+        if (h.kind === 'mod') { const first = SKILLS_BY_MODULE[h.i][0]; if (first) { centerOn(first.id); snd.plop(); } return; }
+        if (h.kind === 'home') { centerOn('root'); snd.plop(); return; }
+        if (h.kind === 'close') { closeModals(); snd.plop(); return; }
+        if (h.kind === 'map') { mapDrag = { x: p.x, y: p.y, px: mapPan.x, py: mapPan.y }; }
       });
+      termCv.addEventListener('pointerup', () => { mapDrag = null; });
       termCv.addEventListener('wheel', ev => {
         ev.preventDefault();
-        termScroll += ev.deltaY > 0 ? 1 : -1;
+        mapPan.y -= ev.deltaY > 0 ? 12 : -12;
+        mapPan.y = Math.max(-260, Math.min(260, mapPan.y));
       }, { passive: false });
     }
-    /* land on a module that has something in it */
-    if (!modulePkgs(termMod).length) {
-      const first = MODULES.findIndex((_, i) => modulePkgs(i).length);
-      if (first >= 0) termMod = first;
-    }
+    labOpenedAt = performance.now();
+    if (!termSel) centerOn('root');
     $('#research-sub').textContent = GAME.fmt(S().feathers) + ' FEATHERS';
     renderSkillCard();
     GAME.dirty.skills = false;
+  }
+
+  /* ================= THE TRIP - a picture-in-picture of the road =================
+     While the load is out, a little window shows the drive: hills
+     scrolling by, the destination skyline rising, the sale, and the
+     ride home.
+     =========================================================== */
+  const tripCv = $('#trip-canvas');
+  const tripCtx = tripCv ? tripCv.getContext('2d') : null;
+  const TRW = 160, TRH = 56;
+  let tripSoldFx = 0;
+  function drawTrip(now) {
+    const view = $('#trip-view');
+    const ph = GAME.tripPhase();
+    if (!ph || !tripCtx) { if (view && !view.hidden) view.hidden = true; return; }
+    if (view.hidden) view.hidden = false;
+    const g = tripCtx;
+    g.imageSmoothingEnabled = false;
+    g.setTransform(3, 0, 0, 3, 0, 0);
+    const f = ph.f, out = f < 0.5;
+    const c2 = ph.city;
+    /* sky */
+    const skyCols = ['#8fc8e8', '#a6d6f0', '#c2e4f5'];
+    skyCols.forEach((col, i) => { g.fillStyle = col; g.fillRect(0, i * 12, TRW, 12); });
+    g.fillStyle = '#e8f4fa'; g.fillRect(0, 36, TRW, 10);
+    g.fillStyle = '#ffe9a0'; g.fillRect(126, 5, 7, 7); g.fillRect(125, 7, 9, 3);
+    /* clouds */
+    for (let i = 0; i < 3; i++) {
+      const cx = ((now / (60 + i * 20) + i * 60) % (TRW + 40)) - 20;
+      g.fillStyle = 'rgba(255,255,255,.85)'; g.fillRect(Math.round(TRW - cx), 6 + i * 7, 14 + i * 4, 3); g.fillRect(Math.round(TRW - cx) + 4, 4 + i * 7, 8, 2);
+    }
+    /* far hills scroll slowly, near ones faster */
+    const scroll = now / 18;
+    for (let x = 0; x < TRW; x++) {
+      const h1 = 14 + Math.sin((x + scroll * 0.4) / 22) * 4 + Math.sin((x + scroll * 0.4) / 7) * 1.5;
+      g.fillStyle = '#7fb85f'; g.fillRect(x, Math.round(TRH - 12 - h1), 1, Math.round(h1));
+      const h2 = 8 + Math.sin((x + scroll) / 15 + 2) * 3;
+      g.fillStyle = '#5aa845'; g.fillRect(x, Math.round(TRH - 12 - h2), 1, Math.round(h2));
+    }
+    /* the destination rises during the drive out; home rises on the way back */
+    const sky = SPR.skylineSprite(c2.sky, 120, 46, 1);
+    if (out) {
+      const sx = Math.round(TRW + 20 - (f / 0.5) * (TRW * 0.55 + 20));
+      g.drawImage(sky, sx, TRH - 12 - 46);
+    } else {
+      const sx = Math.round(-80 - ((f - 0.5) / 0.5) * 120);
+      g.drawImage(sky, sx, TRH - 12 - 46);
+      /* home: mama's nest and the lab, growing from the right */
+      const hx = Math.round(TRW + 20 - ((f - 0.5) / 0.5) * (TRW * 0.55 + 20));
+      g.drawImage(SPR.mamaSprite(S().mamaTier, 1, 'idle'), hx + 30, TRH - 12 - 16);
+      g.fillStyle = '#c9a35f'; g.fillRect(hx, TRH - 26, 22, 14); g.fillStyle = '#5fa8e8'; g.fillRect(hx - 2, TRH - 30, 26, 5);
+      g.fillStyle = '#3a2a16'; g.fillRect(hx + 8, TRH - 20, 6, 8);
+      SPR.drawTiny(g, 'LAB', hx + 4, TRH - 24, '#ffd23f', 1);
+    }
+    /* road */
+    g.fillStyle = '#b58a4f'; g.fillRect(0, TRH - 12, TRW, 12);
+    g.fillStyle = '#8a5e2a'; g.fillRect(0, TRH - 12, TRW, 1);
+    g.fillStyle = 'rgba(255,240,200,.5)';
+    for (let x = -((now / 8) % 22); x < TRW; x += 22) g.fillRect(Math.round(x), TRH - 6, 10, 1);
+    /* the vehicle, bobbing */
+    const v = ph.vehicle;
+    const spr = SPR.vehicleSprite(v.id, Math.floor(now / 90) % 2, 1);
+    const vx = 20, vy = TRH - 2 - spr.height + Math.round(Math.sin(now / 60) * 1);
+    g.drawImage(spr, vx, vy);
+    if (Math.floor(now / 120) % 2) { g.fillStyle = 'rgba(200,190,175,.6)'; g.fillRect(vx - 4, vy + spr.height - 6, 3, 2); }
+    /* banner */
+    let text, col;
+    if (out) { text = 'TO ' + c2.name.toUpperCase(); col = '#3a2a16'; }
+    else if (f < 0.62) { text = 'SOLD ' + ph.n + ' EGGS  +' + GAME.fmt(ph.pay); col = '#1f7a2a'; }
+    else { text = 'HEADING HOME'; col = '#3a2a16'; }
+    const tw = SPR.textW(text, 1);
+    g.fillStyle = 'rgba(255,249,236,.9)'; g.fillRect(Math.round(TRW / 2 - tw / 2) - 4, 2, tw + 8, 10);
+    g.fillStyle = '#3a2a16'; g.fillRect(Math.round(TRW / 2 - tw / 2) - 4, 11, tw + 8, 1);
+    SPR.drawText(g, text, Math.round(TRW / 2 - tw / 2), 4, col, 1);
+    /* coins pop at the sale */
+    if (!out && f < 0.62) {
+      for (let i = 0; i < 6; i++) {
+        const t = ((f - 0.5) / 0.12 + i * 0.13) % 1;
+        g.fillStyle = '#ffd23f'; g.fillRect(Math.round(vx + 10 + i * 6), Math.round(vy - 4 - t * 16), 2, 2);
+      }
+    }
+    /* progress bar along the bottom */
+    g.fillStyle = '#3a2a16'; g.fillRect(0, TRH - 1, TRW, 1);
+    g.fillStyle = '#ffd23f'; g.fillRect(0, TRH - 1, Math.round(TRW * f), 1);
+    g.setTransform(1, 0, 0, 1, 0, 0);
   }
 
   /* ================= INSPECT PANEL ================= */
@@ -2373,7 +2928,12 @@
       const ch = inspect.ref;
       if (st.chickens.indexOf(ch) === -1) { setInspect({ kind: 'farm' }); return; }
       const sp = SPECIES[ch.sp];
-      ipanel.appendChild(ipHead(chickEl(sp, 2, false), sp.name, TIERS[sp.tier].n));
+      ipanel.appendChild(ipHead(chickEl(sp, 2, false), sp.name, TIERS[sp.tier].n + (GAME.isChick(ch) ? ' chick' : '')));
+      if (GAME.isChick(ch)) {
+        ipanel.appendChild(ipRow('grown up', () => Math.round((ch.age || 0) * 100) + '%'));
+        ipanel.appendChild(ipRow('needs', () => Math.ceil((1 - (ch.age || 0)) * GAME.growPellets()) + ' pellets'));
+      }
+      ipanel.appendChild(ipRow('belly', () => ch.food <= 0 ? 'EMPTY - lays slow' : Math.round(ch.food * 100) + '% full'));
       ipanel.appendChild(ipRow('lays every', GAME.fmtTime(GAME.layTime(sp.tier) / (ch.buffT > 0 ? 2 : 1))));
       ipanel.appendChild(ipRow('egg value', GAME.fmt(GAME.eggValue(sp.tier, false))));
       ipanel.appendChild(ipRow('next egg in', () => GAME.fmtTime(Math.max(0, ch.lay))));
@@ -2422,9 +2982,65 @@
       return;
     }
 
+    if (kind === 'applicant') {
+      const a = inspect.ref;
+      if (st.applicants.indexOf(a) === -1) { setInspect(null); return; }
+      ipanel.appendChild(ipHead(cloneCanvas(SPR.personSprite(a.look, 0, 2)), a.name, 'looking for work'));
+      STAT_KEYS.forEach(k => ipanel.appendChild(ipRow(STATS[k].name.toLowerCase(), String(GAME.crewStat(a, k)))));
+      ipanel.appendChild(ipRow('asks', (a.wage * Math.pow(0.88, GAME.lvl('wages'))).toFixed(2) + '/s'));
+      ipanel.appendChild(ipRow('to sign', GAME.fmt(a.sign)));
+      ipanel.appendChild(ipRow('waits', () => GAME.fmtTime(Math.max(0, a.t))));
+      if ((a.traits || []).length) ipanel.appendChild(ipRow('quirks', a.traits.map(t => TRAIT_BY_ID[t] ? TRAIT_BY_ID[t].name : t).join(', ')));
+      const note = document.createElement('p');
+      note.className = 'ip-note';
+      note.textContent = 'Pick a role to hire them on the spot. Roles lean on different stats.';
+      ipanel.appendChild(note);
+      const room = GAME.canHire() && st.coins >= a.sign;
+      const btns = ROLE_KEYS.filter(r => !ROLES[r].robot && GAME.roleOpen(r)).map(r => ({
+        label: ROLES[r].name.toUpperCase(), data: { act: 'hire-applicant', id: String(a.id), role: r },
+        green: room, disabled: !room,
+      }));
+      ipanel.appendChild(ipBtns(btns));
+      return;
+    }
+
+    if (kind === 'soil') {
+      const t = st.soil[inspect.ref];
+      if (!t) { setInspect({ kind: 'farm' }); return; }
+      const [c, r] = inspect.ref.split(',').map(Number);
+      const d = t.crop ? CROPS[t.crop] : null;
+      ipanel.appendChild(ipHead(cloneCanvas(t.crop ? SPR.cropSprite(t.crop, GAME.cropStage(t), t.seed, 2) : SPR.soilSprite(t.seed, t.water > 0, 2)),
+        d ? d.name.toUpperCase() : 'TILLED SOIL', 'tile ' + inspect.ref));
+      if (d) {
+        ipanel.appendChild(ipRow('growth', () => Math.round(Math.min(1, st.soil[inspect.ref].growth) * 100) + '%'));
+        ipanel.appendChild(ipRow('ripe in', () => {
+          const tt = st.soil[inspect.ref];
+          if (!tt || !tt.crop) return '-';
+          if (tt.growth >= 1) return 'now';
+          const rate = 1 / d.grow * (1 + 0.15 * GAME.lvl('farming')) * (tt.water > 0 ? ECON.waterMult : 1);
+          return GAME.fmtTime((1 - tt.growth) / rate);
+        }));
+        ipanel.appendChild(ipRow('feed', GAME.harvestYield(t.crop) + ' pellets'));
+      }
+      ipanel.appendChild(ipRow('watered', () => {
+        const tt = st.soil[inspect.ref];
+        const by = GAME.wateredBy(c, r);
+        return by ? 'by a ' + by : tt && tt.water > 0 ? GAME.fmtTime(tt.water * 70) + ' left' : 'dry';
+      }));
+      const note = document.createElement('p');
+      note.className = 'ip-note';
+      note.textContent = d ? d.desc : 'Bare soil. Plant something with a seed packet from the farm tool.';
+      ipanel.appendChild(note);
+      const btns = [];
+      if (d) btns.push({ label: 'HARVEST', data: { act: 'harvest-here', k: inspect.ref }, green: GAME.ripe(t), disabled: !GAME.ripe(t) });
+      else btns.push({ label: 'CLEAR', data: { act: 'untill-here', k: inspect.ref } });
+      ipanel.appendChild(ipBtns(btns));
+      return;
+    }
+
     if (kind === 'mama') {
       ipanel.appendChild(ipHead(cloneCanvas(SPR.mamaSprite(st.mamaTier, 1, 'idle')), 'MAMA HEN', TIERS[st.mamaTier].n + ' layer'));
-      ipanel.appendChild(ipRow('lays every', GAME.fmtTime(GAME.layTime(st.mamaTier))));
+      ipanel.appendChild(ipRow('lays every', GAME.fmtTime(GAME.mamaLayTime())));
       ipanel.appendChild(ipRow('egg value', GAME.fmt(GAME.eggValue(st.mamaTier, false))));
       ipanel.appendChild(ipRow('pet cooldown', GAME.fmtTime(GAME.petCd(true))));
       ipanel.appendChild(ipRow('mutation', Math.round(GAME.mutationChance() * 100) + '%'));
@@ -2857,11 +3473,138 @@
     crew.appendChild(rule);
   }
 
+  /* ================= THE DEPOT - wheels and routes ================= */
+  let depotSig = '';
+  function renderDepot() {
+    const box = $('#depot-body');
+    const st = S();
+    box.innerHTML = '';
+    const v = GAME.vehicle();
+    $('#depot-sub').textContent = v.name.toUpperCase() + '  -  ' + GAME.truckCap() + ' EGGS  -  ' + GAME.fmtTime(GAME.tripTime()) + ' ROUND TRIP';
+
+    /* --- the garage --- */
+    const gar = document.createElement('div');
+    gar.className = 'depot-sec';
+    const gh = document.createElement('b');
+    gh.className = 'depot-h';
+    gh.textContent = 'THE GARAGE';
+    gar.appendChild(gh);
+    const row = document.createElement('div');
+    row.className = 'veh-row';
+    VEHICLES.forEach((veh, i) => {
+      const card = document.createElement('div');
+      const owned = i <= st.vehicle, cur = i === st.vehicle, next = i === st.vehicle + 1;
+      card.className = 'veh-card' + (cur ? ' current' : owned ? ' owned' : next ? ' next' : ' locked');
+      card.appendChild(cloneCanvas(SPR.vehicleSprite(veh.id, 0, 2)));
+      const nm = document.createElement('b');
+      nm.textContent = veh.name.toUpperCase();
+      card.appendChild(nm);
+      const line = document.createElement('span');
+      line.textContent = veh.cap + ' eggs, ' + GAME.fmtTime(veh.trip * GAME.city().dist) + ' to ' + GAME.city().name;
+      card.appendChild(line);
+      const d = document.createElement('i');
+      d.textContent = veh.desc;
+      card.appendChild(d);
+      if (cur) { const t = document.createElement('em'); t.textContent = 'YOURS'; card.appendChild(t); }
+      else if (next) {
+        const b = document.createElement('button');
+        b.className = 'btn' + (st.coins >= veh.cost && st.truck.state === 'parked' ? ' btn-green' : '');
+        b.disabled = !(st.coins >= veh.cost && st.truck.state === 'parked');
+        b.dataset.act = 'buy-vehicle';
+        b.appendChild(mkIcon('coin', 2));
+        b.appendChild(document.createTextNode(GAME.fmt(veh.cost)));
+        card.appendChild(b);
+      } else if (!owned) { const t = document.createElement('em'); t.textContent = 'LATER'; card.appendChild(t); }
+      row.appendChild(card);
+    });
+    gar.appendChild(row);
+    box.appendChild(gar);
+
+    /* --- the map of routes --- */
+    const rt = document.createElement('div');
+    rt.className = 'depot-sec';
+    const rh = document.createElement('b');
+    rh.className = 'depot-h';
+    rh.textContent = 'ROUTES - WHERE THE NEXT LOAD GOES';
+    rt.appendChild(rh);
+    const list = document.createElement('div');
+    list.className = 'route-list';
+    CITIES.forEach((c, i) => {
+      const open = st.routes.includes(c.id), active = st.route === c.id;
+      const prevOpen = i === 0 || st.routes.includes(CITIES[i - 1].id);
+      const card = document.createElement('div');
+      card.className = 'route-card' + (active ? ' active' : open ? ' open' : prevOpen ? ' next' : ' locked');
+      card.appendChild(cloneCanvas(SPR.skylineSprite(c.sky, 64, 30, 2)));
+      const mid = document.createElement('div');
+      mid.className = 'rc-mid';
+      const nm = document.createElement('b');
+      nm.textContent = c.name.toUpperCase();
+      mid.appendChild(nm);
+      const l1 = document.createElement('span');
+      l1.textContent = c.pop + '  -  pays x' + c.mult.toFixed(2) + (c.sky ? '  -  rare eggs +' + (8 * c.sky) + '% per tier' : '');
+      mid.appendChild(l1);
+      const l2 = document.createElement('span');
+      l2.textContent = GAME.fmtTime(v.trip * c.dist * Math.pow(0.85, GAME.lvl('route')) * Math.pow(0.75, GAME.lvl('fleet'))) + ' round trip on the ' + v.name.toLowerCase();
+      mid.appendChild(l2);
+      const l3 = document.createElement('i');
+      l3.textContent = c.desc;
+      mid.appendChild(l3);
+      card.appendChild(mid);
+      const act = document.createElement('div');
+      act.className = 'rc-act';
+      if (active) { const t = document.createElement('em'); t.textContent = 'DELIVERING HERE'; act.appendChild(t); }
+      else if (open) {
+        const b = document.createElement('button');
+        b.className = 'btn';
+        b.dataset.act = 'set-route'; b.dataset.id = c.id;
+        b.disabled = st.truck.state !== 'parked';
+        b.textContent = 'DELIVER HERE';
+        act.appendChild(b);
+      } else if (prevOpen) {
+        const b = document.createElement('button');
+        b.className = 'btn' + (st.coins >= c.cost ? ' btn-green' : '');
+        b.disabled = st.coins < c.cost;
+        b.dataset.act = 'buy-route'; b.dataset.id = c.id;
+        b.appendChild(mkIcon('coin', 2));
+        b.appendChild(document.createTextNode(GAME.fmt(c.cost)));
+        act.appendChild(b);
+        const t = document.createElement('em'); t.textContent = 'open the route'; act.appendChild(t);
+      } else { const t = document.createElement('em'); t.textContent = 'further down the road'; act.appendChild(t); }
+      card.appendChild(act);
+      list.appendChild(card);
+    });
+    rt.appendChild(list);
+    box.appendChild(rt);
+
+    /* --- send the load from here too --- */
+    const foot = document.createElement('div');
+    foot.className = 'depot-foot';
+    const info = document.createElement('span');
+    info.textContent = st.truck.state === 'parked'
+      ? st.truck.load.length + ' eggs loaded, worth ' + GAME.fmt(GAME.truckPayout()) + ' in ' + GAME.city().name + '. Every route on the map is another place your flyers get read.'
+      : 'Out on the road right now.';
+    foot.appendChild(info);
+    const send = document.createElement('button');
+    send.className = 'btn' + (st.truck.state === 'parked' && st.truck.load.length ? ' btn-green' : '');
+    send.disabled = !(st.truck.state === 'parked' && st.truck.load.length);
+    send.dataset.act = 'send-now';
+    send.textContent = 'SEND IT';
+    foot.appendChild(send);
+    box.appendChild(foot);
+  }
+
   /* ================= THE INDEX =================
      Four tabs: the chickens you have found, the crew on the
      payroll, what each egg is worth, and the diary.
      ============================================ */
   let indexTab = 'chickens';
+  function flipBook() {
+    const page = $('#pedia');
+    page.classList.remove('flip');
+    void page.offsetWidth;
+    page.classList.add('flip');
+    snd.plop();
+  }
   function renderPedia() {
     const box = $('#pedia');
     box.innerHTML = '';
@@ -2966,6 +3709,93 @@
       });
       box.appendChild(legend);
 
+    } else if (indexTab === 'crops') {
+      const st = S();
+      $('#pedia-sub').textContent = st.stats.harvested + ' HARVESTS - ' + Math.floor(st.feedStore) + ' / ' + GAME.feedCap() + ' FEED';
+      const intro = document.createElement('p');
+      intro.className = 'pedia-intro';
+      intro.textContent = 'Every harvest turns into feed pellets. Chicks eat to grow up; grown hens eat to keep laying. Water doubles growth.';
+      box.appendChild(intro);
+      const grid = document.createElement('div');
+      grid.className = 'crop-grid';
+      CROP_KEYS.forEach(k => {
+        const d = CROPS[k];
+        const open = GAME.cropOpen(k);
+        const card = document.createElement('div');
+        card.className = 'crop-card' + (open ? '' : ' unknown');
+        const stages = document.createElement('div');
+        stages.className = 'crop-stages';
+        for (let st2 = 0; st2 < d.stages; st2++) stages.appendChild(cloneCanvas(SPR.cropSprite(k, st2, 3, 2)));
+        card.appendChild(stages);
+        const nm = document.createElement('b');
+        nm.textContent = open ? d.name : '???';
+        nm.style.color = d.col;
+        card.appendChild(nm);
+        if (open) {
+          const q = document.createElement('span');
+          q.textContent = d.desc;
+          card.appendChild(q);
+          const l = document.createElement('i');
+          l.textContent = 'grows in ' + GAME.fmtTime(d.grow / (1 + 0.15 * GAME.lvl('farming'))) + ' dry, ' + GAME.harvestYield(k) + ' feed, ' + GAME.seedCount(k) + ' seeds in hand' + (d.regrow ? ', regrows' : '');
+          card.appendChild(l);
+        } else {
+          const l = document.createElement('i');
+          l.textContent = 'research ' + (SKILL_BY_ID[d.needs] ? SKILL_BY_ID[d.needs].name : d.needs) + ' in the Lab';
+          card.appendChild(l);
+        }
+        grid.appendChild(card);
+      });
+      box.appendChild(grid);
+      const facts = document.createElement('div');
+      facts.className = 'stat-legend';
+      const fh = document.createElement('b');
+      fh.textContent = 'FARM LEDGER';
+      facts.appendChild(fh);
+      [['planted', st.stats.planted + ' seeds planted'], ['harvested', st.stats.harvested + ' harvests'],
+       ['feed made', GAME.fmt(st.stats.feedMade) + ' pellets'], ['grown up', st.stats.grown + ' chicks raised'],
+       ['tilled', Object.keys(st.soil).length + ' tiles of soil']].forEach(([a, b]) => {
+        const row = document.createElement('div');
+        const nm2 = document.createElement('i'); nm2.textContent = a.toUpperCase(); row.appendChild(nm2);
+        const sp2 = document.createElement('span'); sp2.textContent = b; row.appendChild(sp2);
+        facts.appendChild(row);
+      });
+      box.appendChild(facts);
+
+    } else if (indexTab === 'routes') {
+      const st = S();
+      $('#pedia-sub').textContent = st.stats.trips + ' TRIPS - ' + st.routes.length + ' / ' + CITIES.length + ' CITIES';
+      const intro = document.createElement('p');
+      intro.className = 'pedia-intro';
+      intro.textContent = 'You started on a bicycle. Bigger wheels carry more; farther cities pay more. Buy both at the depot sign by the road.';
+      box.appendChild(intro);
+      const vr = document.createElement('div');
+      vr.className = 'veh-row book';
+      VEHICLES.forEach((veh, i) => {
+        const card = document.createElement('div');
+        card.className = 'veh-card' + (i === st.vehicle ? ' current' : i < st.vehicle ? ' owned' : ' locked');
+        card.appendChild(cloneCanvas(SPR.vehicleSprite(veh.id, 0, 2)));
+        const nm = document.createElement('b'); nm.textContent = i <= st.vehicle ? veh.name.toUpperCase() : '???'; card.appendChild(nm);
+        const l = document.createElement('span'); l.textContent = i <= st.vehicle ? veh.cap + ' eggs' : GAME.fmt(veh.cost) + ' coins'; card.appendChild(l);
+        vr.appendChild(card);
+      });
+      box.appendChild(vr);
+      const list = document.createElement('div');
+      list.className = 'route-list book';
+      CITIES.forEach(c => {
+        const open = st.routes.includes(c.id);
+        const card = document.createElement('div');
+        card.className = 'route-card' + (open ? (st.route === c.id ? ' active' : ' open') : ' locked');
+        card.appendChild(cloneCanvas(SPR.skylineSprite(c.sky, 64, 30, 2)));
+        const mid = document.createElement('div');
+        mid.className = 'rc-mid';
+        const nm = document.createElement('b'); nm.textContent = open ? c.name.toUpperCase() : '???'; mid.appendChild(nm);
+        const l1 = document.createElement('span'); l1.textContent = open ? c.pop + ', pays x' + c.mult.toFixed(2) : 'a route to open at the depot'; mid.appendChild(l1);
+        const l3 = document.createElement('i'); l3.textContent = open ? c.desc : ''; mid.appendChild(l3);
+        card.appendChild(mid);
+        list.appendChild(card);
+      });
+      box.appendChild(list);
+
     } else if (indexTab === 'eggs') {
       $('#pedia-sub').textContent = 'EGG VALUES';
       const intro = document.createElement('p');
@@ -3005,7 +3835,7 @@
         box.appendChild(p);
       }
       const icons = { species: null, first: null, land: 'house', mama: 'crown', hire: 'hands',
-                      flyer: 'doc', applicants: 'hands' };
+                      flyer: 'doc', applicants: 'hands', farm: 'sprout', grown: 'chick', wheels: 'truck', route: 'city' };
       list.forEach(en => {
         const row = document.createElement('div');
         row.className = 'diary-row';
@@ -3073,6 +3903,7 @@
     const st = GAME.inStation(x, y, 5);
     if (st === 'lab') { renderSkills(); openModal('#modal-skills'); snd.build(); return true; }
     if (st === 'stand') { renderPedia(); openModal('#modal-pedia'); snd.build(); return true; }
+    if (st === 'depot') { renderDepot(); openModal('#modal-depot'); snd.build(); return true; }
     if (st === 'mamaSign') {
       if (S().tool === 'inspect') { setInspect({ kind: 'mama' }); return true; }
       if (GAME.upgradeMama()) {
@@ -3116,8 +3947,12 @@
     const ch = chickenAt(x, y);
     if (ch) { setInspect({ kind: 'chicken', ref: ch }); return; }
     if (overMama(x, y)) { setInspect({ kind: 'mama' }); return; }
+    const ap = GAME.applicantAt(x, y);
+    if (ap) { setInspect({ kind: 'applicant', ref: ap }); return; }
     const o = GAME.occAt(Math.floor(x / 16), Math.floor(y / 16));
     if (o) { setInspect({ kind: 'build', ref: o }); return; }
+    const sk = Math.floor(x / 16) + ',' + Math.floor(y / 16);
+    if (S().soil[sk]) { setInspect({ kind: 'soil', ref: sk }); return; }
     setInspect({ kind: 'farm' });
   }
 
@@ -3135,10 +3970,11 @@
       return;
     }
     if (tool === 'feed') { trySprinkle(p.x, p.y); ptr.mode = 'feed'; return; }
+    if (tool === 'farm') { farmTile = null; handleFarmAt(p.x, p.y); ptr.mode = 'farm'; return; }
     if (tool === 'inspect') { ptr.mode = 'inspect'; return; }
     if (tool === 'basket') { ptr.mode = 'sweep'; return; }
     if (S().held) { ptr.mode = 'carry'; return; }
-    cand = { ch: chickenAt(p.x, p.y), egg: eggAt(p.x, p.y),
+    cand = { ch: chickenAt(p.x, p.y), egg: eggAt(p.x, p.y), app: GAME.applicantAt(p.x, p.y),
              mama: overMama(p.x, p.y), plume: plumeAt(p.x, p.y) };
     ptr.mode = 'pending';
   });
@@ -3152,7 +3988,8 @@
     if (!ptr.down) return;
     if (ptr.mode === 'inspect' && ptr.moved > 6) ptr.mode = 'pan';
     if (ptr.mode === 'pending' && ptr.moved > 5) {
-      if (cand && cand.ch && GAME.grabChicken(cand.ch)) { snd.squawk(); ptr.mode = 'carry'; heldSince = performance.now(); }
+      if (cand && cand.app) ptr.mode = 'pan';
+      else if (cand && cand.ch && GAME.grabChicken(cand.ch)) { snd.squawk(); ptr.mode = 'carry'; heldSince = performance.now(); }
       else if (cand && cand.egg && GAME.grabEgg(cand.egg)) { snd.plop(); ptr.mode = 'carry'; heldSince = performance.now(); }
       else ptr.mode = 'pan';
     }
@@ -3164,6 +4001,7 @@
       ptr.x = q.x; ptr.y = q.y;
     } else if (ptr.mode === 'place') handlePlaceAt(ptr.x, ptr.y, true);
     else if (ptr.mode === 'feed') trySprinkle(ptr.x, ptr.y);
+    else if (ptr.mode === 'farm') handleFarmAt(ptr.x, ptr.y);
   });
 
   function endPointer(ev) {
@@ -3185,6 +4023,12 @@
       if (cand.mama) {
         if (GAME.petMama()) { petFx.set('mama', performance.now()); heart(W.mama.x, W.mama.y - 18, 3); snd.pet(); }
         return;
+      }
+      if (cand.app) { setInspect({ kind: 'applicant', ref: cand.app }); snd.plop(); return; }
+      {
+        const tc = Math.floor(x / 16), trr = Math.floor(y / 16);
+        const soil = S().soil[tc + ',' + trr];
+        if (soil && GAME.ripe(soil)) { GAME.harvest(tc, trr); return; }
       }
       if (cand.ch) {
         if (GAME.petChicken(cand.ch)) {
@@ -3254,6 +4098,20 @@
     else if (result === 'loaded') snd.clink();
     else snd.plop();
   }
+  let farmTile = null;
+  function handleFarmAt(wx, wy) {
+    const c = Math.floor(wx / 16), r = Math.floor(wy / 16);
+    const k = c + ',' + r;
+    if (farmTile === k) return;
+    farmTile = k;
+    if (farmSel === 'hoe') { if (GAME.till(c, r)) { /* sound comes with the event */ } return; }
+    if (farmSel === 'water') { if (GAME.water(c, r)) snd.sprinkle(); return; }
+    if (farmSel === 'harvest') { GAME.harvest(c, r); return; }
+    if (CROPS[farmSel]) {
+      if (GAME.plant(c, r, farmSel)) renderFarmPalette();
+      else if (S().soil[k] && !S().soil[k].crop && !GAME.canPlant(c, r, farmSel)) { if (ptr.moved < 4) snd.error(); }
+    }
+  }
   function trySprinkle(x, y) {
     if (sprinkleCd > 0) return;
     if (GAME.sprinkleFeed(x, y)) { snd.sprinkle(); sprinkleCd = 0.22; }
@@ -3292,9 +4150,10 @@
     if (ev.key === 'Escape') { closeModals(); buildSel = null; GAME.mark('build'); }
     if (ev.key === '1') setTool('hand');
     if (ev.key === '2') setTool('basket');
-    if (ev.key === '3' && GAME.lvl('feed')) setTool('feed');
-    if (ev.key === '4') setTool('build');
-    if (ev.key === '5') setTool('inspect');
+    if (ev.key === '3') setTool('feed');
+    if (ev.key === '4') setTool('farm');
+    if (ev.key === '5') setTool('build');
+    if (ev.key === '6') setTool('inspect');
   });
   window.addEventListener('keyup', ev => { keys[ev.key.toLowerCase()] = false; });
 
@@ -3309,6 +4168,10 @@
   document.getElementById('app').addEventListener('click', ev => {
     const toolBtn = ev.target.closest('[data-tool]');
     if (toolBtn) { setTool(toolBtn.dataset.tool); return; }
+    const secBtn = ev.target.closest('[data-palsec]');
+    if (secBtn) { palSec = secBtn.dataset.palsec; buildSel = null; GAME.mark('build'); snd.plop(); return; }
+    const farmBtn = ev.target.closest('[data-farm]');
+    if (farmBtn && !farmBtn.disabled) { farmSel = farmBtn.dataset.farm; renderFarmPalette(); updateCursorChip(); snd.plop(); return; }
     const palBtn = ev.target.closest('[data-build]');
     if (palBtn && !palBtn.disabled) {
       const b = palBtn.dataset.build;
@@ -3366,7 +4229,14 @@
         refreshCrewViews();
         break;
       }
-      case 'index-tab': { indexTab = btn.dataset.tab; renderPedia(); break; }
+      case 'index-tab': { indexTab = btn.dataset.tab; flipBook(); renderPedia(); break; }
+      case 'harvest-here': { const [c, r] = btn.dataset.k.split(',').map(Number); if (!GAME.harvest(c, r)) snd.error(); refreshInspect(); break; }
+      case 'untill-here': { const [c, r] = btn.dataset.k.split(',').map(Number); if (GAME.untill(c, r)) { snd.demolish(); setInspect({ kind: 'farm' }); } else snd.error(); break; }
+      case 'open-depot': renderDepot(); openModal('#modal-depot'); break;
+      case 'buy-vehicle': { if (GAME.buyVehicle()) renderDepot(); else snd.error(); break; }
+      case 'buy-route': { if (GAME.buyRoute(btn.dataset.id)) renderDepot(); else snd.error(); break; }
+      case 'set-route': { if (GAME.setRoute(btn.dataset.id)) { snd.plop(); renderDepot(); } else snd.error(); break; }
+      case 'send-now': { if (GAME.sendTruck()) closeModals(); else snd.error(); break; }
       case 'open-hire': renderHire(); openModal('#modal-hire'); break;
       case 'mark-chicken': {
         if (inspect && inspect.kind === 'chicken') {
@@ -3503,7 +4373,24 @@
     coinBurst(W.truckHome.x + 26, W.truckHome.y - 4, n);
     floatWorld('+' + GAME.fmt(pay), W.truckHome.x + 20, W.truckHome.y - 22, 'gold', 'coin');
   });
-  GAME.on('truckleave', () => { snd.engine(); puff(W.truckHome.x - 4, W.roadY + 8, '#c9a35f', 9, 44, 16); });
+  GAME.on('depart', ({ n, to }) => {
+    snd.engine();
+    puff(W.truckHome.x - 4, W.roadY + 8, '#c9a35f', 9, 44, 16);
+    floatWorld('TO ' + to.name.toUpperCase(), W.truckHome.x + 20, W.roadY - 26, 'gold');
+  });
+  GAME.on('home', () => { puff(W.truckHome.x + 30, W.roadY + 8, '#c9a35f', 6, 30, 12); });
+  GAME.on('vehicle', ({ v }) => { snd.grand(); toast({ icon: 'truck', title: v.name.toUpperCase(), body: v.desc }); });
+  GAME.on('route', ({ city }) => { snd.grand(); toast({ icon: 'city', title: 'ROUTE OPEN: ' + city.name.toUpperCase(), body: city.desc }); });
+  GAME.on('grown', ({ ch }) => { puff(ch.x + 10, ch.y + 6, '#fff8ec', 8, 30, 26); heart(ch.x + 10, ch.y - 4, 2); snd.sparkle(); bornFx.set(ch.id, performance.now()); });
+  GAME.on('harvest', ({ c, r, crop, n }) => {
+    puff(c * 16 + 8, r * 16 + 6, crop.col, 10, 40, 30);
+    floatWorld('+' + n + ' FEED', c * 16 + 8, r * 16 - 6, 'green', 'seed');
+    snd.scoop();
+  });
+  GAME.on('ripe', ({ c, r }) => { puff(c * 16 + 8, r * 16 + 2, '#fff8ec', 4, 20, 20); });
+  GAME.on('plant', ({ c, r }) => { puff(c * 16 + 8, r * 16 + 10, '#8a5e2a', 5, 26, 14); snd.plop(); });
+  GAME.on('water', ({ c, r }) => { puff(c * 16 + 8, r * 16 + 8, '#7fc4e8', 6, 28, 18); });
+  GAME.on('till', ({ c, r }) => { puff(c * 16 + 8, r * 16 + 8, '#a07444', 8, 34, 16); snd.demolish(); });
   GAME.on('graduate', ({ sp }) => {
     toast({ sprite: cloneCanvas(SPR.chickenSprite(sp, 2, false)), title: sp.name + ' GRADUATED', body: 'She joins the lab team. Feathers dropped!' });
   });
@@ -3561,6 +4448,7 @@
       if (!titleEl.hidden) drawTitleScreen(dt);
       render(now, dt);
       if (!$('#modal-skills').hidden) drawTerm(now);
+      drawTrip(now);
       hudAcc += dt;
       if (hudAcc > 0.12) {
         hudAcc = 0;
