@@ -2233,10 +2233,18 @@
     const info = document.createElement('div');
     info.className = 'farm-info';
     const st = S();
-    const soil = Object.keys(st.soil).length, crops = Object.values(st.soil).filter(t => t.crop).length;
     const ripeN = Object.values(st.soil).filter(t => GAME.ripe(t)).length;
-    info.textContent = soil + ' tilled, ' + crops + ' growing, ' + ripeN + ' ripe  -  ' +
-      Object.keys(st.terrain).length + ' shaped, ' + Object.keys(st.deco).length + ' planted. drag to paint';
+    [['hoe', Object.keys(st.soil).length, 'Tiles tilled'],
+     ['sprout', Object.values(st.soil).filter(t => t.crop).length, 'Growing'],
+     ['scythe', ripeN, 'Ripe now'],
+     ['road', Object.keys(st.terrain).length, 'Tiles shaped'],
+     ['tree', Object.keys(st.deco).length, 'Decorations']].forEach(([ic, v, tip]) => {
+      const cell = document.createElement('span');
+      cell.title = tip;
+      cell.appendChild(mkIcon(ic, 2));
+      cell.appendChild(document.createTextNode(String(v)));
+      info.appendChild(cell);
+    });
     el.farmPalette.appendChild(info);
   }
 
@@ -3318,9 +3326,11 @@
      the STAFF tab of the Index, so the crew is always two taps
      away wherever you are.
      ================================================ */
-  function statRow(label, v, hue) {
+  function statRow(label, v, hue, icon) {
     const row = document.createElement('div');
     row.className = 'st-row';
+    row.title = label;
+    if (icon) row.appendChild(mkIcon(icon, 2));
     const nm = document.createElement('i');
     nm.textContent = label;
     row.appendChild(nm);
@@ -3360,7 +3370,7 @@
     box.className = 'st-block';
     STAT_KEYS.forEach(k => {
       const lead = uses && uses.includes(k);
-      const row = statRow(STATS[k].name, GAME.crewStat(w, k), lead ? '#ffc72f' : null);
+      const row = statRow(STATS[k].name + ' - ' + STATS[k].desc, GAME.crewStat(w, k), lead ? '#ffc72f' : null, STATS[k].icon);
       if (lead) row.classList.add('lead');
       box.appendChild(row);
     });
@@ -3397,14 +3407,19 @@
     const meta = document.createElement('div');
     meta.className = 'cc-meta';
     const wage = document.createElement('span');
+    wage.title = 'Wages, coins per second';
     wage.appendChild(mkIcon('coin', 2));
-    wage.appendChild(document.createTextNode((w.wage * Math.pow(0.88, GAME.lvl('wages'))).toFixed(2) + '/s'));
+    wage.appendChild(document.createTextNode((w.wage * Math.pow(0.88, GAME.lvl('wages'))).toFixed(2)));
     meta.appendChild(wage);
     const jobs = document.createElement('span');
-    jobs.textContent = GAME.fmt(w.jobs || 0) + ' jobs';
+    jobs.title = 'Jobs done';
+    jobs.appendChild(mkIcon('star', 2));
+    jobs.appendChild(document.createTextNode(GAME.fmt(w.jobs || 0)));
     meta.appendChild(jobs);
     const nrg = document.createElement('span');
-    nrg.textContent = 'stamina ' + Math.round((w.energy === undefined ? 1 : w.energy) * 100) + '%';
+    nrg.title = 'Stamina before they want a breather';
+    nrg.appendChild(mkIcon('flame', 2));
+    nrg.appendChild(document.createTextNode(Math.round((w.energy === undefined ? 1 : w.energy) * 100) + '%'));
     meta.appendChild(nrg);
     card.appendChild(meta);
 
@@ -3445,12 +3460,14 @@
     nm.textContent = ap.name;
     who.appendChild(nm);
     const q = document.createElement('span');
-    q.textContent = 'rating ' + crewQuality(ap.st) + ' / 50';
+    q.appendChild(mkIcon('star', 2));
+    q.appendChild(document.createTextNode(crewQuality(ap.st) + '/50'));
     who.appendChild(q);
     head.appendChild(who);
     const t = document.createElement('span');
     t.className = 'cc-state';
-    t.textContent = 'leaves in ' + GAME.fmtTime(ap.t);
+    t.title = 'How long before they give up and walk off';
+    t.textContent = GAME.fmtTime(ap.t);
     head.appendChild(t);
     card.appendChild(head);
 
@@ -3460,12 +3477,14 @@
     const meta = document.createElement('div');
     meta.className = 'cc-meta';
     const sign = document.createElement('span');
+    sign.title = 'Signing bonus';
     sign.appendChild(mkIcon('coin', 2));
-    sign.appendChild(document.createTextNode(GAME.fmt(ap.sign) + ' to sign'));
+    sign.appendChild(document.createTextNode(GAME.fmt(ap.sign)));
     meta.appendChild(sign);
     const wage = document.createElement('span');
-    wage.appendChild(mkIcon('coin', 2));
-    wage.appendChild(document.createTextNode((ap.wage * Math.pow(0.88, GAME.lvl('wages'))).toFixed(2) + '/s'));
+    wage.title = 'Wages, coins per second';
+    wage.appendChild(mkIcon('clock', 2));
+    wage.appendChild(document.createTextNode((ap.wage * Math.pow(0.88, GAME.lvl('wages'))).toFixed(2)));
     meta.appendChild(wage);
     card.appendChild(meta);
 
@@ -3483,10 +3502,12 @@
       b.appendChild(mkIcon(ROLES[r].icon, 2));
       roles.appendChild(b);
     });
-    const hint = document.createElement('em');
-    hint.className = 'cc-hint';
-    hint.textContent = room ? 'pick a role' : GAME.canHire() ? 'not enough coins' : 'no free slot';
-    roles.appendChild(hint);
+    if (!room) {
+      const hint = document.createElement('em');
+      hint.className = 'cc-hint';
+      hint.textContent = GAME.canHire() ? 'too dear' : 'no room';
+      roles.appendChild(hint);
+    }
     card.appendChild(roles);
     return card;
   }
@@ -3504,10 +3525,11 @@
     b.textContent = 'HELP WANTED';
     mid.appendChild(b);
     const line = document.createElement('span');
-    if (!GAME.lvl('hiring')) line.textContent = 'Research Recruiting in the Lab to start hiring.';
-    else if (!Object.keys(st.huts).length) line.textContent = 'Build a Staff Hut first - the crew needs a base.';
-    else if (st.flyer) line.textContent = 'Flyers are up. Folk should turn up in ' + GAME.fmtTime(st.flyer.t) + '.';
-    else line.textContent = 'Post flyers around the valley and wait for folk to walk in.';
+    if (!GAME.lvl('hiring')) line.textContent = 'Research Recruiting first.';
+    else if (!Object.keys(st.huts).length) line.textContent = 'Build a Staff Hut.';
+    else if (!Object.keys(st.boards).length) line.textContent = 'Build a Noticeboard.';
+    else if (st.flyer) line.textContent = 'Folk arrive in ' + GAME.fmtTime(st.flyer.t);
+    else line.textContent = 'Put flyers up and wait.';
     mid.appendChild(line);
     if (st.flyer) {
       const barr = document.createElement('div');
@@ -3541,7 +3563,7 @@
     } else if (!st.flyer && GAME.lvl('hiring') && Object.keys(st.huts).length) {
       const none = document.createElement('p');
       none.className = 'crew-none';
-      none.textContent = 'Nobody waiting. Put some flyers up.';
+      none.textContent = 'Nobody waiting.';
       box.appendChild(none);
     }
   }
@@ -3573,9 +3595,11 @@
       const b = document.createElement('b');
       b.textContent = (BOTS[r] || { name: def.name }).name.toUpperCase();
       mid.appendChild(b);
+      card.title = open ? (BOTS[r] || { name: def.name }).name + ' - does the ' + def.name + ' job. ' + def.job
+                        : 'Research this one in the Lab first.';
       const job = document.createElement('span');
-      job.textContent = open ? 'Does the ' + def.name + ' job. ' + def.job.split('.')[0] + '. Never tires, never asks for a raise.'
-                             : 'Research required before you can build this one.';
+      job.appendChild(mkIcon(def.icon, 2));
+      job.appendChild(document.createTextNode(open ? def.name : 'LOCKED'));
       mid.appendChild(job);
       const btn = document.createElement('button');
       btn.className = 'btn';
@@ -3893,12 +3917,12 @@
       b2.textContent = 'BUILD A LOGISTICS HQ';
       mid.appendChild(b2);
       const p2 = document.createElement('p');
-      p2.textContent = 'Vehicles and routes are arranged from a dispatch office, not from a signpost. Put one up on the ranch (BUILD, then the CREW tab) and the wall map opens with it.';
+      p2.textContent = 'Build one to open the wall map. BUILD, then CREW.';
       mid.appendChild(p2);
       const p3 = document.createElement('p');
       p3.className = 'hq-cost';
       p3.appendChild(mkIcon('coin', 2));
-      p3.appendChild(document.createTextNode(GAME.fmt(buildCost('hq', st.built.hq)) + '  -  3 by 2 tiles'));
+      p3.appendChild(document.createTextNode(GAME.fmt(buildCost('hq', st.built.hq))));
       mid.appendChild(p3);
       need.appendChild(mid);
       box.appendChild(need);
@@ -3906,9 +3930,12 @@
       const foot = document.createElement('div');
       foot.className = 'depot-foot';
       const info = document.createElement('span');
-      info.textContent = st.truck.state === 'parked'
-        ? st.truck.load.length + ' eggs on the ' + v.name.toLowerCase() + ', worth ' + GAME.fmt(GAME.truckPayout()) + ' in ' + GAME.city().name + '.'
-        : 'Out on the road right now.';
+      if (st.truck.state === 'parked') {
+        info.appendChild(mkIcon('egg', 2));
+        info.appendChild(document.createTextNode(st.truck.load.length + '/' + GAME.truckCap()));
+        info.appendChild(mkIcon('coin', 2));
+        info.appendChild(document.createTextNode(GAME.fmt(GAME.truckPayout())));
+      } else info.textContent = 'On the road.';
       foot.appendChild(info);
       const send = document.createElement('button');
       send.className = 'btn' + (st.truck.state === 'parked' && st.truck.load.length ? ' btn-green' : '');
@@ -3960,12 +3987,14 @@
       const nm = document.createElement('b');
       nm.textContent = veh.name.toUpperCase();
       card.appendChild(nm);
+      card.title = veh.name + ' - ' + veh.desc + ' Carries ' + veh.cap + ' eggs, ' +
+                   GAME.fmtTime(veh.trip * GAME.city().dist) + ' to ' + GAME.city().name + '.';
       const line = document.createElement('span');
-      line.textContent = veh.cap + ' eggs, ' + GAME.fmtTime(veh.trip * GAME.city().dist) + ' to ' + GAME.city().name;
+      line.appendChild(mkIcon('egg', 3));
+      line.appendChild(document.createTextNode(String(veh.cap)));
+      line.appendChild(mkIcon('clock', 3));
+      line.appendChild(document.createTextNode(GAME.fmtTime(veh.trip * GAME.city().dist)));
       card.appendChild(line);
-      const d = document.createElement('i');
-      d.textContent = veh.desc;
-      card.appendChild(d);
       if (cur) { const t = document.createElement('em'); t.textContent = 'YOURS'; card.appendChild(t); }
       else if (next) {
         const b3 = document.createElement('button');
@@ -3986,7 +4015,7 @@
     rt.className = 'depot-sec';
     const rh = document.createElement('b');
     rh.className = 'depot-h';
-    rh.textContent = 'DISPATCH SLIPS - TAP THE MAP OR A SLIP';
+    rh.textContent = 'ROUTES';
     rt.appendChild(rh);
     const list = document.createElement('div');
     list.className = 'route-list';
@@ -4001,15 +4030,14 @@
       const nm = document.createElement('b');
       nm.textContent = c.name.toUpperCase();
       mid.appendChild(nm);
+      card.title = c.name + ' - ' + c.pop + '. ' + c.desc + ' Pays x' + c.mult.toFixed(2) +
+                   (c.sky ? ', and ' + (8 * c.sky) + '% more per tier on rare eggs.' : '.');
       const l1 = document.createElement('span');
-      l1.textContent = c.pop + '  -  pays x' + c.mult.toFixed(2) + (c.sky ? '  -  rare eggs +' + (8 * c.sky) + '% per tier' : '');
+      l1.appendChild(mkIcon('coin', 3));
+      l1.appendChild(document.createTextNode('x' + c.mult.toFixed(2)));
+      l1.appendChild(mkIcon('clock', 3));
+      l1.appendChild(document.createTextNode(GAME.fmtTime(v.trip * c.dist * Math.pow(0.85, GAME.lvl('route')) * Math.pow(0.75, GAME.lvl('fleet')))));
       mid.appendChild(l1);
-      const l2 = document.createElement('span');
-      l2.textContent = GAME.fmtTime(v.trip * c.dist * Math.pow(0.85, GAME.lvl('route')) * Math.pow(0.75, GAME.lvl('fleet'))) + ' round trip on the ' + v.name.toLowerCase();
-      mid.appendChild(l2);
-      const l3 = document.createElement('i');
-      l3.textContent = c.desc;
-      mid.appendChild(l3);
       card.appendChild(mid);
       const act = document.createElement('div');
       act.className = 'rc-act';
@@ -4041,9 +4069,14 @@
     const foot = document.createElement('div');
     foot.className = 'depot-foot';
     const info = document.createElement('span');
-    info.textContent = st.truck.state === 'parked'
-      ? st.truck.load.length + ' eggs loaded, worth ' + GAME.fmt(GAME.truckPayout()) + ' in ' + GAME.city().name + '. Every route on the map is another place your flyers get read.'
-      : 'Out on the road right now.';
+    if (st.truck.state === 'parked') {
+      info.appendChild(mkIcon('egg', 2));
+      info.appendChild(document.createTextNode(st.truck.load.length + '/' + GAME.truckCap()));
+      info.appendChild(mkIcon('coin', 2));
+      info.appendChild(document.createTextNode(GAME.fmt(GAME.truckPayout())));
+      info.appendChild(mkIcon('city', 2));
+      info.appendChild(document.createTextNode(GAME.city().name));
+    } else info.textContent = 'On the road.';
     foot.appendChild(info);
     const send = document.createElement('button');
     send.className = 'btn' + (st.truck.state === 'parked' && st.truck.load.length ? ' btn-green' : '');
@@ -4119,7 +4152,7 @@
       $('#pedia-sub').textContent = crewHeadline();
       const intro = document.createElement('p');
       intro.className = 'pedia-intro';
-      intro.textContent = 'Nobody walks in on their own - print flyers, wait for folk to arrive, then pick the role that suits their stats.';
+      intro.textContent = 'Print flyers. Folk walk in. Pick a role that suits their stats.';
       box.appendChild(intro);
       noticeBoard(box);
       if (st.staff.length) {
@@ -4138,44 +4171,13 @@
         box.appendChild(grid);
       }
       botBench(box);
-      /* what each stat actually does */
-      const legend = document.createElement('div');
-      legend.className = 'stat-legend';
-      const lh = document.createElement('b');
-      lh.textContent = 'WHAT THE STATS DO';
-      legend.appendChild(lh);
-      STAT_KEYS.forEach(k => {
-        const row = document.createElement('div');
-        row.appendChild(mkIcon(STATS[k].icon, 2));
-        const nm = document.createElement('i');
-        nm.textContent = STATS[k].name;
-        row.appendChild(nm);
-        const d = document.createElement('span');
-        d.textContent = STATS[k].desc;
-        row.appendChild(d);
-        legend.appendChild(row);
-      });
-      ROLE_KEYS.forEach(r => {
-        const def = ROLES[r];
-        if (!GAME.roleOpen(r)) return;
-        const row = document.createElement('div');
-        row.appendChild(mkIcon(def.icon, 2));
-        const nm = document.createElement('i');
-        nm.textContent = def.name.toUpperCase();
-        row.appendChild(nm);
-        const d = document.createElement('span');
-        d.textContent = def.job + '  Leans on ' + def.uses.map(k => STATS[k].name).join(' and ') + '.';
-        row.appendChild(d);
-        legend.appendChild(row);
-      });
-      box.appendChild(legend);
 
     } else if (indexTab === 'crops') {
       const st = S();
       $('#pedia-sub').textContent = st.stats.harvested + ' HARVESTS - ' + Math.floor(st.feedStore) + ' / ' + GAME.feedCap() + ' FEED';
       const intro = document.createElement('p');
       intro.className = 'pedia-intro';
-      intro.textContent = 'Every harvest turns into feed pellets. Chicks eat to grow up; grown hens eat to keep laying. Water doubles growth.';
+      intro.textContent = 'Harvests make feed. Chicks eat to grow, hens eat to lay.';
       box.appendChild(intro);
       const grid = document.createElement('div');
       grid.className = 'crop-grid';
@@ -4193,11 +4195,16 @@
         nm.style.color = d.col;
         card.appendChild(nm);
         if (open) {
-          const q = document.createElement('span');
-          q.textContent = d.desc;
-          card.appendChild(q);
+
+          card.title = d.name + ' - ' + d.desc + ' Grows in ' + GAME.fmtTime(d.grow / (1 + 0.15 * GAME.lvl('farming'))) +
+                       ' dry, yields ' + GAME.harvestYield(k) + ' feed.' + (d.regrow ? ' Regrows after picking.' : '');
           const l = document.createElement('i');
-          l.textContent = 'grows in ' + GAME.fmtTime(d.grow / (1 + 0.15 * GAME.lvl('farming'))) + ' dry, ' + GAME.harvestYield(k) + ' feed, ' + GAME.seedCount(k) + ' seeds in hand' + (d.regrow ? ', regrows' : '');
+          l.appendChild(mkIcon('clock', 2));
+          l.appendChild(document.createTextNode(GAME.fmtTime(d.grow / (1 + 0.15 * GAME.lvl('farming')))));
+          l.appendChild(mkIcon('seed', 2));
+          l.appendChild(document.createTextNode(String(GAME.harvestYield(k))));
+          l.appendChild(mkIcon('basket', 2));
+          l.appendChild(document.createTextNode(String(GAME.seedCount(k))));
           card.appendChild(l);
         } else {
           const l = document.createElement('i');
@@ -4208,17 +4215,17 @@
       });
       box.appendChild(grid);
       const facts = document.createElement('div');
-      facts.className = 'stat-legend';
-      const fh = document.createElement('b');
-      fh.textContent = 'FARM LEDGER';
-      facts.appendChild(fh);
-      [['planted', st.stats.planted + ' seeds planted'], ['harvested', st.stats.harvested + ' harvests'],
-       ['feed made', GAME.fmt(st.stats.feedMade) + ' pellets'], ['grown up', st.stats.grown + ' chicks raised'],
-       ['tilled', Object.keys(st.soil).length + ' tiles of soil']].forEach(([a, b]) => {
-        const row = document.createElement('div');
-        const nm2 = document.createElement('i'); nm2.textContent = a.toUpperCase(); row.appendChild(nm2);
-        const sp2 = document.createElement('span'); sp2.textContent = b; row.appendChild(sp2);
-        facts.appendChild(row);
+      facts.className = 'tally';
+      [['sprout', st.stats.planted, 'Seeds planted'], ['scythe', st.stats.harvested, 'Harvests'],
+       ['seed', GAME.fmt(st.stats.feedMade), 'Feed made'], ['chick', st.stats.grown, 'Chicks raised'],
+       ['hoe', Object.keys(st.soil).length, 'Tiles tilled']].forEach(([ic, v, tip]) => {
+        const cell = document.createElement('div');
+        cell.title = tip;
+        cell.appendChild(mkIcon(ic, 3));
+        const n = document.createElement('b');
+        n.textContent = String(v);
+        cell.appendChild(n);
+        facts.appendChild(cell);
       });
       box.appendChild(facts);
 
@@ -4227,7 +4234,7 @@
       $('#pedia-sub').textContent = st.stats.trips + ' TRIPS - ' + st.routes.length + ' / ' + CITIES.length + ' CITIES';
       const intro = document.createElement('p');
       intro.className = 'pedia-intro';
-      intro.textContent = 'You started on a bicycle. Bigger wheels carry more; farther cities pay more. Buy both at the depot sign by the road.';
+      intro.textContent = 'Bigger wheels carry more. Farther cities pay more.';
       box.appendChild(intro);
       const vr = document.createElement('div');
       vr.className = 'veh-row book';
@@ -4261,7 +4268,7 @@
       $('#pedia-sub').textContent = 'EGG VALUES';
       const intro = document.createElement('p');
       intro.className = 'pedia-intro';
-      intro.textContent = 'Every egg both hatches and sells. Golden ones are worth five times as much.';
+      intro.textContent = 'Every egg hatches and sells. Golden ones pay five times.';
       box.appendChild(intro);
       const grid = document.createElement('div');
       grid.className = 'egg-grid';
@@ -4686,7 +4693,7 @@
       case 'send-flyers': {
         if (GAME.sendFlyers()) {
           snd.build();
-          toast({ icon: 'doc', title: 'FLYERS UP', body: 'Give it a minute and folk will start walking in.' });
+          toast({ icon: 'doc', title: 'FLYERS UP', body: 'folk are on their way' });
         } else snd.error();
         refreshCrewViews();
         break;
@@ -4695,8 +4702,8 @@
         if (GAME.hireApplicant(+btn.dataset.id, btn.dataset.role)) {
           snd.skill();
           const w = S().staff[S().staff.length - 1];
-          toast({ icon: ROLES[btn.dataset.role].icon, title: w.name.toUpperCase() + ' HIRED',
-                  body: 'Signed on as a ' + ROLES[btn.dataset.role].name + '.' });
+          toast({ icon: ROLES[btn.dataset.role].icon, title: w.name.toUpperCase(),
+                  body: ROLES[btn.dataset.role].name });
         } else snd.error();
         refreshCrewViews();
         break;
@@ -4704,8 +4711,9 @@
       case 'assemble': {
         if (GAME.assembleBot(btn.dataset.role)) {
           snd.skill();
-          toast({ icon: ROLES[btn.dataset.role].icon, title: ROLES[btn.dataset.role].name.toUpperCase() + ' BUILT',
-                  body: ROLES[btn.dataset.role].job });
+          toast({ icon: ROLES[btn.dataset.role].icon,
+                  title: (BOTS[btn.dataset.role] || ROLES[btn.dataset.role]).name.toUpperCase(),
+                  body: ROLES[btn.dataset.role].name });
         } else snd.error();
         refreshCrewViews();
         break;
@@ -4866,8 +4874,8 @@
     floatWorld('TO ' + to.name.toUpperCase(), W.truckHome.x + 20, W.roadY - 26, 'gold');
   });
   GAME.on('home', () => { puff(W.truckHome.x + 30, W.roadY + 8, '#c9a35f', 6, 30, 12); });
-  GAME.on('vehicle', ({ v }) => { snd.grand(); toast({ icon: 'truck', title: v.name.toUpperCase(), body: v.desc }); });
-  GAME.on('route', ({ city }) => { snd.grand(); toast({ icon: 'city', title: 'ROUTE OPEN: ' + city.name.toUpperCase(), body: city.desc }); });
+  GAME.on('vehicle', ({ v }) => { snd.grand(); toast({ icon: 'truck', title: v.name.toUpperCase(), body: v.cap + ' eggs' }); });
+  GAME.on('route', ({ city }) => { snd.grand(); toast({ icon: 'city', title: city.name.toUpperCase(), body: 'pays x' + city.mult.toFixed(2) }); });
   GAME.on('grown', ({ ch }) => { puff(ch.x + 10, ch.y + 6, '#fff8ec', 8, 30, 26); heart(ch.x + 10, ch.y - 4, 2); snd.sparkle(); bornFx.set(ch.id, performance.now()); });
   GAME.on('harvest', ({ c, r, crop, n }) => {
     puff(c * 16 + 8, r * 16 + 6, crop.col, 10, 40, 30);

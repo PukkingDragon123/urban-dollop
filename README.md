@@ -131,9 +131,11 @@ The crew is always two taps away: there is a crew button on the toolbelt that ba
 | Noticeboard | Where flyers get pinned and applicants queue. |
 | Logistics HQ | A dispatch office with a wall map. Vehicles and routes are bought here. |
 
-### The HUD
+### The interface
 
-Four pills float in the corner: coins, feathers, feed in the barn, and how many chickens the ranch is holding out of what it can hold. The feed pill turns red when the barn is empty; the capacity pill turns red when the coops are full, which is when hatching stops - buy land, build Coops or research **Bigger Flock** to make room. The toolbelt is bigger now, with a label under every tool, and the build palette is split into RANCH, FARM, FACTORY and CREW sections.
+Big, chunky and almost wordless. Four fat pills in the corner - coins, feathers, feed, chickens held out of capacity - and a row of oversized toolbelt keys with nothing but a picture on each. The feed pill goes red when the barn is empty; the capacity pill goes red when the coops are full, which is when hatching stops.
+
+Panels are picture-first: the palettes are shop shelves of big thumbnails with a coin price, crew members show five coloured stat bars with an icon apiece instead of labels, vehicles and routes show their art with a capacity and a multiplier, and statistics are rows of counters rather than sentences. Every button is a fat pixel key that lifts when you hover and squashes when you press. Where a longer explanation exists it lives in the tooltip, so it is there when you want it and out of the way when you do not.
 
 Autosaves to your browser, with up to 8 hours of offline laying and hatching.
 

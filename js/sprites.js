@@ -1076,6 +1076,9 @@ const SPR = (() => {
     c: '#7fe8d0', v: '#a58ae0', k: '#3a3a4a', s: '#f2e2c8', m: '#e8e8f0',
   };
   const ICONS = {
+    clock: [
+      '...oooo...', '..owwwwo..', '.owwowwwo.', 'owwwowwwwo', 'owwwoowwwo',
+      'owwwwwwwwo', 'owwwwwwwwo', '.owwwwwwo.', '..owwwwo..', '...oooo...'],
     hoe: [
       '.......oo.', '......onno', '.....onno.', '....onno..', '...onno...',
       '..onno....', '.oooo.....', 'ogggo.....', 'oggo......', '.oo.......'],
