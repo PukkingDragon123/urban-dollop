@@ -170,6 +170,7 @@
     const GRASS = ['#69ab3e', '#74b845', '#80c44f', '#8ecf5b', '#9ada66'].map(rgb);
     const DIRT = ['#b58a4f', '#c69a5c', '#a87c42', '#d1a86b'].map(rgb);
     const SAND = ['#e0cb98', '#d6bd88', '#eddba9'].map(rgb);
+    const DRY = ['#93aa5c', '#a2ae68', '#afb974', '#bcc484', '#c8ce94'].map(rgb);
     const WATER = ['#3f9ec4', '#4fb0d6', '#63c1e2', '#2f86ad'].map(rgb);
 
     const nBig = makeNoise(11, 34, W.W, W.H);
@@ -213,6 +214,15 @@
           /* dither between bands */
           if ((x + y) % 2 === 0 && Math.abs(v - 0.46) < 0.03) idx = 1;
           c = GRASS[idx];
+          /* the home plot is scrubby and sun-bleached until you work it */
+          const hp = PLOTS[PLOT_START];
+          if (x >= hp.tc * 16 && x < (hp.tc + PLOT_W) * 16 && y >= hp.tr * 16 && y < (hp.tr + PLOT_H) * 16) {
+            c = DRY[Math.min(DRY.length - 1, idx)];
+            /* bald patches, from the same smooth noise the grass uses */
+            const bare = nDirt(x, y) * 0.55 + nBig(x, y) * 0.45;
+            if (bare > 0.755) c = DIRT[((x * 7 + y * 13) % 23) < 8 ? 0 : 2];
+            else if (bare > 0.715 && (x + y) % 2 === 0) c = DIRT[2];
+          }
           /* dirt path */
           const pd = pathDist(x, y);
           const edge = 5 + nDirt(x, y) * 4;
@@ -251,6 +261,8 @@
     for (let i = 0; i < 7000; i++) {
       const x = Math.floor(rndG() * W.W), y = Math.floor(rndG() * (W.roadY - 6)) + 4;
       if (GAME.inPond(x, y)) continue;
+      const hp2 = PLOTS[PLOT_START];
+      if (x >= hp2.tc * 16 && x < (hp2.tc + PLOT_W) * 16 && y >= hp2.tr * 16 && rndG() < 0.72) continue;
       g.fillStyle = rndG() < 0.5 ? 'rgba(96,160,60,.55)' : 'rgba(150,214,110,.5)';
       g.fillRect(x, y, 1, 2);
     }
@@ -339,7 +351,9 @@
       }
     };
     switch (p.theme) {
-      case 'home': place('tree', 2, true); place('bush', 4); place('flower', 7); place('tuft', 12); place('clover', 6); place('rock', 2); place('shroom', 2); break;
+      /* HOME starts all but bare - a couple of stumps, some dry tufts and
+         a stone or two. Everything green on this plot you put there. */
+      case 'home': place('stump', 2); place('rock', 3); place('tuft', 5); break;
       case 'sunflower': place('sunflower', 14); place('tuft', 10); place('flower', 5); place('bush', 2); break;
       case 'rocky': place('rock', 10); place('pine', 4, true); place('tuft', 8); place('stump', 2); break;
       case 'berry': place('bush', 10); place('tree', 2, true); place('tuft', 9); place('flower', 4); break;
@@ -933,6 +947,49 @@
     ctx.fillStyle = '#ffe9c0'; ctx.fillRect(x + 6, y + 14, 3, 2);
   }
 
+  /* the Logistics HQ: a dispatch office with a loading bay and a wall clock */
+  function drawHQ(c, r, hq, now) {
+    const x = c * 16, y = r * 16;
+    ctx.fillStyle = 'rgba(40,58,26,.26)'; ctx.fillRect(x + 3, y + 29, 42, 4);
+    /* body */
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 1, y + 8, 46, 24);
+    ctx.fillStyle = '#e8e2d0'; ctx.fillRect(x + 2, y + 9, 44, 22);
+    ctx.fillStyle = '#fff8ec'; ctx.fillRect(x + 2, y + 9, 44, 2);
+    ctx.fillStyle = '#c9c0a8'; ctx.fillRect(x + 2, y + 28, 44, 3);
+    /* brick base */
+    ctx.fillStyle = '#b5714f';
+    for (let i = 0; i < 22; i++) ctx.fillRect(x + 2 + (i % 11) * 4, y + 25 + Math.floor(i / 11) * 3, 3, 2);
+    /* roof with a sign band */
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x, y + 3, 48, 6);
+    ctx.fillStyle = '#3f6fd6'; ctx.fillRect(x + 1, y + 4, 46, 4);
+    ctx.fillStyle = '#6f9af0'; ctx.fillRect(x + 1, y + 4, 46, 1);
+    SPR.drawTiny(ctx, 'LOGISTICS', x + 6, y + 4, '#ffffff', 1);
+    /* roller door on the loading bay */
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 4, y + 15, 16, 16);
+    ctx.fillStyle = '#8d949e'; ctx.fillRect(x + 5, y + 16, 14, 14);
+    for (let i = 0; i < 5; i++) { ctx.fillStyle = i % 2 ? '#a6aeba' : '#6a7280'; ctx.fillRect(x + 5, y + 16 + i * 3, 14, 2); }
+    ctx.fillStyle = '#ffd23f'; ctx.fillRect(x + 5, y + 30, 14, 1);
+    /* window with a map pinned inside */
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 24, y + 14, 18, 11);
+    ctx.fillStyle = '#bfe8f5'; ctx.fillRect(x + 25, y + 15, 16, 9);
+    ctx.fillStyle = '#e8d9ae'; ctx.fillRect(x + 27, y + 16, 12, 7);
+    ctx.fillStyle = '#8a5e2a'; ctx.fillRect(x + 28, y + 20, 10, 1); ctx.fillRect(x + 33, y + 17, 1, 4);
+    ctx.fillStyle = '#e8542f'; ctx.fillRect(x + 30, y + 18, 1, 1); ctx.fillRect(x + 36, y + 21, 1, 1);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(x + 25, y + 15, 5, 1);
+    /* a clock over the door and a parked pallet */
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 10, y + 10, 5, 5);
+    ctx.fillStyle = '#fff8ec'; ctx.fillRect(x + 11, y + 11, 3, 3);
+    const ang = now / 2000;
+    ctx.fillStyle = '#3a2a16';
+    ctx.fillRect(x + 12 + Math.round(Math.cos(ang) * 1), y + 12 + Math.round(Math.sin(ang) * 1), 1, 1);
+    ctx.fillStyle = '#8a5e2a'; ctx.fillRect(x + 42, y + 26, 5, 5);
+    ctx.fillStyle = '#c9a35f'; ctx.fillRect(x + 42, y + 26, 5, 1); ctx.fillRect(x + 44, y + 27, 1, 4);
+    /* a bot on the forecourt when a load is out */
+    if (S().truck.state !== 'parked' && Math.floor(now / 600) % 2) {
+      ctx.fillStyle = '#7ac74f'; ctx.fillRect(x + 20, y + 6, 2, 2);
+    }
+  }
+
   /* the noticeboard where flyers get pinned */
   function drawBoard(c, r, bd, now) {
     const x = c * 16, y = r * 16;
@@ -1419,7 +1476,7 @@
     ctx.fillStyle = '#3a2a16'; ctx.fillRect(x - 2, y + 9, 17, 8); ctx.fillRect(x - 4, y + 11, 2, 4);
     ctx.fillStyle = '#e8542f'; ctx.fillRect(x - 1, y + 10, 15, 6); ctx.fillRect(x - 3, y + 12, 2, 2);
     ctx.fillStyle = '#ff8f6a'; ctx.fillRect(x - 1, y + 10, 15, 1);
-    SPR.drawTiny(ctx, 'DEPOT', x + 1, y + 11, '#ffffff', 1);
+    SPR.drawTiny(ctx, GAME.hasHQ() ? 'DEPOT' : 'NO HQ', x + 1, y + 11, '#ffffff', 1);
     /* a lamp that blinks when you can afford the next vehicle or route */
     const nextV = VEHICLES[S().vehicle + 1];
     const nextC = CITIES.find(c => !S().routes.includes(c.id));
@@ -1557,17 +1614,43 @@
     } else if (tool === 'feed') {
       ctx.drawImage(SPR.feedbagSprite(1), Math.round(x - 6), Math.round(y - 4));
     } else if (tool === 'farm') {
-      const icon = farmSel === 'hoe' ? 'hoe' : farmSel === 'water' ? 'water' : farmSel === 'harvest' ? 'scythe' : 'sprout';
-      ctx.drawImage(SPR.iconSprite(icon, 1), Math.round(x - 4), Math.round(y - 6 + (ptr.down ? 2 : 0)));
-      /* tile highlight */
       const tc = Math.floor(x / 16), trr = Math.floor(y / 16);
       const soil = S().soil[tc + ',' + trr];
-      let ok = farmSel === 'hoe' ? GAME.canTill(tc, trr)
-             : farmSel === 'water' ? !!soil
-             : farmSel === 'harvest' ? !!(soil && GAME.ripe(soil))
-             : GAME.canPlant(tc, trr, farmSel);
-      ctx.fillStyle = ok ? 'rgba(122,199,79,.30)' : 'rgba(0,0,0,.14)';
+      const sel = farmPick();
+      let ok, ghost = null, deco = null, crop = null;
+      if (sel.kind === 't') { ok = sel.id === 'soil' ? GAME.canTill(tc, trr) : GAME.canShape(sel.id, tc, trr); ghost = sel.id; }
+      else if (sel.kind === 'd') { ok = GAME.canDecorate(sel.id, tc, trr); deco = sel.id; }
+      else if (sel.kind === 'c') { ok = GAME.canPlant(tc, trr, sel.id); crop = sel.id; }
+      else if (sel.id === 'water') ok = !!soil;
+      else if (sel.id === 'harvest') ok = !!(soil && GAME.ripe(soil));
+      else ok = !!(GAME.decoAt(tc, trr) || S().terrain[tc + ',' + trr] || (soil && !soil.crop));
+      /* a see-through preview of what lands here */
+      ctx.globalAlpha = 0.55;
+      if (ghost === 'path' || ghost === 'stone') ctx.drawImage(SPR.pathSprite(ghost, 3, 15, 1), tc * 16, trr * 16);
+      else if (ghost === 'water') ctx.drawImage(SPR.waterSprite(3, 15, 1), tc * 16, trr * 16);
+      else if (ghost === 'high') ctx.drawImage(SPR.terraceSprite(3, 3, 1), tc * 16, trr * 16 - 6);
+      else if (ghost === 'soil') ctx.drawImage(SPR.soilSprite(3, false, 1), tc * 16, trr * 16);
+      else if (deco) {
+        const spr = SPR.decoSprite(DECOS[deco].kind, 1, 40 + DECO_KEYS.indexOf(deco) * 7);
+        ctx.drawImage(spr, tc * 16 + 8 - Math.floor(spr.width / 2), trr * 16 + 15 - spr.height);
+      } else if (crop) {
+        ctx.drawImage(SPR.cropSprite(crop, CROPS[crop].stages - 1, 3, 1), tc * 16, trr * 16 - 4);
+      }
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = ok ? 'rgba(122,199,79,.28)' : 'rgba(232,84,47,.26)';
       ctx.fillRect(tc * 16, trr * 16, 16, 16);
+      /* a dashed marching outline so the target tile is unmistakable */
+      const dash = Math.floor(now / 90) % 4;
+      ctx.fillStyle = ok ? '#dfffc4' : '#ffc9b8';
+      for (let i = 0; i < 16; i++) {
+        if ((i + dash) % 4 < 2) { ctx.fillRect(tc * 16 + i, trr * 16, 1, 1); ctx.fillRect(tc * 16 + i, trr * 16 + 15, 1, 1); }
+        if ((i + dash) % 4 < 2) { ctx.fillRect(tc * 16, trr * 16 + i, 1, 1); ctx.fillRect(tc * 16 + 15, trr * 16 + i, 1, 1); }
+      }
+      const icon = sel.kind === 't' ? TERRAIN[sel.id].icon
+                 : sel.kind === 'd' ? 'tree'
+                 : sel.kind === 'c' ? 'sprout'
+                 : sel.id === 'water' ? 'water' : sel.id === 'harvest' ? 'scythe' : 'remove';
+      ctx.drawImage(SPR.iconSprite(icon, 1), Math.round(x - 4), Math.round(y - 6 + (ptr.down ? 2 : 0)));
     } else if (tool === 'inspect') {
       const g = SPR.iconSprite('magnify', 1);
       ctx.drawImage(g, Math.round(x - 4), Math.round(y - 4));
@@ -1615,6 +1698,7 @@
     else if (buildSel === 'mill') drawMill(c, r, {}, now);
     else if (buildSel === 'coop') drawCoop(c, r, {}, now);
     else if (buildSel === 'board') drawBoard(c, r, {}, now);
+    else if (buildSel === 'hq') drawHQ(c, r, {}, now);
     else drawIncubator(c, r, { queue: [], prog: 0 }, now);
     ctx.globalAlpha = 1;
     if (buildSel === 'well' || buildSel === 'sprinkler' || buildSel === 'coop') {
@@ -1679,6 +1763,33 @@
       ctx.fillRect(p.x + 12 + i * 17, p.y + 10 + (i % 2) * 9, 2, 1);
     }
 
+    /* ---- shaped ground: paths, terraces and dug ponds ---- */
+    const tmask = (c, r, kind) => {
+      const at = (cc, rr) => {
+        const t = GAME.terrainAt(cc, rr);
+        if (kind === 'water') return t === 'water' ? 1 : 0;
+        if (kind === 'high') return t === 'high' ? 1 : 0;
+        return (t === 'path' || t === 'stone') ? 1 : 0;
+      };
+      return at(c, r - 1) | (at(c + 1, r) << 1) | (at(c, r + 1) << 2) | (at(c - 1, r) << 3);
+    };
+    for (const k of Object.keys(S().terrain)) {
+      const [c, r] = k.split(',').map(Number);
+      if (c * 16 + 16 < cam().x || c * 16 > cam().x + W.view.w || r * 16 + 22 < cam().y || r * 16 > cam().y + W.view.h) continue;
+      const t = S().terrain[k];
+      if (t.t === 'path' || t.t === 'stone') ctx.drawImage(SPR.pathSprite(t.t, t.seed, tmask(c, r, 'path'), 1), c * 16, r * 16);
+      else if (t.t === 'water') ctx.drawImage(SPR.waterSprite(t.seed, tmask(c, r, 'water'), 1), c * 16, r * 16);
+      else if (t.t === 'high') ctx.drawImage(SPR.terraceSprite(t.seed, tmask(c, r, 'high'), 1), c * 16, r * 16 - 6);
+    }
+    /* ripples on the ponds you dug */
+    for (const k of Object.keys(S().terrain)) {
+      const t = S().terrain[k];
+      if (t.t !== 'water') continue;
+      const [c, r] = k.split(',').map(Number);
+      if ((c * 7 + r * 3 + Math.floor(now / 700)) % 5) continue;
+      ctx.fillStyle = 'rgba(255,255,255,.4)';
+      ctx.fillRect(c * 16 + 4 + ((Math.floor(now / 400) + c) % 6), r * 16 + 6 + (r % 5), 3, 1);
+    }
     /* tilled soil and whatever is growing in it */
     for (const k of Object.keys(S().soil)) {
       const [c, r] = k.split(',').map(Number);
@@ -1720,10 +1831,23 @@
     for (const k of Object.keys(S().wells)) { const [c, r] = k.split(',').map(Number); drawWell(c, r, S().wells[k], now); }
     for (const k of Object.keys(S().sprinklers)) { const [c, r] = k.split(',').map(Number); drawSprinkler(c, r, S().sprinklers[k], now); }
     for (const k of Object.keys(S().boards)) { const [c, r] = k.split(',').map(Number); drawBoard(c, r, S().boards[k], now); }
+    for (const k of Object.keys(S().hqs)) { const [c, r] = k.split(',').map(Number); drawHQ(c, r, S().hqs[k], now); }
     for (const k of Object.keys(S().barns)) { const [c, r] = k.split(',').map(Number); drawBarn(c, r, S().barns[k], now); }
     for (const k of Object.keys(S().mills)) { const [c, r] = k.split(',').map(Number); drawMill(c, r, S().mills[k], now); }
     for (const k of Object.keys(S().coops)) { const [c, r] = k.split(',').map(Number); drawCoop(c, r, S().coops[k], now); }
     S().applicants.forEach(a => drawApplicant(a, now));
+    /* things you planted for the look of them */
+    for (const k of Object.keys(S().deco)) {
+      const [c, r] = k.split(',').map(Number);
+      if (c * 16 + 24 < cam().x || c * 16 - 8 > cam().x + W.view.w || r * 16 + 24 < cam().y || r * 16 - 20 > cam().y + W.view.h) continue;
+      const d = S().deco[k];
+      const spr = SPR.decoSprite(DECOS[d.kind] ? DECOS[d.kind].kind : 'tuft', 1, d.seed);
+      const px0 = c * 16 + 8 - Math.floor(spr.width / 2);
+      const py0 = r * 16 + 15 - spr.height;
+      shadow(ctx, c * 16 + 8, r * 16 + 14, spr.width * 0.34);
+      const sway = spr.height > 14 ? Math.round(Math.sin(now / 1100 + c * 1.7 + r) * 0.5) : 0;
+      ctx.drawImage(spr, px0 + sway, py0);
+    }
 
     S().items.forEach(it => {
       const spr = it.rainbow ? SPR.eggSprite(it.tier, 1, true, Math.floor(now / 120) % 6) : SPR.eggSprite(it.tier, 1);
@@ -1875,7 +1999,7 @@
 
   const TOOL_ICON = { hand: 'hand', basket: 'basket', feed: 'bowl', farm: 'hoe', build: 'hammer', inspect: 'magnify' };
   const TOOL_LABEL = { hand: 'HAND', basket: 'BASKET', feed: 'FEED', farm: 'FARM', build: 'BUILD', inspect: 'LOOK' };
-  let farmSel = 'hoe', palSec = 'ranch';
+  let farmSel = 't:soil', farmSec = 'ground', palSec = 'ranch';
   function renderToolbelt() {
     el.toolbelt.innerHTML = '';
     ['hand', 'basket', 'feed', 'farm', 'build', 'inspect'].forEach(id => {
@@ -1932,7 +2056,7 @@
      by pointing `ctx` at an offscreen canvas for the duration of the call */
   function buildingThumb(type) {
     const small = ['belt', 'vacuum', 'blower', 'sorter', 'fence', 'splitter', 'trough', 'well', 'sprinkler', 'board'].includes(type);
-    const big = type === 'hatchery';
+    const big = type === 'hatchery' || type === 'hq';
     const wpx = small ? 16 : big ? 50 : 34, hpx = small ? 16 : big ? 50 : 36;
     const k = small ? 2 : 1;
     const c = document.createElement('canvas');
@@ -1963,6 +2087,7 @@
       else if (type === 'mill') drawMill(0, 0, {}, now);
       else if (type === 'coop') drawCoop(0, 0, {}, now);
       else if (type === 'board') drawBoard(0, 0, {}, now);
+      else if (type === 'hq') drawHQ(0, 0, {}, now);
       else drawIncubator(0, 0, { queue: [], prog: 0 }, now);
     } finally {
       ctx = saved;
@@ -2034,51 +2159,86 @@
     GAME.dirty.build = false;
   }
 
-  /* the farm tool's sub-palette: hoe, seed packets, watering can, scythe */
+  /* The landscaping palette. Four tabs: shape the GROUND, PLANT crops,
+     TEND them, and DECOR the place with trees and flowers. */
+  /* ids are namespaced - t: terrain, c: crop, d: decoration - so the clover
+     seed packet and the clover patch never get mistaken for one another */
+  function farmItems() {
+    if (farmSec === 'ground') {
+      return TERRAIN_KEYS.map(k => ({ id: 't:' + k, terrain: k, name: TERRAIN[k].name.toUpperCase(), icon: TERRAIN[k].icon }));
+    }
+    if (farmSec === 'plant') {
+      return CROP_KEYS.map(k => ({ id: 'c:' + k, crop: k, name: CROPS[k].name.toUpperCase() }));
+    }
+    if (farmSec === 'tend') {
+      return [{ id: 'do:water', icon: 'water', name: 'WATER', tip: 'Watered crops grow twice as fast' },
+              { id: 'do:harvest', icon: 'scythe', name: 'HARVEST', tip: 'Cut ripe crops into feed' },
+              { id: 'do:clear', icon: 'remove', name: 'CLEAR', tip: 'Lift a decoration, bare soil or shaped ground' }];
+    }
+    return DECO_KEYS.map(k => ({ id: 'd:' + k, deco: k, name: DECOS[k].name.toUpperCase() }));
+  }
+  /* what the current selection actually is */
+  function farmPick() {
+    const i = farmSel.indexOf(':');
+    return i < 0 ? { kind: 'do', id: farmSel } : { kind: farmSel.slice(0, i), id: farmSel.slice(i + 1) };
+  }
   function renderFarmPalette() {
     if (el.farmPalette.hidden) return;
     el.farmPalette.innerHTML = '';
-    const items = [{ id: 'hoe', icon: 'hoe', name: 'HOE', tip: 'Till grass into soil' }];
-    CROP_KEYS.forEach(k => items.push({ id: k, icon: 'sprout', name: CROPS[k].name.toUpperCase(), crop: k }));
-    items.push({ id: 'water', icon: 'water', name: 'WATER', tip: 'Watered crops grow twice as fast' });
-    items.push({ id: 'harvest', icon: 'scythe', name: 'HARVEST', tip: 'Cut ripe crops into feed' });
-    items.forEach(it => {
+    const tabs = document.createElement('div');
+    tabs.className = 'pal-tabs';
+    FARM_SECTIONS.forEach(sec => {
+      const b = document.createElement('button');
+      b.className = 'pal-tab' + (farmSec === sec.id ? ' active' : '');
+      b.dataset.farmsec = sec.id;
+      b.appendChild(mkIcon(sec.icon, 2));
+      b.appendChild(document.createTextNode(sec.name));
+      tabs.appendChild(b);
+    });
+    el.farmPalette.appendChild(tabs);
+
+    const row = document.createElement('div');
+    row.className = 'pal-row';
+    farmItems().forEach(it => {
       const btn = document.createElement('button');
-      const open = !it.crop || GAME.cropOpen(it.crop);
-      btn.className = 'pal-btn farm' + (farmSel === it.id ? ' active' : '') + (it.crop ? ' crop-' + it.crop : '');
+      let open = true, cost = 0, tip = it.tip || '';
+      if (it.crop) { open = GAME.cropOpen(it.crop); cost = GAME.seedCount(it.crop) > 0 ? 0 : CROPS[it.crop].seed; tip = CROPS[it.crop].desc; }
+      if (it.terrain) { open = GAME.terrainOpen(it.terrain); cost = GAME.terrainCost(it.terrain); tip = TERRAIN[it.terrain].desc; }
+      if (it.deco) { cost = DECOS[it.deco].cost; tip = 'Plant a ' + DECOS[it.deco].name.toLowerCase() + ' just because it looks nice.'; }
+      btn.className = 'pal-btn farm' + (farmSel === it.id ? ' active' : '');
       btn.dataset.farm = it.id;
       btn.disabled = !open;
-      if (it.crop) {
-        const cv2 = cloneCanvas(SPR.cropSprite(it.crop, CROPS[it.crop].stages - 1, 3, 2));
-        btn.appendChild(cv2);
-      } else btn.appendChild(mkIcon(it.icon, 3));
+      if (it.crop) btn.appendChild(cloneCanvas(SPR.cropSprite(it.crop, CROPS[it.crop].stages - 1, 3, 2)));
+      else if (it.deco) btn.appendChild(cloneCanvas(SPR.decoSprite(DECOS[it.deco].kind, 1, 40 + DECO_KEYS.indexOf(it.deco) * 7), 2));
+      else if (it.terrain === 'path' || it.terrain === 'stone') btn.appendChild(cloneCanvas(SPR.pathSprite(it.terrain, 3, 15, 1), 2));
+      else if (it.terrain === 'water') btn.appendChild(cloneCanvas(SPR.waterSprite(3, 15, 1), 2));
+      else if (it.terrain === 'high') btn.appendChild(cloneCanvas(SPR.terraceSprite(3, 3, 1), 2));
+      else if (it.terrain === 'soil') btn.appendChild(cloneCanvas(SPR.soilSprite(3, false, 1), 2));
+      else btn.appendChild(mkIcon(it.icon, 3));
       const nm = document.createElement('b');
       nm.textContent = it.name;
       btn.appendChild(nm);
       const tag = document.createElement('small');
-      if (it.crop) {
-        const d = CROPS[it.crop];
-        if (!open) tag.textContent = 'RESEARCH';
-        else {
-          const have = GAME.seedCount(it.crop);
-          if (have > 0) tag.textContent = 'x' + have + ' SEEDS';
-          else { tag.appendChild(mkIcon('coin', 1)); tag.appendChild(document.createTextNode(GAME.fmt(d.seed))); }
-        }
-        btn.title = d.name + ' - ' + d.desc + ' Grows in ' + GAME.fmtTime(d.grow) + ', ' + GAME.harvestYield(it.crop) + ' feed.';
-      } else { tag.textContent = it.tip.split(' ').slice(0, 2).join(' ').toUpperCase(); btn.title = it.tip; }
+      if (!open) tag.textContent = 'RESEARCH';
+      else if (it.crop && GAME.seedCount(it.crop) > 0) tag.textContent = 'x' + GAME.seedCount(it.crop) + ' SEEDS';
+      else if (cost > 0) { tag.appendChild(mkIcon('coin', 1)); tag.appendChild(document.createTextNode(GAME.fmt(cost))); }
+      else if (it.crop || it.terrain || it.deco) tag.textContent = 'FREE';
+      else tag.textContent = 'DRAG';
       btn.appendChild(tag);
-      el.farmPalette.appendChild(btn);
+      btn.title = it.name + ' - ' + tip;
+      row.appendChild(btn);
     });
-    /* a feed readout so you know why you are farming */
+    el.farmPalette.appendChild(row);
+
     const info = document.createElement('div');
     info.className = 'farm-info';
     const st = S();
     const soil = Object.keys(st.soil).length, crops = Object.values(st.soil).filter(t => t.crop).length;
     const ripeN = Object.values(st.soil).filter(t => GAME.ripe(t)).length;
-    info.textContent = soil + ' tilled, ' + crops + ' growing, ' + ripeN + ' ripe';
+    info.textContent = soil + ' tilled, ' + crops + ' growing, ' + ripeN + ' ripe  -  ' +
+      Object.keys(st.terrain).length + ' shaped, ' + Object.keys(st.deco).length + ' planted. drag to paint';
     el.farmPalette.appendChild(info);
   }
-
 
   /* ---------- speech-bubble hints ---------- */
   let bubbleText = '';
@@ -2996,7 +3156,7 @@
       note.textContent = 'Pick a role to hire them on the spot. Roles lean on different stats.';
       ipanel.appendChild(note);
       const room = GAME.canHire() && st.coins >= a.sign;
-      const btns = ROLE_KEYS.filter(r => !ROLES[r].robot && GAME.roleOpen(r)).map(r => ({
+      const btns = ROLE_KEYS.filter(r => !ROLES[r].botOnly && GAME.roleOpen(r)).map(r => ({
         label: ROLES[r].name.toUpperCase(), data: { act: 'hire-applicant', id: String(a.id), role: r },
         green: room, disabled: !room,
       }));
@@ -3211,7 +3371,7 @@
   function crewCard(w) {
     const def = ROLES[w.role] || ROLES.hand;
     const card = document.createElement('div');
-    card.className = 'crew-card' + (def.robot ? ' bot' : '');
+    card.className = 'crew-card' + (w.bot ? ' bot' : '');
     const head = document.createElement('div');
     head.className = 'cc-head';
     head.appendChild(cloneCanvas(SPR.staffSprite(w, 0, 2)));
@@ -3251,7 +3411,7 @@
     /* role switcher - people can move between people-roles */
     const roles = document.createElement('div');
     roles.className = 'cc-roles';
-    ROLE_KEYS.filter(r => ROLES[r].robot === def.robot && GAME.roleOpen(r)).forEach(r => {
+    ROLE_KEYS.filter(r => (w.bot || !ROLES[r].botOnly) && GAME.roleOpen(r)).forEach(r => {
       const b = document.createElement('button');
       b.className = 'btn btn-tiny' + (r === w.role ? ' on' : '');
       b.dataset.act = 'set-role';
@@ -3266,7 +3426,7 @@
     fire.className = 'btn btn-tiny cc-fire';
     fire.dataset.act = 'fire';
     fire.dataset.id = String(w.id);
-    fire.textContent = def.robot ? 'SCRAP' : 'LET GO';
+    fire.textContent = w.bot ? 'SCRAP' : 'LET GO';
     roles.appendChild(fire);
     card.appendChild(roles);
     return card;
@@ -3312,7 +3472,7 @@
     const roles = document.createElement('div');
     roles.className = 'cc-roles';
     const room = GAME.canHire() && S().coins >= ap.sign;
-    ROLE_KEYS.filter(r => !ROLES[r].robot && GAME.roleOpen(r)).forEach(r => {
+    ROLE_KEYS.filter(r => !ROLES[r].botOnly && GAME.roleOpen(r)).forEach(r => {
       const b = document.createElement('button');
       b.className = 'btn btn-tiny' + (room ? ' btn-green' : '');
       b.dataset.act = 'hire-applicant';
@@ -3388,8 +3548,17 @@
 
   /* robots are built, not recruited */
   function botBench(box) {
-    const bots = ROLE_KEYS.filter(r => ROLES[r].robot);
-    if (!bots.some(r => GAME.roleOpen(r))) return;
+    const bots = ROLE_KEYS.filter(r => GAME.roleOpen(r));
+    if (!bots.length) return;
+    const head = document.createElement('div');
+    head.className = 'ps-head crew-head';
+    const hl = document.createElement('b');
+    hl.textContent = 'THE ROBOT WORKSHOP';
+    head.appendChild(hl);
+    const hr = document.createElement('span');
+    hr.textContent = GAME.botCount() + ' built';
+    head.appendChild(hr);
+    box.appendChild(head);
     const grid = document.createElement('div');
     grid.className = 'bot-grid';
     bots.forEach(r => {
@@ -3398,14 +3567,15 @@
       const cost = GAME.botPrice(r);
       const card = document.createElement('div');
       card.className = 'bot-card' + (open ? '' : ' locked');
-      card.appendChild(cloneCanvas(SPR.staffSprite({ role: r }, 0, 2)));
+      card.appendChild(cloneCanvas(SPR.botSprite(r, 0, 2)));
       const mid = document.createElement('div');
       mid.className = 'hc-mid';
       const b = document.createElement('b');
-      b.textContent = def.name.toUpperCase();
+      b.textContent = (BOTS[r] || { name: def.name }).name.toUpperCase();
       mid.appendChild(b);
       const job = document.createElement('span');
-      job.textContent = open ? def.job : 'Research required before you can build this one.';
+      job.textContent = open ? 'Does the ' + def.name + ' job. ' + def.job.split('.')[0] + '. Never tires, never asks for a raise.'
+                             : 'Research required before you can build this one.';
       mid.appendChild(job);
       const btn = document.createElement('button');
       btn.className = 'btn';
@@ -3473,6 +3643,235 @@
     crew.appendChild(rule);
   }
 
+  /* ================= THE VALLEY MAP =================
+     A sheet of old paper pinned to the HQ wall, drawn in wobbly
+     ink: the ranch, the road, and every town along it. Cities you
+     have not opened yet sit under a fog of unmapped country.
+     ================================================== */
+  const MAP_W = 720, MAP_H = 320, MK = 2;
+  const MVW = MAP_W / MK, MVH = MAP_H / MK;
+  const INK = '#5e4426', INK2 = '#8a6a44', RED = '#b4442e';
+  const MAP_PTS = {
+    ranch:   { x: 34,  y: 118 },
+    hamlet:  { x: 88,  y: 104 },
+    town:    { x: 142, y: 78  },
+    city:    { x: 204, y: 96  },
+    capital: { x: 262, y: 62  },
+    port:    { x: 320, y: 104 },
+  };
+  let mapCv = null, mapCtx = null, mapHits = [], mapHover = null;
+
+  function drawValleyMap(now) {
+    if (!mapCv) return;
+    const g = mapCtx;
+    g.imageSmoothingEnabled = false;
+    g.setTransform(MK, 0, 0, MK, 0, 0);
+    mapHits = [];
+    const st = S();
+
+    /* corkboard behind the paper */
+    g.fillStyle = '#b98a52'; g.fillRect(0, 0, MVW, MVH);
+    const crnd = SPR.mulberry(99);
+    for (let i = 0; i < 900; i++) {
+      const x = Math.floor(crnd() * MVW), y = Math.floor(crnd() * MVH);
+      g.fillStyle = crnd() < 0.5 ? '#a87a45' : '#c99a62';
+      g.fillRect(x, y, 1 + (crnd() < 0.2 ? 1 : 0), 1);
+    }
+    /* the sheet, very slightly crooked */
+    SPR.parchment(g, 6, 5, MVW - 12, MVH - 10, 21);
+
+    /* --- hand-drawn country --- */
+    /* coast down the right-hand side */
+    let prev = null;
+    for (let y = 8; y < MVH - 8; y += 4) {
+      const x = MVW - 22 + Math.round(Math.sin(y / 13) * 5 + Math.sin(y / 5) * 2);
+      if (prev) SPR.inkLine(g, prev[0], prev[1], x, y, INK, 0, 300 + y);
+      prev = [x, y];
+    }
+    for (let y = 10; y < MVH - 10; y += 7) {
+      const x = MVW - 18 + Math.round(Math.sin(y / 13) * 5);
+      SPR.inkLine(g, x + 3, y, x + 9, y, INK2, 0, 400 + y, 2);
+    }
+    /* hills along the top */
+    for (let i = 0; i < 9; i++) {
+      const hx = 24 + i * 34, hy = 26 + (i % 3) * 5;
+      SPR.inkLine(g, hx, hy, hx + 7, hy - 6, INK, 0, 500 + i);
+      SPR.inkLine(g, hx + 7, hy - 6, hx + 14, hy, INK, 0, 520 + i);
+      if (i % 2) { SPR.inkLine(g, hx + 4, hy - 3, hx + 7, hy - 6, INK2, 0, 540 + i); }
+    }
+    /* a little forest */
+    for (let i = 0; i < 7; i++) {
+      const tx = 60 + (i % 4) * 13, ty = 148 + Math.floor(i / 4) * 11;
+      g.fillStyle = INK;
+      g.fillRect(tx + 2, ty + 4, 1, 3);
+      g.fillRect(tx, ty, 5, 1); g.fillRect(tx + 1, ty - 2, 3, 1); g.fillRect(tx + 1, ty + 2, 3, 1);
+    }
+    /* a river winding down to the sea */
+    let rp = [150, 150];
+    for (let i = 0; i < 26; i++) {
+      const nx = rp[0] + 7, ny = 150 + Math.round(Math.sin(i / 3) * 6) - i * 0.4;
+      SPR.inkLine(g, rp[0], rp[1], nx, ny, '#7fa8c4', 1, 600 + i);
+      rp = [nx, ny];
+    }
+
+    /* --- the road: one wobbly line through every town --- */
+    const order = ['ranch'].concat(CITIES.map(c => c.id));
+    for (let i = 0; i < order.length - 1; i++) {
+      const a = MAP_PTS[order[i]], b = MAP_PTS[order[i + 1]];
+      const open = st.routes.includes(order[i + 1]);
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 - 12 };
+      /* two straight halves through a raised midpoint reads as a curve */
+      SPR.inkLine(g, a.x, a.y, mid.x, mid.y, open ? INK : '#bfae90', 1, 700 + i);
+      SPR.inkLine(g, mid.x, mid.y, b.x, b.y, open ? INK : '#bfae90', 1, 730 + i);
+      if (open) {
+        SPR.inkLine(g, a.x, a.y + 1, mid.x, mid.y + 1, INK2, 1, 760 + i, 3);
+        SPR.inkLine(g, mid.x, mid.y + 1, b.x, b.y + 1, INK2, 1, 790 + i, 3);
+      }
+    }
+
+    /* --- the active route, inked in red and crawling --- */
+    const activeIdx = CITIES.findIndex(c => c.id === st.route);
+    if (activeIdx >= 0) {
+      for (let i = 0; i <= activeIdx; i++) {
+        const a = MAP_PTS[order[i]], b = MAP_PTS[order[i + 1]];
+        const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 - 12 };
+        const crawl = Math.floor(now / 90) % 6;
+        [[a, mid], [mid, b]].forEach(([p0, p1], h) => {
+          const steps = Math.max(Math.abs(p1.x - p0.x), Math.abs(p1.y - p0.y));
+          for (let q = 0; q <= steps; q++) {
+            if ((q + crawl) % 6 >= 3) continue;
+            const t = steps ? q / steps : 0;
+            g.fillStyle = RED;
+            g.fillRect(Math.round(p0.x + (p1.x - p0.x) * t), Math.round(p0.y + (p1.y - p0.y) * t) - 2, 1, 2);
+          }
+        });
+      }
+    }
+
+    /* --- the ranch --- */
+    const rr = MAP_PTS.ranch;
+    g.fillStyle = INK;
+    g.fillRect(rr.x - 7, rr.y - 2, 14, 8);
+    g.fillStyle = '#e8d9ae'; g.fillRect(rr.x - 6, rr.y - 1, 12, 6);
+    for (let i = 0; i < 7; i++) g.fillRect(rr.x - 6 + i, rr.y - 2 - Math.min(i, 6 - i), 1, 1);
+    g.fillStyle = INK;
+    for (let i = 0; i < 8; i++) g.fillRect(rr.x - 7 + i, rr.y - 3 - Math.min(i, 7 - i), 1, 1);
+    g.fillRect(rr.x - 1, rr.y + 1, 3, 4);
+    /* the X marking it */
+    for (let i = -4; i <= 4; i++) { g.fillStyle = RED; g.fillRect(rr.x + i, rr.y - 12 + i, 1, 1); g.fillRect(rr.x + i, rr.y - 4 - i, 1, 1); }
+    SPR.drawTiny(g, 'YOUR RANCH', rr.x - 12, rr.y + 9, INK, 1);
+
+    /* --- the towns --- */
+    CITIES.forEach((c, i) => {
+      const p = MAP_PTS[c.id];
+      const open = st.routes.includes(c.id);
+      const active = st.route === c.id;
+      const nextUp = !open && (i === 0 || st.routes.includes(CITIES[i - 1].id));
+      if (!open) {
+        /* unmapped: a smudge of cloud and a question mark */
+        /* a soft bank of cloud, drawn as overlapping puffs */
+        const rnd2 = SPR.mulberry(880 + i);
+        for (let pass = 0; pass < 2; pass++) {
+          g.fillStyle = pass ? 'rgba(226,214,182,.92)' : 'rgba(203,188,152,.85)';
+          for (let q = 0; q < 9; q++) {
+            const cx2 = p.x - 13 + Math.floor(rnd2() * 26);
+            const cy2 = p.y - 10 + Math.floor(rnd2() * 18) - pass;
+            const rr2 = 4 + Math.floor(rnd2() * 4);
+            for (let dy = -rr2; dy <= rr2; dy++) {
+              const half = Math.round(Math.sqrt(Math.max(0, rr2 * rr2 - dy * dy)));
+              g.fillRect(cx2 - half, cy2 + dy, half * 2, 1);
+            }
+          }
+        }
+        /* a curl of ink round the edge so it reads as drawn, not missing */
+        for (let q = 0; q < 22; q++) {
+          const th = q / 22 * Math.PI * 2;
+          g.fillStyle = 'rgba(138,122,90,.5)';
+          g.fillRect(Math.round(p.x + Math.cos(th) * 15), Math.round(p.y - 1 + Math.sin(th) * 12), 1, 1);
+        }
+        SPR.drawText(g, '?', p.x - 2, p.y - 6, nextUp ? RED : '#8a7a5a', 1);
+        if (nextUp) SPR.drawTiny(g, 'UNMAPPED', p.x - 13, p.y + 9, '#8a7a5a', 1);
+      } else {
+        /* a drawn little town: blocks, roofs, and a spire for the big ones */
+        const n = 2 + c.sky;
+        for (let b2 = 0; b2 < n; b2++) {
+          const bx = p.x - n * 3 + b2 * 6, bh = 5 + ((b2 * 7 + c.sky * 3) % 6);
+          g.fillStyle = INK;
+          g.fillRect(bx, p.y - bh, 5, bh);
+          g.fillStyle = '#e8d9ae'; g.fillRect(bx + 1, p.y - bh + 1, 3, bh - 1);
+          g.fillStyle = INK;
+          for (let q = 0; q < 3; q++) g.fillRect(bx + q, p.y - bh - 1 - Math.min(q, 2 - q), 1, 1);
+          if (c.sky >= 2 && b2 % 2) { g.fillStyle = INK2; g.fillRect(bx + 2, p.y - bh + 2, 1, 1); }
+        }
+        if (c.sky >= 3) { g.fillStyle = INK; g.fillRect(p.x + n * 3 - 2, p.y - 18, 2, 18); g.fillRect(p.x + n * 3 - 3, p.y - 21, 4, 3); }
+        if (c.sky === 4) { g.fillStyle = '#7fa8c4'; g.fillRect(p.x - 16, p.y + 3, 34, 1); g.fillRect(p.x - 12, p.y + 5, 26, 1); }
+        const label = c.name.toUpperCase();
+        SPR.drawTiny(g, label, p.x - Math.floor(SPR.tinyW(label, 1) / 2), p.y + 8, active ? RED : INK, 1);
+        if (active) {
+          SPR.drawTiny(g, 'DELIVERING', p.x - 16, p.y + 15, RED, 1);
+          /* a ring drawn round the active town */
+          for (let a2 = 0; a2 < 34; a2++) {
+            const th = a2 / 34 * Math.PI * 2;
+            g.fillStyle = RED;
+            g.fillRect(Math.round(p.x + Math.cos(th) * 18), Math.round(p.y - 4 + Math.sin(th) * 12), 1, 1);
+          }
+        }
+      }
+      if (mapHover === c.id) {
+        g.fillStyle = 'rgba(180,68,46,.16)';
+        g.fillRect(p.x - 18, p.y - 20, 36, 30);
+      }
+      mapHits.push({ id: c.id, x: p.x - 18, y: p.y - 20, w: 36, h: 30 });
+    });
+
+    /* --- the load, riding the road --- */
+    const ph = GAME.tripPhase();
+    if (ph) {
+      const dest = MAP_PTS[st.truck.to || st.route] || MAP_PTS.hamlet;
+      const home = MAP_PTS.ranch;
+      const t = ph.out ? ph.f / 0.5 : 1 - (ph.f - 0.5) / 0.5;
+      const vx = home.x + (dest.x - home.x) * t, vy = home.y + (dest.y - home.y) * t - Math.sin(t * Math.PI) * 10;
+      const spr = SPR.vehicleSprite(ph.vehicle.id, Math.floor(now / 90) % 2, 1);
+      g.save();
+      if (!ph.out) { g.translate(Math.round(vx) + Math.round(spr.width / 2), Math.round(vy) - spr.height + 2); g.scale(-1, 1); g.drawImage(spr, -spr.width, 0); }
+      else g.drawImage(spr, Math.round(vx - spr.width / 2), Math.round(vy) - spr.height + 2);
+      g.restore();
+      g.fillStyle = 'rgba(94,68,38,.28)';
+      g.fillRect(Math.round(vx - spr.width / 2), Math.round(vy) + 1, spr.width, 1);
+    }
+
+    /* --- furniture: compass, title, scale, pins --- */
+    SPR.compassRose(g, MVW - 34, 40, 9, INK);
+    SPR.drawTiny(g, 'N', MVW - 36, 24, INK, 1);
+    const title = 'THE VALLEY';
+    g.fillStyle = 'rgba(232,217,174,.9)';
+    g.fillRect(16, 12, SPR.textW(title, 1) + 10, 14);
+    SPR.inkLine(g, 16, 12, 16 + SPR.textW(title, 1) + 10, 12, INK, 1, 12);
+    SPR.inkLine(g, 16, 26, 16 + SPR.textW(title, 1) + 10, 26, INK, 1, 13);
+    SPR.drawText(g, title, 21, 16, INK, 1);
+    SPR.inkLine(g, 20, MVH - 18, 60, MVH - 18, INK, 1, 44);
+    SPR.drawTiny(g, 'A DAYS RIDE', 20, MVH - 15, INK2, 1);
+    /* pushpins */
+    [[10, 9], [MVW - 12, 9], [10, MVH - 11], [MVW - 12, MVH - 11]].forEach(([px2, py2], i) => {
+      g.fillStyle = ['#c94a3a', '#3f6fd6', '#7ac74f', '#ffd23f'][i];
+      g.fillRect(px2 - 2, py2 - 2, 5, 5);
+      g.fillStyle = 'rgba(255,255,255,.6)'; g.fillRect(px2 - 1, py2 - 1, 2, 2);
+      g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(px2 - 2, py2 + 3, 5, 1);
+    });
+    g.setTransform(1, 0, 0, 1, 0, 0);
+  }
+  function mapCoords(ev) {
+    const r = mapCv.getBoundingClientRect();
+    return { x: (ev.clientX - r.left) / r.width * MVW, y: (ev.clientY - r.top) / r.height * MVH };
+  }
+  function mapHitAt(x, y) {
+    for (let i = mapHits.length - 1; i >= 0; i--) {
+      const h = mapHits[i];
+      if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) return h;
+    }
+    return null;
+  }
+
   /* ================= THE DEPOT - wheels and routes ================= */
   let depotSig = '';
   function renderDepot() {
@@ -3480,6 +3879,68 @@
     const st = S();
     box.innerHTML = '';
     const v = GAME.vehicle();
+    const wrap = $('#depot-map-wrap');
+
+    /* ---- no HQ yet: a blueprint and what to do about it ---- */
+    if (!GAME.hasHQ()) {
+      wrap.hidden = true;
+      $('#depot-sub').textContent = 'NO DISPATCH OFFICE';
+      const need = document.createElement('div');
+      need.className = 'hq-needed';
+      need.appendChild(cloneCanvas(buildingThumb('hq'), 1));
+      const mid = document.createElement('div');
+      const b2 = document.createElement('b');
+      b2.textContent = 'BUILD A LOGISTICS HQ';
+      mid.appendChild(b2);
+      const p2 = document.createElement('p');
+      p2.textContent = 'Vehicles and routes are arranged from a dispatch office, not from a signpost. Put one up on the ranch (BUILD, then the CREW tab) and the wall map opens with it.';
+      mid.appendChild(p2);
+      const p3 = document.createElement('p');
+      p3.className = 'hq-cost';
+      p3.appendChild(mkIcon('coin', 2));
+      p3.appendChild(document.createTextNode(GAME.fmt(buildCost('hq', st.built.hq)) + '  -  3 by 2 tiles'));
+      mid.appendChild(p3);
+      need.appendChild(mid);
+      box.appendChild(need);
+      /* the load can still be sent from the sign */
+      const foot = document.createElement('div');
+      foot.className = 'depot-foot';
+      const info = document.createElement('span');
+      info.textContent = st.truck.state === 'parked'
+        ? st.truck.load.length + ' eggs on the ' + v.name.toLowerCase() + ', worth ' + GAME.fmt(GAME.truckPayout()) + ' in ' + GAME.city().name + '.'
+        : 'Out on the road right now.';
+      foot.appendChild(info);
+      const send = document.createElement('button');
+      send.className = 'btn' + (st.truck.state === 'parked' && st.truck.load.length ? ' btn-green' : '');
+      send.disabled = !(st.truck.state === 'parked' && st.truck.load.length);
+      send.dataset.act = 'send-now';
+      send.textContent = 'SEND IT';
+      foot.appendChild(send);
+      box.appendChild(foot);
+      return;
+    }
+
+    wrap.hidden = false;
+    if (!mapCv) {
+      mapCv = $('#depot-map');
+      mapCv.width = MAP_W; mapCv.height = MAP_H;
+      mapCtx = mapCv.getContext('2d');
+      mapCv.addEventListener('pointermove', ev => {
+        const p2 = mapCoords(ev);
+        const h = mapHitAt(p2.x, p2.y);
+        mapHover = h ? h.id : null;
+        mapCv.style.cursor = h ? 'pointer' : 'default';
+      });
+      mapCv.addEventListener('pointerleave', () => { mapHover = null; });
+      mapCv.addEventListener('pointerdown', ev => {
+        const p2 = mapCoords(ev);
+        const h = mapHitAt(p2.x, p2.y);
+        if (!h) return;
+        if (S().routes.includes(h.id)) { if (GAME.setRoute(h.id)) { snd.plop(); renderDepot(); } else snd.error(); }
+        else if (GAME.buyRoute(h.id)) renderDepot();
+        else snd.error();
+      });
+    }
     $('#depot-sub').textContent = v.name.toUpperCase() + '  -  ' + GAME.truckCap() + ' EGGS  -  ' + GAME.fmtTime(GAME.tripTime()) + ' ROUND TRIP';
 
     /* --- the garage --- */
@@ -3507,25 +3968,25 @@
       card.appendChild(d);
       if (cur) { const t = document.createElement('em'); t.textContent = 'YOURS'; card.appendChild(t); }
       else if (next) {
-        const b = document.createElement('button');
-        b.className = 'btn' + (st.coins >= veh.cost && st.truck.state === 'parked' ? ' btn-green' : '');
-        b.disabled = !(st.coins >= veh.cost && st.truck.state === 'parked');
-        b.dataset.act = 'buy-vehicle';
-        b.appendChild(mkIcon('coin', 2));
-        b.appendChild(document.createTextNode(GAME.fmt(veh.cost)));
-        card.appendChild(b);
+        const b3 = document.createElement('button');
+        b3.className = 'btn' + (st.coins >= veh.cost && st.truck.state === 'parked' ? ' btn-green' : '');
+        b3.disabled = !(st.coins >= veh.cost && st.truck.state === 'parked');
+        b3.dataset.act = 'buy-vehicle';
+        b3.appendChild(mkIcon('coin', 2));
+        b3.appendChild(document.createTextNode(GAME.fmt(veh.cost)));
+        card.appendChild(b3);
       } else if (!owned) { const t = document.createElement('em'); t.textContent = 'LATER'; card.appendChild(t); }
       row.appendChild(card);
     });
     gar.appendChild(row);
     box.appendChild(gar);
 
-    /* --- the map of routes --- */
+    /* --- the routes, as dispatch slips --- */
     const rt = document.createElement('div');
     rt.className = 'depot-sec';
     const rh = document.createElement('b');
     rh.className = 'depot-h';
-    rh.textContent = 'ROUTES - WHERE THE NEXT LOAD GOES';
+    rh.textContent = 'DISPATCH SLIPS - TAP THE MAP OR A SLIP';
     rt.appendChild(rh);
     const list = document.createElement('div');
     list.className = 'route-list';
@@ -3554,21 +4015,21 @@
       act.className = 'rc-act';
       if (active) { const t = document.createElement('em'); t.textContent = 'DELIVERING HERE'; act.appendChild(t); }
       else if (open) {
-        const b = document.createElement('button');
-        b.className = 'btn';
-        b.dataset.act = 'set-route'; b.dataset.id = c.id;
-        b.disabled = st.truck.state !== 'parked';
-        b.textContent = 'DELIVER HERE';
-        act.appendChild(b);
+        const b4 = document.createElement('button');
+        b4.className = 'btn';
+        b4.dataset.act = 'set-route'; b4.dataset.id = c.id;
+        b4.disabled = st.truck.state !== 'parked';
+        b4.textContent = 'DELIVER HERE';
+        act.appendChild(b4);
       } else if (prevOpen) {
-        const b = document.createElement('button');
-        b.className = 'btn' + (st.coins >= c.cost ? ' btn-green' : '');
-        b.disabled = st.coins < c.cost;
-        b.dataset.act = 'buy-route'; b.dataset.id = c.id;
-        b.appendChild(mkIcon('coin', 2));
-        b.appendChild(document.createTextNode(GAME.fmt(c.cost)));
-        act.appendChild(b);
-        const t = document.createElement('em'); t.textContent = 'open the route'; act.appendChild(t);
+        const b5 = document.createElement('button');
+        b5.className = 'btn' + (st.coins >= c.cost ? ' btn-green' : '');
+        b5.disabled = st.coins < c.cost;
+        b5.dataset.act = 'buy-route'; b5.dataset.id = c.id;
+        b5.appendChild(mkIcon('coin', 2));
+        b5.appendChild(document.createTextNode(GAME.fmt(c.cost)));
+        act.appendChild(b5);
+        const t = document.createElement('em'); t.textContent = 'survey the road'; act.appendChild(t);
       } else { const t = document.createElement('em'); t.textContent = 'further down the road'; act.appendChild(t); }
       card.appendChild(act);
       list.appendChild(card);
@@ -3576,7 +4037,7 @@
     rt.appendChild(list);
     box.appendChild(rt);
 
-    /* --- send the load from here too --- */
+    /* --- send the load --- */
     const foot = document.createElement('div');
     foot.className = 'depot-foot';
     const info = document.createElement('span');
@@ -4104,12 +4565,30 @@
     const k = c + ',' + r;
     if (farmTile === k) return;
     farmTile = k;
-    if (farmSel === 'hoe') { if (GAME.till(c, r)) { /* sound comes with the event */ } return; }
-    if (farmSel === 'water') { if (GAME.water(c, r)) snd.sprinkle(); return; }
-    if (farmSel === 'harvest') { GAME.harvest(c, r); return; }
-    if (CROPS[farmSel]) {
-      if (GAME.plant(c, r, farmSel)) renderFarmPalette();
-      else if (S().soil[k] && !S().soil[k].crop && !GAME.canPlant(c, r, farmSel)) { if (ptr.moved < 4) snd.error(); }
+    const sel = farmPick();
+    const miss = () => { if (ptr.moved < 4) snd.error(); };
+    if (sel.kind === 't') {
+      if (sel.id === 'soil') { if (!GAME.till(c, r)) miss(); return; }
+      if (GAME.shape(sel.id, c, r)) { if (sel.id === 'flat') snd.demolish(); }
+      else miss();
+      return;
+    }
+    if (sel.kind === 'd') {
+      if (GAME.decorate(sel.id, c, r)) renderFarmPalette();
+      else miss();
+      return;
+    }
+    if (sel.kind === 'c') {
+      if (GAME.plant(c, r, sel.id)) renderFarmPalette();
+      else miss();
+      return;
+    }
+    if (sel.id === 'water') { if (GAME.water(c, r)) snd.sprinkle(); return; }
+    if (sel.id === 'harvest') { GAME.harvest(c, r); return; }
+    if (sel.id === 'clear') {
+      if (GAME.undecorate(c, r)) { snd.demolish(); renderFarmPalette(); return; }
+      if (GAME.untill(c, r)) { snd.demolish(); return; }
+      if (GAME.shape('flat', c, r)) { snd.demolish(); return; }
     }
   }
   function trySprinkle(x, y) {
@@ -4170,6 +4649,14 @@
     if (toolBtn) { setTool(toolBtn.dataset.tool); return; }
     const secBtn = ev.target.closest('[data-palsec]');
     if (secBtn) { palSec = secBtn.dataset.palsec; buildSel = null; GAME.mark('build'); snd.plop(); return; }
+    const fsec = ev.target.closest('[data-farmsec]');
+    if (fsec) {
+      farmSec = fsec.dataset.farmsec;
+      const first = farmItems()[0];
+      if (first) farmSel = first.id;
+      renderFarmPalette(); updateCursorChip(); snd.plop();
+      return;
+    }
     const farmBtn = ev.target.closest('[data-farm]');
     if (farmBtn && !farmBtn.disabled) { farmSel = farmBtn.dataset.farm; renderFarmPalette(); updateCursorChip(); snd.plop(); return; }
     const palBtn = ev.target.closest('[data-build]');
@@ -4448,6 +4935,7 @@
       if (!titleEl.hidden) drawTitleScreen(dt);
       render(now, dt);
       if (!$('#modal-skills').hidden) drawTerm(now);
+      if (!$('#modal-depot').hidden && mapCv) drawValleyMap(now);
       drawTrip(now);
       hudAcc += dt;
       if (hudAcc > 0.12) {

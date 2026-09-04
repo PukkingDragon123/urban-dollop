@@ -64,13 +64,16 @@
     </div>
   </div>
 
-  <!-- THE DEPOT: wheels and routes -->
+  <!-- THE LOGISTICS HQ: a wall map, a garage and a stack of dispatch slips -->
   <div class="modal" id="modal-depot" hidden>
-    <div class="modal-panel">
+    <div class="modal-panel office">
       <div class="modal-head">
-        <h2>THE DEPOT</h2>
+        <h2>LOGISTICS HQ</h2>
         <span class="panel-sub" id="depot-sub"></span>
         <button class="btn btn-tiny" data-act="close-modal">CLOSE</button>
+      </div>
+      <div id="depot-map-wrap" hidden>
+        <canvas id="depot-map" width="720" height="320"></canvas>
       </div>
       <div id="depot-body"></div>
     </div>

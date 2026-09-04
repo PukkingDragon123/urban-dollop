@@ -8,14 +8,14 @@ It opens on an animated dusk title screen: Mama Hen and her chicks on the hills,
 
 ## How it plays
 
-The field starts empty. Mama Hen lays slowly now (about a minute between eggs), petting her is the quick way to a first clutch, and you pedal the first eggs to the village on a **bicycle** that carries four. The money buys seed; the seed becomes feed; the feed grows chicks into hens; the hens lay; the eggs buy a cart, then a van, then routes to bigger towns that pay more. Everything else grows out of that loop.
+The land starts **bare** - sun-bleached scrub, a couple of stumps and a stone or two. Every tree, path, terrace and pond on your ranch is one you put there. Mama Hen lays slowly now (about a minute between eggs), petting her is the quick way to a first clutch, and you pedal the first eggs to the village on a **bicycle** that carries four. The money buys seed; the seed becomes feed; the feed grows chicks into hens; the hens lay; the eggs buy a cart, then a van, then routes to bigger towns that pay more. Everything else grows out of that loop.
 
 You are the hand. Everything on the field is touchable:
 
 - **Hand** - tap chickens (and Mama Hen) to pet them for an instant egg; hold and drag to pick chickens up and carry them; grab single eggs; drag empty grass to pan the camera.
 - **Basket** - hold and sweep to magnet eggs into your basket (it has a real capacity). Release over the truck or an incubator to unload.
 - **Feed** - scatter pellets from the barn; chicks eat to grow up, grown hens eat to fill their bellies and lay twice as fast.
-- **Farm** - a hoe to till grass into soil, seed packets to plant, a watering can, and a scythe. Drag to paint whole rows.
+- **Farm** - the landscaping tool, in four tabs. GROUND shapes the land, PLANT sows crops, TEND waters and harvests, DECOR plants things purely because they look nice. Drag to paint whole rows; a ghost of whatever you are about to place sits on the tile under your finger, inside a marching dashed outline.
 - **Build** - incubators, love nests, staff huts, silos, vacuums, blowers, sorters, conveyors and fences. Drag to paint belt lines.
 - **Inspect** - tap any hen, worker, machine or patch of grass to read its live stats. Empty grass gives you the whole ranch report: eggs per minute, coins per minute, wages, capacity, silo stock, species found.
 
@@ -29,6 +29,23 @@ Menus are places, not panels:
 - **Love Nests breed chickens**: carry two in, wait for the hearts, and get a fancier egg. Two Divine parents can lay a rainbow egg, which hatches the 12 breed-only Secret species (112 species total in the Chickenpedia bookstand).
 - **Buy land from FOR SALE signs** - twelve plots across a 1024x624 valley, each with its own scenery (sunflower field, lavender meadow, mushroom glen, berry grove, rocky pines, orchard, wet reeds, wildflower meadow, pinewood, thicket, prairie), and each raising chicken capacity and giving room for a bigger factory.
 - Mama's signpost upgrades her egg rarity through eight tiers; laid eggs can also mutate a tier up.
+
+### Landscaping
+
+The ranch is a sandbox. The GROUND tab paints the tile grid:
+
+| Tool | What it does |
+| --- | --- |
+| Till | Turns grass into soil you can plant in. |
+| Path | Packed dirt. The crew walk a quarter faster on it. |
+| Stone Path | Flagstones. Faster still, and very tidy. Research Paving Stones. |
+| Raise | Banks the ground up into a grassy terrace with an earth cliff. Research Terracing. |
+| Dig Pond | Scoops out water with an undulating shore. Nothing walks through it. Research Pond Digging. |
+| Level | Puts a tile back to plain grass. |
+
+Paths, terraces and ponds all knit together with their neighbours, so a block of dug tiles becomes one pond with bitten-back corners rather than a rectangle, and a terrace grows a cliff only on the sides that are actually exposed.
+
+The DECOR tab is a garden centre: oaks, pines, apple trees, bushes, rocks, stumps, flowers, grass tufts, clover, mushrooms, reeds, lavender and sunflowers, each a few coins and each generated with its own silhouette. Lift anything again with CLEAR and get half your money back. Landscaping is deliberately far more permissive than building - anywhere you own, off the road, that is not already spoken for.
 
 ### Farming and growing up
 
@@ -48,7 +65,9 @@ Watering doubles growth. **Feed Troughs** hold a dozen pellets the flock helps i
 
 ### Logistics: from a bicycle to a railcar
 
-The **depot sign** by the road is where the money goes. Six vehicles - bike, pedal cart, egg van, ranch truck, big lorry and the Egg Express railcar - each carry more and drive faster. Five cities sit further down the road, and each pays a steeper premium, sharper still for rare eggs:
+Wheels and routes are arranged from a **Logistics HQ** - a dispatch office with a roller door and a wall map. Until you build one, the depot sign by the road can only send the load you already have; the garage and the routes stay shut.
+
+Inside, the wall of the office carries a **hand-drawn map of the valley**: old paper pinned to a corkboard with pushpins, inked in a wobbly line. Your ranch is marked with a red X, the road winds through every town, hills and a river and a coastline are sketched in, and there is a compass rose in the corner. Towns you have opened are drawn out building by building; the rest sit under a bank of cloud with a question mark. The active route is inked in crawling red dashes, and while a load is out your actual vehicle drives along it. Tap a town on the map to switch the route there, or to survey the road and open it. Six vehicles - bike, pedal cart, egg van, ranch truck, big lorry and the Egg Express railcar - each carry more and drive faster. Five cities sit further down the road, and each pays a steeper premium, sharper still for rare eggs:
 
 | City | Pays | Notes |
 | --- | --- | --- |
@@ -84,7 +103,7 @@ You pick the role, and roles lean on different stats - so the same applicant is 
 
 Quirks are rolled too, good and bad: **Tireless** never needs a break, **Thrifty** works for 30% less, **Strong Back** adds carry, **Butterfingers** fumbles one egg in eight, **Hard Bargain** wants 60% more pay. Wages scale with how good somebody is, so a five-star hire costs five-star money - and if the payroll runs dry the whole crew downs tools until you can pay again. Everyone tires as they work and takes a breather at the hut; **Overtime Pay** and high GRIT keep them going longer.
 
-**Robots are built, not recruited.** Assemble Cull-Bots (they retire chickens you mark) and Match-Bots (they keep love nests full) at the hut - they never tire and never ask for a raise.
+**Robots are built, not recruited** - and there is a robot for every job. The Robot Workshop assembles Gather-Bot, Seed-Bot, Haul-Bot, Fix-Bot, Cuddle-Bot, Cull-Bot and Match-Bot: round, fat, cheerful little machines that hover along on a puff of air with big visor eyes, rosy cheeks and a hat each. They never tire, never ask for a raise, and can be reassigned between any roles - including the two jobs (culling and matchmaking) that only a robot will do.
 
 The crew is always two taps away: there is a crew button on the toolbelt that badges up when applicants are waiting or wages have gone unpaid, the same board sits in the Index, and the Staff Hut opens it too. Move anybody between roles at any time from their card.
 
@@ -110,6 +129,7 @@ The crew is always two taps away: there is a crew button on the toolbelt that ba
 | Mill | Every harvest on the ranch yields 25% more feed. |
 | Coop | +6 chicken room; chicks nearby grow up twice as fast. |
 | Noticeboard | Where flyers get pinned and applicants queue. |
+| Logistics HQ | A dispatch office with a wall map. Vehicles and routes are bought here. |
 
 ### The HUD
 
@@ -128,8 +148,9 @@ Autosaves to your browser, with up to 8 hours of offline laying and hatching.
 | tap Lab / bookstand / signposts / truck | research, the Index and Diary, upgrades, sell |
 | tap the crew button | flyers, applicants and who is on the payroll |
 | tap an applicant by the board | read their stats, hire them into a role |
-| tap the depot sign | buy the next vehicle, open a route, pick where the load goes |
-| farm tool, drag | till, plant, water or harvest whole rows |
+| tap the depot sign | opens the Logistics HQ: garage, routes and the wall map |
+| tap a town on the wall map | switch the route there, or survey the road to open it |
+| farm tool, drag | paint paths, terraces, ponds, crops or decorations |
 | tap a Staff Hut | print flyers, hire, reassign and dismiss crew |
 | inspect tool on empty grass | the full ranch report |
 | `1`-`6` tools, `R` rotate, `Esc` close | shortcuts |
@@ -147,6 +168,8 @@ All sprites are generated at runtime by `js/sprites.js`:
 - every hire is drawn from a little record of skin, hair colour, hair style, shirt, trousers, boots and hat, so no two people on the ranch look alike;
 - the Lab is a whole desk scene drawn the same way - a beige monitor with a phosphor mesh, scanlines and a rolling band, a keyboard whose keys light up when something installs, a steaming mug, sticky notes, and a pixel mouse pointer;
 - crops are drawn per stage from a seed, soil tiles get their own clods and furrows, and five vehicles and five city skylines are generated for the delivery window;
+- terrain knits itself together from neighbour masks: paths fray at the edges, terraces grow mottled earth banks with roots trailing over the lip, ponds wander their shoreline and take a round bite out of every open corner;
+- the valley map is inked with a wobbly-line routine over generated parchment, complete with fibres, foxed edges, cloud banks and a compass rose;
 - UI icons are a set of 53 hand-authored 10x10 pixel glyphs rendered to canvases - the interface has no emoji at all.
 
 ## Run it
@@ -163,7 +186,7 @@ open index.html        # or serve the folder with any static server
 | --- | --- |
 | `index.html` | shell, the four-pill HUD, the title screen, the trip window, the crew board, the depot and the book |
 | `style.css` | cozy pixel-ranch styling |
-| `js/data.js` | tiers, economy, 112 species, nineteen buildings in four sections, five crops, six vehicles, five cities, five crew stats, seven roles, twelve quirks, procedural name and look tables, twelve land plots, 73 research packages and their hex-map layout |
-| `js/sprites.js` | the procedural pixel-art engine (two fonts, icons, foliage, chickens and chicks, crops and soil, procedural people, robots, machines, vehicles, skylines, cracking shells, CRT chrome, hexes) |
-| `js/game.js` | world simulation: twelve plots, chicks that grow and hens that get hungry, farming, feed, flyers and applicants who walk to the board, per-role crew AI, stamina, wages, belts, splitters, silos, loaders, hatcheries, vehicles, routes and trips, diary |
-| `js/ui.js` | title screen, camera renderer, six tools and two palettes, hatch animation, inspect, the crew board, the book, the depot, the trip window, the Lab desk and its hex map, particles, sound |
+| `js/data.js` | tiers, economy, 112 species, twenty buildings in four sections, six terrain tools, thirteen decorations, five crops, six vehicles, five cities, five crew stats, seven roles and seven robot chassis, twelve quirks, twelve land plots, 76 research packages and their hex-map layout |
+| `js/sprites.js` | the procedural pixel-art engine (two fonts, icons, foliage, chickens and chicks, crops, soil, paths, terraces and ponds, procedural people, cute robots, machines, vehicles, skylines, parchment and ink, CRT chrome, hexes) |
+| `js/game.js` | world simulation: twelve plots, terrain and decoration, chicks that grow and hens that get hungry, farming, feed, flyers and applicants who walk to the board, per-role crew AI for people and robots, stamina, wages, belts, splitters, silos, loaders, hatcheries, the HQ, vehicles, routes and trips, diary |
+| `js/ui.js` | title screen, camera renderer, six tools and two sectioned palettes, terrain and decoration rendering, hatch animation, inspect, the crew board and robot workshop, the book, the HQ and its hand-drawn wall map, the trip window, the Lab desk and its hex map, particles, sound |

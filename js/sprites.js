@@ -1383,11 +1383,6 @@ const SPR = (() => {
     return c;
   }
 
-  /* ---------- special ducks: quest-giving pond folk ---------- */
-  const BOT_PAL = {
-    cull:  { shell:'#c9ced6', shade:'#8a9099', dark:'#3a3f47', visor:'#e8542f', glow:'#ff9f7a', trim:'#ffd23f' },
-    match: { shell:'#f2d8e6', shade:'#d0a8c0', dark:'#5e3a4e', visor:'#ff5f9e', glow:'#ffb0d0', trim:'#fff2b0' },
-  };
 
   /* ============================================================
      PROCEDURAL FARM FOLK
@@ -1510,50 +1505,105 @@ const SPR = (() => {
     return c;
   }
 
-  function botSprite(type, frame, scale) {
-    const key = 'staffb_' + type + '_' + frame + '_' + scale;
+  /* A little round robot: big belly, big visor eyes, stubby arms and a
+     hover skirt. One paint job per role, plus a hat and a face. */
+  function botSprite(role, frame, scale) {
+    const key = 'bot_' + role + '_' + frame + '_' + scale;
     if (cache.has(key)) return cache.get(key);
     const k = scale || 1;
-    const P = BOT_PAL[type] || BOT_PAL.cull;
-    const c = newCanvas(13 * k, 16 * k);
+    const B = BOTS[role] || BOTS.hand;
+    const c = newCanvas(16 * k, 18 * k);
     const ctx = c.getContext('2d');
     const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
-    const OUT = '#23262b';
-    /* antenna + blinker */
-    R(6, 0, 1, 2, P.dark);
-    R(6, 0, 1, 1, frame ? P.trim : P.visor);
-    /* head */
-    R(2, 2, 9, 6, OUT);
-    R(3, 3, 7, 4, P.shell);
-    R(3, 3, 7, 1, lighten(P.shell, 0.35));
-    R(3, 6, 7, 1, P.shade);
-    /* visor */
-    R(4, 4, 5, 2, P.dark);
-    R(4, 4, frame ? 5 : 3, 2, P.visor);
-    R(4, 4, 2, 1, P.glow);
-    /* body */
-    R(2, 8, 9, 5, OUT);
-    R(3, 8, 7, 4, P.shell);
-    R(3, 8, 7, 1, lighten(P.shell, 0.3));
-    R(3, 11, 7, 1, P.shade);
-    /* chest panel */
-    R(5, 9, 3, 2, P.dark);
-    R(5 + (frame ? 1 : 0), 9, 1, 1, P.trim);
-    /* side arms / claw */
-    R(1, 9, 1, 3, P.shade);
-    R(10, 9, 2, 2, P.shade);
-    R(11, 8 + (frame ? 0 : 1), 1, 1, P.visor);
-    /* treads */
-    R(2, 13, 9, 3, OUT);
-    for (let i = 0; i < 4; i++) R(3 + i * 2 + (frame ? 1 : 0), 14, 1, 1, P.shade);
+    const OUT = '#2a2420';
+    const shell = B.shell, lite = lighten(shell, 0.38), shade = darken(shell, 0.24), deep = darken(shell, 0.45);
+    const bob = frame ? 0 : 1;      /* the whole robot hovers up and down */
+
+    /* ---- hover skirt and its shadow puff ---- */
+    R(4, 15 + bob, 8, 1, 'rgba(120,200,255,.45)');
+    R(3, 16 + bob, 10, 1, 'rgba(120,200,255,.28)');
+    R(5, 14 + bob, 6, 1, deep);
+
+    /* ---- belly: a big round body ---- */
+    R(3, 7 + bob, 10, 1, OUT);
+    R(2, 8 + bob, 12, 6, OUT);
+    R(3, 14 + bob, 10, 1, OUT);
+    R(3, 8 + bob, 10, 6, shell);
+    R(4, 7 + bob, 8, 1, shell);
+    R(4, 8 + bob, 6, 2, lite);              /* top-left gloss */
+    R(3, 12 + bob, 10, 2, shade);
+    R(11, 9 + bob, 2, 4, shade);
+    /* belly badge */
+    R(6, 10 + bob, 4, 3, deep);
+    R(7, 11 + bob, 2, 1, B.trim);
+    R(6, 10 + bob, 4, 1, darken(B.trim, 0.3));
+
+    /* ---- stubby arms, swinging ---- */
+    const la = frame ? 0 : 1, ra = frame ? 1 : 0;
+    R(0, 9 + bob + la, 3, 3, OUT);
+    R(1, 9 + bob + la, 2, 2, shell);
+    R(1, 9 + bob + la, 1, 1, lite);
+    R(13, 9 + bob + ra, 3, 3, OUT);
+    R(13, 9 + bob + ra, 2, 2, shell);
+    R(13, 9 + bob + ra, 1, 1, lite);
+
+    /* ---- head: wide, rounded, most of the sprite ---- */
+    R(4, 1 + bob, 8, 1, OUT);
+    R(3, 2 + bob, 10, 5, OUT);
+    R(3, 2 + bob, 8, 1, shell);
+    R(4, 2 + bob, 8, 4, shell);
+    R(4, 2 + bob, 5, 1, lite);
+    R(4, 6 + bob, 8, 1, shade);
+    /* visor: one big friendly band */
+    R(4, 3 + bob, 8, 3, '#1d2229');
+    const blink = frame && role === 'keeper';
+    if (blink) {
+      R(5, 4 + bob, 2, 1, B.visor); R(9, 4 + bob, 2, 1, B.visor);
+    } else if (B.face === 'wink') {
+      R(5, 3 + bob, 2, 2, B.visor); R(9, 4 + bob, 2, 1, B.visor);
+    } else if (B.face === 'stern') {
+      R(5, 4 + bob, 2, 2, B.visor); R(9, 4 + bob, 2, 2, B.visor);
+      R(5, 3 + bob, 2, 1, deep); R(9, 3 + bob, 2, 1, deep);
+    } else if (B.face === 'love') {
+      R(5, 3 + bob, 2, 2, B.visor); R(9, 3 + bob, 2, 2, B.visor);
+      R(4, 4 + bob, 1, 1, B.visor); R(11, 4 + bob, 1, 1, B.visor);
+    } else {
+      R(5, 3 + bob, 2, 2, B.visor); R(9, 3 + bob, 2, 2, B.visor);
+    }
+    /* highlight sparkles in the eyes */
+    R(5, 3 + bob, 1, 1, '#ffffff'); R(9, 3 + bob, 1, 1, '#ffffff');
+    /* a little smile under the visor */
+    if (B.face !== 'stern') { R(7, 6 + bob, 2, 1, deep); R(6, 5 + bob, 1, 1, deep); R(9, 5 + bob, 1, 1, deep); }
+    /* rosy cheeks */
+    R(3, 5 + bob, 1, 1, '#ff9fb0'); R(12, 5 + bob, 1, 1, '#ff9fb0');
+
+    /* ---- hat ---- */
+    if (B.hat === 'cap') {
+      R(4, 0 + bob, 8, 1, OUT); R(4, 1 + bob, 8, 1, B.trim);
+      R(12, 1 + bob, 3, 1, darken(B.trim, 0.2));
+    } else if (B.hat === 'straw') {
+      R(5, 0 + bob, 6, 1, '#e0bd82'); R(2, 1 + bob, 12, 1, '#e0bd82');
+      R(3, 1 + bob, 10, 1, '#c9a35f');
+    } else if (B.hat === 'bow') {
+      R(4, 0 + bob, 2, 2, B.trim); R(10, 0 + bob, 2, 2, B.trim);
+      R(6, 1 + bob, 4, 1, darken(B.trim, 0.25));
+    } else if (B.hat === 'bolt') {
+      R(7, -1 + bob, 1, 3, '#8a9099');
+      R(6, -2 + bob, 3, 1, frame ? '#ffd23f' : '#5fe8ff');
+    }
+    /* antenna light for the hatless ones */
+    if (B.hat === 'none') {
+      R(7, 0 + bob, 1, 2, '#8a9099');
+      R(7, -1 + bob, 1, 1, frame ? B.trim : B.visor);
+    }
     cache.set(key, c);
     return c;
   }
 
-  /* w is a crew record: robots by role, people by their look */
+  /* w is a crew record: robots by their chassis, people by their look */
   function staffSprite(w, frame, scale) {
-    const role = typeof w === 'string' ? w : (w && w.role);
-    if (role === 'cull' || role === 'match') return botSprite(role, frame, scale);
+    if (typeof w === 'string') return (w === 'cull' || w === 'match') ? botSprite(w, frame, scale) : personSprite(null, frame, scale);
+    if (w && (w.bot || w.role === 'cull' || w.role === 'match')) return botSprite(w.role, frame, scale);
     return personSprite(w && w.look, frame, scale);
   }
 
@@ -1984,11 +2034,210 @@ const SPR = (() => {
     return Math.abs(dx) <= size * (1 - t * 0.5);
   }
 
+
+  /* ============================================================
+     TERRAIN - what the landscaping tool paints
+     ============================================================ */
+  function pathSprite(kind, seed, mask, scale) {
+    const key = 'path_' + kind + '_' + (seed % 8) + '_' + mask + '_' + scale;
+    if (cache.has(key)) return cache.get(key);
+    const k = scale || 1;
+    const c = newCanvas(16 * k, 16 * k);
+    const ctx = c.getContext('2d');
+    const rnd = mulberry(1700 + seed);
+    const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
+    if (kind === 'stone') {
+      R(0, 0, 16, 16, '#8a8578');
+      /* irregular flagstones with mortar between them */
+      const cuts = [[0, 0, 9, 7], [10, 0, 6, 7], [0, 8, 6, 8], [7, 8, 9, 8]];
+      cuts.forEach(([x, y, w, h], i) => {
+        const tone = ['#c9c4b4', '#bdb8a8', '#d2cdbd', '#b5b0a0'][(i + seed) % 4];
+        R(x + 1, y + 1, w - 2, h - 2, tone);
+        R(x + 1, y + 1, w - 2, 1, lighten(tone, 0.22));
+        R(x + 1, y + h - 2, w - 2, 1, darken(tone, 0.18));
+      });
+      for (let i = 0; i < 5; i++) R(Math.floor(rnd() * 16), Math.floor(rnd() * 16), 1, 1, 'rgba(60,55,45,.25)');
+    } else {
+      R(0, 0, 16, 16, '#b58a4f');
+      for (let i = 0; i < 40; i++) {
+        const x = Math.floor(rnd() * 16), y = Math.floor(rnd() * 16);
+        R(x, y, 1, 1, rnd() < 0.5 ? '#c69a5c' : '#a87c42');
+      }
+      /* wheel ruts */
+      R(3, 0, 1, 16, '#a07444'); R(11, 0, 1, 16, '#a07444');
+      for (let i = 0; i < 5; i++) R(Math.floor(rnd() * 16), Math.floor(rnd() * 16), 2, 1, '#d1a86b');
+    }
+    /* soften the sides that have no path neighbour so it reads as a trail */
+    const edge = 'rgba(110,160,70,.55)';
+    if (!(mask & 1)) for (let x = 0; x < 16; x++) if ((x + seed) % 3) R(x, 0, 1, 1, edge);      /* north */
+    if (!(mask & 2)) for (let y = 0; y < 16; y++) if ((y + seed) % 3) R(15, y, 1, 1, edge);     /* east  */
+    if (!(mask & 4)) for (let x = 0; x < 16; x++) if ((x + seed + 1) % 3) R(x, 15, 1, 1, edge); /* south */
+    if (!(mask & 8)) for (let y = 0; y < 16; y++) if ((y + seed + 1) % 3) R(0, y, 1, 1, edge);  /* west  */
+    cache.set(key, c);
+    return c;
+  }
+
+  /* a raised terrace: bright grass on top, a soil cliff on any open side */
+  function terraceSprite(seed, mask, scale) {
+    const key = 'terr_' + (seed % 8) + '_' + mask + '_' + scale;
+    if (cache.has(key)) return cache.get(key);
+    const k = scale || 1;
+    const c = newCanvas(16 * k, 22 * k);
+    const ctx = c.getContext('2d');
+    const rnd = mulberry(2300 + seed);
+    const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
+    const LIFT = 6;
+    /* cliff face below, only where the tile is exposed: banked earth with
+       stones in it and roots trailing down, lit from the upper left */
+    if (!(mask & 4)) {
+      const top = 16 - LIFT + 10;
+      R(0, top, 16, LIFT, '#93672f');
+      /* mottled earth: irregular clods, never a regular stripe */
+      for (let i = 0; i < 30; i++) {
+        const bx = Math.floor(rnd() * 16), by = top + Math.floor(rnd() * LIFT);
+        const w2 = 1 + Math.floor(rnd() * 3), h2 = 1 + (rnd() < 0.3 ? 1 : 0);
+        R(bx, by, w2, h2, rnd() < 0.5 ? '#a8783f' : '#7d5626');
+      }
+      R(0, top, 16, 1, '#b98a52');
+      /* pebbles poking out of the bank */
+      for (let i = 0; i < 5; i++) {
+        const px2 = Math.floor(rnd() * 14), py2 = top + 1 + Math.floor(rnd() * (LIFT - 2));
+        R(px2, py2, 2, 1, '#b0a89a'); R(px2, py2, 1, 1, '#d0c8ba');
+      }
+      /* roots hanging from the lip */
+      for (let x = 1; x < 16; x += 3) if ((x + seed) % 2) R(x, top + 1, 1, 1 + ((x + seed) % 2), '#5b9636');
+      R(0, 21, 16, 1, '#5e3d18');
+    }
+    /* grassy top, lifted */
+    R(0, 10 - LIFT, 16, 12, '#7fc44f');
+    R(0, 10 - LIFT, 16, 2, '#9ada66');
+    for (let i = 0; i < 22; i++) R(Math.floor(rnd() * 16), 10 - LIFT + Math.floor(rnd() * 12), 1, 1, rnd() < 0.5 ? '#6ab04c' : '#8ecf5b');
+    /* soften the outer corners so a terrace reads as a bank, not a box */
+    const corner = (cx, cy, sx, sy) => {
+      ctx.clearRect((cx) * k, (cy) * k, k, k);
+      ctx.clearRect((cx + sx) * k, (cy) * k, k, k);
+      ctx.clearRect((cx) * k, (cy + sy) * k, k, k);
+    };
+    if (!(mask & 1) && !(mask & 8)) corner(0, 10 - LIFT, 1, 1);
+    if (!(mask & 1) && !(mask & 2)) corner(15, 10 - LIFT, -1, 1);
+    /* lit rim on the exposed north edge */
+    if (!(mask & 1)) R(0, 10 - LIFT, 16, 1, '#b8e986');
+    /* grassy overhang lip where the cliff shows, with tufts hanging over */
+    if (!(mask & 4)) {
+      R(0, 24 - LIFT, 16, 1, '#5b9636'); R(0, 25 - LIFT, 16, 1, '#4a7d2c');
+      for (let i = 0; i < 16; i += 2) if ((i + seed) % 3) R(i, 26 - LIFT, 1, 1, '#5b9636');
+    }
+    /* side shading */
+    if (!(mask & 8)) R(0, 10 - LIFT, 1, 12, '#6ab04c');
+    if (!(mask & 2)) R(15, 10 - LIFT, 1, 12, '#5b9636');
+    cache.set(key, c);
+    return c;
+  }
+
+  /* a dug pond tile: deeper in the middle, sandy where the bank shows */
+  function waterSprite(seed, mask, scale) {
+    const key = 'water_' + (seed % 8) + '_' + mask + '_' + scale;
+    if (cache.has(key)) return cache.get(key);
+    const k = scale || 1;
+    const c = newCanvas(16 * k, 16 * k);
+    const ctx = c.getContext('2d');
+    const rnd = mulberry(3100 + seed);
+    const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
+    const open = (mask & 15) === 15;
+    R(0, 0, 16, 16, open ? '#2f86ad' : '#3f9ec4');
+    for (let i = 0; i < 26; i++) {
+      const x = Math.floor(rnd() * 16), y = Math.floor(rnd() * 16);
+      R(x, y, 1, 1, rnd() < 0.5 ? '#4fb0d6' : '#2a7ba0');
+    }
+    /* An undulating shore rather than a ruled line: the depth of the sand
+       wanders along each open side, and the corners are bitten right back,
+       so a block of dug tiles reads as one pond. */
+    const sand = '#e0cb98', sand2 = '#d6bd88';
+    const wob = (i, salt) => 2 + ((i * 7 + seed * 3 + salt) % 5 === 0 ? 2 : (i * 5 + seed + salt) % 3 === 0 ? 1 : 0);
+    const clearTo = (x, y, w, h) => ctx.clearRect(x * k, y * k, w * k, h * k);
+    if (!(mask & 1)) for (let x = 0; x < 16; x++) { const d = wob(x, 1); clearTo(x, 0, 1, d - 2); R(x, d - 2, 1, 2, sand); R(x, d, 1, 1, sand2); }
+    if (!(mask & 4)) for (let x = 0; x < 16; x++) { const d = wob(x, 2); clearTo(x, 16 - (d - 2), 1, d - 2); R(x, 16 - d, 1, 2, sand); R(x, 15 - d, 1, 1, sand2); }
+    if (!(mask & 8)) for (let y = 0; y < 16; y++) { const d = wob(y, 3); clearTo(0, y, d - 2, 1); R(d - 2, y, 2, 1, sand); R(d, y, 1, 1, sand2); }
+    if (!(mask & 2)) for (let y = 0; y < 16; y++) { const d = wob(y, 4); clearTo(16 - (d - 2), y, d - 2, 1); R(16 - d, y, 2, 1, sand); R(15 - d, y, 1, 1, sand2); }
+    /* corners: take a big round bite so the pond has no square shoulders */
+    const bite = (cx, cy, sx, sy) => {
+      const rr2 = 8;
+      for (let dy = 0; dy < rr2; dy++) for (let dx = 0; dx < rr2; dx++) {
+        const d = Math.hypot(dx, dy);
+        if (d > rr2) continue;
+        const x = cx + sx * dx, y = cy + sy * dy;
+        if (d < rr2 - 3) clearTo(x, y, 1, 1);
+        else { ctx.fillStyle = d < rr2 - 1.6 ? sand : sand2; ctx.fillRect(x * k, y * k, k, k); }
+      }
+    };
+    if (!(mask & 1) && !(mask & 8)) bite(0, 0, 1, 1);
+    if (!(mask & 1) && !(mask & 2)) bite(15, 0, -1, 1);
+    if (!(mask & 4) && !(mask & 8)) bite(0, 15, 1, -1);
+    if (!(mask & 4) && !(mask & 2)) bite(15, 15, -1, -1);
+    cache.set(key, c);
+    return c;
+  }
+
+  /* ============================================================
+     HAND-DRAWN MAP - wobbly ink on old paper, for the HQ wall
+     ============================================================ */
+  function inkLine(ctx, x1, y1, x2, y2, col, wob, seed, dash) {
+    const rnd = mulberry(seed || 7);
+    const steps = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1));
+    let phase = 0;
+    for (let i = 0; i <= steps; i++) {
+      const t = steps ? i / steps : 0;
+      if (dash) { phase++; if (phase % (dash * 2) >= dash) continue; }
+      const jitter = wob ? Math.round((rnd() - 0.5) * wob * 2) : 0;
+      const jx = Math.round(x1 + (x2 - x1) * t), jy = Math.round(y1 + (y2 - y1) * t);
+      ctx.fillStyle = col;
+      ctx.fillRect(jx, jy + jitter, 1, 1);
+      if (rnd() < 0.25) ctx.fillRect(jx, jy + jitter + 1, 1, 1);
+    }
+  }
+  function parchment(ctx, x, y, w, h, seed) {
+    const rnd = mulberry(seed || 11);
+    ctx.fillStyle = '#e8d9ae'; ctx.fillRect(x, y, w, h);
+    /* fibres and blotches */
+    for (let i = 0; i < w * h / 22; i++) {
+      const px2 = x + Math.floor(rnd() * w), py2 = y + Math.floor(rnd() * h);
+      ctx.fillStyle = rnd() < 0.5 ? '#dfceA0'.replace('A', 'a') : '#efe0bc';
+      ctx.fillRect(px2, py2, 1 + (rnd() < 0.2 ? 1 : 0), 1);
+    }
+    for (let i = 0; i < 7; i++) {
+      const bx = x + Math.floor(rnd() * w), by = y + Math.floor(rnd() * h), br = 2 + Math.floor(rnd() * 4);
+      ctx.fillStyle = 'rgba(180,150,100,.16)';
+      ctx.fillRect(bx, by, br, br);
+    }
+    /* browned edges */
+    ctx.fillStyle = 'rgba(150,115,65,.30)';
+    ctx.fillRect(x, y, w, 2); ctx.fillRect(x, y + h - 2, w, 2);
+    ctx.fillRect(x, y, 2, h); ctx.fillRect(x + w - 2, y, 2, h);
+    ctx.fillStyle = 'rgba(150,115,65,.16)';
+    ctx.fillRect(x + 2, y + 2, w - 4, 1); ctx.fillRect(x + 2, y + h - 3, w - 4, 1);
+  }
+  function compassRose(ctx, cx, cy, r, ink) {
+    for (let i = -r; i <= r; i++) {
+      ctx.fillStyle = ink;
+      ctx.fillRect(cx + i, cy, 1, 1);
+      ctx.fillRect(cx, cy + i, 1, 1);
+    }
+    ctx.fillRect(cx - 1, cy - r - 1, 3, 1);
+    ctx.fillRect(cx - 2, cy - r + 1, 5, 1);
+    for (let i = 0; i < 4; i++) {
+      const d = Math.round(r * 0.55);
+      ctx.fillRect(cx + (i % 2 ? d : -d), cy + (i < 2 ? -d : d), 1, 1);
+    }
+    ctx.fillStyle = ink;
+    ctx.fillRect(cx - 1, cy - r - 5, 1, 3); ctx.fillRect(cx, cy - r - 4, 1, 1); ctx.fillRect(cx + 1, cy - r - 5, 1, 3);
+  }
+
   return {
     chickenSprite, eggSprite, nestSprite, mamaSprite, decoSprite,
     uiSprite, iconSprite, basketSprite, feedbagSprite, hammerSprite, staffSprite,
     personSprite, faceSprite, flyerSprite,
     soilSprite, cropSprite, chickSprite, vehicleSprite, skylineSprite, cursorSprite,
+    pathSprite, terraceSprite, waterSprite, inkLine, parchment, compassRose, botSprite,
     plumeSprite, signSprite, treeSprite, eggCrackSprite, shellHalfSprite,
     drawText, textW, drawTiny, tinyW, drawTitle,
     drawBezel, drawScanlines, drawPips, drawBox, TERM, drawHex, hexHit, hexRows,

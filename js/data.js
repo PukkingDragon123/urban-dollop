@@ -75,6 +75,9 @@ const ECON = {
   staffTireless: 90,       // seconds of work before a worker wants a breather
   staffRest: 14,           // seconds of breather at a hut
   techAuraR: 58,           // px a Technician's speed aura reaches
+  pathSpeed: 1.25,         // how much faster the crew walk on a path
+  stoneSpeed: 1.45,
+  decoRefund: 0.5,         // what you get back for lifting a decoration
   loaderRate: 0.35,        // seconds per egg a Loader pushes into the truck
   hatcheryCap: 24,         // eggs a Grand Hatchery holds
 };
@@ -97,6 +100,46 @@ const CROPS = {
             desc:'Regrows after every picking.' },
 };
 const CROP_KEYS = Object.keys(CROPS);
+
+/* ------------------------------------------------------------
+   LANDSCAPING - the ranch is yours to shape. Terrain paints on
+   the tile grid; decorations sit on top of it.
+   ------------------------------------------------------------ */
+const TERRAIN = {
+  soil:  { name:'Till',      icon:'hoe',    cost:0,  desc:'Turn grass into soil you can plant in.' },
+  path:  { name:'Path',      icon:'road',   cost:4,  desc:'Packed dirt. The crew walk a quarter faster on it.' },
+  stone: { name:'Stone Path',icon:'silo',   cost:14, desc:'Neat flagstones. Faster still, and very tidy.', needs:'paving' },
+  high:  { name:'Raise',     icon:'house',  cost:22, desc:'Bank the ground up into a grassy terrace.', needs:'terracing' },
+  water: { name:'Dig Pond',  icon:'water',  cost:30, desc:'Scoop out a pond. Nothing walks through it.', needs:'digging' },
+  flat:  { name:'Level',     icon:'remove', cost:0,  desc:'Put a tile back to plain grass.' },
+};
+const TERRAIN_KEYS = Object.keys(TERRAIN);
+
+/* things you can plant purely because they look nice */
+const DECOS = {
+  tree:      { name:'Oak',        cost:35,  kind:'tree' },
+  pine:      { name:'Pine',       cost:35,  kind:'pine' },
+  apple:     { name:'Apple Tree', cost:60,  kind:'apple' },
+  bush:      { name:'Bush',       cost:18,  kind:'bush' },
+  rock:      { name:'Rock',       cost:10,  kind:'rock' },
+  stump:     { name:'Stump',      cost:12,  kind:'stump' },
+  flower:    { name:'Flowers',    cost:8,   kind:'flower' },
+  tuft:      { name:'Grass Tuft', cost:4,   kind:'tuft' },
+  clover:    { name:'Clover',     cost:6,   kind:'clover' },
+  shroom:    { name:'Mushrooms',  cost:14,  kind:'shroom' },
+  reed:      { name:'Reeds',      cost:9,   kind:'reed' },
+  lavender:  { name:'Lavender',   cost:16,  kind:'lavender' },
+  sunflower: { name:'Sunflower',  cost:20,  kind:'sunflower' },
+};
+const DECO_KEYS = Object.keys(DECOS);
+
+/* the landscaping tool's own tabs */
+const FARM_SECTIONS = [
+  { id:'ground', name:'GROUND', icon:'hoe' },
+  { id:'plant',  name:'PLANT',  icon:'sprout' },
+  { id:'tend',   name:'TEND',   icon:'water' },
+  { id:'decor',  name:'DECOR',  icon:'tree' },
+];
 
 /* ------------------------------------------------------------
    LOGISTICS - you start on a bicycle. Every vehicle carries more
@@ -164,6 +207,8 @@ const BUILDS = {
                desc:'On a belt: sends eggs left and right in turn to fill two lines.', needs:'splitter' },
   loader:    { name:'Truck Loader', sec:'factory', w:2, h:1, base:1400, growth:1.8, refund:550,
                desc:'Parks by the road and shovels belt eggs straight into the truck.', needs:'loader' },
+  hq:        { name:'Logistics HQ', sec:'crew', w:3, h:2, base:600, growth:2.2, refund:240,
+               desc:'A dispatch office with a wall map. Buy vehicles and open routes here.' },
   board:     { name:'Noticeboard', sec:'crew', w:1, h:1, base:40, growth:1.4, refund:15,
                desc:'Where flyers get pinned. Applicants walk up to it and wait.', needs:'hiring' },
   belt:      { name:'Conveyor',  sec:'factory', w:1, h:1, base:15, growth:1, refund:7,
@@ -186,22 +231,38 @@ const STATS = {
 const STAT_KEYS = Object.keys(STATS);
 
 const ROLES = {
-  hand:   { id:'hand',   name:'Farmhand',   icon:'hand',   robot:false, uses:['speed','carry'],
+  hand:   { id:'hand',   name:'Farmhand',   icon:'hand',   uses:['speed','carry'],
             job:'Gathers loose eggs and runs them to a silo, hatchery or the truck.' },
-  feeder: { id:'feeder', name:'Feeder',     icon:'seed',   robot:false, uses:['care','speed'], needs:'feed',
+  feeder: { id:'feeder', name:'Feeder',     icon:'seed',   uses:['care','speed'], needs:'feed',
             job:'Scatters seed so the flock keeps laying at double speed.' },
-  packer: { id:'packer', name:'Packer',     icon:'crate',  robot:false, uses:['carry','grit'], needs:'silo',
+  packer: { id:'packer', name:'Packer',     icon:'crate',  uses:['carry','grit'], needs:'silo',
             job:'Shuttles eggs out of silos and packs the truck to the brim.' },
-  tech:   { id:'tech',   name:'Technician', icon:'gear',   robot:false, uses:['tech','grit'], needs:'belts',
+  tech:   { id:'tech',   name:'Technician', icon:'gear',   uses:['tech','grit'], needs:'belts',
             job:'Walks the line; every machine near them runs faster.' },
-  keeper: { id:'keeper', name:'Keeper',     icon:'hands',  robot:false, uses:['care','grit'], needs:'keeper',
+  keeper: { id:'keeper', name:'Keeper',     icon:'hands',  uses:['care','grit'], needs:'keeper',
             job:'Pets the flock all day, so hens lay on their own more often.' },
-  cull:   { id:'cull',   name:'Cull-Bot',   icon:'remove', robot:true,  uses:['speed','grit'], needs:'cullbot',
+  cull:   { id:'cull',   name:'Cull-Bot',   icon:'remove', botOnly:true, uses:['speed','grit'], needs:'cullbot',
             job:'Retires chickens you mark as unwanted, recycling them into feathers.' },
-  match:  { id:'match',  name:'Match-Bot',  icon:'cupid',  robot:true,  uses:['speed','care'], needs:'matchbot',
+  match:  { id:'match',  name:'Match-Bot',  icon:'cupid',  botOnly:true, uses:['speed','care'], needs:'matchbot',
             job:'Carries pairs of chickens into any empty love nest.' },
 };
 const ROLE_KEYS = Object.keys(ROLES);
+
+/* Every role can be filled by a person or by a little robot. The bots are
+   round, fat and cheerful; each role gets its own paint job and hat. */
+const BOTS = {
+  hand:   { name:'Gather-Bot', shell:'#8fd6f9', trim:'#ffd23f', visor:'#3fd0ff', hat:'cap',    face:'happy' },
+  feeder: { name:'Seed-Bot',   shell:'#b8e986', trim:'#f2a03f', visor:'#7ac74f', hat:'straw',  face:'happy' },
+  packer: { name:'Haul-Bot',   shell:'#f2c14e', trim:'#7a5230', visor:'#ff9f1c', hat:'none',   face:'grin'  },
+  tech:   { name:'Fix-Bot',    shell:'#c9ced6', trim:'#3fa7d6', visor:'#5fe8ff', hat:'bolt',   face:'wink'  },
+  keeper: { name:'Cuddle-Bot', shell:'#ffc0d8', trim:'#fff8ec', visor:'#ff8ab5', hat:'bow',    face:'happy' },
+  cull:   { name:'Cull-Bot',   shell:'#ffb0a0', trim:'#e8542f', visor:'#ff6b4a', hat:'none',   face:'stern' },
+  match:  { name:'Match-Bot',  shell:'#f2d8e6', trim:'#ff5f9e', visor:'#ff8ab5', hat:'bow',    face:'love'  },
+};
+function botName(role, n) {
+  const base = (BOTS[role] || BOTS.hand).name.toUpperCase().replace('-', '');
+  return base + '-' + String(n).padStart(2, '0');
+}
 
 /* procedural perks - an applicant rolls nought to two */
 const TRAITS = [
@@ -560,6 +621,10 @@ const SKILLS = [
   { id:'mill',       br:7, d:5, pre:'well',       name:'The Mill',      icon:'gear',    max:1, base:260, growth:1,   desc:'Unlock the Mill: +25% feed from every harvest' },
   { id:'slowbelly',  br:7, d:5, pre:'hearty',     name:'Slow Bellies',  icon:'heart',   max:5, base:110, growth:2.3, desc:'the flock stays full 25% longer' },
   { id:'harvestbot', br:7, d:6, pre:'mill',       name:'Auto Harvest',  icon:'robot',   max:1, base:900, growth:1,   desc:'ripe crops harvest themselves' },
+
+  { id:'paving',     br:7, d:2, pre:'farming',    name:'Paving Stones', icon:'silo',    max:1, base:20,  growth:1,   desc:'Unlock stone paths: the crew fairly skip along them' },
+  { id:'terracing',  br:7, d:3, pre:'paving',     name:'Terracing',     icon:'house',   max:1, base:55,  growth:1,   desc:'Unlock Raise: bank the ground into grassy terraces' },
+  { id:'digging',    br:7, d:4, pre:'terracing',  name:'Pond Digging',  icon:'water',   max:1, base:130, growth:1,   desc:'Unlock Dig Pond: scoop out water wherever you like' },
 
   /* ---- MARKET ---- */
   { id:'value',    br:6, d:1, pre:'root',      name:'Egg Polish',       icon:'egg',   max:12, base:5,   growth:1.9, desc:'+15% egg sell value' },

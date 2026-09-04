@@ -6,7 +6,7 @@
    ============================================================ */
 'use strict';
 
-const SAVE_KEY = 'infEggCoSave_v5';
+const SAVE_KEY = 'infEggCoSave_v6';
 
 /* the world: 4x3 plots of 16x13 tiles = 64x39 tiles = 1024x624 px */
 const WORLD = {
@@ -33,7 +33,7 @@ const GAME = (() => {
   function freshState() {
     const plots = PLOTS.map(p => p.id === PLOT_START);
     return {
-      v: 5,
+      v: 6,
       coins: 0, feathers: 0,
       plots,
       mamaTier: 0,
@@ -48,8 +48,10 @@ const GAME = (() => {
       belts: {}, incs: {}, vacs: {}, nests: {},   /* "c,r" -> building */
       huts: {}, silos: {}, blowers: {}, sorters: {}, fences: {},
       hatchers: {}, splitters: {}, loaders: {},
-      barns: {}, troughs: {}, wells: {}, sprinklers: {}, mills: {}, coops: {}, boards: {},
+      barns: {}, troughs: {}, wells: {}, sprinklers: {}, mills: {}, coops: {}, boards: {}, hqs: {},
       soil: {},              /* "c,r" -> {crop, growth, water, seed} tilled ground */
+      terrain: {},           /* "c,r" -> {t:'path'|'stone'|'high'|'water', seed} shaped ground */
+      deco: {},              /* "c,r" -> {kind, seed} things planted for the look of them */
       feedStore: 6,          /* pellets in the barn, ready to scatter */
       seeds: { clover: 6, wheat: 4 },
       vehicle: 0,            /* index into VEHICLES - you start on a bike */
@@ -69,12 +71,12 @@ const GAME = (() => {
       truck: { state: 'parked', t: 0, load: [] },
       built: { incubator: 0, vacuum: 0, belt: 0, lovenest: 0, staffhut: 0, silo: 0,
                blower: 0, sorter: 0, fence: 0, hatchery: 0, splitter: 0, loader: 0,
-               barn: 0, trough: 0, well: 0, sprinkler: 0, mill: 0, coop: 0, board: 0 },
+               barn: 0, trough: 0, well: 0, sprinkler: 0, mill: 0, coop: 0, board: 0, hq: 0 },
       disc: [], sk: { root: 1 },
       cam: { x: 0, y: WORLD.H - 208 },
       stats: { pets: 0, laid: 0, collected: 0, sold: 0, coinsEarned: 0, hatched: 0, mutations: 0,
                bred: 0, plumes: 0, culled: 0, wagesPaid: 0, staffEggs: 0, hired: 0, flyers: 0,
-               planted: 0, harvested: 0, feedMade: 0, grown: 0, trips: 0 },
+               planted: 0, harvested: 0, feedMade: 0, grown: 0, trips: 0, shaped: 0, planted2: 0 },
       muted: false, last: Date.now(),
     };
   }
@@ -159,9 +161,19 @@ const GAME = (() => {
     const p = plotAt(x, y);
     return !!(p && S.plots[p.id]);
   }
+  function terrainAt(c, r) { const t = S.terrain[key(c, r)]; return t ? t.t : null; }
   function inPond(x, y) {
     const p = WORLD.pond;
-    return x > p.x - 6 && x < p.x + p.w + 6 && y > p.y - 6 && y < p.y + p.h + 6;
+    if (x > p.x - 6 && x < p.x + p.w + 6 && y > p.y - 6 && y < p.y + p.h + 6) return true;
+    /* ponds you dug yourself block just the same */
+    return terrainAt(Math.floor(x / 16), Math.floor(y / 16)) === 'water';
+  }
+  /* how much quicker the crew move over a tile */
+  function groundSpeed(x, y) {
+    const t = terrainAt(Math.floor(x / 16), Math.floor(y / 16));
+    if (t === 'stone') return ECON.stoneSpeed;
+    if (t === 'path') return ECON.pathSpeed;
+    return 1;
   }
   function inStation(x, y, pad) {
     pad = pad || 0;
@@ -226,6 +238,7 @@ const GAME = (() => {
     two(S.barns, 'barn');
     two(S.mills, 'mill');
     two(S.coops, 'coop');
+    box(S.hqs, 'hq', 3, 2);
     box(S.hatchers, 'hatchery', 3, 3);
     box(S.loaders, 'loader', 2, 1);
   }
@@ -235,6 +248,7 @@ const GAME = (() => {
     const p = plotAt(x, y);
     if (!p || !S.plots[p.id]) return false;
     if (r >= 37) return false;                          /* the road */
+    if (terrainAt(c, r) === 'water') return false;      /* not in the pond */
     if (r === p.tr && p.tr === 0) return false;         /* top tree line */
     const px = c * 16, py = r * 16, pd = WORLD.pond;
     if (px + 16 > pd.x - 4 && px < pd.x + pd.w + 4 && py + 16 > pd.y - 4 && py < pd.y + pd.h + 4) return false;
@@ -251,6 +265,7 @@ const GAME = (() => {
     for (let dc = 0; dc < b.w; dc++) for (let dr = 0; dr < b.h; dr++) {
       const k = key(c + dc, r + dr);
       if (!tileBuildable(c + dc, r + dr) || occ[k] || S.soil[k]) return false;
+      if (S.terrain[k] && S.terrain[k].t === 'water') return false;
     }
     return true;
   }
@@ -643,11 +658,93 @@ const GAME = (() => {
   /* ============================================================
      FARMING - till, plant, water, harvest
      ============================================================ */
-  function canTill(c, r) {
-    return tileBuildable(c, r) && !occ[key(c, r)] && !S.soil[key(c, r)];
+  /* Buildings keep clear of Mama and the stations. Landscaping is far more
+     relaxed: anywhere you own, off the road, that is not already spoken for. */
+  function tileOpen(c, r) {
+    const x = c * 16 + 8, y = r * 16 + 8;
+    const p = plotAt(x, y);
+    if (!p || !S.plots[p.id]) return false;
+    if (r >= 37) return false;
+    if (r === p.tr && p.tr === 0) return false;
+    const px = c * 16, py = r * 16, pd = WORLD.pond;
+    if (px + 16 > pd.x - 2 && px < pd.x + pd.w + 2 && py + 16 > pd.y - 2 && py < pd.y + pd.h + 2) return false;
+    if (Math.abs(px + 8 - WORLD.mama.x) < 18 && Math.abs(py + 8 - WORLD.mama.y) < 18) return false;
+    for (const k of Object.keys(WORLD.stations)) {
+      const st = WORLD.stations[k];
+      if (px + 16 > st.x && px < st.x + st.w && py + 16 > st.y && py < st.y + st.h) return false;
+    }
+    return true;
   }
+  function tileFree(c, r) {
+    const k = key(c, r);
+    return tileOpen(c, r) && !occ[k] && !S.soil[k] && !S.deco[k];
+  }
+  function canTill(c, r) {
+    const t = terrainAt(c, r);
+    return tileFree(c, r) && t !== 'water' && t !== 'stone' && t !== 'path';
+  }
+
+  /* ---- shaping the ground ---- */
+  function terrainCost(kind) { return (TERRAIN[kind] || {}).cost || 0; }
+  function terrainOpen(kind) {
+    const d = TERRAIN[kind];
+    return !!d && (!d.needs || lvl(d.needs) > 0);
+  }
+  function canShape(kind, c, r) {
+    if (!terrainOpen(kind)) return false;
+    const k = key(c, r);
+    if (kind === 'flat') return !!S.terrain[k];
+    if (!tileOpen(c, r) && terrainAt(c, r) !== 'water') return false;
+    if (occ[k] || S.soil[k]) return false;
+    if (kind === 'water' && S.deco[k]) return false;
+    if (terrainAt(c, r) === kind) return false;
+    return S.coins >= terrainCost(kind);
+  }
+  function shape(kind, c, r) {
+    if (!canShape(kind, c, r)) return false;
+    const k = key(c, r);
+    if (kind === 'flat') {
+      delete S.terrain[k];
+      emit('shape', { c, r, kind });
+      return true;
+    }
+    S.coins -= terrainCost(kind);
+    if (kind === 'water' && S.deco[k]) delete S.deco[k];
+    S.terrain[k] = { t: kind, seed: Math.floor(Math.random() * 999) };
+    S.stats.shaped++;
+    if (S.stats.shaped === 1) note('shape', 'Started shaping the land. It is yours to arrange.');
+    emit('shape', { c, r, kind });
+    return true;
+  }
+
+  /* ---- decorations ---- */
+  function canDecorate(kind, c, r) {
+    const d = DECOS[kind];
+    if (!d) return false;
+    const t = terrainAt(c, r);
+    if (t === 'water') return false;
+    return tileFree(c, r) && S.coins >= d.cost;
+  }
+  function decorate(kind, c, r) {
+    if (!canDecorate(kind, c, r)) return false;
+    S.coins -= DECOS[kind].cost;
+    S.deco[key(c, r)] = { kind, seed: Math.floor(Math.random() * 99999) };
+    S.stats.planted2++;
+    emit('decorate', { c, r, kind });
+    return true;
+  }
+  function undecorate(c, r) {
+    const k = key(c, r), d = S.deco[k];
+    if (!d) return false;
+    S.coins += Math.round(DECOS[d.kind].cost * ECON.decoRefund);
+    delete S.deco[k];
+    emit('decorate', { c, r, kind: null });
+    return true;
+  }
+  function decoAt(c, r) { return S.deco[key(c, r)] || null; }
   function till(c, r) {
     if (!canTill(c, r)) return false;
+    delete S.terrain[key(c, r)];
     S.soil[key(c, r)] = { crop: null, growth: 0, water: 0, seed: Math.floor(Math.random() * 999) };
     emit('till', { c, r });
     return true;
@@ -757,9 +854,10 @@ const GAME = (() => {
     const f = 1 - tr.t / (tr.T || tripTime());
     return { f, out: f < 0.5, city: city(), vehicle: vehicle(), n: tr.n, pay: tr.pay };
   }
+  function hasHQ() { return Object.keys(S.hqs).length > 0; }
   function buyVehicle() {
     const next = VEHICLES[S.vehicle + 1];
-    if (!next || S.coins < next.cost || S.truck.state !== 'parked') return false;
+    if (!hasHQ() || !next || S.coins < next.cost || S.truck.state !== 'parked') return false;
     S.coins -= next.cost;
     S.vehicle++;
     note('wheels', 'Traded up to the ' + next.name + '.');
@@ -768,7 +866,7 @@ const GAME = (() => {
   }
   function buyRoute(id) {
     const c = CITY_BY_ID[id];
-    if (!c || S.routes.includes(id) || S.coins < c.cost) return false;
+    if (!hasHQ() || !c || S.routes.includes(id) || S.coins < c.cost) return false;
     /* routes open in order down the road */
     const idx = CITIES.indexOf(c);
     if (idx > 0 && !S.routes.includes(CITIES[idx - 1].id)) return false;
@@ -1331,7 +1429,7 @@ const GAME = (() => {
     return Object.keys(S.huts).length > 0 && S.staff.length < staffSlots();
   }
   function hireApplicant(id, role) {
-    if (!canHire() || !roleOpen(role) || ROLES[role].robot) return false;
+    if (!canHire() || !roleOpen(role) || ROLES[role].botOnly) return false;
     const i = S.applicants.findIndex(a => a.id === id);
     if (i === -1) return false;
     const ap = S.applicants[i];
@@ -1349,10 +1447,11 @@ const GAME = (() => {
     emit('hire', { role, name: ap.name });
     return true;
   }
-  function botPrice(role) { return botCost((S.bots[role] || 0)); }
+  function botCount() { return S.staff.filter(w => w.bot).length; }
+  function botPrice(role) { return Math.round(botCost(botCount()) * (ROLES[role] && ROLES[role].botOnly ? 1 : 0.7)); }
   function assembleBot(role) {
     const def = ROLES[role];
-    if (!def || !def.robot || !roleOpen(role) || !canHire()) return false;
+    if (!def || !roleOpen(role) || !canHire()) return false;
     const cost = botPrice(role);
     if (S.coins < cost) return false;
     S.coins -= cost;
@@ -1361,8 +1460,8 @@ const GAME = (() => {
     const st = {};
     STAT_KEYS.forEach(k => st[k] = def.uses.includes(k) ? 7 : 4);
     S.staff.push({
-      id: nextId++, role, name: def.name.toUpperCase() + '-' + String(S.bots[role]).padStart(2, '0'),
-      st, traits: ['tireless'], look: null, wage: 0.4 + 0.25 * (S.bots[role] - 1),
+      id: nextId++, role, bot: true, name: botName(role, S.bots[role]),
+      st, traits: ['tireless'], look: null, wage: 0.4 + 0.2 * botCount(),
       x: at.x, y: at.y, dir: 1, frame: 0, anim: 0,
       state: 'idle', t: 0, carry: [], target: null, say: 0, energy: 1, jobs: 0,
     });
@@ -1372,8 +1471,11 @@ const GAME = (() => {
   }
   function setRole(id, role) {
     const w = S.staff.find(x => x.id === id);
-    if (!w || !roleOpen(role) || ROLES[role].robot !== ROLES[w.role].robot) return false;
+    if (!w || !roleOpen(role)) return false;
+    /* people cannot take the jobs built for robots */
+    if (ROLES[role].botOnly && !w.bot) return false;
     w.role = role;
+    if (w.bot) w.name = botName(role, (S.bots[role] || 0) + 1);
     w.carry = [];
     w.hold = null;
     w.target = null;
@@ -1387,7 +1489,7 @@ const GAME = (() => {
     (w.carry || []).forEach(e => spawnEgg(w.x, w.y + 8, e.tier, e.golden, e.rainbow));
     if (w.hold) spawnChicken(w.hold.sp, w.x, w.y);
     S.staff.splice(i, 1);
-    if (ROLES[w.role] && ROLES[w.role].robot) S.bots[w.role] = Math.max(0, (S.bots[w.role] || 1) - 1);
+    if (w.bot) S.bots[w.role] = Math.max(0, (S.bots[w.role] || 1) - 1);
     return true;
   }
 
@@ -1412,7 +1514,7 @@ const GAME = (() => {
     const dx = tx - w.x, dy = ty - w.y;
     const d = Math.hypot(dx, dy);
     if (d < 3) return true;
-    const sp = crewSpeed(w) * dt;
+    const sp = crewSpeed(w) * groundSpeed(w.x + 6, w.y + 12) * dt;
     w.dir = dx > 0 ? 1 : -1;
     let nx = w.x + (dx / d) * sp, ny = w.y + (dy / d) * sp;
     if (inPond(nx + 6, ny + 8)) ny = w.y;           /* walk around the pond */
@@ -1733,6 +1835,8 @@ const GAME = (() => {
   function build(type, c, r, dir) {
     const cost = buildCost(type, S.built[type]);
     if (S.coins < cost || !canPlace(type, c, r)) return false;
+    const b0 = BUILDS[type];
+    for (let dc = 0; dc < b0.w; dc++) for (let dr = 0; dr < b0.h; dr++) delete S.deco[key(c + dc, r + dr)];
     S.coins -= cost;
     S.built[type]++;
     const k = key(c, r);
@@ -1755,6 +1859,7 @@ const GAME = (() => {
     else if (type === 'mill') S.mills[k] = { t: 0 };
     else if (type === 'coop') S.coops[k] = { built: Date.now() };
     else if (type === 'board') S.boards[k] = { built: Date.now() };
+    else if (type === 'hq') S.hqs[k] = { built: Date.now() };
     rebuildOcc();
     mark('build');
     return true;
@@ -1813,6 +1918,8 @@ const GAME = (() => {
       delete S.mills[k]; S.built.mill = Math.max(0, S.built.mill - 1);
     } else if (o.type === 'coop') {
       delete S.coops[k]; S.built.coop = Math.max(0, S.built.coop - 1);
+    } else if (o.type === 'hq') {
+      delete S.hqs[k]; S.built.hq = Math.max(0, S.built.hq - 1);
     } else if (o.type === 'board') {
       delete S.boards[k]; S.built.board = Math.max(0, S.built.board - 1);
       S.applicants.forEach(a => { a.state = 'leaving'; });
@@ -1982,7 +2089,7 @@ const GAME = (() => {
       const raw = localStorage.getItem(SAVE_KEY);
       if (!raw) { ensureStarterInc(); rebuildOcc(); return false; }
       const d = JSON.parse(raw);
-      if (!d || d.v !== 5) { ensureStarterInc(); rebuildOcc(); return false; }
+      if (!d || d.v !== 6) { ensureStarterInc(); rebuildOcc(); return false; }
       S = Object.assign(freshState(), d);
       S.truck = Object.assign({ state: 'parked', t: 0, load: [] }, d.truck);
       S.held = null;
@@ -1992,8 +2099,9 @@ const GAME = (() => {
       S.applicants = (S.applicants || []).filter(ap => ap && ap.st);
       S.bots = Object.assign({ cull: 0, match: 0 }, S.bots);
       ['huts', 'silos', 'blowers', 'sorters', 'fences', 'hatchers', 'splitters', 'loaders',
-       'barns', 'troughs', 'wells', 'sprinklers', 'mills', 'coops', 'boards', 'soil']
-        .forEach(m => { if (!S[m]) S[m] = {}; });
+       'barns', 'troughs', 'wells', 'sprinklers', 'mills', 'coops', 'boards', 'hqs', 'soil',
+       'terrain', 'deco'].forEach(m => { if (!S[m]) S[m] = {}; });
+      S.staff.forEach(w => { if (w.bot === undefined) w.bot = (w.role === 'cull' || w.role === 'match'); });
       S.chickens.forEach(c => { if (c.age === undefined) c.age = 1; if (c.food === undefined) c.food = 1; });
       if (!Array.isArray(S.routes) || !S.routes.length) S.routes = ['hamlet'];
       if (!CITY_BY_ID[S.route]) S.route = S.routes[0];
@@ -2056,6 +2164,8 @@ const GAME = (() => {
     crewStat, crewSpeed, crewCarry, trait, machineBoost, careBoost, auraR, restCap,
     markChicken, retireChicken, rates, beltDirFor, plumeValue,
     feedCap, addFeed, canTill, till, untill, canPlant, plant, water, harvest, cropStage, ripe, harvestYield,
+    terrainAt, canShape, shape, terrainOpen, terrainCost, canDecorate, decorate, undecorate, decoAt, tileOpen,
+    groundSpeed, hasHQ, tileFree, botPrice, botCount,
     seedCount, cropOpen, wateredBy, isChick, growPellets, nearCoop, mamaLayTime,
     vehicle, city, tripPhase, buyVehicle, buyRoute, setRoute, applicantAt, boardSpot,
     note,
