@@ -8,26 +8,28 @@
 
 const SAVE_KEY = 'infEggCoSave_v7';
 
-/* the world: 4x3 plots of 16x13 tiles = 64x39 tiles = 1024x624 px */
+/* the world: 5x4 plots of 16x13 tiles = 80x52 tiles = 1280x832 px.
+   the home plot is bottom-left, and the road runs along its foot. */
 const WORLD = {
-  T: 16, COLS: 64, ROWS: 39,
-  W: 1024, H: 624,
-  roadY: 592,                                /* road rows 37-38, bottom plots only */
+  T: 16, COLS: 80, ROWS: 52,
+  W: 1280, H: 832,
+  roadY: 800,                                /* road rows 50-51, bottom plots only */
   view: { w: 384, h: 208 },                  /* camera viewport */
-  mama: { x: 118, y: 480 },
-  truckHome: { x: 150, y: 588, w: 56, h: 32 },
+  mama: { x: 118, y: 688 },
+  truckHome: { x: 150, y: 796, w: 56, h: 32 },
   stations: {
-    lab:      { x: 18,  y: 430, w: 30, h: 32 },   /* the Lab, home of EGGOS */
-    stand:    { x: 56,  y: 436, w: 16, h: 24 },   /* the Index bookstand */
-    mamaSign: { x: 88,  y: 458, w: 14, h: 20 },   /* upgrade-mama signpost */
-    depot:    { x: 216, y: 562, w: 16, h: 26 },   /* the road sign: vehicles and routes */
+    lab:      { x: 18,  y: 638, w: 30, h: 32 },   /* the Lab, home of EGGOS */
+    stand:    { x: 56,  y: 644, w: 16, h: 24 },   /* the Index bookstand */
+    mamaSign: { x: 88,  y: 666, w: 14, h: 20 },   /* upgrade-mama signpost */
+    depot:    { x: 216, y: 770, w: 16, h: 26 },   /* the road sign: vehicles and routes */
   },
-  starterInc: [3, 31],                      /* prebuilt incubator anchor tile */
+  starterInc: [3, 44],                      /* prebuilt incubator anchor tile */
 };
 
 const GAME = (() => {
 
   /* ---------- state ---------- */
+  const zeroCounts = () => Object.keys(BUILDS).reduce((o, t) => { o[t] = 0; return o; }, {});
   let nextId = 1;
   function freshState() {
     const plots = PLOTS.map(p => p.id === PLOT_START);
@@ -36,7 +38,7 @@ const GAME = (() => {
       coins: 0, feathers: 0,
       plots,
       mamaTier: 0,
-      mama: { lay: 8, petCd: 0 },
+      mama: { lay: 8, petCd: 0, belly: 1 },
       chickens: [],          /* {id, sp, x, y, dir, state, t, lay, petCd, buffT} */
       eggs: [],              /* ground eggs {id,tier,golden,x,y,z,vz,suck} */
       plumes: [],            /* feathers on the ground {x,y,z,vz,value,sway} */
@@ -47,6 +49,7 @@ const GAME = (() => {
       belts: {}, incs: {}, vacs: {}, nests: {},   /* "c,r" -> building */
       huts: {}, silos: {}, blowers: {}, sorters: {}, fences: {},
       hatchers: {}, splitters: {}, loaders: {},
+      polishers: {}, graders: {}, dynamos: {},
       barns: {}, troughs: {}, wells: {}, sprinklers: {}, mills: {}, coops: {}, boards: {}, hqs: {},
       soil: {},              /* "c,r" -> {crop, growth, water, seed} tilled ground */
       paint: {},             /* "cx,cy" at 8px -> 'path'|'stone'|'high'|'water', painted ground */
@@ -69,9 +72,10 @@ const GAME = (() => {
       seenTitle: false,
       items: [],             /* eggs riding belts */
       truck: { state: 'parked', t: 0, load: [] },
-      built: { incubator: 0, vacuum: 0, belt: 0, lovenest: 0, staffhut: 0, silo: 0,
-               blower: 0, sorter: 0, fence: 0, hatchery: 0, splitter: 0, loader: 0,
-               barn: 0, trough: 0, well: 0, sprinkler: 0, mill: 0, coop: 0, board: 0, hq: 0 },
+      /* one counter per building, derived from BUILDS so adding a machine
+         can never leave a hole here (a missing counter made buildCost
+         return NaN and quietly wiped your coins) */
+      built: zeroCounts(),
       disc: [], sk: { root: 1 },
       cam: { x: 0, y: WORLD.H - 208 },
       stats: { pets: 0, laid: 0, collected: 0, sold: 0, coinsEarned: 0, hatched: 0, mutations: 0,
@@ -95,11 +99,12 @@ const GAME = (() => {
   const tycoon = () => (lvl('tycoon') ? 2 : 1);
   const ownedPlots = () => S.plots.filter(Boolean).length;
 
-  function eggValue(tier, golden) {
+  function eggValue(tier, golden, polished) {
     let v = ECON.eggValue(tier);
     v *= 1 + 0.15 * lvl('value');
     v *= 1 + 0.01 * lvl('contracts') * disc();
     if (golden) v *= ECON.goldenMult;
+    if (polished) v *= ECON.polishMult;
     return Math.round(v * tycoon());
   }
   function layTime(t) { return ECON.layTime(t) / (1 + 0.10 * lvl('happy')); }
@@ -142,7 +147,7 @@ const GAME = (() => {
   function truckPayout() {
     const c = city();
     /* bigger cities pay a premium, and a steeper one for rare eggs */
-    let sum = S.truck.load.reduce((a, e) => a + eggValue(e.tier, e.golden) * (1 + 0.08 * c.sky * e.tier), 0);
+    let sum = S.truck.load.reduce((a, e) => a + eggValue(e.tier, e.golden, e.pol) * (1 + 0.08 * c.sky * e.tier), 0);
     sum *= c.mult;
     if (S.truck.load.length >= truckCap()) sum *= 1 + 0.06 * lvl('fullbonus');
     return Math.round(sum);
@@ -266,13 +271,17 @@ const GAME = (() => {
     box(S.hqs, 'hq', 3, 2);
     box(S.hatchers, 'hatchery', 3, 3);
     box(S.loaders, 'loader', 2, 1);
+    Object.keys(S.polishers).forEach(k => occ[k] = { type: 'polisher', k });
+    box(S.graders, 'grader', 2, 1);
+    two(S.dynamos, 'dynamo');
   }
   function isFence(x, y) { return !!S.fences[key(Math.floor(x / 16), Math.floor(y / 16))]; }
+  const ROAD_ROW = Math.floor(WORLD.roadY / WORLD.T);   /* derived, never hardcode it */
   function tileBuildable(c, r) {
     const x = c * 16 + 8, y = r * 16 + 8;
     const p = plotAt(x, y);
     if (!p || !S.plots[p.id]) return false;
-    if (r >= 37) return false;                          /* the road */
+    if (r >= ROAD_ROW) return false;                    /* the road */
     if (tileHasWater(c, r)) return false;               /* not in the water */
     if (r === p.tr && p.tr === 0) return false;         /* top tree line */
     const px = c * 16, py = r * 16;
@@ -535,7 +544,10 @@ const GAME = (() => {
   /* ---------- petting / grabbing ---------- */
   function petMama() {
     if (S.mama.petCd > 0) return false;
+    /* a hungry grandma will take the fuss but she has no egg to give */
+    if (mamaHungry()) { S.mama.petCd = 1.2; emit('mamahungry', {}); return 'hungry'; }
     S.mama.petCd = petCd(true);
+    S.mama.belly = Math.max(0, mamaBelly() - 1 / ECON.mamaPellets);
     S.stats.pets++;
     layEgg(WORLD.mama.x, WORLD.mama.y + 8, S.mamaTier, true);
     return true;
@@ -688,7 +700,7 @@ const GAME = (() => {
     const x = c * 16 + 8, y = r * 16 + 8;
     const p = plotAt(x, y);
     if (!p || !S.plots[p.id]) return false;
-    if (r >= 37) return false;
+    if (r >= ROAD_ROW) return false;
     if (r === p.tr && p.tr === 0) return false;
     const px = c * 16, py = r * 16;
     if (Math.abs(px + 8 - WORLD.mama.x) < 18 && Math.abs(py + 8 - WORLD.mama.y) < 18) return false;
@@ -704,9 +716,8 @@ const GAME = (() => {
   }
   function canTill(c, r) {
     if (!tileFree(c, r)) return false;
-    for (let dx = 0; dx < 2; dx++) for (let dy = 0; dy < 2; dy++)
-      if (S.paint[ckey(c * 2 + dx, r * 2 + dy)]) return false;
-    return true;
+    /* you can till straight over a path, but not over open water */
+    return !tileHasWater(c, r);
   }
 
   /* ---- shaping the ground with a brush ---- */
@@ -739,7 +750,14 @@ const GAME = (() => {
       if (d > rr && ((cx * 7 + cy * 13) % 5) < 3) continue;
       const k = ckey(cx, cy);
       if (kind === 'flat') {
-        if (S.paint[k]) { delete S.paint[k]; n++; }
+        if (!S.paint[k]) continue;
+        /* rubbing out soil takes the (empty) plot with it */
+        if (S.paint[k] === 'soil') {
+          const t = S.soil[key(Math.floor(cx / 2), Math.floor(cy / 2))];
+          if (t && t.crop) continue;
+          if (t) delete S.soil[key(Math.floor(cx / 2), Math.floor(cy / 2))];
+        }
+        delete S.paint[k]; n++;
         continue;
       }
       if (S.paint[k] === kind) continue;
@@ -792,18 +810,45 @@ const GAME = (() => {
     return true;
   }
   function decoAt(c, r) { return S.deco[key(c, r)] || null; }
+  /* soil lives on the paint grid like every other ground kind, so a
+     ploughed field gets the same soft dithered edge as a path or a pond
+     instead of a staircase of square tiles. the crop itself still hangs
+     off the 16px tile, which is where growth and water are kept. */
+  function soilCells(c, r, fn) {
+    for (let dx = 0; dx < 2; dx++) for (let dy = 0; dy < 2; dy++) fn(ckey(c * 2 + dx, r * 2 + dy));
+  }
   function till(c, r) {
     if (!canTill(c, r)) return false;
-    for (let dx = 0; dx < 2; dx++) for (let dy = 0; dy < 2; dy++) delete S.paint[ckey(c * 2 + dx, r * 2 + dy)];
+    soilCells(c, r, k => { S.paint[k] = 'soil'; });
     S.soil[key(c, r)] = { crop: null, growth: 0, water: 0, seed: Math.floor(Math.random() * 999) };
     emit('till', { c, r });
     return true;
+  }
+  /* till everything the brush sweeps over, so a field is one drag */
+  function tillStroke(x0, y0, x1, y1, radius) {
+    const rr = Math.max(8, radius);
+    const lo = p => Math.floor((p - rr) / 16), hi = p => Math.floor((p + rr) / 16);
+    let n = 0;
+    for (let r = lo(Math.min(y0, y1)); r <= hi(Math.max(y0, y1)); r++)
+      for (let c = lo(Math.min(x0, x1)); c <= hi(Math.max(x0, x1)); c++) {
+        const px = c * 16 + 8, py = r * 16 + 8;
+        if (segDist(px, py, x0, y0, x1, y1) > rr) continue;
+        if (till(c, r)) n++;
+      }
+    return n;
+  }
+  /* shortest distance from a point to the segment the brush just swept */
+  function segDist(px, py, x0, y0, x1, y1) {
+    const dx = x1 - x0, dy = y1 - y0, len = dx * dx + dy * dy;
+    const t = len ? Math.max(0, Math.min(1, ((px - x0) * dx + (py - y0) * dy) / len)) : 0;
+    return Math.hypot(px - (x0 + dx * t), py - (y0 + dy * t));
   }
   function untill(c, r) {
     const k = key(c, r), t = S.soil[k];
     if (!t) return false;
     if (t.crop) return false;
     delete S.soil[k];
+    soilCells(c, r, ck => { if (S.paint[ck] === 'soil') delete S.paint[ck]; });
     return true;
   }
   function seedCount(crop) { return (S.seeds[crop] || 0); }
@@ -1051,6 +1096,12 @@ const GAME = (() => {
       }
       return item.splitDir;
     }
+    /* the polisher and the grader sit in a line like any other belt
+       piece, so an egg standing on one keeps rolling the way they face */
+    const po = S.polishers[k];
+    if (po) return po.dir;
+    const g = occ[k];
+    if (g && g.type === 'grader' && S.graders[g.k]) return S.graders[g.k].dir;
     return null;
   }
   function tickBelts(dt) {
@@ -1074,13 +1125,39 @@ const GAME = (() => {
       const nc = Math.floor(nx / 16), nr = Math.floor(ny / 16);
       if (nc === c && nr === r) { it.x = nx; it.y = ny; continue; }
       const target = occ[key(nc, nr)];
+      /* the polisher buffs whatever rolls over it; the grader now and
+         then bumps an egg a whole tier. both pass the egg straight on,
+         so they sit in the middle of a line like any other belt piece. */
+      if (target && target.type === 'polisher') {
+        if (!it.pol) {
+          it.pol = true;
+          S.polishers[target.k].n++;
+          S.stats.polished = (S.stats.polished || 0) + 1;
+          emit('polish', { x: nx, y: ny });
+        }
+        it.x = nx; it.y = ny; continue;
+      }
+      if (target && target.type === 'grader') {
+        const g = S.graders[target.k];
+        if (!it.graded) {
+          it.graded = true;
+          g.n++;
+          if (it.tier < TIERS.length - 2 && Math.random() < ECON.gradeChance * machineBoost(nx, ny)) {
+            it.tier++;
+            g.up++;
+            S.stats.graded = (S.stats.graded || 0) + 1;
+            emit('grade', { x: nx, y: ny, tier: it.tier });
+          }
+        }
+        it.x = nx; it.y = ny; continue;
+      }
       if (target && (target.type === 'belt' || target.type === 'sorter' || target.type === 'splitter')) {
         it.x = nx; it.y = ny; continue;
       }
       if (target && target.type === 'hatchery') {
         const h = S.hatchers[target.k];
         if (h.queue.length < ECON.hatcheryCap) {
-          h.queue.push({ tier: it.tier, golden: it.golden, rainbow: it.rainbow });
+          h.queue.push({ tier: it.tier, golden: it.golden, rainbow: it.rainbow, pol: it.pol });
           S.items.splice(i, 1);
         }
         continue;
@@ -1088,7 +1165,7 @@ const GAME = (() => {
       if (target && target.type === 'loader') {
         const ld = S.loaders[target.k];
         if (ld.store.length < 20) {
-          ld.store.push({ tier: it.tier, golden: it.golden, rainbow: it.rainbow });
+          ld.store.push({ tier: it.tier, golden: it.golden, rainbow: it.rainbow, pol: it.pol });
           S.items.splice(i, 1);
         }
         continue;
@@ -1096,7 +1173,7 @@ const GAME = (() => {
       if (target && target.type === 'incubator') {
         const inc = S.incs[target.k];
         if (inc.queue.length < incCap()) {
-          inc.queue.push({ tier: it.tier, golden: it.golden, rainbow: it.rainbow });
+          inc.queue.push({ tier: it.tier, golden: it.golden, rainbow: it.rainbow, pol: it.pol });
           S.items.splice(i, 1);
         }
         continue;
@@ -1104,7 +1181,7 @@ const GAME = (() => {
       if (target && target.type === 'silo') {
         const silo = S.silos[target.k];
         if (silo.store.length < ECON.siloCap) {
-          silo.store.push({ tier: it.tier, golden: it.golden, rainbow: it.rainbow });
+          silo.store.push({ tier: it.tier, golden: it.golden, rainbow: it.rainbow, pol: it.pol });
           S.items.splice(i, 1);
         }
         continue;
@@ -1113,7 +1190,7 @@ const GAME = (() => {
         const th = WORLD.truckHome;
         if (S.truck.state === 'parked' && nx > th.x - 6 && nx < th.x + th.w + 6) {
           if (S.truck.load.length < truckCap()) {
-            S.truck.load.push({ tier: it.tier, golden: it.golden, rainbow: it.rainbow });
+            S.truck.load.push({ tier: it.tier, golden: it.golden, rainbow: it.rainbow, pol: it.pol });
             S.items.splice(i, 1);
             emit('truckload', {});
           }
@@ -1313,7 +1390,24 @@ const GAME = (() => {
       if (Math.hypot(w.x + 6 - x, w.y + 8 - y) > R) continue;
       m += 0.06 * crewStat(w, 'tech');
     }
+    for (const k of Object.keys(S.dynamos)) {
+      const [dc, dr] = k.split(',').map(Number);
+      if (Math.hypot(dc * 16 + 16 - x, dr * 16 + 16 - y) > ECON.dynamoR) continue;
+      m += ECON.dynamoBoost;
+    }
     return m;
+  }
+  /* how many machines a dynamo is currently driving, for its inspect card */
+  function dynamoLoad(c, r) {
+    const x = c * 16 + 16, y = r * 16 + 16;
+    let n = 0;
+    for (const kk of Object.keys(occ)) {
+      const o = occ[kk];
+      if (!o || o.type === 'dynamo' || o.type === 'fence') continue;
+      const [oc, orr] = kk.split(',').map(Number);
+      if (Math.hypot(oc * 16 + 8 - x, orr * 16 + 8 - y) <= ECON.dynamoR) n++;
+    }
+    return n;
   }
   /* Keepers make the flock lay faster just by being about */
   function careBoost(x, y) {
@@ -1713,7 +1807,19 @@ const GAME = (() => {
     }
     if (!w.target) { w.state = 'idle'; return; }
     if (S.feedStore < 1) { w.state = 'idle'; w.target = null; return; }
-    /* a hungry trough comes first */
+    /* a hungry grandma comes before anything else */
+    if (mamaBelly() < 0.5) {
+      w.state = 'walk';
+      if (walkTo(w, WORLD.mama.x - 4, WORLD.mama.y + 16, dt)) {
+        const n = Math.min(Math.floor(S.feedStore), ECON.mamaPellets);
+        S.feedStore -= n;
+        feedMama(n);
+        w.jobs++; w.t = 3; w.state = 'work';
+        emit('stafffeed', { w });
+      }
+      return;
+    }
+    /* a hungry trough comes next */
     const empty = buildingSpots(S.troughs, t => t.n < ECON.troughCap / 2, 1);
     if (empty.length) {
       const tr = nearest(empty, w.x, w.y);
@@ -1903,6 +2009,9 @@ const GAME = (() => {
     else if (type === 'hatchery') S.hatchers[k] = { queue: [], prog: 0 };
     else if (type === 'splitter') S.splitters[k] = { dir: dir || 0, n: 0 };
     else if (type === 'loader') S.loaders[k] = { store: [], t: 0 };
+    else if (type === 'polisher') S.polishers[k] = { dir: dir || 0, n: 0 };
+    else if (type === 'grader') S.graders[k] = { dir: dir || 0, n: 0, up: 0 };
+    else if (type === 'dynamo') S.dynamos[k] = { t: 0 };
     else if (type === 'barn') S.barns[k] = { built: Date.now() };
     else if (type === 'trough') S.troughs[k] = { n: 0 };
     else if (type === 'well') S.wells[k] = { built: Date.now() };
@@ -2007,14 +2116,40 @@ const GAME = (() => {
     return true;
   }
 
-  /* ---------- master tick ---------- */
-  function tick(dt) {
+  /* Mama works for her supper now. Her belly empties as she sits, and an
+     empty grandma does not lay - scatter feed by her nest to top her up. */
+  function mamaBelly() { return Math.max(0, Math.min(1, S.mama.belly == null ? 1 : S.mama.belly)); }
+  function mamaHungry() { return mamaBelly() <= 0; }
+  function feedMama(n) {
+    if (mamaBelly() >= 1) return false;
+    S.mama.belly = Math.min(1, mamaBelly() + n / ECON.mamaPellets);
+    emit('mamafed', {});
+    return true;
+  }
+  function tickMama(dt) {
     S.mama.petCd = Math.max(0, S.mama.petCd - dt);
+    /* she eats what lands within reach of the nest */
+    if (mamaBelly() < 1) {
+      for (let i = S.feed.length - 1; i >= 0; i--) {
+        const f = S.feed[i];
+        if (Math.hypot(f.x - WORLD.mama.x, f.y - WORLD.mama.y - 6) > ECON.mamaReach) continue;
+        S.feed.splice(i, 1);
+        feedMama(1);
+        if (mamaBelly() >= 1) break;
+      }
+    }
+    if (mamaHungry()) { S.mama.belly = 0; return; }
+    S.mama.belly = Math.max(0, mamaBelly() - dt / ECON.mamaHunger);
     S.mama.lay -= dt;
     if (S.mama.lay <= 0) {
       S.mama.lay = mamaLayTime();
       layEgg(WORLD.mama.x, WORLD.mama.y + 10, S.mamaTier, false);
     }
+  }
+
+  /* ---------- master tick ---------- */
+  function tick(dt) {
+    tickMama(dt);
     S.chickens.forEach(ch => tickChicken(ch, dt));
     tickEggs(dt);
     tickVacs(dt);
@@ -2038,10 +2173,13 @@ const GAME = (() => {
     if (dt < 30) { tick(Math.min(2, Math.max(0, dt))); return null; }
     dt = Math.min(dt, ECON.offlineCapHrs * 3600);
     let laid = 0, hatched = 0, pay = 0, feathersGot = 0;
-    const layers = [{ tier: S.mamaTier, x: WORLD.mama.x, y: WORLD.mama.y + 10 }]
-      .concat(S.chickens.map(ch => ({ tier: SPECIES[ch.sp].tier, x: ch.x + 10, y: ch.y + 14 })));
+    /* Mama only lays for as long as the feed in her lasts */
+    const mamaRan = Math.min(dt, mamaBelly() * ECON.mamaHunger);
+    S.mama.belly = Math.max(0, mamaBelly() - dt / ECON.mamaHunger);
+    const layers = [{ tier: S.mamaTier, x: WORLD.mama.x, y: WORLD.mama.y + 10, span: mamaRan }]
+      .concat(S.chickens.map(ch => ({ tier: SPECIES[ch.sp].tier, x: ch.x + 10, y: ch.y + 14, span: dt })));
     for (const L of layers) {
-      const n = Math.floor(dt / layTime(L.tier));
+      const n = Math.floor(L.span / layTime(L.tier));
       for (let i = 0; i < n && S.eggs.length < ECON.groundEggCap; i++) {
         if (layEgg(L.x + (Math.random() * 80 - 40), L.y + (Math.random() * 50 - 25), L.tier, false)) laid++;
       }
@@ -2151,8 +2289,12 @@ const GAME = (() => {
       S.bots = Object.assign({ cull: 0, match: 0 }, S.bots);
       ['huts', 'silos', 'blowers', 'sorters', 'fences', 'hatchers', 'splitters', 'loaders',
        'barns', 'troughs', 'wells', 'sprinklers', 'mills', 'coops', 'boards', 'hqs', 'soil',
-       'paint', 'deco'].forEach(m => { if (!S[m]) S[m] = {}; });
+       'paint', 'deco', 'polishers', 'graders', 'dynamos'].forEach(m => { if (!S[m]) S[m] = {}; });
       if (typeof S.brush !== 'number') S.brush = 2;
+      S.built = Object.assign(zeroCounts(), S.built);
+      Object.keys(S.built).forEach(t => { if (typeof S.built[t] !== 'number' || !isFinite(S.built[t])) S.built[t] = 0; });
+      S.mama = Object.assign({ lay: 8, petCd: 0, belly: 1 }, S.mama);
+      if (typeof S.mama.belly !== 'number') S.mama.belly = 1;
       S.staff.forEach(w => { if (w.bot === undefined) w.bot = (w.role === 'cull' || w.role === 'match'); });
       S.chickens.forEach(c => { if (c.age === undefined) c.age = 1; if (c.food === undefined) c.food = 1; });
       if (!Array.isArray(S.routes) || !S.routes.length) S.routes = ['hamlet'];
@@ -2216,10 +2358,10 @@ const GAME = (() => {
     crewStat, crewSpeed, crewCarry, trait, machineBoost, careBoost, auraR, restCap,
     markChicken, retireChicken, rates, beltDirFor, plumeValue,
     feedCap, addFeed, canTill, till, untill, canPlant, plant, water, harvest, cropStage, ripe, harvestYield,
-    terrainAt, paintAt, tileHasWater, dab, stroke, terrainOpen, terrainCost, cellPaintable, paintedCells, CELL_PX,
+    terrainAt, paintAt, tileHasWater, dab, stroke, tillStroke, terrainOpen, terrainCost, cellPaintable, paintedCells, CELL_PX, dynamoLoad,
     canDecorate, decorate, undecorate, decoAt, tileOpen,
     groundSpeed, hasHQ, tileFree, botPrice, botCount,
-    seedCount, cropOpen, wateredBy, isChick, growPellets, nearCoop, mamaLayTime,
+    seedCount, cropOpen, wateredBy, isChick, growPellets, nearCoop, mamaLayTime, mamaBelly, mamaHungry, feedMama,
     vehicle, city, tripPhase, buyVehicle, buyRoute, setRoute, applicantAt, boardSpot,
     note,
     tick, applyOffline, save, load, reset, fmt, fmtTime,

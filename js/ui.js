@@ -361,10 +361,15 @@
 
   /* the paint pots: each returns a colour for a pixel */
   const PAINT = {
+    /* a walked path is pale, dusty and dry - deliberately a long way off
+       the dark turned earth of a ploughed field, so a track crossing a
+       field still reads as a track */
     path: (x, y, edge) => {
       const n = hash2(x * 0.7, y * 0.7);
-      if (edge) return n < 0.5 ? '#c69a5c' : '#b58a4f';
-      return n < 0.25 ? '#a87c42' : n < 0.6 ? '#b58a4f' : n < 0.88 ? '#c69a5c' : '#d1a86b';
+      if (edge) return n < 0.5 ? '#d6bd94' : '#c9ae84';
+      const grit = hash2(Math.floor(x / 2) * 2.9, Math.floor(y / 2) * 3.7);
+      if (grit < 0.06) return '#a8916c';
+      return n < 0.25 ? '#c2a87e' : n < 0.6 ? '#cdb489' : n < 0.88 ? '#d9c197' : '#e4cfa8';
     },
     stone: (x, y, edge) => {
       /* flagstones cut by mortar lines that wander a little */
@@ -386,6 +391,23 @@
       const n = hash2(x * 0.8, y * 0.8);
       if (edge) return '#5b9636';
       return n < 0.2 ? '#6ab04c' : n < 0.55 ? '#7fc44f' : n < 0.85 ? '#8ecf5b' : '#9ada66';
+    },
+    /* ploughed earth. broken clods, with just a hint of the plough line
+       showing through - strong regular furrows read as corrugated card,
+       so the wave is shallow and the speckle does most of the work. */
+    soil: (x, y, edge) => {
+      if (edge) return hash2(x, y) < 0.5 ? '#8a6034' : '#7a5230';
+      const n = hash2(x * 0.85, y * 0.85);
+      const clod = hash2(Math.floor(x / 3) * 1.7, Math.floor(y / 2) * 2.3);
+      const fur = Math.sin((y + Math.sin(x * 0.09) * 3.4 + hash2(x * 0.2, 0) * 2) * 0.42);
+      const drift = hash2(Math.floor(x / 11) * 3.1, Math.floor(y / 9) * 4.7);
+      let t = clod * 0.50 + n * 0.24 + fur * 0.09 + drift * 0.17;
+      if (t < 0.22) return '#6e4a28';
+      if (t < 0.40) return '#7f5732';
+      if (t < 0.56) return '#8d6339';
+      if (t < 0.72) return '#9a6e40';
+      if (t < 0.88) return '#a87a49';
+      return '#b58755';
     },
   };
   const CLIFF = (x, y, t) => {
@@ -528,6 +550,8 @@
       case 'pinewood': place('pine', 7, true); place('stump', 4); place('shroom', 5); place('tuft', 8); break;
       case 'thicket': place('bush', 12); place('tree', 3, true); place('shroom', 4); place('tuft', 9); break;
       case 'prairie': place('tuft', 18); place('clover', 9); place('sunflower', 4); place('rock', 4); break;
+      case 'birch': place('tree', 6, true); place('tuft', 11); place('flower', 6); place('shroom', 3); break;
+      case 'highland': place('rock', 14); place('pine', 5, true); place('tuft', 6); place('stump', 3); break;
       default: place('tuft', 12); place('flower', 5); place('bush', 3); break;
     }
   }
@@ -946,6 +970,84 @@
   }
 
   /* a hopper on legs that tips belt eggs into the truck */
+  /* ---- the polisher: a 1x1 buffing wheel that sits in a belt line ---- */
+  function drawPolisher(c, r, po, now) {
+    const x = c * 16, y = r * 16;
+    ctx.fillStyle = 'rgba(40,58,26,.24)'; ctx.fillRect(x + 3, y + 14, 10, 2);
+    ctx.fillStyle = '#2e3238'; ctx.fillRect(x + 1, y + 3, 14, 11);
+    ctx.fillStyle = '#7f8894'; ctx.fillRect(x + 2, y + 4, 12, 9);
+    ctx.fillStyle = '#a9b2bd'; ctx.fillRect(x + 2, y + 4, 12, 2);
+    ctx.fillStyle = '#5a626e'; ctx.fillRect(x + 2, y + 11, 12, 2);
+    /* the wheel, spinning */
+    const sp = Math.floor(now / 90) % 4;
+    ctx.fillStyle = '#23262b'; ctx.fillRect(x + 4, y + 6, 8, 5);
+    ctx.fillStyle = '#ffe9a8';
+    for (let i = 0; i < 4; i++) if ((i + sp) % 4 < 2) ctx.fillRect(x + 5 + i * 2, y + 7, 1, 3);
+    /* a sparkle popping off the top */
+    if (Math.floor(now / 220) % 3 === 0) {
+      ctx.fillStyle = '#fff8ec';
+      ctx.fillRect(x + 7, y + 1, 2, 1); ctx.fillRect(x + 8, y, 1, 1);
+    }
+    ctx.fillStyle = '#3d434e'; ctx.fillRect(x + 2, y + 14, 3, 2); ctx.fillRect(x + 11, y + 14, 3, 2);
+  }
+
+  /* ---- the grader: a 2x1 line that lifts the odd egg a whole tier ---- */
+  function drawGrader(c, r, g, now) {
+    const x = c * 16, y = r * 16;
+    ctx.fillStyle = 'rgba(40,58,26,.24)'; ctx.fillRect(x + 3, y + 14, 26, 3);
+    ctx.fillStyle = '#2a2f36'; ctx.fillRect(x + 1, y + 2, 30, 12);
+    ctx.fillStyle = '#8d949e'; ctx.fillRect(x + 2, y + 3, 28, 10);
+    ctx.fillStyle = '#c2c9d2'; ctx.fillRect(x + 2, y + 3, 28, 2);
+    ctx.fillStyle = '#5a626e'; ctx.fillRect(x + 2, y + 11, 28, 2);
+    /* graded slots lighting up in sequence */
+    ctx.fillStyle = '#20242a'; ctx.fillRect(x + 4, y + 5, 24, 5);
+    const step = Math.floor(now / 160) % 6;
+    for (let i = 0; i < 6; i++) {
+      ctx.fillStyle = i === step ? '#7ce8a0' : i < step ? '#3f7a52' : '#2c3138';
+      ctx.fillRect(x + 5 + i * 4, y + 6, 3, 3);
+    }
+    /* a little grading arm sweeping the top */
+    const ax = x + 4 + ((Math.floor(now / 130) % 12) * 2);
+    ctx.fillStyle = '#ffc72f'; ctx.fillRect(ax, y, 2, 3);
+    ctx.fillStyle = '#3d434e'; ctx.fillRect(x + 3, y + 14, 3, 2); ctx.fillRect(x + 26, y + 14, 3, 2);
+  }
+
+  /* ---- the dynamo: a 2x2 flywheel that drives everything nearby ---- */
+  function drawDynamo(c, r, dy, now) {
+    const x = c * 16, y = r * 16;
+    ctx.fillStyle = 'rgba(40,58,26,.26)'; ctx.fillRect(x + 3, y + 28, 26, 3);
+    /* housing */
+    ctx.fillStyle = '#26292f'; ctx.fillRect(x + 2, y + 6, 28, 24);
+    ctx.fillStyle = '#6f7885'; ctx.fillRect(x + 3, y + 7, 26, 22);
+    ctx.fillStyle = '#9aa3b0'; ctx.fillRect(x + 3, y + 7, 26, 3);
+    ctx.fillStyle = '#4b525d'; ctx.fillRect(x + 3, y + 25, 26, 4);
+    /* the flywheel */
+    const cx = x + 16, cy = y + 18, a = now / 220;
+    ctx.fillStyle = '#2a2e34'; 
+    for (let dy2 = -7; dy2 <= 7; dy2++) {
+      const half = Math.round(Math.sqrt(Math.max(0, 49 - dy2 * dy2)));
+      ctx.fillRect(cx - half, cy + dy2, half * 2, 1);
+    }
+    ctx.fillStyle = '#c9924f';
+    for (let i = 0; i < 6; i++) {
+      const t = a + i / 6 * Math.PI * 2;
+      ctx.fillRect(Math.round(cx + Math.cos(t) * 5) - 1, Math.round(cy + Math.sin(t) * 5) - 1, 2, 2);
+    }
+    ctx.fillStyle = '#ffd23f'; ctx.fillRect(cx - 1, cy - 1, 2, 2);
+    /* the exhaust stack and its lamp */
+    ctx.fillStyle = '#3d434e'; ctx.fillRect(x + 22, y + 1, 5, 6);
+    ctx.fillStyle = '#575f6b'; ctx.fillRect(x + 23, y + 1, 3, 5);
+    ctx.fillStyle = Math.floor(now / 300) % 2 ? '#7ac74f' : '#aef07a';
+    ctx.fillRect(x + 5, y + 8, 3, 3);
+    /* arcs of power skipping round the rim */
+    if (Math.floor(now / 180) % 2) {
+      ctx.fillStyle = 'rgba(180,235,255,.75)';
+      const t = a * 1.7;
+      ctx.fillRect(Math.round(cx + Math.cos(t) * 9), Math.round(cy + Math.sin(t) * 9), 1, 1);
+      ctx.fillRect(Math.round(cx + Math.cos(t + 2) * 9), Math.round(cy + Math.sin(t + 2) * 9), 1, 1);
+    }
+  }
+
   function drawLoader(c, r, ld, now) {
     const x = c * 16, y = r * 16;
     ctx.fillStyle = 'rgba(40,58,26,.24)'; ctx.fillRect(x + 2, y + 14, 28, 3);
@@ -1727,15 +1829,42 @@
     const bob = Math.sin(now / 450) * 1;
     let squish = 0;
     if (pf && now - pf < 250) squish = 1 - (now - pf) / 250;
+    /* the nest is stretched to fit a grandma this size: NEST_W wide,
+       drawn in two passes so she sits down inside the rim */
+    const NEST_W = 38, NEST_H = 13, nx = m.x + 1 - NEST_W / 2, ny = m.y + 3;
     ctx.fillStyle = 'rgba(40,58,26,.24)';
-    ctx.fillRect(m.x - 13, m.y + 12, 28, 3);
+    ctx.fillRect(m.x - 17, m.y + 15, 36, 3);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(nx, ny, NEST_W, 6);
+    ctx.clip();
+    ctx.drawImage(nest, nx, ny, NEST_W, NEST_H);
+    ctx.restore();
     ctx.save();
     ctx.translate(m.x + 1, m.y + 14);
     ctx.scale(1 + squish * 0.12, 1 - squish * 0.12);
-    ctx.drawImage(mama, -15, -26 + Math.round(bob));
+    ctx.drawImage(mama, -19, -36 + Math.round(bob));
     ctx.restore();
-    ctx.drawImage(nest, m.x - 10, m.y + 6);
-    if (S().mama.petCd <= 0 && Math.floor(now / 400) % 2) {
+
+    /* only once supper is wearing off: a small gauge on her nest rail */
+    const belly = GAME.mamaBelly();
+    if (belly < 0.6) {
+      const bw = 16, bx = m.x - 7, by = m.y - 26;
+      ctx.fillStyle = '#2a2018'; ctx.fillRect(bx - 1, by - 1, bw + 2, 4);
+      ctx.fillStyle = '#e8dcc0'; ctx.fillRect(bx, by, bw, 2);
+      ctx.fillStyle = belly < 0.25 ? '#e8542f' : '#e8a92f';
+      ctx.fillRect(bx, by, Math.max(1, Math.round(bw * belly)), 2);
+      if (belly <= 0 && Math.floor(now / 380) % 2)
+        ctx.drawImage(SPR.iconSprite('seed', 1), m.x - 5, by - 12);
+    }
+    /* and the front rim over her toes */
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(nx, ny + 6, NEST_W, NEST_H);
+    ctx.clip();
+    ctx.drawImage(nest, nx, ny, NEST_W, NEST_H);
+    ctx.restore();
+    if (S().mama.petCd <= 0 && !GAME.mamaHungry() && Math.floor(now / 400) % 2) {
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(m.x + 13, m.y - 22, 1, 1);
       ctx.fillRect(m.x + 12, m.y - 21, 1, 1);
@@ -1780,11 +1909,12 @@
       const sel = farmPick();
       const tc = Math.floor(x / 16), trr = Math.floor(y / 16);
       const soil = S().soil[tc + ',' + trr];
-      if (sel.kind === 't' && sel.id !== 'soil') {
+      if (sel.kind === 't') {
         /* a round brush outline that pulses while you paint */
         const r = brushPx() + (ptr.down ? 1 : 0);
         const col = sel.id === 'flat' ? '#ff9f8a' : sel.id === 'water' ? '#7fd6f5'
-                  : sel.id === 'high' ? '#9ada66' : sel.id === 'stone' ? '#d8d2c0' : '#d1a86b';
+                  : sel.id === 'high' ? '#9ada66' : sel.id === 'stone' ? '#d8d2c0'
+                  : sel.id === 'soil' ? '#a37a49' : '#d1a86b';
         const spin = now / 340;
         for (let i = 0; i < 40; i++) {
           const a = i / 40 * Math.PI * 2 + spin;
@@ -1801,15 +1931,13 @@
                       Math.round(x - 4), Math.round(y - r - 12 + (ptr.down ? 2 : 0)));
       } else {
         let ok, deco = null, crop = null;
-        if (sel.kind === 't') ok = GAME.canTill(tc, trr);
-        else if (sel.kind === 'd') { ok = GAME.canDecorate(sel.id, tc, trr); deco = sel.id; }
+        if (sel.kind === 'd') { ok = GAME.canDecorate(sel.id, tc, trr); deco = sel.id; }
         else if (sel.kind === 'c') { ok = GAME.canPlant(tc, trr, sel.id); crop = sel.id; }
         else if (sel.id === 'water') ok = !!soil;
         else if (sel.id === 'harvest') ok = !!(soil && GAME.ripe(soil));
         else ok = !!(GAME.decoAt(tc, trr) || GAME.paintAt(x, y) || (soil && !soil.crop));
         ctx.globalAlpha = 0.55;
-        if (sel.kind === 't') ctx.drawImage(SPR.soilSprite(3, false, 1), tc * 16, trr * 16);
-        else if (deco) {
+        if (deco) {
           const spr = SPR.decoSprite(DECOS[deco].kind, 1, 40 + DECO_KEYS.indexOf(deco) * 7);
           ctx.drawImage(spr, tc * 16 + 8 - Math.floor(spr.width / 2), trr * 16 + 15 - spr.height);
         } else if (crop) {
@@ -1867,6 +1995,9 @@
     else if (buildSel === 'silo') drawSilo(c, r, { store: [] }, now);
     else if (buildSel === 'splitter') drawSplitter(c, r, { dir: placeDir, n: 0 }, now);
     else if (buildSel === 'loader') drawLoader(c, r, { store: [] }, now);
+    else if (buildSel === 'polisher') drawPolisher(c, r, {}, now);
+    else if (buildSel === 'grader') drawGrader(c, r, {}, now);
+    else if (buildSel === 'dynamo') drawDynamo(c, r, {}, now);
     else if (buildSel === 'hatchery') drawHatchery(c, r, { queue: [], prog: 0 }, now);
     else if (buildSel === 'barn') drawBarn(c, r, {}, now);
     else if (buildSel === 'trough') drawTrough(c, r, { n: 6 }, now);
@@ -1931,16 +2062,23 @@
         ctx.fillRect(Math.round(gx), Math.round(gy), 3, 1);
       }
     }
-    /* tilled soil and whatever is growing in it */
+    /* the soil itself comes off the paint layer; only what grows in it
+       is drawn per tile */
     for (const k of Object.keys(S().soil)) {
       const [c, r] = k.split(',').map(Number);
       const t = S().soil[k];
       if (c * 16 + 16 < cam().x || c * 16 > cam().x + W.view.w || r * 16 + 20 < cam().y || r * 16 > cam().y + W.view.h) continue;
-      ctx.drawImage(SPR.soilSprite(t.seed, t.water > 0, 1), c * 16, r * 16);
+      if (t.water > 0) {
+        /* a damp sheen while the watering can is still on it */
+        ctx.fillStyle = 'rgba(60,110,150,.16)';
+        ctx.fillRect(c * 16, r * 16, 16, 16);
+      }
       if (t.crop) {
         const stage = GAME.cropStage(t);
         const sway = t.growth > 0.3 ? Math.round(Math.sin(now / 700 + c * 1.3 + r) * 0.6) : 0;
-        ctx.drawImage(SPR.cropSprite(t.crop, stage, t.seed, 1), c * 16 + sway, r * 16 - 4);
+        /* the same seeded nudge, so a planted field looks sown by hand */
+        const jx = (t.seed % 5) - 2, jy = ((t.seed >> 3) % 3) - 1;
+        ctx.drawImage(SPR.cropSprite(t.crop, stage, t.seed, 1), c * 16 + sway + jx, r * 16 - 4 + jy);
         if (GAME.ripe(t) && Math.floor(now / 420) % 2) {
           ctx.fillStyle = '#fff8ec'; ctx.fillRect(c * 16 + 12, r * 16 - 6, 2, 2);
           ctx.fillStyle = '#ffd23f'; ctx.fillRect(c * 16 + 3, r * 16 - 3, 1, 1);
@@ -1967,6 +2105,9 @@
     for (const k of Object.keys(S().silos)) { const [c, r] = k.split(',').map(Number); drawSilo(c, r, S().silos[k], now); }
     for (const k of Object.keys(S().splitters)) { const [c, r] = k.split(',').map(Number); drawSplitter(c, r, S().splitters[k], now); }
     for (const k of Object.keys(S().loaders)) { const [c, r] = k.split(',').map(Number); drawLoader(c, r, S().loaders[k], now); }
+    for (const k of Object.keys(S().polishers)) { const [c, r] = k.split(',').map(Number); drawPolisher(c, r, S().polishers[k], now); }
+    for (const k of Object.keys(S().graders)) { const [c, r] = k.split(',').map(Number); drawGrader(c, r, S().graders[k], now); }
+    for (const k of Object.keys(S().dynamos)) { const [c, r] = k.split(',').map(Number); drawDynamo(c, r, S().dynamos[k], now); }
     for (const k of Object.keys(S().hatchers)) { const [c, r] = k.split(',').map(Number); drawHatchery(c, r, S().hatchers[k], now); }
     for (const k of Object.keys(S().troughs)) { const [c, r] = k.split(',').map(Number); drawTrough(c, r, S().troughs[k], now); }
     for (const k of Object.keys(S().wells)) { const [c, r] = k.split(',').map(Number); drawWell(c, r, S().wells[k], now); }
@@ -1983,9 +2124,12 @@
       if (c * 16 + 24 < cam().x || c * 16 - 8 > cam().x + W.view.w || r * 16 + 24 < cam().y || r * 16 - 20 > cam().y + W.view.h) continue;
       const d = S().deco[k];
       const spr = SPR.decoSprite(DECOS[d.kind] ? DECOS[d.kind].kind : 'tuft', 1, d.seed);
-      const px0 = c * 16 + 8 - Math.floor(spr.width / 2);
-      const py0 = r * 16 + 15 - spr.height;
-      shadow(ctx, c * 16 + 8, r * 16 + 14, spr.width * 0.34);
+      /* nudged off the tile centre by its own seed, so a row of trees
+         does not line up like fence posts on a grid */
+      const jx = (d.seed % 7) - 3, jy = ((d.seed >> 3) % 5) - 2;
+      const px0 = c * 16 + 8 + jx - Math.floor(spr.width / 2);
+      const py0 = r * 16 + 15 + jy - spr.height;
+      shadow(ctx, c * 16 + 8 + jx, r * 16 + 14 + jy, spr.width * 0.34);
       const sway = spr.height > 14 ? Math.round(Math.sin(now / 1100 + c * 1.7 + r) * 0.5) : 0;
       ctx.drawImage(spr, px0 + sway, py0);
     }
@@ -2196,7 +2340,7 @@
   /* miniature building render for the palette buttons: reuse the world painters
      by pointing `ctx` at an offscreen canvas for the duration of the call */
   function buildingThumb(type) {
-    const small = ['belt', 'vacuum', 'blower', 'sorter', 'fence', 'splitter', 'trough', 'well', 'sprinkler', 'board'].includes(type);
+    const small = ['belt', 'vacuum', 'blower', 'sorter', 'fence', 'splitter', 'trough', 'well', 'sprinkler', 'board', 'polisher'].includes(type);
     const big = type === 'hatchery' || type === 'hq';
     const wpx = small ? 16 : big ? 50 : 34, hpx = small ? 16 : big ? 50 : 36;
     const k = small ? 2 : 1;
@@ -2220,6 +2364,9 @@
       else if (type === 'silo') drawSilo(0, 0, { store: [] }, now);
       else if (type === 'splitter') drawSplitter(0, 0, { dir: placeDir, n: 0 }, now);
       else if (type === 'loader') drawLoader(0, 0, { store: [] }, now);
+      else if (type === 'polisher') drawPolisher(0, 0, {}, now);
+      else if (type === 'grader') drawGrader(0, 0, {}, now);
+      else if (type === 'dynamo') drawDynamo(0, 0, {}, now);
       else if (type === 'hatchery') drawHatchery(0, 0, { queue: [], prog: 0 }, now);
       else if (type === 'barn') drawBarn(0, 0, {}, now);
       else if (type === 'trough') drawTrough(0, 0, { n: 6 }, now);
@@ -2440,7 +2587,8 @@
     const incK = Object.keys(st.incs)[0];
     const incPos = incK ? incK.split(',').map(Number) : null;
     let anchor = null, text = null;
-    if (stats.pets === 0) { anchor = [W.mama.x, W.mama.y - 30]; text = 'pet me!'; }
+    if (GAME.mamaHungry()) { anchor = [W.mama.x, W.mama.y - 34]; text = 'grandma is hungry - scatter feed by her nest'; }
+    else if (stats.pets === 0) { anchor = [W.mama.x, W.mama.y - 34]; text = 'pet me!'; }
     else if (stats.collected === 0 && st.eggs.length > 1) { anchor = [W.mama.x + 34, W.mama.y - 6]; text = 'take the basket tool and sweep up eggs'; }
     else if (stats.hatched === 0 && (st.basket.length > 0 || st.held)) { anchor = incPos ? [incPos[0] * 16 + 16, incPos[1] * 16 - 8] : null; text = 'drop eggs in the incubator to hatch them'; }
     else if (stats.sold === 0 && (st.basket.length > 2 || st.truck.load.length)) { anchor = [W.truckHome.x + 26, W.truckHome.y - 24]; text = st.truck.load.length ? 'tap the truck to sell' : 'drop eggs on the truck'; }
@@ -3393,7 +3541,8 @@
 
     if (kind === 'mama') {
       ipanel.appendChild(ipHead(cloneCanvas(SPR.mamaSprite(st.mamaTier, 1, 'idle')), 'MAMA HEN', TIERS[st.mamaTier].n + ' layer'));
-      ipanel.appendChild(ipRow('lays every', GAME.fmtTime(GAME.mamaLayTime())));
+      ipanel.appendChild(ipRow('belly', Math.round(GAME.mamaBelly() * 100) + '%'));
+      ipanel.appendChild(ipRow('lays every', GAME.mamaHungry() ? 'HUNGRY' : GAME.fmtTime(GAME.mamaLayTime())));
       ipanel.appendChild(ipRow('egg value', GAME.fmt(GAME.eggValue(st.mamaTier, false))));
       ipanel.appendChild(ipRow('pet cooldown', GAME.fmtTime(GAME.petCd(true))));
       ipanel.appendChild(ipRow('mutation', Math.round(GAME.mutationChance() * 100) + '%'));
@@ -3452,6 +3601,21 @@
         ipanel.appendChild(ipRow('tier-up odds', Math.round(GAME.breedUp() * 100) + '%'));
         ipanel.appendChild(ipRow('rainbow odds', Math.round(GAME.rainbowChance() * 100) + '%'));
         btns.push({ label: 'EJECT PAIR', data: { act: 'eject-nest', k: o.k } });
+      } else if (o.type === 'polisher') {
+        const po = st.polishers[o.k];
+        if (!po) { setInspect({ kind: 'farm' }); return; }
+        ipanel.appendChild(ipRow('buffed', () => GAME.fmt(st.polishers[o.k] ? st.polishers[o.k].n : 0)));
+        ipanel.appendChild(ipRow('worth', 'x' + ECON.polishMult.toFixed(2)));
+      } else if (o.type === 'grader') {
+        const g = st.graders[o.k];
+        if (!g) { setInspect({ kind: 'farm' }); return; }
+        ipanel.appendChild(ipRow('graded', () => GAME.fmt(st.graders[o.k] ? st.graders[o.k].n : 0)));
+        ipanel.appendChild(ipRow('bumped up', () => GAME.fmt(st.graders[o.k] ? st.graders[o.k].up : 0)));
+        ipanel.appendChild(ipRow('odds', Math.round(ECON.gradeChance * 100) + '%'));
+      } else if (o.type === 'dynamo') {
+        ipanel.appendChild(ipRow('driving', () => GAME.dynamoLoad(c, r) + ' machines'));
+        ipanel.appendChild(ipRow('reach', ECON.dynamoR + ' px'));
+        ipanel.appendChild(ipRow('speed', '+' + Math.round(ECON.dynamoBoost * 100) + '%'));
       } else if (o.type === 'sorter') {
         const so = st.sorters[o.k];
         if (!so) { setInspect({ kind: 'farm' }); return; }
@@ -4768,7 +4932,12 @@
     }
     if (ptr.mode === 'pending' && wasTap && cand) {
       if (cand.mama) {
-        if (GAME.petMama()) { petFx.set('mama', performance.now()); heart(W.mama.x, W.mama.y - 18, 3); snd.pet(); }
+        const pet = GAME.petMama();
+        if (pet === 'hungry') {
+          petFx.set('mama', performance.now());
+          floatWorld('FEED ME', W.mama.x, W.mama.y - 30, 'pink', 'seed');
+          snd.error();
+        } else if (pet) { petFx.set('mama', performance.now()); heart(W.mama.x, W.mama.y - 22, 3); snd.pet(); }
         return;
       }
       if (cand.app) { setInspect({ kind: 'applicant', ref: cand.app }); snd.plop(); return; }
@@ -4867,14 +5036,17 @@
     const miss = () => { if (ptr.moved < 4) snd.error(); };
 
     /* --- the brush: a continuous stroke, not a tile at a time --- */
-    if (sel.kind === 't' && sel.id !== 'soil') {
+    if (sel.kind === 't') {
       const r = brushPx();
       const a = lastPaint || { x: wx, y: wy };
-      const n = GAME.stroke(sel.id, a.x, a.y, wx, wy, r);
+      const n = sel.id === 'soil'
+        ? GAME.tillStroke(a.x, a.y, wx, wy, r)
+        : GAME.stroke(sel.id, a.x, a.y, wx, wy, r);
       lastPaint = { x: wx, y: wy };
       if (n) {
-        terrainTouched(a.x, a.y, wx, wy, r);
+        terrainTouched(a.x, a.y, wx, wy, r + 16);
         if (!brushSnd || performance.now() - brushSnd > 90) { brushSnd = performance.now(); snd.sprinkle(); }
+        if (sel.id === 'soil') renderFarmPalette();
       } else miss();
       return;
     }
@@ -4884,7 +5056,6 @@
     const k = c + ',' + r2;
     if (farmTile === k) return;
     farmTile = k;
-    if (sel.kind === 't') { if (!GAME.till(c, r2)) miss(); else terrainTouched(wx, wy, wx, wy, 20); return; }
     if (sel.kind === 'd') {
       if (GAME.decorate(sel.id, c, r2)) renderFarmPalette();
       else miss();
@@ -4899,7 +5070,7 @@
     if (sel.id === 'harvest') { GAME.harvest(c, r2); return; }
     if (sel.id === 'clear') {
       if (GAME.undecorate(c, r2)) { snd.demolish(); renderFarmPalette(); return; }
-      if (GAME.untill(c, r2)) { snd.demolish(); return; }
+      if (GAME.untill(c, r2)) { snd.demolish(); terrainTouched(wx, wy, wx, wy, 24); renderFarmPalette(); return; }
       /* nothing loose here: rub the paint out with the brush instead */
       const rr = brushPx();
       if (GAME.stroke('flat', wx, wy, wx, wy, rr)) { terrainTouched(wx, wy, wx, wy, rr); snd.demolish(); }
@@ -5195,13 +5366,19 @@
   GAME.on('ripe', ({ c, r }) => { puff(c * 16 + 8, r * 16 + 2, '#fff8ec', 4, 20, 20); });
   GAME.on('plant', ({ c, r }) => { puff(c * 16 + 8, r * 16 + 10, '#8a5e2a', 5, 26, 14); snd.plop(); });
   GAME.on('water', ({ c, r }) => { puff(c * 16 + 8, r * 16 + 8, '#7fc4e8', 6, 28, 18); });
-  GAME.on('till', ({ c, r }) => { puff(c * 16 + 8, r * 16 + 8, '#a07444', 8, 34, 16); snd.demolish(); });
+  GAME.on('till', ({ c, r }) => { puff(c * 16 + 8, r * 16 + 8, '#a07444', 8, 34, 16); terrainTouched(c * 16 + 8, r * 16 + 8, c * 16 + 8, r * 16 + 8, 20); });
   GAME.on('graduate', ({ sp }) => {
     toast({ sprite: cloneCanvas(SPR.chickenSprite(sp, 2, false)), title: sp.name + ' GRADUATED', body: 'She joins the lab team. Feathers dropped!' });
   });
   GAME.on('feedeat', ({ x, y }) => puff(x, y, '#f2c94c', 4, 18, 14));
   GAME.on('land', () => { GAME.mark('ground'); });
-  GAME.on('paint', () => {});
+  GAME.on('paint', ({ x0, y0, x1, y1, radius }) => { terrainTouched(x0, y0, x1, y1, radius); });
+  GAME.on('polish', ({ x, y }) => { puff(x, y - 4, '#fff8ec', 3, 16, 12); });
+  GAME.on('grade', ({ x, y, tier }) => {
+    puff(x, y - 6, TIERS[tier].c, 6, 26, 20);
+    floatWorld('+1 TIER', x, y - 12, 'green', 'star');
+    snd.sparkle();
+  });
 
   /* ================= BOOT ================= */
   function boot() {

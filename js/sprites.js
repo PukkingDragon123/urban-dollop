@@ -688,35 +688,53 @@ const SPR = (() => {
     },
   };
 
+  /* Mama Hen: a big, fat grandma of a bird. Bonnet and shawl on top,
+     an apron over a belly you could rest a teacup on, and spectacles
+     drawn in over the eyes further down. 34x30, drawn at 1x in world. */
+  /* Mama Hen: a big, fat grandma of a bird. Bonnet and shawl on top, an
+     apron over a belly you could rest a teacup on, and spectacles drawn
+     in over the eyes further down. 34x30, drawn at 1x in the world. */
+  /* Mama Hen: a big, fat grandma of a bird. Bonnet and shawl on top, an
+     apron down the front, and spectacles drawn in over the eyes further
+     down. 34x30, drawn at 1x in the world. */
   const MAMA_ROWS = [
-    '..........C.C.C...........',
-    '..........CCCCC...........',
-    '..........OOOOO...........',
-    '........OOBBBBBOO.........',
-    '.......OBBBBBBBBBO........',
-    '......OBBBBBBBBBBBO.......',
-    '......OBBBBBBBBBBBO.......',
-    '.....OBBBBBBBBBBBBBO......',
-    '....OBBBBBBBBBBBBBBBO.....',
-    '....OBBBBBBBBBBBBBBBO.....',
-    '...OBBBBBBBBBBBBBBBBBO....',
-    '...OBBBBBBBBBBBBBBBBBO....',
-    '..OBBBBBBBBBBBBBBBBBBBO...',
-    '..OBWWBBBBLLLLLLBBBWWBO...',
-    '..OBWWWBBLLLLLLLLBWWWBO...',
-    '..OBBWWBBLLLLLLLLBWWBBO...',
-    '..OBBBBBBLLLLLLLLBBBBBO...',
-    '...OBBBBBBLLLLLLBBBBBO....',
-    '....OBBBBBBBBBBBBBBBO.....',
-    '.....OOBBBBBBBBBBOO.......',
-    '.......OOOOOOOOOO.........',
+    '...............C.C.C..............',
+    '..............CCCCC...............',
+    '.............OOOOOOOO.............',
+    '...........OOSSSSSSSSOO...........',
+    '..........OSSSSSSSSSSSSO..........',
+    '..........OSSBBBBBBBBSSO..........',
+    '..........OBBBBBBBBBBBBO..........',
+    '..........OBBBBBBBBBBBBO..........',
+    '..........OBBBBBBBBBBBBO..........',
+    '...........OBBBBBBBBBBO...........',
+    '............OBBBBBBBBO............',
+    '.............OSSSSSSO.............',
+    '............OSSSSSSSSO............',
+    '.........OSSSSSSSSSSSSSSO.........',
+    '......OOOSSSSSSSSSSSSSSSSOOO......',
+    '....OOSsSsSsSsSsSsSsSsSsSsSsOO....',
+    '...OWWWWWWBBBBBBBBBBBBBBWWWWWWO...',
+    '..OWWWWWWBBBBAAAAAAAABBBBWWWWWWO..',
+    '..OTTWWWWBBBBAAAAAAAABBBBWWWWTTO..',
+    '.OTTWWWWBBBAAAAAAAAAAAABBBWWWWTTO.',
+    '.OTTWWWWBBBAAAaaaaaaAAABBBWWWWTTO.',
+    '.OTTWWWWBBBAAAaaaaaaAAABBBWWWWTTO.',
+    '.OTTWWWWBBBAAAaaaaaaAAABBBWWWWTTO.',
+    '..OTTWWWWLLAAAAAAAAAAAALLWWWWTTO..',
+    '..OTTWWWWLLAAAAAAAAAAAALLWWWWTTO..',
+    '...OOTWWWWLBAAAAAAAAAABLWWWWTOO...',
+    '.....OOWWWWWaaaaaaaaaaWWWWWOO.....',
+    '.......OOBBBBBBBBBBBBBBBBOO.......',
+    '.........OOOOOOOOOOOOOOOO.........',
+    '............OOO....OOO............',
   ];
   const MAMA = {
-    rows: MAMA_ROWS, eyeL: [9, 7], eyeR: [14, 7], beak: [12, 9], blushY: 9,
-    blushL: 6, blushR: 17, headTop: [12, 2], wattle: true, w: 26, h: 21,
+    rows: MAMA_ROWS, eyeL: [13, 6], eyeR: [19, 6], beak: [16, 8], blushY: 8,
+    blushL: 11, blushR: 21, headTop: [16, 2], wattle: true, w: 34, h: 30,
   };
   const MAMA_TIER = [
-    ['#f7f0e0', '#e8542f'], ['#bfe6a8', '#e8542f'], ['#a8d8f0', '#e8542f'],
+    ['#e8d9bd', '#e8542f'], ['#bfe6a8', '#e8542f'], ['#a8d8f0', '#e8542f'],
     ['#d5b3ef', '#b03ee0'], ['#ffcf7d', '#e8542f'], ['#ff9db5', '#c42f5e'],
     ['#8f86e8', '#ffd23f'], ['#ffe9a8', '#f0b429'],
   ];
@@ -1032,18 +1050,43 @@ const SPR = (() => {
     const key = 'mama' + tier + '_' + scale + '_' + mood;
     if (cache.has(key)) return cache.get(key);
     const k = scale;
-    const c = newCanvas(30 * k, 26 * k);
+    const c = newCanvas(38 * k, 34 * k);
     const ctx = c.getContext('2d');
     const [body, comb] = MAMA_TIER[tier];
-    const ox = 2, oy = 4;
+    const ox = 2, oy = 3;
+    /* the shawl takes its colour from the comb, so a Divine grandma
+       knits herself something gold */
+    const shawl = darken(comb, 0.18), shawlDark = darken(comb, 0.42);
     drawGrid(ctx, MAMA.rows, {
-      O: darken(body, 0.48), B: body, L: lighten(body, 0.4),
-      W: darken(body, 0.16), C: comb, T: darken(body, 0.28),
+      O: darken(body, 0.48), B: body, L: lighten(body, 0.34),
+      W: darken(body, 0.20), C: comb, T: darken(body, 0.36),
+      S: shawl, s: shawlDark, A: '#fffdf6', a: '#ded0b0',
     }, ox * k, oy * k, k);
     shadeBody(ctx, MAMA.rows, ox, oy, k, body);
 
-    if (tier === 6) [[7, 11], [15, 13], [11, 16], [17, 9]].forEach(([x, y]) => px(ctx, ox + x, oy + y, k, '#ffd23f'));
-    else if (tier === 7) [[6, 11], [16, 10], [12, 17]].forEach(([x, y]) => px(ctx, ox + x, oy + y, k, '#ffffff'));
+    /* an inked edge down both sides of the apron, so it reads as a pinny
+       laid over her front rather than a pale patch of feathers */
+    const apEdge = darken('#fffdf6', 0.30);
+    MAMA.rows.forEach((row, y) => {
+      const first = row.search(/[Aa]/);
+      if (first < 0) return;
+      const last = row.lastIndexOf(row.match(/[Aa](?=[^Aa]*$)/) ? row.match(/[Aa](?=[^Aa]*$)/)[0] : 'A');
+      px(ctx, ox + first, oy + y, k, apEdge);
+      px(ctx, ox + last, oy + y, k, apEdge);
+    });
+    /* a waistband across the top of it */
+    const apTop = MAMA.rows.findIndex(r => /[Aa]/.test(r));
+    if (apTop >= 0) {
+      const row = MAMA.rows[apTop];
+      for (let x = row.search(/[Aa]/); x <= row.lastIndexOf('A'); x++) px(ctx, ox + x, oy + apTop, k, apEdge);
+    }
+
+    /* apron strings up over the shoulders, and a stitched hem */
+    [[10, 16], [11, 17], [23, 16], [22, 17]].forEach(([x, y]) => px(ctx, ox + x, oy + y, k, '#fff6e2'));
+    for (let x = 9; x <= 24; x++) if (x % 2 === 0) px(ctx, ox + x, oy + 26, k, '#c9b48a');
+
+    if (tier === 6) [[8, 19], [25, 21], [16, 25]].forEach(([x, y]) => px(ctx, ox + x, oy + y, k, '#ffd23f'));
+    else if (tier === 7) [[7, 18], [26, 20], [16, 26]].forEach(([x, y]) => px(ctx, ox + x, oy + y, k, '#ffffff'));
 
     const exL = ox + MAMA.eyeL[0], eyL = oy + MAMA.eyeL[1];
     const exR = ox + MAMA.eyeR[0], eyR = oy + MAMA.eyeR[1];
@@ -1060,6 +1103,20 @@ const SPR = (() => {
     px(ctx, ox + MAMA.blushR, oy + MAMA.blushY, k, BLUSH);
     px(ctx, ox + MAMA.blushR + 1, oy + MAMA.blushY, k, BLUSH);
     ctx.globalAlpha = 1;
+
+    /* spectacles: a wire rim round each eye and a bridge between them */
+    const WIRE = '#8a6b3a', GLINT = 'rgba(255,255,255,.55)';
+    [[MAMA.eyeL[0], MAMA.eyeL[1]], [MAMA.eyeR[0], MAMA.eyeR[1]]].forEach(([gx, gy]) => {
+      for (let i = -1; i <= 2; i++) { px(ctx, ox + gx + i, oy + gy - 1, k, WIRE); px(ctx, ox + gx + i, oy + gy + 2, k, WIRE); }
+      for (let i = 0; i <= 1; i++) { px(ctx, ox + gx - 2, oy + gy + i, k, WIRE); px(ctx, ox + gx + 3, oy + gy + i, k, WIRE); }
+      px(ctx, ox + gx - 1, oy + gy, k, GLINT);
+    });
+    px(ctx, ox + MAMA.eyeL[0] + 4, oy + MAMA.eyeL[1], k, WIRE);
+    px(ctx, ox + MAMA.eyeL[0] + 5, oy + MAMA.eyeL[1], k, WIRE);
+    /* arms of the frame, tucked back towards the bonnet */
+    px(ctx, ox + MAMA.eyeL[0] - 3, oy + MAMA.eyeL[1], k, WIRE);
+    px(ctx, ox + MAMA.eyeR[0] + 4, oy + MAMA.eyeR[1], k, WIRE);
+
     if (tier === 7) stampAcc(ctx, 'halo', MAMA.headTop, ox, oy, k);
     cache.set(key, c);
     return c;

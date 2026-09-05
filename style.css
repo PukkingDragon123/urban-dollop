@@ -178,11 +178,12 @@ button:focus-visible{ outline:3px dashed var(--pink); outline-offset:2px; }
 #menu-pop .btn{ font-size:15px; letter-spacing:1px; }
 
 /* inspect panel - docked bottom-left inside the stage */
-/* the inspect card hangs under the resource pills, not down in the
-   bottom band, so it never fights the tool dock for the same corner */
+/* the inspect card lives top-right: the pills own the top-left, the dock
+   owns the bottom band and the toolbelt the bottom-right, so this is the
+   one corner where it covers nothing you need to reach */
 #inspect-panel{
-  position:absolute; left:10px; top:64px; z-index:6;
-  width:236px; max-height:calc(100% - 310px); overflow-y:auto;
+  position:absolute; right:10px; top:10px; z-index:6;
+  width:236px; max-height:calc(100% - 190px); overflow-y:auto;
   background:rgba(255,249,236,.96);
   border:4px solid var(--ink);
   box-shadow:4px 4px 0 var(--shadow);
@@ -284,19 +285,30 @@ button:focus-visible{ outline:3px dashed var(--pink); outline-offset:2px; }
 .egg-card span{ font-size:23px; color:var(--ink-soft); }
 
 /* speech bubble hints */
+/* the hint that hangs over the field: a proper comic-book bubble with
+   rounded shoulders and a fat tail pointing at whatever it is about */
 #bubble{
   position:fixed; z-index:60; pointer-events:none;
-  font-family:var(--font-body); font-size:26px; line-height:1.05;
-  background:#fff9ec; border:4px solid var(--ink);
-  box-shadow:3px 3px 0 rgba(0,0,0,.25);
-  padding:5px 10px; max-width:230px;
-  animation:bubble-pop .18s steps(3) both;
+  font-family:var(--font-body); font-size:27px; line-height:1.08;
+  background:#fff9ec; color:var(--ink);
+  border:4px solid var(--ink); border-radius:16px;
+  box-shadow:4px 5px 0 rgba(0,0,0,.22);
+  padding:8px 14px; max-width:250px; text-align:center;
+  animation:bubble-pop .2s var(--pop) both;
 }
 #bubble::after{
-  content:""; position:absolute; left:50%; bottom:-8px; margin-left:-4px;
-  border:4px solid transparent; border-top-color:var(--ink);
+  content:""; position:absolute; left:50%; bottom:-15px; margin-left:-9px;
+  width:0; height:0;
+  border-left:9px solid transparent; border-right:9px solid transparent;
+  border-top:15px solid var(--ink);
 }
-@keyframes bubble-pop{ from{ transform:scale(.6); opacity:0; } }
+#bubble::before{
+  content:""; position:absolute; left:50%; bottom:-8px; margin-left:-6px;
+  width:0; height:0; z-index:1;
+  border-left:6px solid transparent; border-right:6px solid transparent;
+  border-top:11px solid #fff9ec;
+}
+@keyframes bubble-pop{ from{ transform:scale(.55) translateY(10px); opacity:0; } }
 
 #cursor-chip{
   position:fixed; z-index:70; pointer-events:none;
@@ -402,16 +414,27 @@ button:focus-visible{ outline:3px dashed var(--pink); outline-offset:2px; }
 /* ---------- fx ---------- */
 #fx-layer{ position:fixed; inset:0; pointer-events:none; overflow:hidden; z-index:90; }
 .float-txt{
-  position:absolute; font-family:var(--font-px); font-size:17px;
-  color:var(--ink); text-shadow:2px 2px 0 #fff;
-  animation:float-up 1.1s ease-out forwards; white-space:nowrap;
-  display:flex; align-items:center; gap:4px;
+  position:absolute; font-family:var(--font-px); font-size:16px;
+  color:var(--ink);
+  background:#fff9ec; border:3px solid var(--ink); border-radius:11px;
+  box-shadow:2px 3px 0 rgba(0,0,0,.22);
+  padding:5px 9px;
+  animation:float-up 1.2s ease-out forwards; white-space:nowrap;
+  display:flex; align-items:center; gap:5px;
+  transform-origin:50% 100%;
+}
+.float-txt::after{
+  content:""; position:absolute; left:50%; bottom:-9px; margin-left:-5px;
+  width:0; height:0;
+  border-left:5px solid transparent; border-right:5px solid transparent;
+  border-top:9px solid var(--ink);
 }
 .float-txt.gold{ color:var(--gold-dark); }
 .float-txt.pink{ color:var(--pink-dark); }
 .float-txt.green{ color:var(--green-dark); }
 @keyframes float-up{
-  0%{ transform:translateY(0); opacity:1; }
+  0%{ transform:translateY(4px) scale(.7); opacity:0; }
+  18%{ transform:translateY(0) scale(1); opacity:1; }
   100%{ transform:translateY(-70px); opacity:0; }
 }
 
@@ -422,10 +445,23 @@ button:focus-visible{ outline:3px dashed var(--pink); outline-offset:2px; }
   width:min(380px, calc(100vw - 30px));
 }
 .toast{
-  background:var(--panel); border:4px solid var(--ink);
-  box-shadow:4px 4px 0 var(--shadow);
-  padding:8px 12px; display:flex; gap:10px; align-items:center;
-  animation:toast-in .25s steps(3) both; font-size:26px;
+  position:relative;
+  background:var(--panel); border:4px solid var(--ink); border-radius:16px;
+  box-shadow:4px 5px 0 var(--shadow);
+  padding:10px 14px; display:flex; gap:11px; align-items:center;
+  animation:toast-in .25s var(--pop) both; font-size:26px;
+}
+.toast::after{
+  content:""; position:absolute; right:26px; bottom:-15px;
+  width:0; height:0;
+  border-left:9px solid transparent; border-right:9px solid transparent;
+  border-top:15px solid var(--ink);
+}
+.toast::before{
+  content:""; position:absolute; right:29px; bottom:-8px;
+  width:0; height:0; z-index:1;
+  border-left:6px solid transparent; border-right:6px solid transparent;
+  border-top:11px solid var(--panel);
 }
 .toast canvas{ width:40px; height:40px; flex:none; }
 .toast b{ font-family:var(--font-px); font-size:16px; display:block; margin-bottom:3px; }
@@ -859,11 +895,11 @@ button:focus-visible{ outline:3px dashed var(--pink); outline-offset:2px; }
 #inspect-panel .btn{ font-size:13px; }
 
 /* toasts and bubbles */
-#toasts .toast{ border-width:4px; box-shadow:5px 5px 0 var(--shadow); padding:11px 14px; }
+#toasts .toast{ border-width:4px; box-shadow:5px 6px 0 var(--shadow); padding:12px 16px; }
 #toasts .toast b{ font-size:14px; }
 #toasts .toast span{ font-size:21px; }
 #toasts .toast canvas{ transform:scale(1.25); margin-right:6px; }
-#bubble{ font-size:24px; border-width:4px; padding:10px 14px; }
+#bubble{ font-size:26px; border-width:4px; padding:10px 16px; }
 
 /* skill card under the lab screen */
 #skill-card{ border-width:4px; padding:12px; }
@@ -1014,9 +1050,9 @@ button:focus-visible{ outline:3px dashed var(--pink); outline-offset:2px; }
   position:fixed; z-index:200; pointer-events:none;
   max-width:290px;
   background:var(--panel); color:var(--ink);
-  border:4px solid var(--ink);
+  border:4px solid var(--ink); border-radius:14px;
   box-shadow:5px 5px 0 var(--shadow);
-  padding:10px 14px; font-family:var(--font-body); font-size:23px; line-height:1.1;
+  padding:11px 15px; font-family:var(--font-body); font-size:24px; line-height:1.12;
   --tail:20px;
 }
 #tip-bubble.pop{ animation:tipPop .16s cubic-bezier(.34,1.7,.5,1); }

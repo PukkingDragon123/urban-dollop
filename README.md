@@ -1,6 +1,6 @@
 # Inf Egg Co.
 
-A cozy 2D pixel-art incremental game. You are a floating hand tending an egg ranch that grows into a whole valley: a bare field, a slow old hen and a bicycle at the start; farms, factories, a crew and a fleet by the end. Every pixel is generated procedurally in code - the two pixel fonts included - so there are no image files, no emoji and no icon fonts.
+A cozy 2D pixel-art incremental game. You are a floating hand tending an egg ranch that grows into a whole valley: a bare field, a hungry old grandma of a hen and a bicycle at the start; farms, factories, a crew and a fleet by the end. Twenty plots across a 1280x832 valley. Every pixel is generated procedurally in code - the two pixel fonts included - so there are no image files, no emoji and no icon fonts.
 
 It opens on an animated dusk title screen: Mama Hen and her chicks on the hills, eggs drifting up through the sky, and a tally of how many of the 112 chickens you have found so far.
 
@@ -8,11 +8,11 @@ It opens on an animated dusk title screen: Mama Hen and her chicks on the hills,
 
 ## How it plays
 
-The land starts **bare** - sun-bleached scrub and nothing else. No pond, no paths, not a stone scattered for you. Every tree, path, terrace and pond on your ranch is one you painted there yourself. Mama Hen lays slowly now (about a minute between eggs), petting her is the quick way to a first clutch, and you pedal the first eggs to the village on a **bicycle** that carries four. The money buys seed; the seed becomes feed; the feed grows chicks into hens; the hens lay; the eggs buy a cart, then a van, then routes to bigger towns that pay more. Everything else grows out of that loop.
+The land starts **bare** - sun-bleached scrub and nothing else. No pond, no paths, not a stone scattered for you. Every tree, path, terrace and pond on your ranch is one you painted there yourself. **Mama Hen is a big fat grandma in a bonnet, spectacles and an apron, and she works for her supper**: a full belly keeps her laying for a couple of minutes, and once it runs out she stops, sits there and waits for you to scatter feed by her nest. Petting her costs a little of that supper too. You pedal the first eggs to the village on a **bicycle** that carries four. The money buys seed; the seed becomes feed; the feed grows chicks into hens; the hens lay; the eggs buy a cart, then a van, then routes to bigger towns that pay more. Everything else grows out of that loop.
 
 You are the hand. Everything on the field is touchable:
 
-- **Hand** - tap chickens (and Mama Hen) to pet them for an instant egg; hold and drag to pick chickens up and carry them; grab single eggs; drag empty grass to pan the camera.
+- **Hand** - tap chickens (and Mama Hen, if she has been fed) to pet them for an instant egg; hold and drag to pick chickens up and carry them; grab single eggs; drag empty grass to pan the camera.
 - **Basket** - hold and sweep to magnet eggs into your basket (it has a real capacity). Release over the truck or an incubator to unload.
 - **Feed** - scatter pellets from the barn; chicks eat to grow up, grown hens eat to fill their bellies and lay twice as fast.
 - **Farm** - the landscaping tool, in four tabs. GROUND shapes the land with a **paint brush**, PLANT sows crops, TEND waters and harvests, DECOR plants things purely because they look nice. Five brush sizes, and a round brush outline sits under your finger showing exactly what it will cover.
@@ -24,22 +24,22 @@ Menus are places, not panels:
 - The **truck** on the road sells eggs - load it, tap it, and it drives to market and returns with coins.
 - **Incubators are the only way to hatch.** The egg inside rocks harder and harder as hairline cracks spread across the shell, then it splits: the two halves tumble away, a sparkle ring pops, and a chick squashes and stretches its way up out of the wreck, trailing feathers.
 - **Feathers are physical** - they flutter out of every hatch and sometimes when you scoop. Sweep them up; they are your research currency.
-- The **Lab shack** puts you at a desk. There is a keyboard, a mug, sticky notes, and an old beige monitor that boots EGGOS and runs SKILLMAP.EXE: research as a **map of blocky hexagons** joined by paths, fanning out from the kernel in the middle along eight modules (crew, gather, hens, hatch, love, factory, market, farm), 73 packages in all. A pixel mouse pointer follows your finger across the glass. Only hexes you have installed or could install right now are lit; the rest of the map is dark, with dotted stubs and question marks hinting where the paths go on. Gold hexes install with one click on the README window's button; module chips on the taskbar pan the map to each branch. Drop a chicken on the Lab to graduate it for bonus feathers.
+- The **Lab shack** puts you at a desk. There is a keyboard, a mug, sticky notes, and an old beige monitor that boots EGGOS and runs SKILLMAP.EXE: research as a **map of blocky hexagons** joined by paths, fanning out from the kernel in the middle along eight modules (crew, gather, hens, hatch, love, factory, market, farm), 79 packages in all. A pixel mouse pointer follows your finger across the glass. Only hexes you have installed or could install right now are lit; the rest of the map is dark, with dotted stubs and question marks hinting where the paths go on. Gold hexes install with one click on the README window's button; module chips on the taskbar pan the map to each branch. Drop a chicken on the Lab to graduate it for bonus feathers.
 - **The Index bookstand** opens an actual book - cream pages, a leather spine, coloured bookmark tabs down the edge, a dog-eared corner, and a page flip when you change tab. Six tabs: every chicken you have found (the rest still silhouettes), your **Crew**, your **Crops**, your **Routes**, what each egg tier is worth, and the **Diary** that writes itself.
 - **Love Nests breed chickens**: carry two in, wait for the hearts, and get a fancier egg. Two Divine parents can lay a rainbow egg, which hatches the 12 breed-only Secret species (112 species total in the Chickenpedia bookstand).
-- **Buy land from FOR SALE signs** - twelve plots across a 1024x624 valley, each with its own scenery (sunflower field, lavender meadow, mushroom glen, berry grove, rocky pines, orchard, wet reeds, wildflower meadow, pinewood, thicket, prairie), and each raising chicken capacity and giving room for a bigger factory.
+- **Buy land from FOR SALE signs** - twenty plots across a 1280x832 valley, each with its own scenery (sunflower field, lavender meadow, mushroom glen, berry grove, rocky pines, orchard, wet reeds, wildflower meadow, pinewood, thicket, prairie, birchwood, highland), and each raising chicken capacity and giving room for a bigger factory.
 - Mama's signpost upgrades her egg rarity through eight tiers; laid eggs can also mutate a tier up.
 
 ### Landscaping
 
-The ranch is a sandbox, and the GROUND tab is a **paint brush**, not a block placer. Pick a brush size, hold, and drag: the ground follows your hand in one continuous stroke, with no gaps however fast you sweep. Terrain is stored on an 8-pixel grid, half the size of a tile, and drawn per pixel through a weighted vote of each point's neighbours - so a stroke comes out with a soft, dithered, organic edge instead of a staircase. Ponds get an undulating shore, terraces grow an earth cliff only where they are actually exposed, and Level is just another brush that rubs the paint back off.
+The ranch is a sandbox, and the GROUND tab is a **paint brush**, not a block placer - the plough included. Pick a brush size, hold, and drag: the ground follows your hand in one continuous stroke, with no gaps however fast you sweep, and one sweep of TILL turns a whole field over. Terrain is stored on an 8-pixel grid, half the size of a tile, and drawn per pixel through a weighted vote of each point's neighbours - so a stroke comes out with a soft, dithered, organic edge instead of a staircase. Ponds get an undulating shore, terraces grow an earth cliff only where they are actually exposed, and Level is just another brush that rubs the paint back off.
 
 | Tool | What it does |
 | --- | --- |
 
 | Tool | What it does |
 | --- | --- |
-| Till | Turns grass into soil you can plant in (a tile at a time, not a brush). |
+| Till | Ploughs grass into soil you can plant in. A brush like the rest. |
 | Path | Packed dirt. The crew walk a quarter faster on it. |
 | Stone Path | Flagstones. Faster still, and very tidy. Research Paving Stones. |
 | Raise | Banks the ground up into a grassy terrace with an earth cliff. Research Terracing. |
@@ -126,6 +126,9 @@ The crew is always two taps away: there is a crew button on the toolbelt that ba
 | Grand Hatchery | A 3x3 bank of 24 drawers that works three eggs at a time, each at double speed. |
 | Splitter | On a belt: sends eggs left and right in turn, so two lines fill evenly. |
 | Truck Loader | Parks by the road, buffers twenty eggs off the belts and shovels them straight into the truck. |
+| Polisher | Sits in a belt line and buffs every egg that rolls through: worth half again as much. |
+| Grader | Sits in a belt line and now and then grades an egg up a whole tier. |
+| Dynamo | A flywheel that drives every belt and machine in a wide circle 55% faster. |
 | Feed Barn | Stores 160 more pellets of feed. |
 | Feed Trough | Holds a dozen pellets; the flock helps itself and Feeders keep it full. |
 | Well / Sprinkler | Keep every crop in a circle watered. |
@@ -177,7 +180,8 @@ All sprites are generated at runtime by `js/sprites.js`:
 - every hire is drawn from a little record of skin, hair colour, hair style, shirt, trousers, boots and hat, so no two people on the ranch look alike;
 - the Lab is a whole desk scene drawn the same way - a beige monitor with a phosphor mesh, scanlines and a rolling band, a keyboard whose keys light up when something installs, a steaming mug, sticky notes, and a pixel mouse pointer;
 - crops are drawn per stage from a seed, soil tiles get their own clods and furrows, and five vehicles and five city skylines are generated for the delivery window;
-- painted terrain is resolved per pixel rather than per tile: each point takes a distance-weighted vote of the nine cells around it, thresholds it with a dither so the boundary breaks up, and lands in its own offscreen layer that is repainted only under the brush. That is what gives a stroke its soft edge - ponds wander their shoreline, dirt frays into the grass, and a terrace lifts by a few pixels and drops a mottled earth bank down the sides that are actually exposed;
+- Mama Hen is a 34x30 grandma built the same way as everything else: a pear silhouette generated from a profile of half-widths, a bonnet and a knitted shawl tinted from her comb, an apron inked down both sides, and wire spectacles drawn in over her eyes afterwards;
+- painted terrain is resolved per pixel rather than per tile: each point takes a distance-weighted vote of the nine cells around it, thresholds it with a dither so the boundary breaks up, and lands in its own offscreen layer that is repainted only under the brush. That is what gives a stroke its soft edge - ponds wander their shoreline, a ploughed field breaks into clods, a pale dusty track frays into the grass, and a terrace lifts by a few pixels and drops a mottled earth bank down the sides that are actually exposed. Decorations and crops are nudged off their tile centres by their own seed, so nothing lines up like fence posts on a grid;
 - the valley map is inked with a wobbly-line routine over generated parchment, complete with fibres, foxed edges, cloud banks and a compass rose;
 - robots are drawn from a chassis record - shell colour, trim, visor, hat, temperament - into a 24-row sprite with five rows of headroom reserved for the hat, so nothing gets shaved off by the edge of the canvas;
 - UI icons are a set of 61 hand-authored 10x10 pixel glyphs rendered to canvases - the interface has no emoji at all.
@@ -196,7 +200,7 @@ open index.html        # or serve the folder with any static server
 | --- | --- |
 | `index.html` | shell, the four-pill HUD, the title screen, the trip window, the crew board, the depot and the book |
 | `style.css` | cozy pixel-ranch styling |
-| `js/data.js` | tiers, economy, 112 species, twenty buildings in four sections, six terrain tools, thirteen decorations, five crops, six vehicles, five cities, five crew stats, seven roles and seven robot chassis, twelve quirks, twelve land plots, 76 research packages and their hex-map layout |
+| `js/data.js` | tiers, economy, 112 species, 23 buildings in four sections, six terrain tools, thirteen decorations, five crops, six vehicles, five cities, five crew stats, seven roles and seven robot chassis, twelve quirks, twenty land plots, 79 research packages and their hex-map layout |
 | `js/sprites.js` | the procedural pixel-art engine (two fonts, icons, foliage, chickens and chicks, crops, soil, paths, terraces and ponds, procedural people, cute robots, machines, vehicles, skylines, parchment and ink, CRT chrome, hexes) |
-| `js/game.js` | world simulation: twelve plots, brush-painted terrain and decoration, chicks that grow and hens that get hungry, farming, feed, flyers and applicants who walk to the board, per-role crew AI for people and robots, stamina, wages, belts, splitters, silos, loaders, hatcheries, the HQ, vehicles, routes and trips, diary |
+| `js/game.js` | world simulation: twenty plots, brush-painted terrain and decoration, a grandma hen with a belly to fill, chicks that grow and hens that get hungry, farming, feed, flyers and applicants who walk to the board, per-role crew AI for people and robots, stamina, wages, belts, splitters, silos, loaders, hatcheries, the HQ, vehicles, routes and trips, diary |
 | `js/ui.js` | title screen, camera renderer, six tools and the two-dock palettes, the terrain paint layer, speech-bubble tooltips, the job-application crew forms, hatch animation, inspect, the crew board and robot workshop, the book, the HQ and its hand-drawn wall map, the trip window, the Lab desk and its hex map, particles, sound |

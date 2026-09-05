@@ -36,6 +36,9 @@ const ECON = {
   basePetCd: 6,            // seconds between pets per chicken
   mamaPetCd: 4,            // mama likes attention, in moderation
   mamaLayMult: 3.2,        // mama takes her time between eggs - the flock is the engine
+  mamaHunger: 150,         // seconds a full grandma keeps laying before she wants feeding
+  mamaPellets: 4,          // pellets that fill her right back up
+  mamaReach: 34,           // px around the nest she can reach without getting up
   chickPellets: 3,         // pellets a chick eats to grow up
   hungerTime: 110,         // seconds for a full belly to empty
   hungryLay: 0.5,          // lay speed when the belly is empty
@@ -45,6 +48,10 @@ const ECON = {
   wellR: 44,               // px a well keeps watered
   sprinklerR: 30,          // px a sprinkler keeps watered
   waterMult: 2.0,          // crop growth when watered
+  polishMult: 1.5,         // what a polished egg is worth
+  gradeChance: 0.12,       // chance a grader bumps an egg a tier
+  dynamoR: 74,             // px a dynamo drives machines
+  dynamoBoost: 0.55,       // how much faster inside that circle
   coopR: 60,               // px a coop speeds chicks growing
   baseBasketCap: 8,
   baseTruckCap: 10,
@@ -207,6 +214,12 @@ const BUILDS = {
                desc:'On a belt: sends eggs left and right in turn to fill two lines.', needs:'splitter' },
   loader:    { name:'Truck Loader', sec:'factory', w:2, h:1, base:1400, growth:1.8, refund:550,
                desc:'Parks by the road and shovels belt eggs straight into the truck.', needs:'loader' },
+  polisher:  { name:'Polisher',  sec:'factory', w:1, h:1, base:900, growth:1.7, refund:350,
+               desc:'On a belt: buffs every egg that rolls through, worth half again as much.', needs:'polisher' },
+  grader:    { name:'Grader',    sec:'factory', w:2, h:1, base:5200, growth:1.9, refund:2000,
+               desc:'On a belt: now and then it grades an egg up a whole tier.', needs:'grader' },
+  dynamo:    { name:'Dynamo',    sec:'factory', w:2, h:2, base:9000, growth:2.0, refund:3600,
+               desc:'Drives every belt and machine around it a good deal faster.', needs:'dynamo' },
   hq:        { name:'Logistics HQ', sec:'crew', w:3, h:2, base:600, growth:2.2, refund:240,
                desc:'A dispatch office with a wall map. Buy vehicles and open routes here.' },
   board:     { name:'Noticeboard', sec:'crew', w:1, h:1, base:40, growth:1.4, refund:15,
@@ -336,26 +349,36 @@ function buildCost(type, owned) {
 }
 
 /* ------------------------------------------------------------
-   LAND - 4x3 plots of 16x13 tiles = 64x39 tiles = 1024x624 px.
+   LAND - 5x4 plots of 16x13 tiles = 80x52 tiles = 1280x832 px.
    You start on the bottom-left plot; buy neighbours from their
    FOR SALE signs. Row 2 is the road row.
    ------------------------------------------------------------ */
-const PLOT_W = 16, PLOT_H = 13, PLOT_COLS = 4, PLOT_ROWS = 3;
+const PLOT_W = 16, PLOT_H = 13, PLOT_COLS = 5, PLOT_ROWS = 4;
 const PLOTS = [
-  { id:0,  tc:0,  tr:0,  price:9e7,   theme:'pinewood' },
-  { id:1,  tc:16, tr:0,  price:5e9,   theme:'wetland'  },
-  { id:2,  tc:32, tr:0,  price:4e10,  theme:'thicket'  },
-  { id:3,  tc:48, tr:0,  price:3e11,  theme:'shroom'   },
-  { id:4,  tc:0,  tr:13, price:3000,  theme:'berry'    },
-  { id:5,  tc:16, tr:13, price:25000, theme:'orchard'  },
-  { id:6,  tc:32, tr:13, price:1.5e6, theme:'lavender' },
-  { id:7,  tc:48, tr:13, price:7e8,   theme:'rocky'    },
-  { id:8,  tc:0,  tr:26, price:0,     theme:'home'     },   /* start */
-  { id:9,  tc:16, tr:26, price:400,   theme:'sunflower'},
-  { id:10, tc:32, tr:26, price:200000,theme:'meadow'   },
-  { id:11, tc:48, tr:26, price:1.2e7, theme:'prairie'  },
+  /* top row - the far end of the valley, and the last land you buy */
+  { id:0,  tc:0,  tr:0,  price:8e11,  theme:'pinewood' },
+  { id:1,  tc:16, tr:0,  price:4e12,  theme:'wetland'  },
+  { id:2,  tc:32, tr:0,  price:2e13,  theme:'thicket'  },
+  { id:3,  tc:48, tr:0,  price:9e13,  theme:'shroom'   },
+  { id:4,  tc:64, tr:0,  price:4e14,  theme:'highland' },
+  { id:5,  tc:0,  tr:13, price:9e6,   theme:'birch'    },
+  { id:6,  tc:16, tr:13, price:5e8,   theme:'pinewood' },
+  { id:7,  tc:32, tr:13, price:4e9,   theme:'wetland'  },
+  { id:8,  tc:48, tr:13, price:3e10,  theme:'thicket'  },
+  { id:9,  tc:64, tr:13, price:1.5e11,theme:'highland' },
+  { id:10, tc:0,  tr:26, price:3000,  theme:'berry'    },
+  { id:11, tc:16, tr:26, price:25000, theme:'orchard'  },
+  { id:12, tc:32, tr:26, price:1.5e6, theme:'lavender' },
+  { id:13, tc:48, tr:26, price:7e7,   theme:'rocky'    },
+  { id:14, tc:64, tr:26, price:2e9,   theme:'birch'    },
+  /* the home row, along the road */
+  { id:15, tc:0,  tr:39, price:0,     theme:'home'     },   /* start */
+  { id:16, tc:16, tr:39, price:400,   theme:'sunflower'},
+  { id:17, tc:32, tr:39, price:200000,theme:'meadow'   },
+  { id:18, tc:48, tr:39, price:1.2e7, theme:'prairie'  },
+  { id:19, tc:64, tr:39, price:4e8,   theme:'orchard'  },
 ];
-const PLOT_START = 8;
+const PLOT_START = 15;
 function plotNeighbors(id) {
   const c = id % PLOT_COLS, r = Math.floor(id / PLOT_COLS), out = [];
   if (c > 0) out.push(id - 1);
@@ -605,6 +628,9 @@ const SKILLS = [
   { id:'blower',   br:5, d:4, pre:'sorter',    name:'Air Blower',    icon:'blower', max:1, base:260, growth:1,   desc:'Unlock the Blower: herds loose eggs along' },
   { id:'vacspeed', br:5, d:4, pre:'vacradius', name:'Turbo Pumps',   icon:'wind',   max:6, base:40,  growth:2.2, desc:'+25% vacuum speed' },
   { id:'loader',   br:5, d:5, pre:'splitter',  name:'Truck Loader',  icon:'crate',  max:1, base:700, growth:1,   desc:'Unlock the Loader: belts feed the truck directly' },
+  { id:'polisher', br:5, d:6, pre:'loader',    name:'Polishing',     icon:'sparkle',  max:1, base:1100, growth:1,  desc:'Unlock the Polisher: belt eggs come out worth half again' },
+  { id:'grader',   br:5, d:7, pre:'polisher',  name:'Grading Line',  icon:'star',   max:1, base:2600, growth:1,  desc:'Unlock the Grader: it bumps the odd egg a whole tier' },
+  { id:'dynamo',   br:5, d:8, pre:'grader',    name:'The Dynamo',    icon:'gear',   max:1, base:5200, growth:1,  desc:'Unlock the Dynamo: drives every machine around it faster' },
   { id:'overclock',br:5, d:6, pre:'loader',    name:'Overclock',     icon:'bolt',   max:1, base:1500,growth:1,   desc:'ALL machines run 2x faster' },
 
   /* ---- FARM: the field starts bare ---- */
