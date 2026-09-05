@@ -71,11 +71,58 @@ button:focus-visible{ outline:3px dashed var(--pink); outline-offset:2px; }
 .pill.full{ background:rgba(255,214,214,.95); border-color:#a8321c; }
 .pill.full b{ color:#a8321c; }
 
-/* toolbelt — little round tools bottom right */
+/* toolbelt — the tool rack, bottom right, on its own leather strap */
 #toolbelt{
   position:absolute; right:10px; bottom:10px;
   display:flex; gap:8px; align-items:center;
+  padding:7px 9px 9px;
+  background:linear-gradient(180deg,#8a5e2a 0 34%, #6b4620 34%);
+  border:4px solid var(--ink);
+  box-shadow:0 5px 0 var(--shadow), 0 2px 0 rgba(255,255,255,.18) inset;
 }
+/* the number key that picks each tool */
+.tool-key{
+  position:absolute; left:-6px; top:-6px;
+  width:20px; height:20px; line-height:20px; text-align:center;
+  font-family:var(--font-px); font-size:10px; text-decoration:none;
+  color:var(--cream); background:var(--ink);
+  border:2px solid var(--cream);
+  box-shadow:1px 1px 0 rgba(0,0,0,.4);
+}
+.tool-btn.active .tool-key{ background:var(--gold); color:var(--ink); border-color:var(--ink); }
+
+/* ============================================================
+   THE DESK BAR
+   Bottom-left, opposite the tools: one fat key each for the Lab,
+   the Index, Mama, the crew and the depot. Nothing important is
+   buried inside another screen any more.
+   ============================================================ */
+#deskbar{
+  position:absolute; left:10px; bottom:10px;
+  display:flex; gap:8px; align-items:flex-end;
+}
+.desk-btn{
+  position:relative;
+  width:66px; height:70px; padding:4px 0 5px;
+  background:linear-gradient(180deg,#fffaef 0 58%, #efe0be 58%);
+  border:5px solid var(--ink);
+  box-shadow:0 6px 0 var(--shadow);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+  image-rendering:pixelated;
+  transition: transform .10s var(--pop), box-shadow .10s var(--pop), filter .10s ease;
+}
+.desk-btn canvas{ transform:scale(1.15); }
+.desk-btn small{
+  font-family:var(--font-px); font-size:9px; letter-spacing:0; color:var(--ink);
+}
+.desk-btn:hover:not(:disabled){ transform:translateY(-4px) scale(1.03); filter:brightness(1.06); }
+.desk-btn:active:not(:disabled){ transform:translateY(3px) scale(.96); box-shadow:0 2px 0 var(--shadow); }
+.desk-btn.locked{
+  filter:grayscale(.85) brightness(.94);
+  opacity:.6; cursor:not-allowed;
+  box-shadow:0 4px 0 var(--shadow);
+}
+.desk-btn.locked small{ color:var(--ink-soft); }
 .tool-btn{
   width:58px; height:62px;
   background:rgba(255,249,236,.94);
@@ -287,26 +334,16 @@ button:focus-visible{ outline:3px dashed var(--pink); outline-offset:2px; }
 /* speech bubble hints */
 /* the hint that hangs over the field: a proper comic-book bubble with
    rounded shoulders and a fat tail pointing at whatever it is about */
+/* the hint over the field. the frame is a generated pixel cloud painted
+   in as a background, so the padding has to leave room for the tail */
 #bubble{
   position:fixed; z-index:60; pointer-events:none;
   font-family:var(--font-body); font-size:27px; line-height:1.08;
-  background:#fff9ec; color:var(--ink);
-  border:4px solid var(--ink); border-radius:16px;
-  box-shadow:4px 5px 0 rgba(0,0,0,.22);
-  padding:8px 14px; max-width:250px; text-align:center;
+  color:var(--ink);
+  padding:16px 22px 30px; max-width:260px; text-align:center;
+  background-repeat:no-repeat; background-position:0 0;
+  image-rendering:pixelated;
   animation:bubble-pop .2s var(--pop) both;
-}
-#bubble::after{
-  content:""; position:absolute; left:50%; bottom:-15px; margin-left:-9px;
-  width:0; height:0;
-  border-left:9px solid transparent; border-right:9px solid transparent;
-  border-top:15px solid var(--ink);
-}
-#bubble::before{
-  content:""; position:absolute; left:50%; bottom:-8px; margin-left:-6px;
-  width:0; height:0; z-index:1;
-  border-left:6px solid transparent; border-right:6px solid transparent;
-  border-top:11px solid #fff9ec;
 }
 @keyframes bubble-pop{ from{ transform:scale(.55) translateY(10px); opacity:0; } }
 
@@ -899,7 +936,7 @@ button:focus-visible{ outline:3px dashed var(--pink); outline-offset:2px; }
 #toasts .toast b{ font-size:14px; }
 #toasts .toast span{ font-size:21px; }
 #toasts .toast canvas{ transform:scale(1.25); margin-right:6px; }
-#bubble{ font-size:26px; border-width:4px; padding:10px 16px; }
+#bubble{ font-size:26px; }
 
 /* skill card under the lab screen */
 #skill-card{ border-width:4px; padding:12px; }
@@ -1048,31 +1085,17 @@ button:focus-visible{ outline:3px dashed var(--pink); outline-offset:2px; }
    ============================================================ */
 #tip-bubble{
   position:fixed; z-index:200; pointer-events:none;
-  max-width:290px;
-  background:var(--panel); color:var(--ink);
-  border:4px solid var(--ink); border-radius:14px;
-  box-shadow:5px 5px 0 var(--shadow);
-  padding:11px 15px; font-family:var(--font-body); font-size:24px; line-height:1.12;
-  --tail:20px;
+  max-width:300px;
+  color:var(--ink);
+  padding:16px 22px 30px;
+  font-family:var(--font-body); font-size:24px; line-height:1.12;
+  background-repeat:no-repeat; background-position:0 0;
+  image-rendering:pixelated;
 }
+#tip-bubble.below{ padding:30px 22px 16px; }
 #tip-bubble.pop{ animation:tipPop .16s cubic-bezier(.34,1.7,.5,1); }
 @keyframes tipPop{ from{ transform:scale(.7) translateY(6px); opacity:0; } to{ transform:scale(1) translateY(0); opacity:1; } }
-/* the tail is two triangles: a fat ink one, and a slightly smaller
-   panel-coloured one sitting on top, which leaves an even outline */
-#tip-bubble::after{
-  content:''; position:absolute; left:var(--tail); bottom:-14px;
-  width:0; height:0;
-  border-left:9px solid transparent; border-right:9px solid transparent;
-  border-top:14px solid var(--ink);
-}
-#tip-bubble::before{
-  content:''; position:absolute; left:calc(var(--tail) + 3px); bottom:-7px;
-  width:0; height:0; z-index:1;
-  border-left:6px solid transparent; border-right:6px solid transparent;
-  border-top:11px solid var(--panel);
-}
-#tip-bubble.below::after{ bottom:auto; top:-14px; border-top:none; border-bottom:14px solid var(--ink); }
-#tip-bubble.below::before{ bottom:auto; top:-7px; border-top:none; border-bottom:11px solid var(--panel); }
+
 
 /* ============================================================
    THE BRUSH ROW

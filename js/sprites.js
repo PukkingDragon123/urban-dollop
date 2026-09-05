@@ -697,41 +697,56 @@ const SPR = (() => {
   /* Mama Hen: a big, fat grandma of a bird. Bonnet and shawl on top, an
      apron down the front, and spectacles drawn in over the eyes further
      down. 34x30, drawn at 1x in the world. */
+  /* Mama Hen: a big fat grandma of a bird, and a hen rather than a blob -
+     tail feathers sweeping off one flank, a folded wing inked onto the
+     other, a bonnet and shawl on top and an apron down the front.
+     34x32, drawn at 1x in the world. */
+  /* Mama Hen: a big fat grandma of a bird, and a hen rather than a blob -
+     tail feathers sweeping off one flank, a folded wing inked onto the
+     other, a bonnet and shawl on top and an apron down the front.
+     34x33, drawn at 1x in the world. */
+  /* Mama Hen: a big fat grandma of a bird, and a hen rather than a blob -
+     tail feathers sweeping off one flank, a folded wing inked onto the
+     other, a bonnet and shawl on top and a stitched pinafore down the
+     front. 34x33, drawn at 1x in the world. */
   const MAMA_ROWS = [
-    '...............C.C.C..............',
-    '..............CCCCC...............',
+    '...............CCC.C..............',
+    '..............CCCCCC..............',
     '.............OOOOOOOO.............',
     '...........OOSSSSSSSSOO...........',
     '..........OSSSSSSSSSSSSO..........',
-    '..........OSSBBBBBBBBSSO..........',
-    '..........OBBBBBBBBBBBBO..........',
-    '..........OBBBBBBBBBBBBO..........',
+    '.........OSSSSSSSSSSSSSSO.........',
+    '.........OSSBBBBBBBBBBSSO.........',
+    '.........OBBBBBBBBBBBBBBO.........',
+    '.........OBBBBBBBBBBBBBBO.........',
     '..........OBBBBBBBBBBBBO..........',
     '...........OBBBBBBBBBBO...........',
     '............OBBBBBBBBO............',
-    '.............OSSSSSSO.............',
     '............OSSSSSSSSO............',
-    '.........OSSSSSSSSSSSSSSO.........',
-    '......OOOSSSSSSSSSSSSSSSSOOO......',
-    '....OOSsSsSsSsSsSsSsSsSsSsSsOO....',
-    '...OWWWWWWBBBBBBBBBBBBBBWWWWWWO...',
-    '..OWWWWWWBBBBAAAAAAAABBBBWWWWWWO..',
-    '..OTTWWWWBBBBAAAAAAAABBBBWWWWTTO..',
-    '.OTTWWWWBBBAAAAAAAAAAAABBBWWWWTTO.',
-    '.OTTWWWWBBBAAAaaaaaaAAABBBWWWWTTO.',
-    '.OTTWWWWBBBAAAaaaaaaAAABBBWWWWTTO.',
-    '.OTTWWWWBBBAAAaaaaaaAAABBBWWWWTTO.',
-    '..OTTWWWWLLAAAAAAAAAAAALLWWWWTTO..',
-    '..OTTWWWWLLAAAAAAAAAAAALLWWWWTTO..',
-    '...OOTWWWWLBAAAAAAAAAABLWWWWTOO...',
-    '.....OOWWWWWaaaaaaaaaaWWWWWOO.....',
-    '.......OOBBBBBBBBBBBBBBBBOO.......',
-    '.........OOOOOOOOOOOOOOOO.........',
+    '............OSSSSSSSSO............',
+    '..........OSSSSSSSSSSSSO..........',
+    '........OSSSSSSSSSSSSSSSSO........',
+    '..O....OSSSSSSSSSSSSSSSSSSO.......',
+    'OOTOO.OBBBBBBBhAAAAhBBooBBBO......',
+    'TOTTTOOBBBBBBhAAAAAAhoWWoBBO......',
+    'TTTTTTOBBBBBBhAAAAAhWWWWWoBO......',
+    'TTTTTOBBBBBBhAAAAAAAhWWWWWoBO.....',
+    'OTTTOOBBBBBBhAAaaaaAhWWWWWWBO.....',
+    '.OTTTOBBBBBBhAAaaaaAhWWWWWWBO.....',
+    '.OTTTOBBBBBBhAAaaaaAhWWWWWWBO.....',
+    '.OTTTTOBBBBBhAAAAAAAhWWWWWWO......',
+    '..OTTTOBBBBBhAAAAAAAhWWWWWBO......',
+    '...OTTTOBBBBBhAAAAAhWWWWWBO.......',
+    '....OTTOBBBBBhAAAAAAhoWWBBO.......',
+    '.....OTOOOBLLLhhhhhhLLLBOO........',
+    '......O...OOLLLLLLLLLLOO..........',
+    '............OOOOOOOOOO............',
+    '............OOO....OOO............',
     '............OOO....OOO............',
   ];
   const MAMA = {
-    rows: MAMA_ROWS, eyeL: [13, 6], eyeR: [19, 6], beak: [16, 8], blushY: 8,
-    blushL: 11, blushR: 21, headTop: [16, 2], wattle: true, w: 34, h: 30,
+    rows: MAMA_ROWS, eyeL: [12, 7], eyeR: [20, 7], beak: [16, 9], blushY: 9,
+    blushL: 10, blushR: 22, headTop: [16, 2], wattle: true, w: 34, h: 33,
   };
   const MAMA_TIER = [
     ['#e8d9bd', '#e8542f'], ['#bfe6a8', '#e8542f'], ['#a8d8f0', '#e8542f'],
@@ -1050,43 +1065,25 @@ const SPR = (() => {
     const key = 'mama' + tier + '_' + scale + '_' + mood;
     if (cache.has(key)) return cache.get(key);
     const k = scale;
-    const c = newCanvas(38 * k, 34 * k);
+    const c = newCanvas(38 * k, 37 * k);
     const ctx = c.getContext('2d');
     const [body, comb] = MAMA_TIER[tier];
-    const ox = 2, oy = 3;
+    const ox = 2, oy = 2;
     /* the shawl takes its colour from the comb, so a Divine grandma
        knits herself something gold */
     const shawl = darken(comb, 0.18), shawlDark = darken(comb, 0.42);
     drawGrid(ctx, MAMA.rows, {
-      O: darken(body, 0.48), B: body, L: lighten(body, 0.34),
-      W: darken(body, 0.20), C: comb, T: darken(body, 0.36),
-      S: shawl, s: shawlDark, A: '#fffdf6', a: '#ded0b0',
+      O: darken(body, 0.50), B: body, L: lighten(body, 0.30),
+      W: darken(body, 0.17), o: darken(body, 0.40), C: comb, T: darken(body, 0.30),
+      S: shawl, s: shawlDark, A: '#f8eeda', a: '#e0d0ab', h: '#b09468',
     }, ox * k, oy * k, k);
     shadeBody(ctx, MAMA.rows, ox, oy, k, body);
 
-    /* an inked edge down both sides of the apron, so it reads as a pinny
-       laid over her front rather than a pale patch of feathers */
-    const apEdge = darken('#fffdf6', 0.30);
-    MAMA.rows.forEach((row, y) => {
-      const first = row.search(/[Aa]/);
-      if (first < 0) return;
-      const last = row.lastIndexOf(row.match(/[Aa](?=[^Aa]*$)/) ? row.match(/[Aa](?=[^Aa]*$)/)[0] : 'A');
-      px(ctx, ox + first, oy + y, k, apEdge);
-      px(ctx, ox + last, oy + y, k, apEdge);
-    });
-    /* a waistband across the top of it */
-    const apTop = MAMA.rows.findIndex(r => /[Aa]/.test(r));
-    if (apTop >= 0) {
-      const row = MAMA.rows[apTop];
-      for (let x = row.search(/[Aa]/); x <= row.lastIndexOf('A'); x++) px(ctx, ox + x, oy + apTop, k, apEdge);
-    }
+    /* apron strings coming up over the shawl to the shoulders */
+    [[13, 15], [14, 16], [20, 15], [19, 16]].forEach(([x, y]) => px(ctx, ox + x, oy + y, k, '#f8eeda'));
 
-    /* apron strings up over the shoulders, and a stitched hem */
-    [[10, 16], [11, 17], [23, 16], [22, 17]].forEach(([x, y]) => px(ctx, ox + x, oy + y, k, '#fff6e2'));
-    for (let x = 9; x <= 24; x++) if (x % 2 === 0) px(ctx, ox + x, oy + 26, k, '#c9b48a');
-
-    if (tier === 6) [[8, 19], [25, 21], [16, 25]].forEach(([x, y]) => px(ctx, ox + x, oy + y, k, '#ffd23f'));
-    else if (tier === 7) [[7, 18], [26, 20], [16, 26]].forEach(([x, y]) => px(ctx, ox + x, oy + y, k, '#ffffff'));
+    if (tier === 6) [[8, 20], [26, 22], [16, 29]].forEach(([x, y]) => px(ctx, ox + x, oy + y, k, '#ffd23f'));
+    else if (tier === 7) [[7, 19], [27, 21], [16, 30]].forEach(([x, y]) => px(ctx, ox + x, oy + y, k, '#ffffff'));
 
     const exL = ox + MAMA.eyeL[0], eyL = oy + MAMA.eyeL[1];
     const exR = ox + MAMA.eyeR[0], eyR = oy + MAMA.eyeR[1];
@@ -1739,6 +1736,96 @@ const SPR = (() => {
     return c;
   }
 
+  /* ============================================================
+     CLOUD SPEECH BUBBLES
+     A comic-book cloud, built as a pixel mask rather than a CSS
+     rounded rectangle: a solid core with a ring of overlapping
+     lobes round the edge, a tail of three shrinking blobs, then an
+     outline pass over whatever that union came out as. Sized to the
+     element that will wear it as a background.
+     ============================================================ */
+  function cloudBubble(wPx, hPx, tailAt, below, opts) {
+    const o = opts || {};
+    const k = o.px || 3;                       /* size of one fat pixel */
+    const key = 'cloud_' + [wPx, hPx, tailAt, !!below, k, o.fill, o.ink].join('|');
+    if (cache.has(key)) return cache.get(key);
+
+    const gw = Math.max(12, Math.round(wPx / k));
+    const gh = Math.max(10, Math.round(hPx / k));
+    const TAIL = 5;                            /* rows the tail occupies */
+    const mask = new Uint8Array(gw * gh);
+    const set = (x, y) => { if (x >= 0 && x < gw && y >= 0 && y < gh) mask[y * gw + x] = 1; };
+    const at = (x, y) => (x < 0 || x >= gw || y < 0 || y >= gh) ? 0 : mask[y * gw + x];
+    const disc = (cx, cy, r) => {
+      const rr = r * r;
+      for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++)
+        for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
+          const dx = x - cx, dy = y - cy;
+          if (dx * dx + dy * dy <= rr) set(x, y);
+        }
+    };
+    /* deterministic wobble, so the same bubble is always the same shape */
+    const wob = i => { const n = Math.sin(i * 12.9898 + gw * 4.1414 + gh * 7.233) * 43758.5453; return n - Math.floor(n); };
+
+    const bodyY0 = below ? TAIL : 0;
+    const bodyY1 = below ? gh - 1 : gh - 1 - TAIL;
+    const inset = 6;
+    const x0 = inset, x1 = gw - 1 - inset;
+    const y0 = bodyY0 + inset, y1 = bodyY1 - inset;
+
+    /* the solid middle */
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) set(x, y);
+
+    /* lobes walked round the inset rectangle */
+    const wSide = Math.max(1, x1 - x0), hSide = Math.max(1, y1 - y0);
+    const per = 2 * (wSide + hSide);
+    const n = Math.max(9, Math.round(per / 9));
+    for (let i = 0; i < n; i++) {
+      let d = (i / n) * per, px, py;
+      if (d < wSide) { px = x0 + d; py = y0; }
+      else if (d < wSide + hSide) { px = x1; py = y0 + (d - wSide); }
+      else if (d < 2 * wSide + hSide) { px = x1 - (d - wSide - hSide); py = y1; }
+      else { px = x0; py = y1 - (d - 2 * wSide - hSide); }
+      disc(px, py, 4.4 + wob(i) * 2.6);
+    }
+
+    /* the tail: three blobs marching out from the body towards the thing
+       the bubble is about */
+    const tx = Math.max(4, Math.min(gw - 5, Math.round((tailAt == null ? wPx / 2 : tailAt) / k)));
+    const dir = below ? -1 : 1;
+    const start = below ? bodyY0 + 1 : bodyY1 - 1;
+    disc(tx, start + dir * 1, 2.9);
+    disc(tx + dir, start + dir * 3, 1.9);
+    disc(tx + dir * 2, start + dir * 4, 1.1);
+
+    /* ---- paint it ---- */
+    const c = newCanvas(gw * k, gh * k);
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    const FILL = o.fill || '#fff9ec';
+    const INK = o.ink || '#2e2216';
+    const LIT = lighten(FILL, 0.5);
+    const SHD = darken(FILL, 0.10);
+    const SHADOW = 'rgba(46,34,22,.22)';
+    const box = (x, y, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, y * k, k, k); };
+
+    /* a soft shadow one fat pixel down-right */
+    for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++)
+      if (at(x - 1, y - 1) && !at(x, y)) box(x, y, SHADOW);
+
+    for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) {
+      if (!at(x, y)) continue;
+      const edge = !at(x - 1, y) || !at(x + 1, y) || !at(x, y - 1) || !at(x, y + 1);
+      if (edge) { box(x, y, INK); continue; }
+      /* a lit rim just inside the top-left, shade inside the bottom */
+      if (!at(x, y - 2) || !at(x - 2, y)) box(x, y, LIT);
+      else if (!at(x, y + 2)) box(x, y, SHD);
+      else box(x, y, FILL);
+    }
+    cache.set(key, c);
+    return c;
+  }
+
   /* w is a crew record: robots by their chassis, people by their look */
   function staffSprite(w, frame, scale) {
     if (typeof w === 'string') return (w === 'cull' || w === 'match') ? botSprite(w, frame, scale) : personSprite(null, frame, scale);
@@ -2373,6 +2460,7 @@ const SPR = (() => {
 
   return {
     chickenSprite, eggSprite, nestSprite, mamaSprite, decoSprite,
+    cloudBubble,
     uiSprite, iconSprite, basketSprite, feedbagSprite, hammerSprite, staffSprite,
     personSprite, faceSprite, flyerSprite,
     soilSprite, cropSprite, chickSprite, vehicleSprite, skylineSprite, cursorSprite,

@@ -106,7 +106,18 @@
     t.classList.toggle('below', below);
     /* the tail points back at whatever you are hovering */
     const tail = Math.max(14, Math.min(tw - 14, r.left + r.width / 2 - x));
-    t.style.setProperty('--tail', Math.round(tail) + 'px');
+    paintCloud(t, tail, below);
+  }
+  /* wear a generated pixel cloud as a background, sized to the box */
+  function paintCloud(elm, tailAt, below, opts) {
+    const w = elm.offsetWidth, h = elm.offsetHeight;
+    if (!w || !h) return;
+    const sig = w + 'x' + h + '|' + Math.round(tailAt) + '|' + (below ? 1 : 0);
+    if (elm.dataset.cloud === sig) return;
+    elm.dataset.cloud = sig;
+    const cv = SPR.cloudBubble(w, h, tailAt, below, opts);
+    elm.style.backgroundImage = 'url(' + cv.toDataURL() + ')';
+    elm.style.backgroundSize = cv.width + 'px ' + cv.height + 'px';
   }
   function hideTip() { if (tipEl) { tipEl.hidden = true; } tipFor = null; }
   /* Titles are moved into data-tip the moment they enter the page, so the
@@ -1843,7 +1854,7 @@
     ctx.save();
     ctx.translate(m.x + 1, m.y + 14);
     ctx.scale(1 + squish * 0.12, 1 - squish * 0.12);
-    ctx.drawImage(mama, -19, -36 + Math.round(bob));
+    ctx.drawImage(mama, -19, -38 + Math.round(bob));
     ctx.restore();
 
     /* only once supper is wearing off: a small gauge on her nest rail */
@@ -2262,7 +2273,8 @@
     coins: $('#r-coins'), feathers: $('#r-feathers'), feed: $('#r-feed'), feedPill: $('#pill-feed'),
     cap: $('#r-cap'), capPill: $('#pill-cap'),
     cursorChip: $('#cursor-chip'), bubble: $('#bubble'),
-    toolbelt: $('#toolbelt'), palette: $('#build-palette'), farmPalette: $('#farm-palette'),
+    toolbelt: $('#toolbelt'), deskbar: $('#deskbar'),
+    palette: $('#build-palette'), farmPalette: $('#farm-palette'),
   };
   /* prepend pixel icons to the resource pills once */
   (function seedPills() {
@@ -2285,9 +2297,56 @@
   const TOOL_ICON = { hand: 'hand', basket: 'basket', feed: 'bowl', farm: 'hoe', build: 'hammer', inspect: 'magnify' };
   const TOOL_LABEL = { hand: 'HAND', basket: 'BASKET', feed: 'FEED', farm: 'FARM', build: 'BUILD', inspect: 'LOOK' };
   let farmSel = 't:soil', farmSec = 'ground', palSec = 'ranch';
+  /* ------------------------------------------------------------
+     THE DESK BAR
+     Everything that used to mean walking to a shack or digging
+     through the book gets a fat button of its own down here: the
+     Lab, the Index, the crew payroll, the dispatch office and
+     Mama's upgrade. Locked ones stay put and say what unlocks them,
+     so the row never jumps about under your finger.
+     ------------------------------------------------------------ */
+  const DESK = [
+    { act: 'open-lab',   icon: 'flask',  name: 'LAB',
+      tip: 'The Lab - spend feathers on research', open: () => true },
+    { act: 'open-book',  icon: 'book',   name: 'INDEX',
+      tip: 'The Index - chickens, crops, routes, eggs and the diary', open: () => true },
+    { act: 'open-mama',  icon: 'crown',  name: 'MAMA',
+      tip: 'Mama Hen - feed her, pet her and upgrade her tier', open: () => true },
+    { act: 'crew',       icon: 'hands',  name: 'CREW',
+      tip: 'The crew - flyers, applications and the payroll',
+      open: () => GAME.lvl('hiring'), why: 'research Recruiting' },
+    { act: 'open-depot', icon: 'truck',  name: 'DEPOT',
+      tip: 'Logistics - vehicles, routes and the wall map', open: () => true },
+  ];
+  let crewBadgeDesk = null;
+  function renderDeskbar() {
+    el.deskbar.innerHTML = '';
+    crewBadgeDesk = null;
+    DESK.forEach(d => {
+      const b = document.createElement('button');
+      const open = d.open();
+      b.className = 'desk-btn' + (open ? '' : ' locked');
+      b.dataset.act = d.act;
+      b.disabled = !open;
+      b.title = open ? d.tip : d.tip + ' (' + d.why + ')';
+      b.appendChild(mkIcon(d.icon, 3));
+      const nm = document.createElement('small');
+      nm.textContent = d.name;
+      b.appendChild(nm);
+      if (d.act === 'crew') {
+        const badge = document.createElement('i');
+        badge.className = 'tb-badge';
+        badge.hidden = true;
+        b.appendChild(badge);
+        crewBadgeDesk = badge;
+      }
+      el.deskbar.appendChild(b);
+    });
+  }
+
   function renderToolbelt() {
     el.toolbelt.innerHTML = '';
-    ['hand', 'basket', 'feed', 'farm', 'build', 'inspect'].forEach(id => {
+    ['hand', 'basket', 'feed', 'farm', 'build', 'inspect'].forEach((id, i) => {
       const b = document.createElement('button');
       b.className = 'tool-btn' + (S().tool === id ? ' active' : '');
       b.dataset.tool = id;
@@ -2303,21 +2362,15 @@
       const lab = document.createElement('small');
       lab.textContent = TOOL_LABEL[id];
       b.appendChild(lab);
+      /* the number key that picks it, printed on the tool like a rack tag */
+      const key = document.createElement('u');
+      key.className = 'tool-key';
+      key.textContent = String(i + 1);
+      b.appendChild(key);
       el.toolbelt.appendChild(b);
     });
-    if (GAME.lvl('hiring')) {
-      const crew = document.createElement('button');
-      crew.className = 'tool-btn tool-crew';
-      crew.dataset.act = 'crew';
-      crew.title = 'The crew - flyers, applicants and who is on the payroll';
-      crew.appendChild(mkIcon('hands', 3));
-      const badge = document.createElement('i');
-      badge.className = 'tb-badge';
-      badge.hidden = true;
-      crew.appendChild(badge);
-      el.toolbelt.appendChild(crew);
-      crewBadge = badge;
-    } else crewBadge = null;
+    renderDeskbar();
+    crewBadge = crewBadgeDesk;
     const menu = document.createElement('button');
     menu.className = 'tool-btn tool-menu';
     menu.dataset.act = 'menu';
@@ -2604,14 +2657,18 @@
     el.bubble.hidden = false;
     const r = cv.getBoundingClientRect();
     const bw = el.bubble.offsetWidth || 140;
+    let left, tailAt = bw / 2;
     if (anchor) {
       const sp = worldToScreen(anchor[0], anchor[1]);
-      el.bubble.style.left = Math.max(r.left + 6, Math.min(sp.x - bw / 2, r.right - bw - 6)) + 'px';
-      el.bubble.style.top = Math.max(r.top + 6, sp.y - 36) + 'px';
+      left = Math.max(r.left + 6, Math.min(sp.x - bw / 2, r.right - bw - 6));
+      el.bubble.style.top = Math.max(r.top + 6, sp.y - 46) + 'px';
+      tailAt = Math.max(16, Math.min(bw - 16, sp.x - left));
     } else {
-      el.bubble.style.left = (r.left + r.width / 2 - bw / 2) + 'px';
+      left = r.left + r.width / 2 - bw / 2;
       el.bubble.style.top = (r.top + 12) + 'px';
     }
+    el.bubble.style.left = left + 'px';
+    paintCloud(el.bubble, tailAt, false);
   }
 
   function lightUpdate() {
@@ -2837,11 +2894,19 @@
     const px2 = hexToPx(p.q, p.r, HEXR);
     mapPan = { x: -px2.x, y: -px2.y };
   }
+  /* Every hex wears its module's colour, always - the branch is the thing
+     you are trying to read at a glance. State is carried by how bright it
+     is: installed burns full, affordable is lit and gets a gold rim
+     pulsing round it, and one you cannot pay for yet sits dark. */
   function hexPal(state, hue) {
-    if (state === 'root') return { base: '#a8783f', light: '#c9a35f', dark: '#7a5230', out: '#3e2810' };
-    if (state === 'done') return { base: hue, light: SPR.lighten(hue, 0.35), dark: SPR.darken(hue, 0.3), out: SPR.darken(hue, 0.65) };
-    if (state === 'ready') return { base: '#ffc72f', light: '#ffe27a', dark: '#e0a416', out: '#7a5210' };
-    return { base: '#2a4a3a', light: '#3a5e4a', dark: '#1d3628', out: '#0f1f16' };
+    if (state === 'root') return { base: '#c9a35f', light: '#eccf95', dark: '#8a5e2a', out: '#3e2810' };
+    if (state === 'done') return { base: hue, light: SPR.lighten(hue, 0.40), dark: SPR.darken(hue, 0.28), out: SPR.darken(hue, 0.68) };
+    if (state === 'ready') {
+      const b = SPR.darken(hue, 0.18);
+      return { base: b, light: SPR.lighten(b, 0.30), dark: SPR.darken(b, 0.28), out: '#ffc72f' };
+    }
+    const d = SPR.darken(hue, 0.68);
+    return { base: d, light: SPR.lighten(d, 0.14), dark: SPR.darken(d, 0.35), out: '#0f1f16' };
   }
 
   function drawTerm(now) {
@@ -2986,6 +3051,21 @@
         if (Math.floor(now / 700 + c2.d) % 2) SPR.drawTiny(g, '?', Math.round(a2.x + dx / d * 25) - 1, Math.round(a2.y + dy / d * 25) - 2, 'rgba(126,242,168,.5)', 1);
       });
     });
+    /* branch names floating over each cluster, in that branch's colour,
+       so the map says what its limbs are without being clicked */
+    MODULES.forEach((m, i) => {
+      const own = SKILLS_BY_MODULE[i].filter(pkgVisible);
+      if (own.length < 2) return;
+      let sx = 0, sy = 0, minY = 1e9;
+      own.forEach(sk => { const c3 = hexCenter(sk); sx += c3.x; sy += c3.y; minY = Math.min(minY, c3.y); });
+      const lx = Math.round(sx / own.length), ly = Math.round(minY - HEXR - 8);
+      if (lx < inner.x - 20 || lx > inner.x + inner.w + 20 || ly < inner.y - 8 || ly > inner.y + inner.h) return;
+      const w2 = SPR.tinyW(m.name.toUpperCase(), 1);
+      g.fillStyle = 'rgba(4,20,14,.75)';
+      g.fillRect(lx - w2 / 2 - 2, ly - 1, w2 + 4, 7);
+      SPR.drawTiny(g, m.name.toUpperCase(), Math.round(lx - w2 / 2), ly, m.hue, 1);
+    });
+
     /* hexes */
     visible.forEach(sk => {
       const c2 = hexCenter(sk);
@@ -3015,6 +3095,25 @@
         SPR.drawTiny(g, 'ON', c2.x - 3, c2.y + 3, '#1a1410', 1);
       }
       termHits.push({ kind: 'hex', id: sk.id, x: c2.x - HEXR, y: c2.y - 9, w: HEXR * 2, h: 18, cx: c2.x, cy: c2.y });
+    });
+
+    /* branch names, drawn last so they sit legibly on top of their own
+       cluster rather than under the first hex that happens to overlap */
+    MODULES.forEach((m, i) => {
+      const own = SKILLS_BY_MODULE[i].filter(pkgVisible);
+      if (own.length < 2) return;
+      let sx = 0, minY = 1e9;
+      own.forEach(sk => { const c3 = hexCenter(sk); sx += c3.x; minY = Math.min(minY, c3.y); });
+      const name = m.name.toUpperCase(), w2 = SPR.tinyW(name, 1);
+      let lx = Math.round(sx / own.length);
+      const ly = Math.round(minY - HEXR - 9);
+      lx = Math.max(inner.x + w2 / 2 + 3, Math.min(inner.x + inner.w - w2 / 2 - 3, lx));
+      if (ly < inner.y || ly > inner.y + inner.h - 12) return;
+      g.fillStyle = 'rgba(4,20,14,.86)';
+      g.fillRect(lx - w2 / 2 - 3, ly - 2, w2 + 6, 9);
+      g.fillStyle = m.hue;
+      g.fillRect(lx - w2 / 2 - 3, ly - 2, w2 + 6, 1);
+      SPR.drawTiny(g, name, Math.round(lx - w2 / 2), ly, m.hue, 1);
     });
     g.restore();
     /* window status line */
@@ -3093,6 +3192,9 @@
       g.globalAlpha = has ? 1 : 0.4;
       g.drawImage(SPR.iconSprite(m.icon, 1), cx + 1, tb.y + 2);
       g.globalAlpha = 1;
+      /* a swatch of the branch colour, so the chips read as a key */
+      g.fillStyle = has ? m.hue : '#24382c';
+      g.fillRect(cx + 1, tb.y + 10, 10, 1);
       if (ready && Math.floor(now / 340) % 2) { g.fillStyle = '#ffd23f'; g.fillRect(cx + 9, tb.y + 2, 3, 3); }
       termHits.push({ kind: 'mod', i, x: cx, y: tb.y + 2, w: 12, h: 10 });
     });
@@ -5164,10 +5266,19 @@
       case 'start-game': hideTitle(); snd.sparkle(); break;
       case 'title': showTitle(); $('#menu-pop').hidden = true; break;
       case 'crew': {
-        indexTab = 'staff';
-        renderPedia();
-        openModal('#modal-pedia');
+        renderHire();
+        openModal('#modal-hire');
         $('#menu-pop').hidden = true;
+        snd.build();
+        break;
+      }
+      case 'open-lab': { renderSkills(); openModal('#modal-skills'); snd.build(); break; }
+      case 'open-book': { renderPedia(); openModal('#modal-pedia'); snd.build(); break; }
+      case 'open-mama': {
+        setInspect({ kind: 'mama' });
+        GAME.S.cam.x = W.mama.x - W.view.w / 2;
+        GAME.S.cam.y = W.mama.y - W.view.h / 2;
+        GAME.clampCam();
         snd.build();
         break;
       }
