@@ -1508,96 +1508,175 @@ const SPR = (() => {
     return c;
   }
 
-  /* A little round robot: big belly, big visor eyes, stubby arms and a
-     hover skirt. One paint job per role, plus a hat and a face. */
+  /* ============================================================
+     THE ROBOTS
+     A fat little chassis that hovers on a puff of air: domed head,
+     a wraparound visor with proper eyes, a round belly with a
+     lit-up job badge, stubby arms holding the tool of the trade,
+     and a hat. Three tones of shading on every curve so they read
+     as round rather than flat.
+     ============================================================ */
   function botSprite(role, frame, scale) {
-    const key = 'bot_' + role + '_' + frame + '_' + scale;
+    const key = 'bot3_' + role + '_' + frame + '_' + scale;
     if (cache.has(key)) return cache.get(key);
     const k = scale || 1;
     const B = BOTS[role] || BOTS.hand;
-    const c = newCanvas(16 * k, 18 * k);
+    /* 24 rows, not 21: the top five belong to the hat, so caps, straw
+       brims, bows and antennae have somewhere to sit instead of being
+       shaved off by the edge of the canvas */
+    const c = newCanvas(18 * k, 24 * k);
     const ctx = c.getContext('2d');
-    const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
-    const OUT = '#2a2420';
-    const shell = B.shell, lite = lighten(shell, 0.38), shade = darken(shell, 0.24), deep = darken(shell, 0.45);
-    const bob = frame ? 0 : 1;      /* the whole robot hovers up and down */
+    const R = (x, y, w, h, col) => { if (!col) return; ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
+    const OUT = '#2a2018';
+    const sh = B.shell;
+    const lite = lighten(sh, 0.42), mid = sh, shade = darken(sh, 0.20), deep = darken(sh, 0.40);
+    const bob = frame ? 0 : 1;
+    const T = B.trim, V = B.visor;
 
-    /* ---- hover skirt and its shadow puff ---- */
-    R(4, 15 + bob, 8, 1, 'rgba(120,200,255,.45)');
-    R(3, 16 + bob, 10, 1, 'rgba(120,200,255,.28)');
-    R(5, 14 + bob, 6, 1, deep);
+    /* ---- hover puff, drawn under everything ---- */
+    const puff = frame ? 0 : 1;
+    R(5, 22 + bob - puff, 8, 1, 'rgba(150,215,255,.5)');
+    R(3, 23 + bob - puff, 12, 1, 'rgba(150,215,255,.28)');
+    R(6 + puff * 2, 21 + bob, 2, 1, 'rgba(200,240,255,.7)');
+    R(10 - puff * 2, 21 + bob, 2, 1, 'rgba(200,240,255,.7)');
 
-    /* ---- belly: a big round body ---- */
-    R(3, 7 + bob, 10, 1, OUT);
-    R(2, 8 + bob, 12, 6, OUT);
-    R(3, 14 + bob, 10, 1, OUT);
-    R(3, 8 + bob, 10, 6, shell);
-    R(4, 7 + bob, 8, 1, shell);
-    R(4, 8 + bob, 6, 2, lite);              /* top-left gloss */
-    R(3, 12 + bob, 10, 2, shade);
-    R(11, 9 + bob, 2, 4, shade);
-    /* belly badge */
-    R(6, 10 + bob, 4, 3, deep);
-    R(7, 11 + bob, 2, 1, B.trim);
-    R(6, 10 + bob, 4, 1, darken(B.trim, 0.3));
+    /* ---- belly: a round barrel ---- */
+    const by = 12 + bob;
+    R(4, by - 1, 10, 1, OUT);
+    R(3, by, 12, 1, OUT);
+    R(2, by + 1, 14, 6, OUT);
+    R(3, by + 7, 12, 1, OUT);
+    R(4, by + 8, 10, 1, OUT);
+    R(4, by, 8, 1, lite);
+    R(3, by + 1, 12, 6, mid);
+    R(4, by + 1, 5, 3, lite);            /* upper-left gloss */
+    R(3, by + 5, 12, 2, shade);
+    R(12, by + 1, 3, 6, shade);
+    R(13, by + 2, 2, 4, deep);
+    R(4, by + 7, 10, 1, deep);
+    /* a seam round the middle */
+    R(3, by + 4, 12, 1, darken(sh, 0.10));
+    /* job badge, lit */
+    R(6, by + 2, 6, 4, '#1d2229');
+    R(7, by + 3, 4, 2, V);
+    R(7, by + 3, 2, 1, lighten(V, 0.5));
+    R(6, by + 2, 6, 1, deep);
+    if (frame) R(11, by + 3, 1, 1, T);
 
-    /* ---- stubby arms, swinging ---- */
+    /* ---- arms, swinging, each holding something ---- */
     const la = frame ? 0 : 1, ra = frame ? 1 : 0;
-    R(0, 9 + bob + la, 3, 3, OUT);
-    R(1, 9 + bob + la, 2, 2, shell);
-    R(1, 9 + bob + la, 1, 1, lite);
-    R(13, 9 + bob + ra, 3, 3, OUT);
-    R(13, 9 + bob + ra, 2, 2, shell);
-    R(13, 9 + bob + ra, 1, 1, lite);
-
-    /* ---- head: wide, rounded, most of the sprite ---- */
-    R(4, 1 + bob, 8, 1, OUT);
-    R(3, 2 + bob, 10, 5, OUT);
-    R(3, 2 + bob, 8, 1, shell);
-    R(4, 2 + bob, 8, 4, shell);
-    R(4, 2 + bob, 5, 1, lite);
-    R(4, 6 + bob, 8, 1, shade);
-    /* visor: one big friendly band */
-    R(4, 3 + bob, 8, 3, '#1d2229');
-    const blink = frame && role === 'keeper';
-    if (blink) {
-      R(5, 4 + bob, 2, 1, B.visor); R(9, 4 + bob, 2, 1, B.visor);
-    } else if (B.face === 'wink') {
-      R(5, 3 + bob, 2, 2, B.visor); R(9, 4 + bob, 2, 1, B.visor);
-    } else if (B.face === 'stern') {
-      R(5, 4 + bob, 2, 2, B.visor); R(9, 4 + bob, 2, 2, B.visor);
-      R(5, 3 + bob, 2, 1, deep); R(9, 3 + bob, 2, 1, deep);
-    } else if (B.face === 'love') {
-      R(5, 3 + bob, 2, 2, B.visor); R(9, 3 + bob, 2, 2, B.visor);
-      R(4, 4 + bob, 1, 1, B.visor); R(11, 4 + bob, 1, 1, B.visor);
-    } else {
-      R(5, 3 + bob, 2, 2, B.visor); R(9, 3 + bob, 2, 2, B.visor);
+    R(0, by + 1 + la, 3, 4, OUT);
+    R(1, by + 1 + la, 2, 3, mid);
+    R(1, by + 1 + la, 1, 1, lite);
+    R(1, by + 4 + la, 2, 1, deep);
+    R(15, by + 1 + ra, 3, 4, OUT);
+    R(15, by + 1 + ra, 2, 3, mid);
+    R(15, by + 1 + ra, 1, 1, lite);
+    R(15, by + 4 + ra, 2, 1, deep);
+    /* the tool of the trade in the right hand, big enough to read at 1x */
+    const tx = 15, ty = by + 5 + ra;
+    if (role === 'hand') {                                   /* an egg */
+      R(tx + 1, ty, 1, 1, '#fff8ee');
+      R(tx, ty + 1, 3, 2, '#fff8ee');
+      R(tx + 2, ty + 1, 1, 2, '#e2d3b6');
+      R(tx, ty + 3, 2, 1, '#fff8ee');
+      R(tx + 2, ty + 3, 1, 1, '#e2d3b6');
+    } else if (role === 'packer') {                          /* a crate */
+      R(tx, ty, 3, 4, '#8a5a2c');
+      R(tx, ty + 1, 3, 1, '#c9924f');
+      R(tx + 1, ty, 1, 4, '#a8703a');
+    } else if (role === 'feeder') {                          /* a scoop of grain */
+      R(tx, ty, 3, 2, '#e8c458');
+      R(tx, ty, 2, 1, '#fff0b0');
+      R(tx + 1, ty + 2, 2, 1, '#c9a03c');
+      R(tx + 2, ty + 3, 1, 1, '#e8c458');
+    } else if (role === 'tech') {                            /* a brass spanner */
+      R(tx + 1, ty, 1, 4, '#4a4038');
+      R(tx + 1, ty + 2, 1, 1, '#7a6a58');
+      R(tx, ty - 1, 3, 1, '#ffd23f');
+      R(tx, ty, 1, 1, '#ffd23f'); R(tx + 2, ty, 1, 1, '#e8a92f');
+      R(tx, ty - 1, 1, 1, '#fff0b0');
+    } else if (role === 'keeper' || role === 'match') {      /* a heart */
+      R(tx, ty, 1, 1, '#ff8ab5'); R(tx + 2, ty, 1, 1, '#ff8ab5');
+      R(tx, ty + 1, 3, 1, '#ff8ab5');
+      R(tx + 1, ty + 2, 1, 1, '#ff8ab5');
+      R(tx, ty, 1, 1, '#ffc2d8');
+    } else if (role === 'cull') {                            /* a red-tipped baton */
+      R(tx + 1, ty - 1, 1, 4, '#8a9099');
+      R(tx + 1, ty - 1, 1, 1, '#c9ced6');
+      R(tx, ty + 3, 3, 1, '#e8542f');
+      R(tx, ty + 3, 1, 1, '#ff8f5f');
     }
-    /* highlight sparkles in the eyes */
-    R(5, 3 + bob, 1, 1, '#ffffff'); R(9, 3 + bob, 1, 1, '#ffffff');
-    /* a little smile under the visor */
-    if (B.face !== 'stern') { R(7, 6 + bob, 2, 1, deep); R(6, 5 + bob, 1, 1, deep); R(9, 5 + bob, 1, 1, deep); }
-    /* rosy cheeks */
-    R(3, 5 + bob, 1, 1, '#ff9fb0'); R(12, 5 + bob, 1, 1, '#ff9fb0');
 
-    /* ---- hat ---- */
+    /* ---- head: a wide dome ---- */
+    const hy = 5 + bob;
+    R(5, hy - 1, 8, 1, OUT);
+    R(4, hy, 10, 1, OUT);
+    R(3, hy + 1, 12, 6, OUT);
+    R(4, hy + 7, 10, 1, OUT);
+    R(5, hy, 8, 1, lite);
+    R(4, hy + 1, 10, 6, mid);
+    R(5, hy + 1, 5, 2, lite);
+    R(4, hy + 6, 10, 1, shade);
+    R(12, hy + 1, 2, 6, shade);
+    /* ears / bolts */
+    R(2, hy + 3, 2, 3, OUT); R(2, hy + 3, 1, 2, shade);
+    R(14, hy + 3, 2, 3, OUT); R(14, hy + 3, 1, 2, shade);
+    /* a little collar, so the head reads apart from the belly */
+    R(4, hy + 8, 10, 1, darken(T, 0.25));
+    R(5, hy + 8, 8, 1, T);
+    R(6, hy + 8, 5, 1, lighten(T, 0.35));
+
+    /* ---- visor: wraps round the face ---- */
+    R(4, hy + 2, 10, 4, '#161b21');
+    R(4, hy + 2, 10, 1, '#242b34');
+    /* eyes, per personality */
+    const eyeL = 5, eyeR = 10, ey = hy + 3;
+    const blink = frame && (role === 'keeper' || role === 'feeder');
+    const eye = (x, kind) => {
+      if (kind === 'shut') { R(x, ey + 1, 3, 1, V); return; }
+      if (kind === 'wide') { R(x, ey - 1, 3, 3, V); R(x, ey - 1, 1, 1, '#ffffff'); return; }
+      if (kind === 'cross') { R(x, ey, 1, 1, V); R(x + 2, ey, 1, 1, V); R(x + 1, ey + 1, 1, 1, V); R(x, ey + 2, 1, 1, V); R(x + 2, ey + 2, 1, 1, V); return; }
+      if (kind === 'heart') { R(x, ey, 1, 1, V); R(x + 2, ey, 1, 1, V); R(x, ey + 1, 3, 1, V); R(x + 1, ey + 2, 1, 1, V); return; }
+      R(x, ey, 3, 2, V); R(x, ey, 1, 1, '#ffffff');
+    };
+    if (blink) { eye(eyeL, 'shut'); eye(eyeR, 'shut'); }
+    else if (B.face === 'wink') { eye(eyeL, 'wide'); eye(eyeR, 'shut'); }
+    else if (B.face === 'stern') { eye(eyeL, 'cross'); eye(eyeR, 'cross'); }
+    else if (B.face === 'love') { eye(eyeL, 'heart'); eye(eyeR, 'heart'); }
+    else if (B.face === 'grin') { eye(eyeL, 'wide'); eye(eyeR, 'wide'); }
+    else { eye(eyeL, ''); eye(eyeR, ''); }
+    /* a sweep of reflection across the glass */
+    R(4, hy + 2, 2, 1, 'rgba(255,255,255,.30)');
+    R(6, hy + 2, 1, 1, 'rgba(255,255,255,.16)');
+    /* mouth speaker grille and cheeks */
+    if (B.face !== 'stern') { R(7, hy + 6, 4, 1, deep); R(8, hy + 7, 2, 1, deep); }
+    else { R(7, hy + 6, 4, 1, deep); }
+    R(3, hy + 5, 1, 1, '#ff9fb0'); R(14, hy + 5, 1, 1, '#ff9fb0');
+
+    /* ---- hats ---- */
     if (B.hat === 'cap') {
-      R(4, 0 + bob, 8, 1, OUT); R(4, 1 + bob, 8, 1, B.trim);
-      R(12, 1 + bob, 3, 1, darken(B.trim, 0.2));
+      R(4, hy - 2, 10, 1, OUT); R(4, hy - 1, 10, 1, T);
+      R(5, hy - 3, 8, 1, OUT); R(5, hy - 2, 8, 1, lighten(T, 0.3));
+      R(14, hy - 1, 4, 1, darken(T, 0.2)); R(14, hy, 3, 1, OUT);
     } else if (B.hat === 'straw') {
-      R(5, 0 + bob, 6, 1, '#e0bd82'); R(2, 1 + bob, 12, 1, '#e0bd82');
-      R(3, 1 + bob, 10, 1, '#c9a35f');
+      R(6, hy - 3, 6, 1, '#f2dcb0'); R(5, hy - 2, 8, 1, '#e0bd82');
+      R(1, hy - 1, 16, 1, '#e0bd82'); R(2, hy, 14, 1, '#c9a35f');
+      R(6, hy - 2, 3, 1, '#fff3d6');
     } else if (B.hat === 'bow') {
-      R(4, 0 + bob, 2, 2, B.trim); R(10, 0 + bob, 2, 2, B.trim);
-      R(6, 1 + bob, 4, 1, darken(B.trim, 0.25));
+      R(3, hy - 3, 3, 3, T); R(12, hy - 3, 3, 3, T);
+      R(3, hy - 3, 3, 1, lighten(T, 0.35)); R(12, hy - 3, 3, 1, lighten(T, 0.35));
+      R(6, hy - 2, 6, 2, darken(T, 0.22)); R(8, hy - 3, 2, 1, darken(T, 0.3));
     } else if (B.hat === 'bolt') {
-      R(7, -1 + bob, 1, 3, '#8a9099');
-      R(6, -2 + bob, 3, 1, frame ? '#ffd23f' : '#5fe8ff');
-    }
-    /* antenna light for the hatless ones */
-    if (B.hat === 'none') {
-      R(7, 0 + bob, 1, 2, '#8a9099');
-      R(7, -1 + bob, 1, 1, frame ? B.trim : B.visor);
+      R(8, hy - 3, 2, 3, '#8a9099'); R(8, hy - 3, 1, 3, '#c9ced6');
+      R(6, hy - 5, 6, 2, frame ? '#ffd23f' : '#5fe8ff');
+      R(7, hy - 6, 4, 1, frame ? '#fff3b0' : '#c2f6ff');
+      R(5, hy - 5, 1, 1, frame ? '#ffd23f' : '#5fe8ff');
+      R(12, hy - 5, 1, 1, frame ? '#ffd23f' : '#5fe8ff');
+    } else {
+      R(8, hy - 4, 2, 4, '#8a9099'); R(8, hy - 4, 1, 4, '#c9ced6');
+      R(7, hy - 6, 4, 2, OUT);
+      R(8, hy - 5, 2, 1, frame ? T : V);
     }
     cache.set(key, c);
     return c;

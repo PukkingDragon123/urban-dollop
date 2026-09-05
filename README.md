@@ -8,14 +8,14 @@ It opens on an animated dusk title screen: Mama Hen and her chicks on the hills,
 
 ## How it plays
 
-The land starts **bare** - sun-bleached scrub, a couple of stumps and a stone or two. Every tree, path, terrace and pond on your ranch is one you put there. Mama Hen lays slowly now (about a minute between eggs), petting her is the quick way to a first clutch, and you pedal the first eggs to the village on a **bicycle** that carries four. The money buys seed; the seed becomes feed; the feed grows chicks into hens; the hens lay; the eggs buy a cart, then a van, then routes to bigger towns that pay more. Everything else grows out of that loop.
+The land starts **bare** - sun-bleached scrub and nothing else. No pond, no paths, not a stone scattered for you. Every tree, path, terrace and pond on your ranch is one you painted there yourself. Mama Hen lays slowly now (about a minute between eggs), petting her is the quick way to a first clutch, and you pedal the first eggs to the village on a **bicycle** that carries four. The money buys seed; the seed becomes feed; the feed grows chicks into hens; the hens lay; the eggs buy a cart, then a van, then routes to bigger towns that pay more. Everything else grows out of that loop.
 
 You are the hand. Everything on the field is touchable:
 
 - **Hand** - tap chickens (and Mama Hen) to pet them for an instant egg; hold and drag to pick chickens up and carry them; grab single eggs; drag empty grass to pan the camera.
 - **Basket** - hold and sweep to magnet eggs into your basket (it has a real capacity). Release over the truck or an incubator to unload.
 - **Feed** - scatter pellets from the barn; chicks eat to grow up, grown hens eat to fill their bellies and lay twice as fast.
-- **Farm** - the landscaping tool, in four tabs. GROUND shapes the land, PLANT sows crops, TEND waters and harvests, DECOR plants things purely because they look nice. Drag to paint whole rows; a ghost of whatever you are about to place sits on the tile under your finger, inside a marching dashed outline.
+- **Farm** - the landscaping tool, in four tabs. GROUND shapes the land with a **paint brush**, PLANT sows crops, TEND waters and harvests, DECOR plants things purely because they look nice. Five brush sizes, and a round brush outline sits under your finger showing exactly what it will cover.
 - **Build** - incubators, love nests, staff huts, silos, vacuums, blowers, sorters, conveyors and fences. Drag to paint belt lines.
 - **Inspect** - tap any hen, worker, machine or patch of grass to read its live stats. Empty grass gives you the whole ranch report: eggs per minute, coins per minute, wages, capacity, silo stock, species found.
 
@@ -32,18 +32,19 @@ Menus are places, not panels:
 
 ### Landscaping
 
-The ranch is a sandbox. The GROUND tab paints the tile grid:
+The ranch is a sandbox, and the GROUND tab is a **paint brush**, not a block placer. Pick a brush size, hold, and drag: the ground follows your hand in one continuous stroke, with no gaps however fast you sweep. Terrain is stored on an 8-pixel grid, half the size of a tile, and drawn per pixel through a weighted vote of each point's neighbours - so a stroke comes out with a soft, dithered, organic edge instead of a staircase. Ponds get an undulating shore, terraces grow an earth cliff only where they are actually exposed, and Level is just another brush that rubs the paint back off.
 
 | Tool | What it does |
 | --- | --- |
-| Till | Turns grass into soil you can plant in. |
+
+| Tool | What it does |
+| --- | --- |
+| Till | Turns grass into soil you can plant in (a tile at a time, not a brush). |
 | Path | Packed dirt. The crew walk a quarter faster on it. |
 | Stone Path | Flagstones. Faster still, and very tidy. Research Paving Stones. |
 | Raise | Banks the ground up into a grassy terrace with an earth cliff. Research Terracing. |
 | Dig Pond | Scoops out water with an undulating shore. Nothing walks through it. Research Pond Digging. |
-| Level | Puts a tile back to plain grass. |
-
-Paths, terraces and ponds all knit together with their neighbours, so a block of dug tiles becomes one pond with bitten-back corners rather than a rectangle, and a terrace grows a cliff only on the sides that are actually exposed.
+| Level | Rubs the paint back off, down to plain grass. |
 
 The DECOR tab is a garden centre: oaks, pines, apple trees, bushes, rocks, stumps, flowers, grass tufts, clover, mushrooms, reeds, lavender and sunflowers, each a few coins and each generated with its own silhouette. Lift anything again with CLEAR and get half your money back. Landscaping is deliberately far more permissive than building - anywhere you own, off the road, that is not already spoken for.
 
@@ -103,7 +104,9 @@ You pick the role, and roles lean on different stats - so the same applicant is 
 
 Quirks are rolled too, good and bad: **Tireless** never needs a break, **Thrifty** works for 30% less, **Strong Back** adds carry, **Butterfingers** fumbles one egg in eight, **Hard Bargain** wants 60% more pay. Wages scale with how good somebody is, so a five-star hire costs five-star money - and if the payroll runs dry the whole crew downs tools until you can pay again. Everyone tires as they work and takes a breather at the hut; **Overtime Pay** and high GRIT keep them going longer.
 
-**Robots are built, not recruited** - and there is a robot for every job. The Robot Workshop assembles Gather-Bot, Seed-Bot, Haul-Bot, Fix-Bot, Cuddle-Bot, Cull-Bot and Match-Bot: round, fat, cheerful little machines that hover along on a puff of air with big visor eyes, rosy cheeks and a hat each. They never tire, never ask for a raise, and can be reassigned between any roles - including the two jobs (culling and matchmaking) that only a robot will do.
+**Robots are built, not recruited** - and there is a robot for every job. The Robot Workshop assembles Gather-Bot, Seed-Bot, Haul-Bot, Fix-Bot, Cuddle-Bot, Cull-Bot and Match-Bot: round, fat, cheerful little machines that hover along on a puff of air. Each is drawn from a barrel belly with a lit job badge, a domed head with bolt ears and a collar, a wraparound visor whose eyes suit its temperament (Cuddle-Bot has hearts, Cull-Bot has crosses), rosy cheeks, a hat of its own - cap, straw brim, bow, or a bulb on an antenna - and its trade held in one swinging hand: an egg, a crate, a scoop of grain, a brass spanner, a heart, a red-tipped baton. They never tire, never ask for a raise, and can be reassigned between any roles - including the two jobs (culling and matchmaking) that only a robot will do.
+
+**Payroll is paperwork.** Every crew screen is a stack of forms on ruled paper with a red margin line: applicants arrive as an APPLICATION with a photo box, dotted NAME / RATING / ASKS fields, a ratings block and a row of tick boxes for the job you want to give them, all under a rotated PENDING stamp. Hired staff become a numbered STAFF RECORD stamped HIRED; robots are a BUILD ORDER stamped BUILT. You hire someone by ticking a box on their form.
 
 The crew is always two taps away: there is a crew button on the toolbelt that badges up when applicants are waiting or wages have gone unpaid, the same board sits in the Index, and the Staff Hut opens it too. Move anybody between roles at any time from their card.
 
@@ -135,7 +138,11 @@ The crew is always two taps away: there is a crew button on the toolbelt that ba
 
 Big, chunky and almost wordless. Four fat pills in the corner - coins, feathers, feed, chickens held out of capacity - and a row of oversized toolbelt keys with nothing but a picture on each. The feed pill goes red when the barn is empty; the capacity pill goes red when the coops are full, which is when hatching stops.
 
-Panels are picture-first: the palettes are shop shelves of big thumbnails with a coin price, crew members show five coloured stat bars with an icon apiece instead of labels, vehicles and routes show their art with a capacity and a multiplier, and statistics are rows of counters rather than sentences. Every button is a fat pixel key that lifts when you hover and squashes when you press. Where a longer explanation exists it lives in the tooltip, so it is there when you want it and out of the way when you do not.
+Panels are picture-first: crew members show five coloured stat bars with an icon apiece instead of labels, vehicles and routes show their art with a capacity and a multiplier, and statistics are rows of counters rather than sentences. Every button is a fat pixel key that lifts when you hover and squashes when you press.
+
+The build and landscaping palettes are one short **dock** along the foot of the stage - tabs down the left, a shelf of big thumbnails that scrolls sideways, brush sizes and counters on the right - so the field stays visible instead of sitting behind a wall of buttons. The DECOR shelf is styled as a garden centre, every plant on a wooden shelf with its own price tag. While you are mid-stroke the dock fades right down and stops taking clicks, and the camera is allowed to scroll a little past the foot of the map, so no strip of your land is ever stuck behind the UI.
+
+Nothing uses the browser's own tooltips. Hovering anything pops a **cartoon speech bubble** with a fat ink outline and a tail that points back at what you asked about, flipping above or below depending on where there is room.
 
 Autosaves to your browser, with up to 8 hours of offline laying and hatching.
 
@@ -152,7 +159,7 @@ Autosaves to your browser, with up to 8 hours of offline laying and hatching.
 | tap an applicant by the board | read their stats, hire them into a role |
 | tap the depot sign | opens the Logistics HQ: garage, routes and the wall map |
 | tap a town on the wall map | switch the route there, or survey the road to open it |
-| farm tool, drag | paint paths, terraces, ponds, crops or decorations |
+| farm tool, drag | brush paths, terraces and ponds, or place crops and decorations |
 | tap a Staff Hut | print flyers, hire, reassign and dismiss crew |
 | inspect tool on empty grass | the full ranch report |
 | `1`-`6` tools, `R` rotate, `Esc` close | shortcuts |
@@ -164,15 +171,16 @@ All sprites are generated at runtime by `js/sprites.js`:
 - a seeded RNG gives every tree, bush, rock and mushroom its own silhouette, so no two are identical;
 - blob masks are shaded automatically (upper-left light, lower-right shade, dithered rims) to give volume;
 - chickens get a procedural volume pass, wing creases and beak shading on top of their 16x16 templates;
-- the ground is painted from smooth value noise into an ImageData buffer: banded grass tones, dithered borders, worn dirt paths and a shoreline-graded pond;
+- the ground is painted from smooth value noise into an ImageData buffer: banded grass tones, dithered borders and worn scrub;
 - two hand-authored pixel fonts, drawn glyph by glyph in code: a tight 3x5 face for labels that have to fit inside a tile, and a 5x6 display face with drop shadows and an eight-way outline mode for signs, titles and the logo;
 - hatching is animated from generated art too: a per-tier crack overlay in three stages, then the two shell halves as separate sprites that tumble apart under their own rotation;
 - every hire is drawn from a little record of skin, hair colour, hair style, shirt, trousers, boots and hat, so no two people on the ranch look alike;
 - the Lab is a whole desk scene drawn the same way - a beige monitor with a phosphor mesh, scanlines and a rolling band, a keyboard whose keys light up when something installs, a steaming mug, sticky notes, and a pixel mouse pointer;
 - crops are drawn per stage from a seed, soil tiles get their own clods and furrows, and five vehicles and five city skylines are generated for the delivery window;
-- terrain knits itself together from neighbour masks: paths fray at the edges, terraces grow mottled earth banks with roots trailing over the lip, ponds wander their shoreline and take a round bite out of every open corner;
+- painted terrain is resolved per pixel rather than per tile: each point takes a distance-weighted vote of the nine cells around it, thresholds it with a dither so the boundary breaks up, and lands in its own offscreen layer that is repainted only under the brush. That is what gives a stroke its soft edge - ponds wander their shoreline, dirt frays into the grass, and a terrace lifts by a few pixels and drops a mottled earth bank down the sides that are actually exposed;
 - the valley map is inked with a wobbly-line routine over generated parchment, complete with fibres, foxed edges, cloud banks and a compass rose;
-- UI icons are a set of 53 hand-authored 10x10 pixel glyphs rendered to canvases - the interface has no emoji at all.
+- robots are drawn from a chassis record - shell colour, trim, visor, hat, temperament - into a 24-row sprite with five rows of headroom reserved for the hat, so nothing gets shaved off by the edge of the canvas;
+- UI icons are a set of 61 hand-authored 10x10 pixel glyphs rendered to canvases - the interface has no emoji at all.
 
 ## Run it
 
@@ -190,5 +198,5 @@ open index.html        # or serve the folder with any static server
 | `style.css` | cozy pixel-ranch styling |
 | `js/data.js` | tiers, economy, 112 species, twenty buildings in four sections, six terrain tools, thirteen decorations, five crops, six vehicles, five cities, five crew stats, seven roles and seven robot chassis, twelve quirks, twelve land plots, 76 research packages and their hex-map layout |
 | `js/sprites.js` | the procedural pixel-art engine (two fonts, icons, foliage, chickens and chicks, crops, soil, paths, terraces and ponds, procedural people, cute robots, machines, vehicles, skylines, parchment and ink, CRT chrome, hexes) |
-| `js/game.js` | world simulation: twelve plots, terrain and decoration, chicks that grow and hens that get hungry, farming, feed, flyers and applicants who walk to the board, per-role crew AI for people and robots, stamina, wages, belts, splitters, silos, loaders, hatcheries, the HQ, vehicles, routes and trips, diary |
-| `js/ui.js` | title screen, camera renderer, six tools and two sectioned palettes, terrain and decoration rendering, hatch animation, inspect, the crew board and robot workshop, the book, the HQ and its hand-drawn wall map, the trip window, the Lab desk and its hex map, particles, sound |
+| `js/game.js` | world simulation: twelve plots, brush-painted terrain and decoration, chicks that grow and hens that get hungry, farming, feed, flyers and applicants who walk to the board, per-role crew AI for people and robots, stamina, wages, belts, splitters, silos, loaders, hatcheries, the HQ, vehicles, routes and trips, diary |
+| `js/ui.js` | title screen, camera renderer, six tools and the two-dock palettes, the terrain paint layer, speech-bubble tooltips, the job-application crew forms, hatch animation, inspect, the crew board and robot workshop, the book, the HQ and its hand-drawn wall map, the trip window, the Lab desk and its hex map, particles, sound |

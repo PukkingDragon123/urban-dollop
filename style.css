@@ -95,17 +95,41 @@ button:focus-visible{ outline:3px dashed var(--pink); outline-offset:2px; }
 }
 .tool-btn.tool-menu, .tool-btn.tool-crew{ width:44px; height:44px; align-self:flex-end; }
 
-/* build palette pops above the toolbelt */
+/* ============================================================
+   THE DOCK
+   Both palettes are one short tray along the bottom of the stage.
+   They used to be a tall box floating over the middle of the field,
+   which meant half your land sat behind a wall of buttons.
+   Tabs down the left, a shelf that scrolls sideways, extras on the right.
+   ============================================================ */
 #build-palette, #farm-palette{
-  position:absolute; right:10px; bottom:80px;
-  display:flex; flex-direction:column; gap:6px;
-  max-width:min(560px, calc(100% - 20px));
-  background:rgba(255,249,236,.94);
+  position:absolute; left:8px; right:8px; bottom:80px; z-index:7;
+  display:flex; flex-direction:row; align-items:stretch; gap:8px;
+  background:linear-gradient(180deg,#fffaef 0 42%, #f3e7cd 42%);
   border:4px solid var(--ink);
-  box-shadow:3px 3px 0 var(--shadow);
+  border-radius:3px;
+  box-shadow:0 5px 0 var(--shadow), 0 -2px 0 rgba(255,255,255,.7) inset;
   padding:6px;
 }
-#farm-palette{ flex-direction:row; flex-wrap:wrap; justify-content:flex-end; align-items:stretch; }
+.dock-tabs{
+  display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:4px;
+  flex:0 0 auto; align-content:start; width:196px;
+}
+.dock-shelf{
+  flex:1 1 auto; min-width:0;
+  overflow-x:auto; overflow-y:hidden;
+  padding-bottom:3px;
+  scrollbar-width:thin; scrollbar-color:var(--ink) transparent;
+}
+.dock-shelf::-webkit-scrollbar{ height:8px; }
+.dock-shelf::-webkit-scrollbar-thumb{ background:var(--ink); border-radius:0; }
+.dock-shelf::-webkit-scrollbar-track{ background:rgba(122,90,58,.18); }
+.dock-shelf .pal-row{ flex-wrap:nowrap; justify-content:flex-start; }
+.dock-side{
+  flex:0 0 auto;
+  display:flex; flex-direction:column; align-items:flex-end; justify-content:center; gap:8px;
+  border-left:3px dashed rgba(122,90,58,.35); padding-left:8px;
+}
 .pal-tabs{ display:flex; gap:4px; flex-wrap:wrap; }
 .pal-tab{
   font-family:var(--font-px); font-size:11px; display:inline-flex; align-items:center; gap:4px;
@@ -113,6 +137,13 @@ button:focus-visible{ outline:3px dashed var(--pink); outline-offset:2px; }
 }
 .pal-tab.active{ background:var(--ink); color:var(--gold); }
 .pal-tab.dim{ opacity:.55; }
+.dock-tabs .pal-tab{
+  width:100%; justify-content:flex-start; gap:3px;
+  padding:5px 4px 5px 4px; font-size:9px;
+  overflow:hidden; white-space:nowrap;
+  box-shadow:2px 2px 0 var(--shadow);
+}
+.dock-tabs .pal-tab.active{ transform:translate(1px,1px); box-shadow:1px 1px 0 var(--shadow); }
 .pal-row{ display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
 .pal-btn{
   min-width:64px; min-height:72px;
@@ -121,9 +152,13 @@ button:focus-visible{ outline:3px dashed var(--pink); outline-offset:2px; }
   padding:4px 5px;
 }
 .pal-btn b{ font-family:var(--font-px); font-size:10px; }
+.pal-btn.farm b{
+  background:rgba(255,253,246,.92); padding:2px 4px; line-height:1.2;
+  box-shadow:0 0 0 1px rgba(122,90,58,.25);
+}
 .pal-btn.farm{ min-width:62px; }
 .pal-btn.farm canvas{ image-rendering:pixelated; }
-.farm-info{ width:100%; text-align:right; font-size:23px; color:var(--ink-soft); padding:2px 4px 0; }
+.farm-info{ color:var(--ink-soft); }
 .pal-btn small{
   font-family:var(--font-px); font-size:11px;
   display:inline-flex; align-items:center; gap:3px;
@@ -143,9 +178,11 @@ button:focus-visible{ outline:3px dashed var(--pink); outline-offset:2px; }
 #menu-pop .btn{ font-size:15px; letter-spacing:1px; }
 
 /* inspect panel - docked bottom-left inside the stage */
+/* the inspect card hangs under the resource pills, not down in the
+   bottom band, so it never fights the tool dock for the same corner */
 #inspect-panel{
-  position:absolute; left:10px; bottom:10px; z-index:6;
-  width:236px; max-height:calc(100% - 24px); overflow-y:auto;
+  position:absolute; left:10px; top:64px; z-index:6;
+  width:236px; max-height:calc(100% - 310px); overflow-y:auto;
   background:rgba(255,249,236,.96);
   border:4px solid var(--ink);
   box-shadow:4px 4px 0 var(--shadow);
@@ -574,7 +611,7 @@ button:focus-visible{ outline:3px dashed var(--pink); outline-offset:2px; }
 }
 .modal-panel.book .tab-btn{
   writing-mode:vertical-rl; text-orientation:upright;
-  padding:10px 6px; font-size:11px; letter-spacing:-2px;
+  padding:12px 7px; font-size:10px; letter-spacing:1px; line-height:1;
   border-left:none; box-shadow:3px 3px 0 var(--shadow);
   background:var(--pink); color:#4a1c30;
 }
@@ -720,7 +757,7 @@ button:focus-visible{ outline:3px dashed var(--pink); outline-offset:2px; }
 }
 
 /* palettes: big picture tiles, a name and a price, nothing else */
-#build-palette, #farm-palette{ bottom:100px; padding:9px; gap:9px; max-width:min(640px, calc(100% - 20px)); }
+#build-palette, #farm-palette{ bottom:100px; padding:8px; gap:10px; }
 .pal-tabs{ gap:6px; }
 .pal-tab{
   font-size:13px; padding:9px 13px; gap:6px; border-width:4px;
@@ -863,6 +900,184 @@ button:focus-visible{ outline:3px dashed var(--pink); outline-offset:2px; }
 .veh-card span, .route-card span, .depot-foot span, .crop-card i{ display:inline-flex; align-items:center; gap:5px; flex-wrap:wrap; justify-content:center; }
 .route-card .rc-mid span{ justify-content:flex-start; }
 
-.farm-info{ display:flex; gap:14px; justify-content:flex-end; align-items:center; flex-wrap:wrap; }
-.farm-info span{ display:inline-flex; align-items:center; gap:5px; font-family:var(--font-px); font-size:13px; }
+/* the tally board on the right of the dock: what you have tilled, grown,
+   ripened, painted and planted, each a little counter card */
+.farm-info{ display:flex; gap:7px; justify-content:flex-end; align-items:center; flex-wrap:wrap; }
+.farm-info span{
+  display:inline-flex; align-items:center; gap:5px; justify-content:flex-end;
+  font-family:var(--font-px); font-size:13px;
+  background:rgba(255,253,246,.75); border:2px solid rgba(122,90,58,.28);
+  padding:2px 6px 2px 4px; line-height:1.1; min-width:54px;
+}
 .farm-info canvas{ image-rendering:pixelated; }
+
+
+/* ============================================================
+   THE PAPERWORK LOOK
+   Crew, applicants and robot orders are all filled-in forms:
+   ruled paper, printed field labels, tick boxes and a stamp.
+   ============================================================ */
+.form-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(290px,1fr)); gap:14px; margin-bottom:14px; }
+.form-card{
+  position:relative; overflow:hidden;
+  background:
+    repeating-linear-gradient(0deg, rgba(90,120,160,.09) 0 1px, transparent 1px 26px),
+    linear-gradient(180deg,#fffdf6,#fdf6e6);
+  border:4px solid var(--ink);
+  box-shadow:5px 5px 0 var(--shadow);
+  padding:0 0 10px;
+  display:flex; flex-direction:column; gap:8px;
+}
+.form-card::before{
+  content:''; position:absolute; left:26px; top:0; bottom:0; width:2px;
+  background:rgba(220,90,90,.30);
+}
+.form-card.bot{ background:repeating-linear-gradient(0deg, rgba(90,120,160,.10) 0 1px, transparent 1px 26px), linear-gradient(180deg,#f4f8ff,#e9f1fb); }
+.form-card.applicant{ background:repeating-linear-gradient(0deg, rgba(150,120,60,.10) 0 1px, transparent 1px 26px), linear-gradient(180deg,#fffaf0,#fdf0d5); }
+.form-card.order{ background:repeating-linear-gradient(0deg, rgba(90,120,160,.10) 0 1px, transparent 1px 26px), linear-gradient(180deg,#f7fbff,#eaf3fd); }
+.form-card.locked{ opacity:.55; filter:grayscale(.4); }
+.form-card.unpaid{ box-shadow:5px 5px 0 var(--shadow), inset 0 0 0 4px rgba(232,96,122,.5); }
+
+.form-head{
+  display:flex; align-items:center; gap:10px;
+  background:var(--ink); color:var(--cream);
+  padding:8px 12px 8px 34px;
+}
+.form-head i{ font-style:normal; font-family:var(--font-px); font-size:10px; opacity:.8; }
+.form-head b{ font-family:var(--font-px); font-size:11px; margin-left:auto; }
+
+.form-body{ display:flex; gap:12px; padding:2px 12px 0 34px; align-items:flex-start; }
+.form-photo{
+  flex:none; width:74px; height:74px;
+  border:4px solid var(--ink); background:#fff;
+  box-shadow:3px 3px 0 var(--shadow);
+  display:flex; align-items:center; justify-content:center;
+  image-rendering:pixelated;
+}
+.form-photo canvas{ image-rendering:pixelated; }
+.form-fields{ flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; }
+.ff{ display:flex; align-items:baseline; gap:8px; }
+.ff i{
+  font-style:normal; font-family:var(--font-px); font-size:9px;
+  color:var(--ink-soft); flex:none; width:56px;
+}
+.ff span{
+  flex:1; min-width:0; font-size:23px; line-height:1.05;
+  border-bottom:3px dotted var(--ink-soft); padding-bottom:2px;
+  display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+}
+.ff.wide span{ font-family:var(--font-px); font-size:12px; }
+.chip{ display:inline-flex; align-items:center; gap:5px; font-size:22px; flex-wrap:nowrap; white-space:nowrap; }
+.chip canvas{ image-rendering:pixelated; }
+.chip.pay{ color:#1f7a2a; }
+
+.form-rate{ padding:0 12px 0 34px; }
+.form-rate > i{ font-style:normal; font-family:var(--font-px); font-size:9px; color:var(--ink-soft); display:block; margin-bottom:4px; }
+.form-card .trait-row{ padding:0 12px 0 34px; }
+.form-meta{ display:flex; gap:14px; align-items:center; padding:0 12px 0 34px; font-size:21px; color:var(--ink-soft); }
+.form-meta span{ display:inline-flex; align-items:center; gap:5px; }
+.form-state{ margin-left:auto; font-family:var(--font-px); font-size:10px; color:var(--ink); }
+
+.form-roles{ display:flex; align-items:center; gap:9px; padding:0 12px 0 34px; flex-wrap:wrap; }
+.form-roles > i{ font-style:normal; font-family:var(--font-px); font-size:9px; color:var(--ink-soft); }
+.tickrow{ display:flex; gap:6px; flex-wrap:wrap; }
+.tick{
+  width:44px; height:44px; padding:0;
+  border:4px solid var(--ink); background:#fff;
+  box-shadow:3px 3px 0 var(--shadow);
+  display:flex; align-items:center; justify-content:center;
+  transition: transform .1s var(--pop), box-shadow .1s var(--pop);
+}
+.tick canvas{ image-rendering:pixelated; transform:scale(1.15); }
+.tick:hover:not(:disabled){ transform:translate(-1px,-3px); }
+.tick:active:not(:disabled){ transform:translate(2px,3px); box-shadow:none; }
+.tick.on{ background:var(--gold); box-shadow:1px 1px 0 var(--shadow); transform:translate(2px,2px); }
+.tick.go{ background:#dff5c8; }
+.tick:disabled{ cursor:default; }
+.cc-fire{ margin-left:auto; background:#f2a08f; font-size:12px; }
+
+/* the stamp, rolled on at an angle */
+.stamp{
+  position:absolute; right:-16px; top:38%;
+  font-family:var(--font-px); font-size:14px; letter-spacing:3px;
+  padding:6px 20px; transform:rotate(-13deg);
+  border:4px solid currentColor; opacity:.5; pointer-events:none;
+}
+.stamp.green{ color:#3f8a33; }
+.stamp.amber{ color:#c98f1f; }
+.form-card.order .stamp{ display:none; }
+
+/* ============================================================
+   SPEECH BUBBLE TOOLTIPS
+   ============================================================ */
+#tip-bubble{
+  position:fixed; z-index:200; pointer-events:none;
+  max-width:290px;
+  background:var(--panel); color:var(--ink);
+  border:4px solid var(--ink);
+  box-shadow:5px 5px 0 var(--shadow);
+  padding:10px 14px; font-family:var(--font-body); font-size:23px; line-height:1.1;
+  --tail:20px;
+}
+#tip-bubble.pop{ animation:tipPop .16s cubic-bezier(.34,1.7,.5,1); }
+@keyframes tipPop{ from{ transform:scale(.7) translateY(6px); opacity:0; } to{ transform:scale(1) translateY(0); opacity:1; } }
+/* the tail is two triangles: a fat ink one, and a slightly smaller
+   panel-coloured one sitting on top, which leaves an even outline */
+#tip-bubble::after{
+  content:''; position:absolute; left:var(--tail); bottom:-14px;
+  width:0; height:0;
+  border-left:9px solid transparent; border-right:9px solid transparent;
+  border-top:14px solid var(--ink);
+}
+#tip-bubble::before{
+  content:''; position:absolute; left:calc(var(--tail) + 3px); bottom:-7px;
+  width:0; height:0; z-index:1;
+  border-left:6px solid transparent; border-right:6px solid transparent;
+  border-top:11px solid var(--panel);
+}
+#tip-bubble.below::after{ bottom:auto; top:-14px; border-top:none; border-bottom:14px solid var(--ink); }
+#tip-bubble.below::before{ bottom:auto; top:-7px; border-top:none; border-bottom:11px solid var(--panel); }
+
+/* ============================================================
+   THE BRUSH ROW
+   ============================================================ */
+.brush-row{ display:flex; gap:8px; align-items:center; justify-content:flex-end; }
+.brush-btn{
+  width:46px; height:46px; padding:0;
+  border:4px solid var(--ink); background:var(--panel2);
+  box-shadow:3px 3px 0 var(--shadow);
+  display:flex; align-items:center; justify-content:center;
+  transition: transform .1s var(--pop), box-shadow .1s var(--pop);
+}
+.brush-btn i{ display:block; background:var(--ink-soft); border-radius:50%; }
+.brush-btn:hover{ transform:translate(-1px,-3px); }
+.brush-btn.active{ background:var(--gold); box-shadow:1px 1px 0 var(--shadow); transform:translate(2px,2px); }
+.brush-btn.active i{ background:var(--ink); }
+
+/* ============================================================
+   THE GARDEN CENTRE
+   Decor tiles get a shelf, a little price tag and a lift.
+   ============================================================ */
+#farm-palette .pal-row{ align-items:flex-end; }
+.pal-btn.farm{
+  background:linear-gradient(180deg,#fffdf6 0 62%, #efe3c6 62%);
+  position:relative;
+}
+.pal-btn.farm.active{
+  background:linear-gradient(180deg,#fff3c4 0 62%, #e6d29a 62%);
+  color:var(--ink);
+  box-shadow:0 0 0 3px var(--gold), 3px 3px 0 var(--shadow);
+  transform:translateY(-3px);
+}
+.pal-btn.farm.active small{ background:#fff8e2; }
+.pal-btn.farm small{
+  background:var(--gold); border:3px solid var(--ink); padding:2px 6px;
+  box-shadow:2px 2px 0 var(--shadow);
+}
+.pal-btn.farm:disabled small{ background:#d8cfbc; }
+
+#build-palette.dim, #farm-palette.dim{
+  opacity:.14; pointer-events:none;
+  transition:opacity .12s ease;
+}
+#build-palette, #farm-palette{ transition:opacity .18s ease; }

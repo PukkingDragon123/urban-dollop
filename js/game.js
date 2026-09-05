@@ -6,7 +6,7 @@
    ============================================================ */
 'use strict';
 
-const SAVE_KEY = 'infEggCoSave_v6';
+const SAVE_KEY = 'infEggCoSave_v7';
 
 /* the world: 4x3 plots of 16x13 tiles = 64x39 tiles = 1024x624 px */
 const WORLD = {
@@ -15,7 +15,6 @@ const WORLD = {
   roadY: 592,                                /* road rows 37-38, bottom plots only */
   view: { w: 384, h: 208 },                  /* camera viewport */
   mama: { x: 118, y: 480 },
-  pond: { x: 180, y: 434, w: 56, h: 28 },
   truckHome: { x: 150, y: 588, w: 56, h: 32 },
   stations: {
     lab:      { x: 18,  y: 430, w: 30, h: 32 },   /* the Lab, home of EGGOS */
@@ -33,7 +32,7 @@ const GAME = (() => {
   function freshState() {
     const plots = PLOTS.map(p => p.id === PLOT_START);
     return {
-      v: 6,
+      v: 7,
       coins: 0, feathers: 0,
       plots,
       mamaTier: 0,
@@ -50,7 +49,8 @@ const GAME = (() => {
       hatchers: {}, splitters: {}, loaders: {},
       barns: {}, troughs: {}, wells: {}, sprinklers: {}, mills: {}, coops: {}, boards: {}, hqs: {},
       soil: {},              /* "c,r" -> {crop, growth, water, seed} tilled ground */
-      terrain: {},           /* "c,r" -> {t:'path'|'stone'|'high'|'water', seed} shaped ground */
+      paint: {},             /* "cx,cy" at 8px -> 'path'|'stone'|'high'|'water', painted ground */
+      brush: 2,              /* brush radius, in 8px cells */
       deco: {},              /* "c,r" -> {kind, seed} things planted for the look of them */
       feedStore: 6,          /* pellets in the barn, ready to scatter */
       seeds: { clover: 6, wheat: 4 },
@@ -161,16 +161,36 @@ const GAME = (() => {
     const p = plotAt(x, y);
     return !!(p && S.plots[p.id]);
   }
-  function terrainAt(c, r) { const t = S.terrain[key(c, r)]; return t ? t.t : null; }
-  function inPond(x, y) {
-    const p = WORLD.pond;
-    if (x > p.x - 6 && x < p.x + p.w + 6 && y > p.y - 6 && y < p.y + p.h + 6) return true;
-    /* ponds you dug yourself block just the same */
-    return terrainAt(Math.floor(x / 16), Math.floor(y / 16)) === 'water';
+  /* ============================================================
+     THE PAINT GRID
+     Terrain is not placed in tiles - it is painted, on a grid of
+     8px cells, four to a tile. Brushes are round and paint every
+     cell they cover, so what you draw has organic edges.
+     ============================================================ */
+  const CELL_PX = 8;
+  const ckey = (cx, cy) => cx + ',' + cy;
+  function paintAt(x, y) { return S.paint[ckey(Math.floor(x / CELL_PX), Math.floor(y / CELL_PX))] || null; }
+  /* what covers a whole tile, if anything covers most of it */
+  function terrainAt(c, r) {
+    const counts = {};
+    let best = null, bn = 0;
+    for (let dx = 0; dx < 2; dx++) for (let dy = 0; dy < 2; dy++) {
+      const k = S.paint[ckey(c * 2 + dx, r * 2 + dy)];
+      if (!k) continue;
+      counts[k] = (counts[k] || 0) + 1;
+      if (counts[k] > bn) { bn = counts[k]; best = k; }
+    }
+    return bn >= 2 ? best : null;
   }
-  /* how much quicker the crew move over a tile */
+  function tileHasWater(c, r) {
+    for (let dx = 0; dx < 2; dx++) for (let dy = 0; dy < 2; dy++)
+      if (S.paint[ckey(c * 2 + dx, r * 2 + dy)] === 'water') return true;
+    return false;
+  }
+  function inPond(x, y) { return paintAt(x, y) === 'water'; }
+  /* how much quicker the crew move over the ground underfoot */
   function groundSpeed(x, y) {
-    const t = terrainAt(Math.floor(x / 16), Math.floor(y / 16));
+    const t = paintAt(x, y);
     if (t === 'stone') return ECON.stoneSpeed;
     if (t === 'path') return ECON.pathSpeed;
     return 1;
@@ -195,6 +215,11 @@ const GAME = (() => {
     });
     return { x0, y0, x1, y1 };
   }
+  /* the tool dock floats over the foot of the screen. camPad is how many
+     world pixels it covers, so the camera may scroll that much further
+     down and no strip of your land is ever stuck behind the buttons. */
+  let camPad = 0;
+  function setCamPad(px) { camPad = Math.max(0, Math.round(px) || 0); clampCam(); }
   function clampCam() {
     const b = ownedBounds();
     const vw = WORLD.view.w, vh = WORLD.view.h;
@@ -202,7 +227,7 @@ const GAME = (() => {
     const loX = Math.max(0, Math.min(b.x0, WORLD.W - vw));
     const hiX = Math.max(loX, Math.min(WORLD.W - vw, b.x1 - vw));
     const loY = Math.max(0, Math.min(b.y0, WORLD.H - vh));
-    const hiY = Math.max(loY, Math.min(WORLD.H - vh, b.y1 - vh));
+    const hiY = Math.max(loY, Math.min(WORLD.H - vh, b.y1 - vh) + camPad);
     S.cam.x = clamp(S.cam.x, loX, hiX);
     S.cam.y = clamp(S.cam.y, loY, hiY);
   }
@@ -248,10 +273,9 @@ const GAME = (() => {
     const p = plotAt(x, y);
     if (!p || !S.plots[p.id]) return false;
     if (r >= 37) return false;                          /* the road */
-    if (terrainAt(c, r) === 'water') return false;      /* not in the pond */
+    if (tileHasWater(c, r)) return false;               /* not in the water */
     if (r === p.tr && p.tr === 0) return false;         /* top tree line */
-    const px = c * 16, py = r * 16, pd = WORLD.pond;
-    if (px + 16 > pd.x - 4 && px < pd.x + pd.w + 4 && py + 16 > pd.y - 4 && py < pd.y + pd.h + 4) return false;
+    const px = c * 16, py = r * 16;
     if (Math.abs(px + 8 - WORLD.mama.x) < 28 && Math.abs(py + 8 - WORLD.mama.y) < 28) return false;
     for (const k of Object.keys(WORLD.stations)) {
       const st = WORLD.stations[k];
@@ -265,7 +289,7 @@ const GAME = (() => {
     for (let dc = 0; dc < b.w; dc++) for (let dr = 0; dr < b.h; dr++) {
       const k = key(c + dc, r + dr);
       if (!tileBuildable(c + dc, r + dr) || occ[k] || S.soil[k]) return false;
-      if (S.terrain[k] && S.terrain[k].t === 'water') return false;
+      if (tileHasWater(c + dc, r + dr)) return false;
     }
     return true;
   }
@@ -666,8 +690,7 @@ const GAME = (() => {
     if (!p || !S.plots[p.id]) return false;
     if (r >= 37) return false;
     if (r === p.tr && p.tr === 0) return false;
-    const px = c * 16, py = r * 16, pd = WORLD.pond;
-    if (px + 16 > pd.x - 2 && px < pd.x + pd.w + 2 && py + 16 > pd.y - 2 && py < pd.y + pd.h + 2) return false;
+    const px = c * 16, py = r * 16;
     if (Math.abs(px + 8 - WORLD.mama.x) < 18 && Math.abs(py + 8 - WORLD.mama.y) < 18) return false;
     for (const k of Object.keys(WORLD.stations)) {
       const st = WORLD.stations[k];
@@ -680,49 +703,76 @@ const GAME = (() => {
     return tileOpen(c, r) && !occ[k] && !S.soil[k] && !S.deco[k];
   }
   function canTill(c, r) {
-    const t = terrainAt(c, r);
-    return tileFree(c, r) && t !== 'water' && t !== 'stone' && t !== 'path';
+    if (!tileFree(c, r)) return false;
+    for (let dx = 0; dx < 2; dx++) for (let dy = 0; dy < 2; dy++)
+      if (S.paint[ckey(c * 2 + dx, r * 2 + dy)]) return false;
+    return true;
   }
 
-  /* ---- shaping the ground ---- */
+  /* ---- shaping the ground with a brush ---- */
   function terrainCost(kind) { return (TERRAIN[kind] || {}).cost || 0; }
   function terrainOpen(kind) {
     const d = TERRAIN[kind];
     return !!d && (!d.needs || lvl(d.needs) > 0);
   }
-  function canShape(kind, c, r) {
-    if (!terrainOpen(kind)) return false;
-    const k = key(c, r);
-    if (kind === 'flat') return !!S.terrain[k];
-    if (!tileOpen(c, r) && terrainAt(c, r) !== 'water') return false;
-    if (occ[k] || S.soil[k]) return false;
-    if (kind === 'water' && S.deco[k]) return false;
-    if (terrainAt(c, r) === kind) return false;
-    return S.coins >= terrainCost(kind);
-  }
-  function shape(kind, c, r) {
-    if (!canShape(kind, c, r)) return false;
-    const k = key(c, r);
-    if (kind === 'flat') {
-      delete S.terrain[k];
-      emit('shape', { c, r, kind });
-      return true;
-    }
-    S.coins -= terrainCost(kind);
-    if (kind === 'water' && S.deco[k]) delete S.deco[k];
-    S.terrain[k] = { t: kind, seed: Math.floor(Math.random() * 999) };
-    S.stats.shaped++;
-    if (S.stats.shaped === 1) note('shape', 'Started shaping the land. It is yours to arrange.');
-    emit('shape', { c, r, kind });
+  /* a cell can be painted if you own the ground under it and nothing is built there */
+  function cellPaintable(cx, cy) {
+    const x = cx * CELL_PX + 4, y = cy * CELL_PX + 4;
+    const c = Math.floor(x / 16), r = Math.floor(y / 16);
+    if (!tileOpen(c, r)) return false;
+    if (occ[key(c, r)] || S.soil[key(c, r)] || S.deco[key(c, r)]) return false;
     return true;
   }
+  /* paint one round dab. returns how many cells actually changed. */
+  function dab(kind, x, y, radius) {
+    if (kind !== 'flat' && !terrainOpen(kind)) return 0;
+    const rr = Math.max(0.5, radius);
+    const cx0 = Math.floor((x - rr) / CELL_PX), cx1 = Math.floor((x + rr) / CELL_PX);
+    const cy0 = Math.floor((y - rr) / CELL_PX), cy1 = Math.floor((y + rr) / CELL_PX);
+    let n = 0;
+    for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) {
+      const px = cx * CELL_PX + CELL_PX / 2, py = cy * CELL_PX + CELL_PX / 2;
+      /* a soft round edge: cells right on the rim only take about half the time,
+         which is what stops a brush stroke looking like a staircase */
+      const d = Math.hypot(px - x, py - y);
+      if (d > rr + 3) continue;
+      if (d > rr && ((cx * 7 + cy * 13) % 5) < 3) continue;
+      const k = ckey(cx, cy);
+      if (kind === 'flat') {
+        if (S.paint[k]) { delete S.paint[k]; n++; }
+        continue;
+      }
+      if (S.paint[k] === kind) continue;
+      if (!cellPaintable(cx, cy)) continue;
+      if (!S.paint[k]) {
+        if (S.coins < terrainCost(kind) / 4) continue;
+        S.coins -= terrainCost(kind) / 4;
+      }
+      S.paint[k] = kind;
+      n++;
+    }
+    if (n) { S.stats.shaped += n; if (S.stats.shaped === n) note('shape', 'Started shaping the land.'); }
+    return n;
+  }
+  /* a whole stroke, so a fast drag leaves no gaps */
+  function stroke(kind, x0, y0, x1, y1, radius) {
+    const d = Math.hypot(x1 - x0, y1 - y0);
+    const steps = Math.max(1, Math.ceil(d / Math.max(1, radius * 0.6)));
+    let n = 0;
+    for (let i = 0; i <= steps; i++) {
+      const t = steps ? i / steps : 0;
+      n += dab(kind, x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, radius);
+    }
+    if (n) emit('paint', { kind, x0, y0, x1, y1, radius });
+    return n;
+  }
+  function paintedCells() { return Object.keys(S.paint).length; }
 
   /* ---- decorations ---- */
   function canDecorate(kind, c, r) {
     const d = DECOS[kind];
     if (!d) return false;
-    const t = terrainAt(c, r);
-    if (t === 'water') return false;
+    if (tileHasWater(c, r)) return false;
     return tileFree(c, r) && S.coins >= d.cost;
   }
   function decorate(kind, c, r) {
@@ -744,7 +794,7 @@ const GAME = (() => {
   function decoAt(c, r) { return S.deco[key(c, r)] || null; }
   function till(c, r) {
     if (!canTill(c, r)) return false;
-    delete S.terrain[key(c, r)];
+    for (let dx = 0; dx < 2; dx++) for (let dy = 0; dy < 2; dy++) delete S.paint[ckey(c * 2 + dx, r * 2 + dy)];
     S.soil[key(c, r)] = { crop: null, growth: 0, water: 0, seed: Math.floor(Math.random() * 999) };
     emit('till', { c, r });
     return true;
@@ -1822,6 +1872,7 @@ const GAME = (() => {
       applicants: S.applicants.length,
       feed: S.feedStore, feedCap: feedCap(),
       soil: Object.keys(S.soil).length,
+      painted: Object.keys(S.paint).length,
       crops: Object.values(S.soil).filter(t => t.crop).length,
       ripe: Object.values(S.soil).filter(t => ripe(t)).length,
       chicks: S.chickens.filter(isChick).length,
@@ -2089,7 +2140,7 @@ const GAME = (() => {
       const raw = localStorage.getItem(SAVE_KEY);
       if (!raw) { ensureStarterInc(); rebuildOcc(); return false; }
       const d = JSON.parse(raw);
-      if (!d || d.v !== 6) { ensureStarterInc(); rebuildOcc(); return false; }
+      if (!d || d.v !== 7) { ensureStarterInc(); rebuildOcc(); return false; }
       S = Object.assign(freshState(), d);
       S.truck = Object.assign({ state: 'parked', t: 0, load: [] }, d.truck);
       S.held = null;
@@ -2100,7 +2151,8 @@ const GAME = (() => {
       S.bots = Object.assign({ cull: 0, match: 0 }, S.bots);
       ['huts', 'silos', 'blowers', 'sorters', 'fences', 'hatchers', 'splitters', 'loaders',
        'barns', 'troughs', 'wells', 'sprinklers', 'mills', 'coops', 'boards', 'hqs', 'soil',
-       'terrain', 'deco'].forEach(m => { if (!S[m]) S[m] = {}; });
+       'paint', 'deco'].forEach(m => { if (!S[m]) S[m] = {}; });
+      if (typeof S.brush !== 'number') S.brush = 2;
       S.staff.forEach(w => { if (w.bot === undefined) w.bot = (w.role === 'cull' || w.role === 'match'); });
       S.chickens.forEach(c => { if (c.age === undefined) c.age = 1; if (c.food === undefined) c.food = 1; });
       if (!Array.isArray(S.routes) || !S.routes.length) S.routes = ['hamlet'];
@@ -2158,13 +2210,14 @@ const GAME = (() => {
     tileBuildable, canPlace, occAt: (c, r) => occ[key(c, r)],
     buyPlot, petMama, petChicken, grabChicken, grabEgg, dropHeld, hitTruck,
     scoopEgg, collectPlume, basketToTruck, basketToInc, basketToGround, sprinkleFeed,
-    sendTruck, build, demolish, setBeltDir, ejectNest, buySkill, upgradeMama,
+    sendTruck, build, demolish, setBeltDir, ejectNest, buySkill, upgradeMama, setCamPad,
     staffSlots, wagePerSec, canHire, fireStaff, setRole, roleOpen,
     sendFlyers, canFlyer, flyerPrice, hireApplicant, assembleBot, botPrice,
     crewStat, crewSpeed, crewCarry, trait, machineBoost, careBoost, auraR, restCap,
     markChicken, retireChicken, rates, beltDirFor, plumeValue,
     feedCap, addFeed, canTill, till, untill, canPlant, plant, water, harvest, cropStage, ripe, harvestYield,
-    terrainAt, canShape, shape, terrainOpen, terrainCost, canDecorate, decorate, undecorate, decoAt, tileOpen,
+    terrainAt, paintAt, tileHasWater, dab, stroke, terrainOpen, terrainCost, cellPaintable, paintedCells, CELL_PX,
+    canDecorate, decorate, undecorate, decoAt, tileOpen,
     groundSpeed, hasHQ, tileFree, botPrice, botCount,
     seedCount, cropOpen, wateredBy, isChick, growPellets, nearCoop, mamaLayTime,
     vehicle, city, tripPhase, buyVehicle, buyRoute, setRoute, applicantAt, boardSpot,

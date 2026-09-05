@@ -62,6 +62,75 @@
     };
   })();
 
+  /* ================= SPEECH BUBBLES =================
+     Nothing in the interface gets a thin grey browser tooltip. Any
+     element with a title grows a fat cartoon bubble with a tail
+     instead, and the title is moved out of the way so the native
+     one never appears.
+     ================================================== */
+  let tipEl = null, tipFor = null, tipT = 0;
+  function ensureTip() {
+    if (tipEl) return tipEl;
+    tipEl = document.createElement('div');
+    tipEl.id = 'tip-bubble';
+    tipEl.hidden = true;
+    document.body.appendChild(tipEl);
+    return tipEl;
+  }
+  function tipTextOf(el) {
+    let n = el;
+    for (let i = 0; i < 5 && n; i++, n = n.parentElement) {
+      if (n.dataset && n.dataset.tip) return { el: n, text: n.dataset.tip };
+      if (n.title) { n.dataset.tip = n.title; n.title = ''; return { el: n, text: n.dataset.tip }; }
+    }
+    return null;
+  }
+  function showTip(target, text) {
+    const t = ensureTip();
+    if (tipFor === target && !t.hidden) return;
+    tipFor = target;
+    t.textContent = text;
+    t.hidden = false;
+    t.classList.remove('pop');
+    void t.offsetWidth;
+    t.classList.add('pop');
+    const r = target.getBoundingClientRect();
+    const tw = t.offsetWidth, th = t.offsetHeight;
+    let x = r.left + r.width / 2 - tw / 2;
+    let y = r.top - th - 14;
+    let below = false;
+    if (y < 8) { y = r.bottom + 14; below = true; }
+    x = Math.max(8, Math.min(window.innerWidth - tw - 8, x));
+    t.style.left = Math.round(x) + 'px';
+    t.style.top = Math.round(y) + 'px';
+    t.classList.toggle('below', below);
+    /* the tail points back at whatever you are hovering */
+    const tail = Math.max(14, Math.min(tw - 14, r.left + r.width / 2 - x));
+    t.style.setProperty('--tail', Math.round(tail) + 'px');
+  }
+  function hideTip() { if (tipEl) { tipEl.hidden = true; } tipFor = null; }
+  /* Titles are moved into data-tip the moment they enter the page, so the
+     browser never gets a chance to draw its own thin grey tooltip. */
+  function stripTitles(root) {
+    if (!root || root.nodeType !== 1) return;
+    if (root.title) { root.dataset.tip = root.title; root.title = ''; }
+    const kids = root.querySelectorAll ? root.querySelectorAll('[title]') : [];
+    kids.forEach(n => { if (n.title) { n.dataset.tip = n.title; n.title = ''; } });
+  }
+  new MutationObserver(muts => {
+    muts.forEach(m => m.addedNodes.forEach(stripTitles));
+  }).observe(document.body, { childList: true, subtree: true });
+  stripTitles(document.body);
+
+  document.addEventListener('pointerover', ev => {
+    const found = tipTextOf(ev.target);
+    if (!found || !found.text) { hideTip(); return; }
+    clearTimeout(tipT);
+    tipT = setTimeout(() => showTip(found.el, found.text), 90);
+  });
+  document.addEventListener('pointerout', ev => { clearTimeout(tipT); hideTip(); });
+  document.addEventListener('pointerdown', () => { clearTimeout(tipT); hideTip(); });
+
   /* ================= DOM ICON HELPERS ================= */
   function mkIcon(name, scale) {
     const src = SPR.iconSprite(name, scale || 2);
@@ -178,28 +247,8 @@
     const nDirt = makeNoise(47, 7, W.W, W.H);
 
     /* dirt paths: polylines through the home plot */
-    /* dirt paths through the home plot, plus a lane along the road */
-    const paths = [
-      [[36, 458], [52, 508], [92, 538], [150, 574], [186, 588]],
-      [[92, 538], [118, 500]],
-      [[64, 456], [58, 494]],
-      [[186, 588], [420, 584], [700, 588], [980, 584]],
-    ];
-    function pathDist(x, y) {
-      let best = 1e9;
-      for (const poly of paths) {
-        for (let i = 0; i < poly.length - 1; i++) {
-          const [x1, y1] = poly[i], [x2, y2] = poly[i + 1];
-          const dx = x2 - x1, dy = y2 - y1;
-          const t = Math.max(0, Math.min(1, ((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy)));
-          const px = x1 + dx * t, py = y1 + dy * t;
-          best = Math.min(best, Math.hypot(x - px, y - py));
-        }
-      }
-      return best;
-    }
-
-    const pond = W.pond;
+    /* nothing is baked into the ground any more - no paths, no pond.
+       Whatever crosses this valley, you painted it. */
     for (let y = 0; y < W.H; y++) {
       for (let x = 0; x < W.W; x++) {
         let c;
@@ -223,28 +272,6 @@
             if (bare > 0.755) c = DIRT[((x * 7 + y * 13) % 23) < 8 ? 0 : 2];
             else if (bare > 0.715 && (x + y) % 2 === 0) c = DIRT[2];
           }
-          /* dirt path */
-          const pd = pathDist(x, y);
-          const edge = 5 + nDirt(x, y) * 4;
-          if (pd < edge) {
-            const n = nSml(x * 1.7, y * 1.7);
-            c = DIRT[n < 0.35 ? 0 : n < 0.7 ? 1 : 2];
-            if (pd > edge - 1.6 && (x + y) % 2 === 0) c = GRASS[1];
-          }
-          /* pond */
-          const inPondRect = x > pond.x - 6 && x < pond.x + pond.w + 6 && y > pond.y - 5 && y < pond.y + pond.h + 6;
-          if (inPondRect) {
-            const cx = pond.x + pond.w / 2, cy = pond.y + pond.h / 2;
-            const dx = (x - cx) / (pond.w / 2), dy = (y - cy) / (pond.h / 2);
-            const r = dx * dx + dy * dy + (nSml(x, y) - 0.5) * 0.16;
-            if (r < 0.82) {
-              const depth = 1 - r;
-              c = WATER[depth > 0.75 ? 3 : depth > 0.5 ? 0 : depth > 0.3 ? 1 : 2];
-            } else if (r < 1.05) {
-              const n = nSml(x * 2, y * 2);
-              c = SAND[n < 0.4 ? 0 : n < 0.8 ? 1 : 2];
-            }
-          }
         }
         put(x, y, c);
       }
@@ -260,26 +287,10 @@
     /* grass blades everywhere */
     for (let i = 0; i < 7000; i++) {
       const x = Math.floor(rndG() * W.W), y = Math.floor(rndG() * (W.roadY - 6)) + 4;
-      if (GAME.inPond(x, y)) continue;
       const hp2 = PLOTS[PLOT_START];
-      if (x >= hp2.tc * 16 && x < (hp2.tc + PLOT_W) * 16 && y >= hp2.tr * 16 && rndG() < 0.72) continue;
+      if (x >= hp2.tc * 16 && x < (hp2.tc + PLOT_W) * 16 && y >= hp2.tr * 16 && rndG() < 0.55) continue;
       g.fillStyle = rndG() < 0.5 ? 'rgba(96,160,60,.55)' : 'rgba(150,214,110,.5)';
       g.fillRect(x, y, 1, 2);
-    }
-
-    /* pond extras: lily pads, reeds, shore stones */
-    g.fillStyle = '#4f9b3f';
-    [[10, 20], [40, 6], [24, 24]].forEach(([ox, oy], i) => {
-      const lx = pond.x + ox, ly = pond.y + oy;
-      g.fillStyle = '#4f9b3f'; g.fillRect(lx, ly, 6, 3); g.fillRect(lx + 1, ly - 1, 4, 5);
-      g.fillStyle = '#63b048'; g.fillRect(lx + 1, ly, 3, 2);
-      if (i === 1) { g.fillStyle = '#ff8ab5'; g.fillRect(lx + 2, ly, 2, 2); g.fillStyle = '#fff'; g.fillRect(lx + 2, ly, 1, 1); }
-    });
-    for (let i = 0; i < 7; i++) {
-      const a = rndG() * Math.PI * 2;
-      const rx = pond.x + pond.w / 2 + Math.cos(a) * (pond.w / 2 + 4);
-      const ry = pond.y + pond.h / 2 + Math.sin(a) * (pond.h / 2 + 3);
-      g.drawImage(SPR.decoSprite('reed', 1, 100 + i), Math.floor(rx) - 4, Math.floor(ry) - 10);
     }
 
     /* per-plot scenery */
@@ -304,19 +315,172 @@
       g.drawImage(spr, W.W - 20, y + 8);
     }
 
-    /* mama's tended nest patch */
-    const mx = W.mama.x, my = W.mama.y;
-    for (let y = -6; y < 18; y++) for (let x = -20; x < 22; x++) {
-      const dx = x / 20, dy = (y - 6) / 11;
-      if (dx * dx + dy * dy < 1 && rndG() < 0.85) {
-        g.fillStyle = rndG() < 0.5 ? '#c9a35f' : '#d9b673';
-        g.fillRect(mx + x, my + y, 1, 1);
-      }
-    }
 
     /* fences: pretty picket for owned, weathered for locked */
     PLOTS.forEach(p => { if (!S().plots[p.id]) lockedPlot(g, p); });
     GAME.dirty.ground = false;
+  }
+
+  /* ============================================================
+     THE PAINTED LAYER
+     The paint grid is 8px cells, but nothing is drawn as a cell.
+     Every pixel asks its neighbourhood how much of each kind
+     covers it, and the answer is thresholded with a dither, so a
+     brush stroke comes out as a soft organic shape rather than a
+     staircase. Only the region under the brush is redrawn.
+     ============================================================ */
+  const TERR_LIFT = 8;                  /* headroom above the world for raised ground */
+  let terrCv = null, terrCtx = null, terrImg = null, terrDirty = true;
+  const CP = 8;
+
+  function coverAt(px, py, kind) {
+    /* weighted vote of the 3x3 cells around this pixel */
+    const fx = px / CP, fy = py / CP;
+    const c0 = Math.floor(fx), r0 = Math.floor(fy);
+    let hit = 0, tot = 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const cx = c0 + dx, cy = r0 + dy;
+      const d = Math.hypot((cx + 0.5) - fx, (cy + 0.5) - fy);
+      const w = Math.max(0, 1.45 - d);
+      if (w <= 0) continue;
+      tot += w;
+      if (GAME.S.paint[cx + ',' + cy] === kind) hit += w;
+    }
+    return tot > 0 ? hit / tot : 0;
+  }
+  function topKindAt(px, py) {
+    const fx = Math.floor(px / CP), fy = Math.floor(py / CP);
+    const seen = {};
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const k = GAME.S.paint[(fx + dx) + ',' + (fy + dy)];
+      if (k) seen[k] = 1;
+    }
+    return Object.keys(seen);
+  }
+  const hash2 = (x, y) => { const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return n - Math.floor(n); };
+
+  /* the paint pots: each returns a colour for a pixel */
+  const PAINT = {
+    path: (x, y, edge) => {
+      const n = hash2(x * 0.7, y * 0.7);
+      if (edge) return n < 0.5 ? '#c69a5c' : '#b58a4f';
+      return n < 0.25 ? '#a87c42' : n < 0.6 ? '#b58a4f' : n < 0.88 ? '#c69a5c' : '#d1a86b';
+    },
+    stone: (x, y, edge) => {
+      /* flagstones cut by mortar lines that wander a little */
+      const gx = Math.floor((x + Math.sin(y * 0.21) * 2) / 9), gy = Math.floor((y + Math.sin(x * 0.19) * 2) / 7);
+      const mort = ((x + Math.round(Math.sin(y * 0.21) * 2)) % 9 === 0) || ((y + Math.round(Math.sin(x * 0.19) * 2)) % 7 === 0);
+      if (mort) return '#8a8578';
+      const n = hash2(gx, gy);
+      const base = n < 0.25 ? '#c9c4b4' : n < 0.5 ? '#bdb8a8' : n < 0.75 ? '#d2cdbd' : '#b5b0a0';
+      if (edge) return '#9a9488';
+      return hash2(x, y) < 0.10 ? SPR.darken(base, 0.12) : base;
+    },
+    water: (x, y, edge, depth) => {
+      if (edge) return hash2(x, y) < 0.5 ? '#e0cb98' : '#d6bd88';
+      const n = hash2(x * 0.6, y * 0.6);
+      if (depth < 0.62) return n < 0.5 ? '#63c1e2' : '#4fb0d6';
+      return n < 0.2 ? '#2a7ba0' : n < 0.62 ? '#2f86ad' : '#3f9ec4';
+    },
+    high: (x, y, edge) => {
+      const n = hash2(x * 0.8, y * 0.8);
+      if (edge) return '#5b9636';
+      return n < 0.2 ? '#6ab04c' : n < 0.55 ? '#7fc44f' : n < 0.85 ? '#8ecf5b' : '#9ada66';
+    },
+  };
+  const CLIFF = (x, y, t) => {
+    const n = hash2(x * 0.9, y * 1.3);
+    if (t < 0.16) return '#b98a52';
+    if (n < 0.18) return '#a8783f';
+    if (n < 0.34) return '#7d5626';
+    return '#93672f';
+  };
+
+  function ensureTerrain() {
+    if (terrCv) return;
+    terrCv = SPR.newCanvas(W.W, W.H + TERR_LIFT);
+    terrCtx = terrCv.getContext('2d');
+    terrCtx.imageSmoothingEnabled = false;
+  }
+  /* redraw a rectangle of the layer straight into an ImageData buffer */
+  function repaintRegion(x0, y0, x1, y1) {
+    ensureTerrain();
+    x0 = Math.max(0, Math.floor(x0)); y0 = Math.max(0, Math.floor(y0));
+    x1 = Math.min(W.W, Math.ceil(x1)); y1 = Math.min(W.H + TERR_LIFT, Math.ceil(y1));
+    const w = x1 - x0, h = y1 - y0;
+    if (w <= 0 || h <= 0) return;
+    const img = terrCtx.createImageData(w, h);
+    const d = img.data;
+    const rgb = hex => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+    const cache = {};
+    const col = hex => cache[hex] || (cache[hex] = rgb(hex));
+    for (let py = y0; py < y1; py++) {
+      /* the layer is drawn TERR_LIFT lower than the world so raised ground
+         has somewhere to stand up into */
+      const wy = py - TERR_LIFT;
+      for (let px = x0; px < x1; px++) {
+        const i = ((py - y0) * w + (px - x0)) * 4;
+        let put = null;
+
+        /* raised ground first: it lifts, and drops a bank below itself */
+        const hUp = coverAt(px, wy + TERR_LIFT, 'high');
+        if (hUp > 0.5 || (hUp > 0.33 && ((px + wy) % 2 === 0))) {
+          put = PAINT.high(px, wy, hUp <= 0.62);
+        } else {
+          /* the cut bank under the lifted grass */
+          let bank = 0;
+          for (let k = 1; k <= TERR_LIFT + 3; k++) {
+            const c2 = coverAt(px, wy + TERR_LIFT - k, 'high');
+            if (c2 > 0.5) { bank = k; break; }
+          }
+          if (bank) put = CLIFF(px, wy, bank / (TERR_LIFT + 3));
+        }
+
+        if (!put) {
+          const kinds = topKindAt(px, wy);
+          let bestK = null, bestC = 0;
+          for (let n = 0; n < kinds.length; n++) {
+            if (kinds[n] === 'high') continue;
+            const c2 = coverAt(px, wy, kinds[n]);
+            if (c2 > bestC) { bestC = c2; bestK = kinds[n]; }
+          }
+          if (bestK) {
+            const solid = bestC > 0.52;
+            const fringe = bestC > 0.34 && ((px * 3 + wy * 5) % 4 < 2 || hash2(px, wy) < 0.4);
+            if (solid || fringe) {
+              const edge = !solid || bestC < 0.66;
+              put = PAINT[bestK](px, wy, edge, bestC);
+            }
+          }
+        }
+        if (put) {
+          const c3 = col(put);
+          d[i] = c3[0]; d[i + 1] = c3[1]; d[i + 2] = c3[2]; d[i + 3] = 255;
+        }
+      }
+    }
+    terrCtx.clearRect(x0, y0, w, h);
+    terrCtx.putImageData(img, x0, y0);
+  }
+  function rebuildTerrain() {
+    ensureTerrain();
+    terrCtx.clearRect(0, 0, terrCv.width, terrCv.height);
+    /* only bother with the rows that actually have paint in them */
+    let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+    for (const k in GAME.S.paint) {
+      const [cx, cy] = k.split(',').map(Number);
+      minX = Math.min(minX, cx * CP); maxX = Math.max(maxX, cx * CP + CP);
+      minY = Math.min(minY, cy * CP); maxY = Math.max(maxY, cy * CP + CP);
+    }
+    terrDirty = false;
+    if (maxX < minX) return;
+    repaintRegion(minX - 12, minY - 12, maxX + 12, maxY + TERR_LIFT + 14);
+  }
+  function terrainTouched(x0, y0, x1, y1, radius) {
+    ensureTerrain();
+    const pad = radius + 14;
+    repaintRegion(Math.min(x0, x1) - pad, Math.min(y0, y1) - pad,
+                  Math.max(x0, x1) + pad, Math.max(y0, y1) + pad + TERR_LIFT + 6);
   }
 
   function shadow(g, cx, cy, r) {
@@ -338,7 +502,6 @@
           y = y0 + 10 + rnd() * (ph - (p.tr === (PLOT_ROWS - 1) * PLOT_H ? 66 : 24));
           tries++;
         } while (tries < 26 && (
-          GAME.inPond(x + 6, y + 4) ||
           GAME.inStation(x + 6, y + 4, 16) ||
           (Math.abs(x - W.mama.x) < 36 && Math.abs(y - W.mama.y) < 32) ||
           (y > W.roadY - 46 && Math.abs(x - (W.truckHome.x + 28)) < 56) ||
@@ -351,9 +514,9 @@
       }
     };
     switch (p.theme) {
-      /* HOME starts all but bare - a couple of stumps, some dry tufts and
-         a stone or two. Everything green on this plot you put there. */
-      case 'home': place('stump', 2); place('rock', 3); place('tuft', 5); break;
+      /* HOME is a blank canvas: not a tree, not a rock, not a blade.
+         Everything on this plot is something you put there. */
+      case 'home': break;
       case 'sunflower': place('sunflower', 14); place('tuft', 10); place('flower', 5); place('bush', 2); break;
       case 'rocky': place('rock', 10); place('pine', 4, true); place('tuft', 8); place('stump', 2); break;
       case 'berry': place('bush', 10); place('tree', 2, true); place('tuft', 9); place('flower', 4); break;
@@ -1614,43 +1777,57 @@
     } else if (tool === 'feed') {
       ctx.drawImage(SPR.feedbagSprite(1), Math.round(x - 6), Math.round(y - 4));
     } else if (tool === 'farm') {
+      const sel = farmPick();
       const tc = Math.floor(x / 16), trr = Math.floor(y / 16);
       const soil = S().soil[tc + ',' + trr];
-      const sel = farmPick();
-      let ok, ghost = null, deco = null, crop = null;
-      if (sel.kind === 't') { ok = sel.id === 'soil' ? GAME.canTill(tc, trr) : GAME.canShape(sel.id, tc, trr); ghost = sel.id; }
-      else if (sel.kind === 'd') { ok = GAME.canDecorate(sel.id, tc, trr); deco = sel.id; }
-      else if (sel.kind === 'c') { ok = GAME.canPlant(tc, trr, sel.id); crop = sel.id; }
-      else if (sel.id === 'water') ok = !!soil;
-      else if (sel.id === 'harvest') ok = !!(soil && GAME.ripe(soil));
-      else ok = !!(GAME.decoAt(tc, trr) || S().terrain[tc + ',' + trr] || (soil && !soil.crop));
-      /* a see-through preview of what lands here */
-      ctx.globalAlpha = 0.55;
-      if (ghost === 'path' || ghost === 'stone') ctx.drawImage(SPR.pathSprite(ghost, 3, 15, 1), tc * 16, trr * 16);
-      else if (ghost === 'water') ctx.drawImage(SPR.waterSprite(3, 15, 1), tc * 16, trr * 16);
-      else if (ghost === 'high') ctx.drawImage(SPR.terraceSprite(3, 3, 1), tc * 16, trr * 16 - 6);
-      else if (ghost === 'soil') ctx.drawImage(SPR.soilSprite(3, false, 1), tc * 16, trr * 16);
-      else if (deco) {
-        const spr = SPR.decoSprite(DECOS[deco].kind, 1, 40 + DECO_KEYS.indexOf(deco) * 7);
-        ctx.drawImage(spr, tc * 16 + 8 - Math.floor(spr.width / 2), trr * 16 + 15 - spr.height);
-      } else if (crop) {
-        ctx.drawImage(SPR.cropSprite(crop, CROPS[crop].stages - 1, 3, 1), tc * 16, trr * 16 - 4);
+      if (sel.kind === 't' && sel.id !== 'soil') {
+        /* a round brush outline that pulses while you paint */
+        const r = brushPx() + (ptr.down ? 1 : 0);
+        const col = sel.id === 'flat' ? '#ff9f8a' : sel.id === 'water' ? '#7fd6f5'
+                  : sel.id === 'high' ? '#9ada66' : sel.id === 'stone' ? '#d8d2c0' : '#d1a86b';
+        const spin = now / 340;
+        for (let i = 0; i < 40; i++) {
+          const a = i / 40 * Math.PI * 2 + spin;
+          if ((i + Math.floor(now / 90)) % 5 < 2) continue;
+          ctx.fillStyle = col;
+          ctx.fillRect(Math.round(x + Math.cos(a) * r), Math.round(y + Math.sin(a) * r), 1, 1);
+        }
+        ctx.fillStyle = 'rgba(255,255,255,.20)';
+        for (let dy = -r; dy <= r; dy += 2) {
+          const half = Math.round(Math.sqrt(Math.max(0, r * r - dy * dy)));
+          ctx.fillRect(Math.round(x) - half, Math.round(y + dy), half * 2, 1);
+        }
+        ctx.drawImage(SPR.iconSprite(TERRAIN[sel.id] ? TERRAIN[sel.id].icon : 'remove', 1),
+                      Math.round(x - 4), Math.round(y - r - 12 + (ptr.down ? 2 : 0)));
+      } else {
+        let ok, deco = null, crop = null;
+        if (sel.kind === 't') ok = GAME.canTill(tc, trr);
+        else if (sel.kind === 'd') { ok = GAME.canDecorate(sel.id, tc, trr); deco = sel.id; }
+        else if (sel.kind === 'c') { ok = GAME.canPlant(tc, trr, sel.id); crop = sel.id; }
+        else if (sel.id === 'water') ok = !!soil;
+        else if (sel.id === 'harvest') ok = !!(soil && GAME.ripe(soil));
+        else ok = !!(GAME.decoAt(tc, trr) || GAME.paintAt(x, y) || (soil && !soil.crop));
+        ctx.globalAlpha = 0.55;
+        if (sel.kind === 't') ctx.drawImage(SPR.soilSprite(3, false, 1), tc * 16, trr * 16);
+        else if (deco) {
+          const spr = SPR.decoSprite(DECOS[deco].kind, 1, 40 + DECO_KEYS.indexOf(deco) * 7);
+          ctx.drawImage(spr, tc * 16 + 8 - Math.floor(spr.width / 2), trr * 16 + 15 - spr.height);
+        } else if (crop) {
+          ctx.drawImage(SPR.cropSprite(crop, CROPS[crop].stages - 1, 3, 1), tc * 16, trr * 16 - 4);
+        }
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = ok ? 'rgba(122,199,79,.28)' : 'rgba(232,84,47,.26)';
+        ctx.fillRect(tc * 16, trr * 16, 16, 16);
+        const dash = Math.floor(now / 90) % 4;
+        ctx.fillStyle = ok ? '#dfffc4' : '#ffc9b8';
+        for (let i = 0; i < 16; i++) {
+          if ((i + dash) % 4 < 2) { ctx.fillRect(tc * 16 + i, trr * 16, 1, 1); ctx.fillRect(tc * 16 + i, trr * 16 + 15, 1, 1); }
+          if ((i + dash) % 4 < 2) { ctx.fillRect(tc * 16, trr * 16 + i, 1, 1); ctx.fillRect(tc * 16 + 15, trr * 16 + i, 1, 1); }
+        }
+        const icon = sel.kind === 't' ? 'hoe' : sel.kind === 'd' ? 'tree' : sel.kind === 'c' ? 'sprout'
+                   : sel.id === 'water' ? 'water' : sel.id === 'harvest' ? 'scythe' : 'remove';
+        ctx.drawImage(SPR.iconSprite(icon, 1), Math.round(x - 4), Math.round(y - 6 + (ptr.down ? 2 : 0)));
       }
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = ok ? 'rgba(122,199,79,.28)' : 'rgba(232,84,47,.26)';
-      ctx.fillRect(tc * 16, trr * 16, 16, 16);
-      /* a dashed marching outline so the target tile is unmistakable */
-      const dash = Math.floor(now / 90) % 4;
-      ctx.fillStyle = ok ? '#dfffc4' : '#ffc9b8';
-      for (let i = 0; i < 16; i++) {
-        if ((i + dash) % 4 < 2) { ctx.fillRect(tc * 16 + i, trr * 16, 1, 1); ctx.fillRect(tc * 16 + i, trr * 16 + 15, 1, 1); }
-        if ((i + dash) % 4 < 2) { ctx.fillRect(tc * 16, trr * 16 + i, 1, 1); ctx.fillRect(tc * 16 + 15, trr * 16 + i, 1, 1); }
-      }
-      const icon = sel.kind === 't' ? TERRAIN[sel.id].icon
-                 : sel.kind === 'd' ? 'tree'
-                 : sel.kind === 'c' ? 'sprout'
-                 : sel.id === 'water' ? 'water' : sel.id === 'harvest' ? 'scythe' : 'remove';
-      ctx.drawImage(SPR.iconSprite(icon, 1), Math.round(x - 4), Math.round(y - 6 + (ptr.down ? 2 : 0)));
     } else if (tool === 'inspect') {
       const g = SPR.iconSprite('magnify', 1);
       ctx.drawImage(g, Math.round(x - 4), Math.round(y - 4));
@@ -1730,65 +1907,29 @@
   /* ================= MAIN RENDER ================= */
   function render(now, dt) {
     if (GAME.dirty.ground || !groundCv) buildGround();
+    /* the camera can sit a little past the foot of the map so the dock
+       never hides your land, so paint the surround before anything else */
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = '#3c5a24';
+    ctx.fillRect(0, 0, cv.width, cv.height);
     ctx.setTransform(SC, 0, 0, SC, Math.round(-cam().x * SC), Math.round(-cam().y * SC));
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(groundCv, 0, 0);
 
-    /* pond ripples */
-    const p = W.pond;
-    ctx.fillStyle = 'rgba(255,255,255,.45)';
-    for (let i = 0; i < 4; i++) {
-      const sx = p.x + 6 + ((i * 15 + Math.floor(now / 420)) % (p.w - 14));
-      ctx.fillRect(sx, p.y + 5 + i * 6, 4, 1);
-    }
-    /* a couple of lily pads drifting on the surface */
-    for (let i = 0; i < 2; i++) {
-      const phase = (now / (13000 + i * 4200)) % 1;
-      const dx = p.x + 10 + (phase < 0.5 ? phase * 2 : (1 - phase) * 2) * (p.w - 26);
-      const dy = p.y + 8 + i * 12 + Math.sin(now / 1400 + i) * 1;
-      ctx.fillStyle = '#3f8a33';
-      ctx.fillRect(Math.round(dx), Math.round(dy) + 1, 7, 3);
-      ctx.fillRect(Math.round(dx) + 1, Math.round(dy), 5, 5);
-      ctx.fillStyle = '#5aa845';
-      ctx.fillRect(Math.round(dx) + 2, Math.round(dy) + 1, 3, 2);
-      if (i === 0) {
-        ctx.fillStyle = '#fff2c4'; ctx.fillRect(Math.round(dx) + 3, Math.round(dy) + 1, 2, 2);
-        ctx.fillStyle = '#ffd23f'; ctx.fillRect(Math.round(dx) + 3, Math.round(dy) + 1, 1, 1);
+    /* ---- everything you painted, blitted from its own layer ---- */
+    if (terrDirty) rebuildTerrain();
+    ctx.drawImage(terrCv, 0, -TERR_LIFT);
+    /* water catches the light */
+    if (GAME.paintedCells()) {
+      const t0 = Math.floor(now / 260);
+      ctx.fillStyle = 'rgba(255,255,255,.45)';
+      for (let i = 0; i < 26; i++) {
+        const gx = ((i * 137 + t0 * 3) % (W.view.w + 40)) + cam().x - 20;
+        const gy = ((i * 313 + Math.floor(t0 / 3) * 5) % (W.view.h + 40)) + cam().y - 20;
+        if (GAME.paintAt(gx, gy) !== 'water') continue;
+        if ((i + t0) % 4) continue;
+        ctx.fillRect(Math.round(gx), Math.round(gy), 3, 1);
       }
-    }
-    /* sun glints */
-    ctx.fillStyle = 'rgba(255,255,255,.6)';
-    for (let i = 0; i < 3; i++) {
-      if (Math.floor(now / 300 + i * 2) % 4) continue;
-      ctx.fillRect(p.x + 12 + i * 17, p.y + 10 + (i % 2) * 9, 2, 1);
-    }
-
-    /* ---- shaped ground: paths, terraces and dug ponds ---- */
-    const tmask = (c, r, kind) => {
-      const at = (cc, rr) => {
-        const t = GAME.terrainAt(cc, rr);
-        if (kind === 'water') return t === 'water' ? 1 : 0;
-        if (kind === 'high') return t === 'high' ? 1 : 0;
-        return (t === 'path' || t === 'stone') ? 1 : 0;
-      };
-      return at(c, r - 1) | (at(c + 1, r) << 1) | (at(c, r + 1) << 2) | (at(c - 1, r) << 3);
-    };
-    for (const k of Object.keys(S().terrain)) {
-      const [c, r] = k.split(',').map(Number);
-      if (c * 16 + 16 < cam().x || c * 16 > cam().x + W.view.w || r * 16 + 22 < cam().y || r * 16 > cam().y + W.view.h) continue;
-      const t = S().terrain[k];
-      if (t.t === 'path' || t.t === 'stone') ctx.drawImage(SPR.pathSprite(t.t, t.seed, tmask(c, r, 'path'), 1), c * 16, r * 16);
-      else if (t.t === 'water') ctx.drawImage(SPR.waterSprite(t.seed, tmask(c, r, 'water'), 1), c * 16, r * 16);
-      else if (t.t === 'high') ctx.drawImage(SPR.terraceSprite(t.seed, tmask(c, r, 'high'), 1), c * 16, r * 16 - 6);
-    }
-    /* ripples on the ponds you dug */
-    for (const k of Object.keys(S().terrain)) {
-      const t = S().terrain[k];
-      if (t.t !== 'water') continue;
-      const [c, r] = k.split(',').map(Number);
-      if ((c * 7 + r * 3 + Math.floor(now / 700)) % 5) continue;
-      ctx.fillStyle = 'rgba(255,255,255,.4)';
-      ctx.fillRect(c * 16 + 4 + ((Math.floor(now / 400) + c) % 6), r * 16 + 6 + (r % 5), 3, 1);
     }
     /* tilled soil and whatever is growing in it */
     for (const k of Object.keys(S().soil)) {
@@ -2095,15 +2236,26 @@
     return c;
   }
 
+  /* how much of the field the open dock is standing on, in world pixels */
+  function syncCamPad() {
+    const dock = !el.palette.hidden ? el.palette : !el.farmPalette.hidden ? el.farmPalette : null;
+    if (!dock) { GAME.setCamPad(0); return; }
+    const r = cv.getBoundingClientRect();
+    if (!r.width) return;
+    const d = dock.getBoundingClientRect();
+    GAME.setCamPad(Math.max(0, (r.bottom - d.top) / (r.width / W.view.w)));
+  }
+
   function renderPalette() {
     el.palette.hidden = S().tool !== 'build';
     el.farmPalette.hidden = S().tool !== 'farm';
     renderFarmPalette();
+    requestAnimationFrame(syncCamPad);
     if (el.palette.hidden) { GAME.dirty.build = false; return; }
     el.palette.innerHTML = '';
-    /* section tabs across the top */
+    /* section tabs run down the left edge of the dock */
     const tabs = document.createElement('div');
-    tabs.className = 'pal-tabs';
+    tabs.className = 'dock-tabs';
     BUILD_SECTIONS.forEach(sec => {
       const anyOpen = Object.keys(BUILDS).some(t => BUILDS[t].sec === sec.id && (!BUILDS[t].needs || GAME.lvl(BUILDS[t].needs)));
       const b = document.createElement('button');
@@ -2114,6 +2266,8 @@
       tabs.appendChild(b);
     });
     el.palette.appendChild(tabs);
+    const shelf = document.createElement('div');
+    shelf.className = 'dock-shelf';
     const row = document.createElement('div');
     row.className = 'pal-row';
     Object.keys(BUILDS).filter(t => BUILDS[t].sec === palSec).forEach(type => {
@@ -2138,6 +2292,12 @@
       btn.title = b.name + ' - ' + b.desc + (locked ? ' (research first)' : '');
       row.appendChild(btn);
     });
+    shelf.appendChild(row);
+    el.palette.appendChild(shelf);
+
+    /* rotate + remove live on the right, out of the scrolling shelf */
+    const side = document.createElement('div');
+    side.className = 'dock-side';
     const rot = document.createElement('button');
     rot.className = 'pal-btn small';
     rot.dataset.build = 'rotate';
@@ -2146,7 +2306,7 @@
     rtag.textContent = ['EAST', 'SOUTH', 'WEST', 'NORTH'][placeDir];
     rot.appendChild(rtag);
     rot.title = 'Rotate (R)';
-    row.appendChild(rot);
+    side.appendChild(rot);
     const rem = document.createElement('button');
     rem.className = 'pal-btn small' + (buildSel === 'remove' ? ' active' : '');
     rem.dataset.build = 'remove';
@@ -2154,8 +2314,8 @@
     const dtag = document.createElement('small');
     dtag.textContent = 'REMOVE';
     rem.appendChild(dtag);
-    row.appendChild(rem);
-    el.palette.appendChild(row);
+    side.appendChild(rem);
+    el.palette.appendChild(side);
     GAME.dirty.build = false;
   }
 
@@ -2186,7 +2346,7 @@
     if (el.farmPalette.hidden) return;
     el.farmPalette.innerHTML = '';
     const tabs = document.createElement('div');
-    tabs.className = 'pal-tabs';
+    tabs.className = 'dock-tabs';
     FARM_SECTIONS.forEach(sec => {
       const b = document.createElement('button');
       b.className = 'pal-tab' + (farmSec === sec.id ? ' active' : '');
@@ -2197,6 +2357,8 @@
     });
     el.farmPalette.appendChild(tabs);
 
+    const shelf = document.createElement('div');
+    shelf.className = 'dock-shelf';
     const row = document.createElement('div');
     row.className = 'pal-row';
     farmItems().forEach(it => {
@@ -2228,8 +2390,29 @@
       btn.title = it.name + ' - ' + tip;
       row.appendChild(btn);
     });
-    el.farmPalette.appendChild(row);
+    shelf.appendChild(row);
+    el.farmPalette.appendChild(shelf);
 
+    const side = document.createElement('div');
+    side.className = 'dock-side';
+
+    /* brush sizes, only where a brush is what you are holding */
+    if (farmSec === 'ground') {
+      const bs = document.createElement('div');
+      bs.className = 'brush-row';
+      [1, 2, 3, 5, 8].forEach(n => {
+        const b = document.createElement('button');
+        b.className = 'brush-btn' + (S().brush === n ? ' active' : '');
+        b.dataset.brush = String(n);
+        b.title = 'Brush size ' + n;
+        const dot = document.createElement('i');
+        const px2 = Math.max(6, Math.min(30, n * 4 + 4));
+        dot.style.width = px2 + 'px'; dot.style.height = px2 + 'px';
+        b.appendChild(dot);
+        bs.appendChild(b);
+      });
+      side.appendChild(bs);
+    }
     const info = document.createElement('div');
     info.className = 'farm-info';
     const st = S();
@@ -2237,7 +2420,7 @@
     [['hoe', Object.keys(st.soil).length, 'Tiles tilled'],
      ['sprout', Object.values(st.soil).filter(t => t.crop).length, 'Growing'],
      ['scythe', ripeN, 'Ripe now'],
-     ['road', Object.keys(st.terrain).length, 'Tiles shaped'],
+     ['road', GAME.paintedCells(), 'Ground painted'],
      ['tree', Object.keys(st.deco).length, 'Decorations']].forEach(([ic, v, tip]) => {
       const cell = document.createElement('span');
       cell.title = tip;
@@ -2245,7 +2428,9 @@
       cell.appendChild(document.createTextNode(String(v)));
       info.appendChild(cell);
     });
-    el.farmPalette.appendChild(info);
+    side.appendChild(info);
+    el.farmPalette.appendChild(side);
+    requestAnimationFrame(syncCamPad);
   }
 
   /* ---------- speech-bubble hints ---------- */
@@ -3377,131 +3562,198 @@
     return box;
   }
 
-  /* a hired worker */
+  /* a small form field: a printed label with something written in it */
+  function formField(label, valueNode, cls) {
+    const f = document.createElement('div');
+    f.className = 'ff' + (cls ? ' ' + cls : '');
+    const l = document.createElement('i');
+    l.textContent = label;
+    f.appendChild(l);
+    const v = document.createElement('span');
+    if (typeof valueNode === 'string') v.textContent = valueNode;
+    else if (valueNode) v.appendChild(valueNode);
+    f.appendChild(v);
+    return f;
+  }
+  function stampEl(text, cls) {
+    const st = document.createElement('div');
+    st.className = 'stamp ' + (cls || '');
+    st.textContent = text;
+    return st;
+  }
+
+  /* a hired worker: their application, filed and stamped */
   function crewCard(w) {
     const def = ROLES[w.role] || ROLES.hand;
     const card = document.createElement('div');
-    card.className = 'crew-card' + (w.bot ? ' bot' : '');
+    card.className = 'form-card' + (w.bot ? ' bot' : '') + (S().unpaid ? ' unpaid' : '');
+    card.dataset.tip = w.name + ' - ' + def.name + '. ' + def.job;
+
     const head = document.createElement('div');
-    head.className = 'cc-head';
-    head.appendChild(cloneCanvas(SPR.staffSprite(w, 0, 2)));
-    const who = document.createElement('div');
-    who.className = 'cc-who';
-    const nm = document.createElement('b');
-    nm.textContent = w.name;
-    who.appendChild(nm);
-    const rl = document.createElement('span');
-    rl.appendChild(mkIcon(def.icon, 2));
-    rl.appendChild(document.createTextNode(def.name));
-    who.appendChild(rl);
-    head.appendChild(who);
-    const st = document.createElement('span');
-    st.className = 'cc-state';
-    st.textContent = S().unpaid ? 'unpaid' : w.state === 'rest' ? 'on a break' : w.state;
-    head.appendChild(st);
+    head.className = 'form-head';
+    const no = document.createElement('i');
+    no.textContent = 'FORM ' + (w.bot ? 'R' : 'H') + '-' + String(w.id).padStart(3, '0');
+    head.appendChild(no);
+    const kind = document.createElement('b');
+    kind.textContent = w.bot ? 'ROBOT UNIT' : 'STAFF RECORD';
+    head.appendChild(kind);
     card.appendChild(head);
 
-    card.appendChild(statBlock(w, def.uses));
+    const body = document.createElement('div');
+    body.className = 'form-body';
+    const photo = document.createElement('div');
+    photo.className = 'form-photo';
+    photo.appendChild(cloneCanvas(SPR.staffSprite(w, 0, 3)));
+    body.appendChild(photo);
+
+    const fields = document.createElement('div');
+    fields.className = 'form-fields';
+    fields.appendChild(formField('NAME', w.name, 'wide'));
+    const post = document.createElement('span');
+    post.className = 'chip';
+    post.appendChild(mkIcon(def.icon, 2));
+    post.appendChild(document.createTextNode(def.name));
+    fields.appendChild(formField('POST', post));
+    const pay = document.createElement('span');
+    pay.className = 'chip pay';
+    pay.appendChild(mkIcon('coin', 2));
+    pay.appendChild(document.createTextNode((w.wage * Math.pow(0.88, GAME.lvl('wages'))).toFixed(2)));
+    fields.appendChild(formField('PAY/S', pay));
+    body.appendChild(fields);
+    card.appendChild(body);
+
+    /* the ratings box */
+    const rate = document.createElement('div');
+    rate.className = 'form-rate';
+    const rh = document.createElement('i');
+    rh.textContent = 'RATINGS';
+    rate.appendChild(rh);
+    rate.appendChild(statBlock(w, def.uses));
+    card.appendChild(rate);
+
     card.appendChild(traitChips(w.traits));
 
     const meta = document.createElement('div');
-    meta.className = 'cc-meta';
-    const wage = document.createElement('span');
-    wage.title = 'Wages, coins per second';
-    wage.appendChild(mkIcon('coin', 2));
-    wage.appendChild(document.createTextNode((w.wage * Math.pow(0.88, GAME.lvl('wages'))).toFixed(2)));
-    meta.appendChild(wage);
+    meta.className = 'form-meta';
     const jobs = document.createElement('span');
     jobs.title = 'Jobs done';
     jobs.appendChild(mkIcon('star', 2));
     jobs.appendChild(document.createTextNode(GAME.fmt(w.jobs || 0)));
     meta.appendChild(jobs);
     const nrg = document.createElement('span');
-    nrg.title = 'Stamina before they want a breather';
+    nrg.title = 'Stamina left before a breather';
     nrg.appendChild(mkIcon('flame', 2));
     nrg.appendChild(document.createTextNode(Math.round((w.energy === undefined ? 1 : w.energy) * 100) + '%'));
     meta.appendChild(nrg);
+    const stt = document.createElement('span');
+    stt.className = 'form-state';
+    stt.textContent = S().unpaid ? 'UNPAID' : w.state === 'rest' ? 'ON A BREAK' : w.state.toUpperCase();
+    meta.appendChild(stt);
     card.appendChild(meta);
 
-    /* role switcher - people can move between people-roles */
+    /* reassignment: tick a different box */
     const roles = document.createElement('div');
-    roles.className = 'cc-roles';
+    roles.className = 'form-roles';
+    const rl = document.createElement('i');
+    rl.textContent = 'REASSIGN';
+    roles.appendChild(rl);
+    const boxes = document.createElement('div');
+    boxes.className = 'tickrow';
     ROLE_KEYS.filter(r => (w.bot || !ROLES[r].botOnly) && GAME.roleOpen(r)).forEach(r => {
       const b = document.createElement('button');
-      b.className = 'btn btn-tiny' + (r === w.role ? ' on' : '');
+      b.className = 'tick' + (r === w.role ? ' on' : '');
       b.dataset.act = 'set-role';
       b.dataset.id = String(w.id);
       b.dataset.role = r;
       b.disabled = r === w.role;
-      b.title = ROLES[r].job;
+      b.title = ROLES[r].name + ' - ' + ROLES[r].job;
       b.appendChild(mkIcon(ROLES[r].icon, 2));
-      roles.appendChild(b);
+      boxes.appendChild(b);
     });
+    roles.appendChild(boxes);
     const fire = document.createElement('button');
     fire.className = 'btn btn-tiny cc-fire';
     fire.dataset.act = 'fire';
     fire.dataset.id = String(w.id);
+    fire.title = w.bot ? 'Break this robot down for parts' : 'Let this person go';
     fire.textContent = w.bot ? 'SCRAP' : 'LET GO';
     roles.appendChild(fire);
     card.appendChild(roles);
+
+    card.appendChild(stampEl(w.bot ? 'BUILT' : 'HIRED', 'green'));
     return card;
   }
 
-  /* somebody who answered a flyer */
+  /* somebody who answered a flyer: an application waiting on a decision */
   function applicantCard(ap) {
     const card = document.createElement('div');
-    card.className = 'crew-card applicant';
+    card.className = 'form-card applicant';
+    card.dataset.tip = ap.name + ' wants a job. Rating ' + crewQuality(ap.st) + ' out of 50.';
+
     const head = document.createElement('div');
-    head.className = 'cc-head';
-    head.appendChild(cloneCanvas(SPR.personSprite(ap.look, 0, 2)));
-    const who = document.createElement('div');
-    who.className = 'cc-who';
-    const nm = document.createElement('b');
-    nm.textContent = ap.name;
-    who.appendChild(nm);
-    const q = document.createElement('span');
-    q.appendChild(mkIcon('star', 2));
-    q.appendChild(document.createTextNode(crewQuality(ap.st) + '/50'));
-    who.appendChild(q);
-    head.appendChild(who);
-    const t = document.createElement('span');
-    t.className = 'cc-state';
+    head.className = 'form-head';
+    const no = document.createElement('i');
+    no.textContent = 'APPLICATION';
+    head.appendChild(no);
+    const t = document.createElement('b');
     t.title = 'How long before they give up and walk off';
-    t.textContent = GAME.fmtTime(ap.t);
+    t.textContent = GAME.fmtTime(Math.max(0, ap.t));
     head.appendChild(t);
     card.appendChild(head);
 
-    card.appendChild(statBlock(ap, null));
+    const body = document.createElement('div');
+    body.className = 'form-body';
+    const photo = document.createElement('div');
+    photo.className = 'form-photo';
+    photo.appendChild(cloneCanvas(SPR.personSprite(ap.look, 0, 3)));
+    body.appendChild(photo);
+    const fields = document.createElement('div');
+    fields.className = 'form-fields';
+    fields.appendChild(formField('NAME', ap.name, 'wide'));
+    const rate = document.createElement('span');
+    rate.className = 'chip';
+    rate.appendChild(mkIcon('star', 2));
+    rate.appendChild(document.createTextNode(crewQuality(ap.st) + '/50'));
+    fields.appendChild(formField('RATING', rate));
+    const ask = document.createElement('span');
+    ask.className = 'chip pay';
+    ask.appendChild(mkIcon('coin', 2));
+    ask.appendChild(document.createTextNode(GAME.fmt(ap.sign)));
+    ask.appendChild(mkIcon('clock', 2));
+    ask.appendChild(document.createTextNode((ap.wage * Math.pow(0.88, GAME.lvl('wages'))).toFixed(2)));
+    fields.appendChild(formField('ASKS', ask));
+    body.appendChild(fields);
+    card.appendChild(body);
+
+    const rbox = document.createElement('div');
+    rbox.className = 'form-rate';
+    const rh = document.createElement('i');
+    rh.textContent = 'RATINGS';
+    rbox.appendChild(rh);
+    rbox.appendChild(statBlock(ap, null));
+    card.appendChild(rbox);
     card.appendChild(traitChips(ap.traits));
 
-    const meta = document.createElement('div');
-    meta.className = 'cc-meta';
-    const sign = document.createElement('span');
-    sign.title = 'Signing bonus';
-    sign.appendChild(mkIcon('coin', 2));
-    sign.appendChild(document.createTextNode(GAME.fmt(ap.sign)));
-    meta.appendChild(sign);
-    const wage = document.createElement('span');
-    wage.title = 'Wages, coins per second';
-    wage.appendChild(mkIcon('clock', 2));
-    wage.appendChild(document.createTextNode((ap.wage * Math.pow(0.88, GAME.lvl('wages'))).toFixed(2)));
-    meta.appendChild(wage);
-    card.appendChild(meta);
-
     const roles = document.createElement('div');
-    roles.className = 'cc-roles';
+    roles.className = 'form-roles';
+    const rl = document.createElement('i');
+    rl.textContent = 'HIRE AS';
+    roles.appendChild(rl);
     const room = GAME.canHire() && S().coins >= ap.sign;
+    const boxes = document.createElement('div');
+    boxes.className = 'tickrow';
     ROLE_KEYS.filter(r => !ROLES[r].botOnly && GAME.roleOpen(r)).forEach(r => {
       const b = document.createElement('button');
-      b.className = 'btn btn-tiny' + (room ? ' btn-green' : '');
+      b.className = 'tick' + (room ? ' go' : '');
       b.dataset.act = 'hire-applicant';
       b.dataset.id = String(ap.id);
       b.dataset.role = r;
       b.disabled = !room;
       b.title = 'Hire as ' + ROLES[r].name + ' - ' + ROLES[r].job;
       b.appendChild(mkIcon(ROLES[r].icon, 2));
-      roles.appendChild(b);
+      boxes.appendChild(b);
     });
+    roles.appendChild(boxes);
     if (!room) {
       const hint = document.createElement('em');
       hint.className = 'cc-hint';
@@ -3509,6 +3761,7 @@
       roles.appendChild(hint);
     }
     card.appendChild(roles);
+    card.appendChild(stampEl('PENDING', 'amber'));
     return card;
   }
 
@@ -3557,7 +3810,7 @@
 
     if (st.applicants.length) {
       const grid = document.createElement('div');
-      grid.className = 'crew-grid';
+      grid.className = 'form-grid';
       st.applicants.forEach(ap => grid.appendChild(applicantCard(ap)));
       box.appendChild(grid);
     } else if (!st.flyer && GAME.lvl('hiring') && Object.keys(st.huts).length) {
@@ -3575,32 +3828,56 @@
     const head = document.createElement('div');
     head.className = 'ps-head crew-head';
     const hl = document.createElement('b');
-    hl.textContent = 'THE ROBOT WORKSHOP';
+    hl.textContent = 'ROBOT WORKSHOP - BUILD ORDERS';
     head.appendChild(hl);
     const hr = document.createElement('span');
     hr.textContent = GAME.botCount() + ' built';
     head.appendChild(hr);
     box.appendChild(head);
     const grid = document.createElement('div');
-    grid.className = 'bot-grid';
+    grid.className = 'form-grid';
     bots.forEach(r => {
       const def = ROLES[r];
       const open = GAME.roleOpen(r);
       const cost = GAME.botPrice(r);
       const card = document.createElement('div');
-      card.className = 'bot-card' + (open ? '' : ' locked');
-      card.appendChild(cloneCanvas(SPR.botSprite(r, 0, 2)));
-      const mid = document.createElement('div');
-      mid.className = 'hc-mid';
-      const b = document.createElement('b');
-      b.textContent = (BOTS[r] || { name: def.name }).name.toUpperCase();
-      mid.appendChild(b);
-      card.title = open ? (BOTS[r] || { name: def.name }).name + ' - does the ' + def.name + ' job. ' + def.job
-                        : 'Research this one in the Lab first.';
-      const job = document.createElement('span');
-      job.appendChild(mkIcon(def.icon, 2));
-      job.appendChild(document.createTextNode(open ? def.name : 'LOCKED'));
-      mid.appendChild(job);
+      card.className = 'form-card order' + (open ? '' : ' locked');
+      card.dataset.tip = open ? (BOTS[r] || { name: def.name }).name + ' - does the ' + def.name + ' job. ' + def.job
+                              : 'Research this chassis in the Lab first.';
+      const head = document.createElement('div');
+      head.className = 'form-head';
+      const no = document.createElement('i');
+      no.textContent = 'BUILD ORDER';
+      head.appendChild(no);
+      const nm2 = document.createElement('b');
+      nm2.textContent = (BOTS[r] || { name: def.name }).name.toUpperCase();
+      head.appendChild(nm2);
+      card.appendChild(head);
+      const body = document.createElement('div');
+      body.className = 'form-body';
+      const photo = document.createElement('div');
+      photo.className = 'form-photo';
+      photo.appendChild(cloneCanvas(SPR.botSprite(r, 0, 3)));
+      body.appendChild(photo);
+      const fields = document.createElement('div');
+      fields.className = 'form-fields';
+      const post = document.createElement('span');
+      post.className = 'chip';
+      post.appendChild(mkIcon(def.icon, 2));
+      post.appendChild(document.createTextNode(open ? def.name : 'LOCKED'));
+      fields.appendChild(formField('POST', post));
+      const specs = document.createElement('span');
+      specs.className = 'chip';
+      def.uses.forEach(u => { specs.appendChild(mkIcon(STATS[u].icon, 2)); });
+      specs.appendChild(document.createTextNode('7'));
+      fields.appendChild(formField('SPEC', specs));
+      body.appendChild(fields);
+      card.appendChild(body);
+      const foot = document.createElement('div');
+      foot.className = 'form-roles';
+      const rl2 = document.createElement('i');
+      rl2.textContent = 'COST';
+      foot.appendChild(rl2);
       const btn = document.createElement('button');
       btn.className = 'btn';
       btn.dataset.act = 'assemble';
@@ -3609,9 +3886,9 @@
       if (ok) btn.classList.add('btn-green');
       btn.disabled = !ok;
       btn.appendChild(mkIcon('coin', 2));
-      btn.appendChild(document.createTextNode(open ? GAME.fmt(cost) : 'LOCKED'));
-      mid.appendChild(btn);
-      card.appendChild(mid);
+      btn.appendChild(document.createTextNode(open ? GAME.fmt(cost) : '-'));
+      foot.appendChild(btn);
+      card.appendChild(foot);
       grid.appendChild(card);
     });
     box.appendChild(grid);
@@ -3648,7 +3925,7 @@
     }
     if (st.staff.length) {
       const grid = document.createElement('div');
-      grid.className = 'crew-grid';
+      grid.className = 'form-grid';
       st.staff.forEach(w => grid.appendChild(crewCard(w)));
       crew.appendChild(grid);
     }
@@ -4159,14 +4436,14 @@
         const head = document.createElement('div');
         head.className = 'ps-head crew-head';
         const hl = document.createElement('b');
-        hl.textContent = 'ON THE PAYROLL';
+        hl.textContent = 'PERSONNEL FILES';
         head.appendChild(hl);
         const hr = document.createElement('span');
         hr.textContent = st.staff.length + ' / ' + GAME.staffSlots();
         head.appendChild(hr);
         box.appendChild(head);
         const grid = document.createElement('div');
-        grid.className = 'crew-grid';
+        grid.className = 'form-grid';
         st.staff.forEach(w => grid.appendChild(crewCard(w)));
         box.appendChild(grid);
       }
@@ -4218,7 +4495,7 @@
       facts.className = 'tally';
       [['sprout', st.stats.planted, 'Seeds planted'], ['scythe', st.stats.harvested, 'Harvests'],
        ['seed', GAME.fmt(st.stats.feedMade), 'Feed made'], ['chick', st.stats.grown, 'Chicks raised'],
-       ['hoe', Object.keys(st.soil).length, 'Tiles tilled']].forEach(([ic, v, tip]) => {
+       ['road', GAME.paintedCells(), 'Ground painted']].forEach(([ic, v, tip]) => {
         const cell = document.createElement('div');
         cell.title = tip;
         cell.appendChild(mkIcon(ic, 3));
@@ -4434,11 +4711,11 @@
     const tool = S().tool;
     ptr.mode = null; ptr.target = null; cand = null;
     if (tool === 'build') {
-      if (buildSel) { paintTile = null; handlePlaceAt(p.x, p.y, false); ptr.mode = 'place'; }
+      if (buildSel) { paintTile = null; dimPalettes(true); handlePlaceAt(p.x, p.y, false); ptr.mode = 'place'; }
       return;
     }
     if (tool === 'feed') { trySprinkle(p.x, p.y); ptr.mode = 'feed'; return; }
-    if (tool === 'farm') { farmTile = null; handleFarmAt(p.x, p.y); ptr.mode = 'farm'; return; }
+    if (tool === 'farm') { farmTile = null; lastPaint = null; dimPalettes(true); handleFarmAt(p.x, p.y); ptr.mode = 'farm'; return; }
     if (tool === 'inspect') { ptr.mode = 'inspect'; return; }
     if (tool === 'basket') { ptr.mode = 'sweep'; return; }
     if (S().held) { ptr.mode = 'carry'; return; }
@@ -4475,6 +4752,8 @@
   function endPointer(ev) {
     if (!ptr.down) return;
     ptr.down = false;
+    lastPaint = null;
+    dimPalettes(false);
     const wasTap = ptr.moved < 6 && performance.now() - ptr.downAt < 420;
     const x = ptr.x, y = ptr.y;
     const tool = S().tool;
@@ -4549,6 +4828,16 @@
   cv.addEventListener('pointerleave', () => { ptr.inside = false; });
   cv.addEventListener('pointerenter', () => { ptr.inside = true; });
   cv.addEventListener('contextmenu', ev => ev.preventDefault());
+  window.addEventListener('resize', () => requestAnimationFrame(syncCamPad));
+  /* the dock shelf runs sideways, so let a plain wheel roll it along */
+  [el.palette, el.farmPalette].forEach(dock => {
+    dock.addEventListener('wheel', ev => {
+      const shelf = ev.target.closest('.dock-shelf');
+      if (!shelf || shelf.scrollWidth <= shelf.clientWidth) return;
+      ev.preventDefault();
+      shelf.scrollLeft += (Math.abs(ev.deltaX) > Math.abs(ev.deltaY) ? ev.deltaX : ev.deltaY);
+    }, { passive: false });
+  });
   cv.addEventListener('wheel', ev => {
     ev.preventDefault();
     cam().x += (ev.shiftKey ? ev.deltaY : ev.deltaX) / 3;
@@ -4566,38 +4855,57 @@
     else if (result === 'loaded') snd.clink();
     else snd.plop();
   }
-  let farmTile = null;
+  /* while you are actually drawing, the palette gets out of the way */
+  function dimPalettes(on) {
+    el.palette.classList.toggle('dim', !!on);
+    el.farmPalette.classList.toggle('dim', !!on);
+  }
+  let farmTile = null, lastPaint = null;
+  function brushPx() { return S().brush * GAME.CELL_PX * 0.5 + 3; }
   function handleFarmAt(wx, wy) {
-    const c = Math.floor(wx / 16), r = Math.floor(wy / 16);
-    const k = c + ',' + r;
-    if (farmTile === k) return;
-    farmTile = k;
     const sel = farmPick();
     const miss = () => { if (ptr.moved < 4) snd.error(); };
-    if (sel.kind === 't') {
-      if (sel.id === 'soil') { if (!GAME.till(c, r)) miss(); return; }
-      if (GAME.shape(sel.id, c, r)) { if (sel.id === 'flat') snd.demolish(); }
-      else miss();
+
+    /* --- the brush: a continuous stroke, not a tile at a time --- */
+    if (sel.kind === 't' && sel.id !== 'soil') {
+      const r = brushPx();
+      const a = lastPaint || { x: wx, y: wy };
+      const n = GAME.stroke(sel.id, a.x, a.y, wx, wy, r);
+      lastPaint = { x: wx, y: wy };
+      if (n) {
+        terrainTouched(a.x, a.y, wx, wy, r);
+        if (!brushSnd || performance.now() - brushSnd > 90) { brushSnd = performance.now(); snd.sprinkle(); }
+      } else miss();
       return;
     }
+
+    /* --- everything else still works a tile at a time --- */
+    const c = Math.floor(wx / 16), r2 = Math.floor(wy / 16);
+    const k = c + ',' + r2;
+    if (farmTile === k) return;
+    farmTile = k;
+    if (sel.kind === 't') { if (!GAME.till(c, r2)) miss(); else terrainTouched(wx, wy, wx, wy, 20); return; }
     if (sel.kind === 'd') {
-      if (GAME.decorate(sel.id, c, r)) renderFarmPalette();
+      if (GAME.decorate(sel.id, c, r2)) renderFarmPalette();
       else miss();
       return;
     }
     if (sel.kind === 'c') {
-      if (GAME.plant(c, r, sel.id)) renderFarmPalette();
+      if (GAME.plant(c, r2, sel.id)) renderFarmPalette();
       else miss();
       return;
     }
-    if (sel.id === 'water') { if (GAME.water(c, r)) snd.sprinkle(); return; }
-    if (sel.id === 'harvest') { GAME.harvest(c, r); return; }
+    if (sel.id === 'water') { if (GAME.water(c, r2)) snd.sprinkle(); return; }
+    if (sel.id === 'harvest') { GAME.harvest(c, r2); return; }
     if (sel.id === 'clear') {
-      if (GAME.undecorate(c, r)) { snd.demolish(); renderFarmPalette(); return; }
-      if (GAME.untill(c, r)) { snd.demolish(); return; }
-      if (GAME.shape('flat', c, r)) { snd.demolish(); return; }
+      if (GAME.undecorate(c, r2)) { snd.demolish(); renderFarmPalette(); return; }
+      if (GAME.untill(c, r2)) { snd.demolish(); return; }
+      /* nothing loose here: rub the paint out with the brush instead */
+      const rr = brushPx();
+      if (GAME.stroke('flat', wx, wy, wx, wy, rr)) { terrainTouched(wx, wy, wx, wy, rr); snd.demolish(); }
     }
   }
+  let brushSnd = 0;
   function trySprinkle(x, y) {
     if (sprinkleCd > 0) return;
     if (GAME.sprinkleFeed(x, y)) { snd.sprinkle(); sprinkleCd = 0.22; }
@@ -4656,6 +4964,8 @@
     if (toolBtn) { setTool(toolBtn.dataset.tool); return; }
     const secBtn = ev.target.closest('[data-palsec]');
     if (secBtn) { palSec = secBtn.dataset.palsec; buildSel = null; GAME.mark('build'); snd.plop(); return; }
+    const brushBtn = ev.target.closest('[data-brush]');
+    if (brushBtn) { S().brush = +brushBtn.dataset.brush; renderFarmPalette(); snd.plop(); return; }
     const fsec = ev.target.closest('[data-farmsec]');
     if (fsec) {
       farmSec = fsec.dataset.farmsec;
@@ -4891,12 +5201,14 @@
   });
   GAME.on('feedeat', ({ x, y }) => puff(x, y, '#f2c94c', 4, 18, 14));
   GAME.on('land', () => { GAME.mark('ground'); });
+  GAME.on('paint', () => {});
 
   /* ================= BOOT ================= */
   function boot() {
     GAME.load();
     const off = GAME.applyOffline();
     buildGround();
+    terrDirty = true;
     renderToolbelt();
     renderPalette();
     updateCursorChip();
