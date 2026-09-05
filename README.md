@@ -1,6 +1,6 @@
 # Inf Egg Co.
 
-A cozy 2D pixel-art incremental game. You are a floating hand tending an egg ranch that grows into a whole valley: a bare field, a hungry old grandma of a hen and a bicycle at the start; farms, factories, a crew and a fleet by the end. Twenty plots across a 1280x832 valley. Every pixel is generated procedurally in code - the two pixel fonts included - so there are no image files, no emoji and no icon fonts.
+A 2D pixel-art incremental game. You are a floating hand tending an egg ranch that grows into a whole valley: a bare field, a hungry old grandma of a hen and a bicycle at the start; farms, factories, a crew and a fleet by the end. Twenty plots across a 1280x832 valley. Every pixel is generated procedurally in code - the two pixel fonts included - so there are no image files, no emoji and no icon fonts.
 
 It opens on an animated dusk title screen: Mama Hen and her chicks on the hills, eggs drifting up through the sky, and a tally of how many of the 112 chickens you have found so far.
 
@@ -8,13 +8,13 @@ It opens on an animated dusk title screen: Mama Hen and her chicks on the hills,
 
 ## How it plays
 
-The land starts **bare** - sun-bleached scrub and nothing else. No pond, no paths, not a stone scattered for you. Every tree, path, terrace and pond on your ranch is one you painted there yourself. **Mama Hen is a big fat grandma in a bonnet, spectacles and an apron, and she works for her supper**: a full belly keeps her laying for a couple of minutes, and once it runs out she stops, sits there and waits for you to scatter feed by her nest. Petting her costs a little of that supper too. You pedal the first eggs to the village on a **bicycle** that carries four. The money buys seed; the seed becomes feed; the feed grows chicks into hens; the hens lay; the eggs buy a cart, then a van, then routes to bigger towns that pay more. Everything else grows out of that loop.
+The land starts **bare** - sun-bleached scrub and nothing else. No pond, no paths, not a stone scattered for you. Every tree, path, terrace and pond on your ranch is one you painted there yourself. **Mama Hen is a big broody hen settled low over her nest - serrated comb, wattles, an arched neck and a folded wing - and she works for her supper**: a full belly keeps her laying for a couple of minutes, and once it runs out she stops, sits there and waits for you to scatter feed by her nest. Petting her costs a little of that supper too. You pedal the first eggs to the village on a **bicycle** that carries four. The money buys seed; the seed becomes feed; the feed grows chicks into hens; the hens lay; the eggs buy a cart, then a van, then routes to bigger towns that pay more. Everything else grows out of that loop.
 
 You are the hand. Everything on the field is touchable:
 
 - **Hand** - tap chickens (and Mama Hen, if she has been fed) to pet them for an instant egg; hold and drag to pick chickens up and carry them; grab single eggs; drag empty grass to pan the camera.
 - **Basket** - hold and sweep to magnet eggs into your basket (it has a real capacity). Release over the truck or an incubator to unload.
-- **Feed** - scatter pellets from the barn; chicks eat to grow up, grown hens eat to fill their bellies and lay twice as fast.
+- **Feed** - scatter pellets from the barn; chicks eat to grow up, grown hens eat to fill their bellies and lay twice as fast. A chick needs **twelve feeds and five minutes** before it is a laying bird - neither one on its own will do it, and a coop halves the wait.
 - **Farm** - the landscaping tool, in four tabs. GROUND shapes the land with a **paint brush**, PLANT sows crops, TEND waters and harvests, DECOR plants things purely because they look nice. Five brush sizes, and a round brush outline sits under your finger showing exactly what it will cover.
 - **Build** - incubators, love nests, staff huts, silos, vacuums, blowers, sorters, conveyors and fences. Drag to paint belt lines.
 - **Inspect** - tap any hen, worker, machine or patch of grass to read its live stats. Empty grass gives you the whole ranch report: eggs per minute, coins per minute, wages, capacity, silo stock, species found.
@@ -50,7 +50,7 @@ The DECOR tab is a garden centre: oaks, pines, apple trees, bushes, rocks, stump
 
 ### Farming and growing up
 
-Nothing lays until it has eaten. Every hatchling is a **chick**: it does not lay, and it follows the smell of feed until it has eaten enough pellets (three, fewer with research) to grow up - a little green bar over its head shows how close it is. Grown hens keep a belly that empties over a couple of minutes; an empty belly halves their laying until they eat again, and a hungry hen holds up a little seed bubble to tell you.
+Nothing lays until it has eaten. Every hatchling is a **chick**: it does not lay, and it follows the smell of feed until it has grown. Growing up takes **both** - twelve feeds and five minutes of being a chick, whichever finishes last. Tip the whole barn over a hatchling and it is still a chick; leave one unfed for an hour and it is still a chick. Two little rails over its head show where it stands: amber for how well it has been fed, green for how long it has been growing. Research on **Hearty Feed** brings both down, and a coop halves the wait. Grown hens keep a belly that empties over a couple of minutes; an empty belly halves their laying until they eat again, and a hungry hen holds up a little seed bubble to tell you.
 
 Feed comes from the ground. Till a tile, plant a seed packet, water it (or let a **Well** or **Sprinkler** do it) and harvest when it sparkles. Each harvest hands back two seeds of its kind and a pile of pellets into the **Feed Barn**; overflow spills on the grass where the flock finds it.
 
@@ -133,7 +133,7 @@ The crew is always one tap away: the CREW key on the desk bar opens the payroll 
 | Feed Trough | Holds a dozen pellets; the flock helps itself and Feeders keep it full. |
 | Well / Sprinkler | Keep every crop in a circle watered. |
 | Mill | Every harvest on the ranch yields 25% more feed. |
-| Coop | +6 chicken room; chicks nearby grow up twice as fast. |
+| Coop | +6 chicken room; chicks nearby come on twice as fast. |
 | Noticeboard | Where flyers get pinned and applicants queue. |
 | Logistics HQ | A dispatch office with a wall map. Vehicles and routes are bought here. |
 
@@ -183,7 +183,9 @@ All sprites are generated at runtime by `js/sprites.js`:
 - every hire is drawn from a little record of skin, hair colour, hair style, shirt, trousers, boots and hat, so no two people on the ranch look alike;
 - the Lab is a whole desk scene drawn the same way - a beige monitor with a phosphor mesh, scanlines and a rolling band, a keyboard whose keys light up when something installs, a steaming mug, sticky notes, and a pixel mouse pointer;
 - crops are drawn per stage from a seed, soil tiles get their own clods and furrows, and five vehicles and five city skylines are generated for the delivery window;
-- Mama Hen is a 34x33 grandma built the same way as everything else: a silhouette generated from a profile of half-widths, taller than she is wide, with tail feathers sweeping off one flank and a folded wing inked onto the other so she reads as a hen rather than a blob. A bonnet and knitted shawl tinted from her comb, a stitched pinafore down the front, and wire spectacles drawn in over her eyes afterwards;
+- the birds are drawn in **side profile the way a chicken actually stands**: a serrated comb and wattles on the head, an arched neck, a folded wing with feather partings laid across the flank, sickle tail feathers off the back and scaly yellow shanks with toes underneath. Four breed silhouettes - a compact pullet, a standard hen, a low fluffy heavy breed and a leggy upright one - each 20x18, generated from overlapping ellipses and then outlined;
+- chicks are the same profile in miniature: a round downy body, a head far too big for it, a wing that is still a stub, and the first hint of a comb coming through;
+- Mama Hen is a 34x26 broody hen settled low over her nest with her legs tucked under her, drawn the same way at twice the size;
 - speech bubbles are pixel clouds generated per box: a mask of overlapping lobes round an inset rectangle, a three-blob tail, an outline pass, then a fat-pixel paint - handed to the DOM as a background image;
 - painted terrain is resolved per pixel rather than per tile: each point takes a distance-weighted vote of the nine cells around it, thresholds it with a dither so the boundary breaks up, and lands in its own offscreen layer that is repainted only under the brush. That is what gives a stroke its soft edge - ponds wander their shoreline, a ploughed field breaks into clods, a pale dusty track frays into the grass, and a terrace lifts by a few pixels and drops a mottled earth bank down the sides that are actually exposed. Decorations and crops are nudged off their tile centres by their own seed, so nothing lines up like fence posts on a grid;
 - the valley map is inked with a wobbly-line routine over generated parchment, complete with fibres, foxed edges, cloud banks and a compass rose;

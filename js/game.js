@@ -395,13 +395,25 @@ const GAME = (() => {
       y: Math.max(20, Math.min(WORLD.roadY - 24, y)),
       dir: Math.random() < 0.5 ? -1 : 1, state: 'idle', t: Math.random() * 2,
       lay: layTime(sp.tier) * (0.3 + Math.random() * 0.7), petCd: 0, buffT: 0,
-      age: 1, food: 1,
+      age: 1, fed: 1, raised: 1e9, food: 1,
     };
     S.chickens.push(ch);
     return ch;
   }
   function isChick(ch) { return (ch.age === undefined ? 1 : ch.age) < 1; }
-  function growPellets() { return Math.max(1, ECON.chickPellets - lvl('hearty')); }
+  /* A chick has two things to get through before it is a laying bird:
+     enough feed, and enough time. Neither one on its own will do it -
+     you cannot rush a bird by tipping the whole barn over it, and it
+     will not grow on time alone if nobody feeds it. */
+  function growPellets() { return Math.max(3, ECON.chickPellets - 2 * lvl('hearty')); }
+  function growTime() { return ECON.growTime * Math.pow(0.88, lvl('hearty')); }
+  /* how far along a chick is: the lesser of what it has eaten and how
+     long it has been growing */
+  function growAge(ch) {
+    const fed = ch.fed === undefined ? (ch.age === undefined ? 1 : ch.age) : ch.fed;
+    const t = ch.raised === undefined ? 1e9 : ch.raised;
+    return Math.max(0, Math.min(1, Math.min(fed, t / growTime())));
+  }
   function nearCoop(x, y) {
     return Object.keys(S.coops).some(k => {
       const [c, r] = k.split(',').map(Number);
@@ -411,14 +423,8 @@ const GAME = (() => {
   /* a chicken eats one pellet: chicks grow, adults fill up and lay faster */
   function eat(ch) {
     if (isChick(ch)) {
-      ch.age = Math.min(1, ch.age + (1 / growPellets()) * (nearCoop(ch.x + 10, ch.y + 10) ? 2 : 1));
+      ch.fed = Math.min(1, (ch.fed || 0) + 1 / growPellets());
       ch.food = 1;
-      if (ch.age >= 1) {
-        ch.lay = layTime(SPECIES[ch.sp].tier) * 0.5;
-        S.stats.grown++;
-        emit('grown', { ch });
-        if (S.stats.grown === 1) note('grown', 'The first chick grew up. It lays now.', ch.sp);
-      }
     } else {
       ch.food = 1;
       ch.buffT = ECON.feedBuff * (1 + 0.5 * lvl('feedplus'));
@@ -446,6 +452,8 @@ const GAME = (() => {
       S.stats.hatched++;
       const born = spawnChicken(sp.id, x, y);
       born.age = 0;
+      born.fed = 0;
+      born.raised = 0;
       born.food = 1;
       if (S.autoMark >= 0 && sp.tier < S.autoMark) born.marked = true;
       births.push({ sp, feathers: f, isNew, miracle: !rainbow && ht > t });
@@ -492,6 +500,18 @@ const GAME = (() => {
     if (ch.age === undefined) ch.age = 1;
     if (ch.food === undefined) ch.food = 1;
     const chick = isChick(ch);
+    if (chick) {
+      /* a coop keeps them warm, so they come on twice as fast in one */
+      ch.raised = (ch.raised || 0) + dt * (nearCoop(ch.x + 10, ch.y + 10) ? 2 : 1);
+      const was = ch.age;
+      ch.age = growAge(ch);
+      if (was < 1 && ch.age >= 1) {
+        ch.lay = layTime(SPECIES[ch.sp].tier) * 0.5;
+        S.stats.grown++;
+        emit('grown', { ch });
+        if (S.stats.grown === 1) note('grown', 'The first chick grew up. It lays now.', ch.sp);
+      }
+    }
     ch.food = Math.max(0, ch.food - dt / (ECON.hungerTime * (1 + 0.25 * lvl('slowbelly'))));
     /* seek feed: the hungry and the little ones look further */
     const keen = chick || ch.food < 0.5;
@@ -557,8 +577,9 @@ const GAME = (() => {
     ch.petCd = petCd(false);
     S.stats.pets++;
     if (isChick(ch)) {
-      ch.age = Math.min(1, ch.age + 0.06);
-      if (ch.age >= 1) { S.stats.grown++; emit('grown', { ch }); }
+      /* a fuss is worth about a beakful, no more */
+      ch.fed = Math.min(1, (ch.fed || 0) + 0.04);
+      ch.age = growAge(ch);
       return true;
     }
     layEgg(ch.x + 10, ch.y + 14, SPECIES[ch.sp].tier, true);
@@ -2296,7 +2317,13 @@ const GAME = (() => {
       S.mama = Object.assign({ lay: 8, petCd: 0, belly: 1 }, S.mama);
       if (typeof S.mama.belly !== 'number') S.mama.belly = 1;
       S.staff.forEach(w => { if (w.bot === undefined) w.bot = (w.role === 'cull' || w.role === 'match'); });
-      S.chickens.forEach(c => { if (c.age === undefined) c.age = 1; if (c.food === undefined) c.food = 1; });
+      S.chickens.forEach(c => {
+        if (c.age === undefined) c.age = 1;
+        if (c.food === undefined) c.food = 1;
+        /* saves from before growing took time: carry their progress over */
+        if (c.fed === undefined) c.fed = c.age;
+        if (c.raised === undefined) c.raised = c.age >= 1 ? 1e9 : c.age * ECON.growTime;
+      });
       if (!Array.isArray(S.routes) || !S.routes.length) S.routes = ['hamlet'];
       if (!CITY_BY_ID[S.route]) S.route = S.routes[0];
       if (!Array.isArray(S.diary)) S.diary = [];
@@ -2361,7 +2388,7 @@ const GAME = (() => {
     terrainAt, paintAt, tileHasWater, dab, stroke, tillStroke, terrainOpen, terrainCost, cellPaintable, paintedCells, CELL_PX, dynamoLoad,
     canDecorate, decorate, undecorate, decoAt, tileOpen,
     groundSpeed, hasHQ, tileFree, botPrice, botCount,
-    seedCount, cropOpen, wateredBy, isChick, growPellets, nearCoop, mamaLayTime, mamaBelly, mamaHungry, feedMama,
+    seedCount, cropOpen, wateredBy, isChick, growPellets, growTime, growAge, nearCoop, mamaLayTime, mamaBelly, mamaHungry, feedMama,
     vehicle, city, tripPhase, buyVehicle, buyRoute, setRoute, applicantAt, boardSpot,
     note,
     tick, applyOffline, save, load, reset, fmt, fmtTime,

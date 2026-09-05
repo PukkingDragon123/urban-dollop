@@ -39,7 +39,8 @@ const ECON = {
   mamaHunger: 150,         // seconds a full grandma keeps laying before she wants feeding
   mamaPellets: 4,          // pellets that fill her right back up
   mamaReach: 34,           // px around the nest she can reach without getting up
-  chickPellets: 3,         // pellets a chick eats to grow up
+  chickPellets: 12,        // pellets a chick eats to grow up
+  growTime: 300,           // seconds a chick needs to grow, however well fed
   hungerTime: 110,         // seconds for a full belly to empty
   hungryLay: 0.5,          // lay speed when the belly is empty
   baseFeedCap: 40,         // pellets the ranch can store before a barn
@@ -643,7 +644,7 @@ const SKILLS = [
   { id:'coopbuild',  br:7, d:3, pre:'trough',     name:'The Coop',      icon:'house',   max:1, base:40,  growth:1,   desc:'Unlock the Coop: chicks near it grow twice as fast' },
   { id:'well',       br:7, d:4, pre:'sprinkler',  name:'The Well',      icon:'spiral',  max:1, base:90,  growth:1,   desc:'Unlock the Well: a wide watered circle' },
   { id:'berries',    br:7, d:4, pre:'sunflowers', name:'Berry Bushes',  icon:'heart',   max:1, base:120, growth:1,   desc:'Unlock berry bushes: they regrow after picking' },
-  { id:'hearty',     br:7, d:4, pre:'coopbuild',  name:'Hearty Feed',   icon:'flame',   max:5, base:60,  growth:2.3, desc:'chicks grow up on one pellet fewer' },
+  { id:'hearty',     br:7, d:4, pre:'coopbuild',  name:'Hearty Feed',   icon:'flame',   max:5, base:60,  growth:2.3, desc:'chicks need two feeds fewer and 12% less time' },
   { id:'mill',       br:7, d:5, pre:'well',       name:'The Mill',      icon:'gear',    max:1, base:260, growth:1,   desc:'Unlock the Mill: +25% feed from every harvest' },
   { id:'slowbelly',  br:7, d:5, pre:'hearty',     name:'Slow Bellies',  icon:'heart',   max:5, base:110, growth:2.3, desc:'the flock stays full 25% longer' },
   { id:'harvestbot', br:7, d:6, pre:'mill',       name:'Auto Harvest',  icon:'robot',   max:1, base:900, growth:1,   desc:'ripe crops harvest themselves' },

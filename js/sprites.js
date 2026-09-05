@@ -597,94 +597,110 @@ const SPR = (() => {
   /* ============================================================
      CHICKENS
      ============================================================ */
+  /* Four breeds, all drawn in side profile the way a real bird stands:
+     comb and wattle on the head, an arched neck, a folded wing with
+     feather partings laid on the flank, sickle tail feathers off the
+     back and scaly shanks with toes underneath. 20x18 in a 20x20 cell. */
   const SHAPES = {
     chick: {
       rows: [
-        '................',
-        '................',
-        '.....OOOOOO.....',
-        '...OOBBBBBBOO...',
-        '..OBBBBBBBBBBO..',
-        '..OBBBBBBBBBBO..',
-        '.OBBBBBBBBBBBBO.',
-        '.OBBBBBBBBBBBBO.',
-        '.OBBBBBBBBBBBBO.',
-        '.OBBBLLLLLLBBBO.',
-        '.OWBBLLLLLLBBWO.',
-        '..OWBLLLLLLBWO..',
-        '..OBBLLLLLLBBO..',
-        '...OBBBBBBBBO...',
-        '....OOOOOOOO....',
-        '.....F....F.....',
+        '....................',
+        '..............C.C...',
+        '.............CCCC...',
+        '....OO.......OBBO...',
+        '...OTTO.....OOLBKK..',
+        '...OTTTOOOOOOLBEKO..',
+        '....OTTBLLLLLLBCO...',
+        '....OOBBBLLLLBBBO...',
+        '.....OBBWWWWWWBBO...',
+        '.....OBWwWwWwWBBO...',
+        '.....OBWwWwWwWDBO...',
+        '.....OBDWWWWWDDBO...',
+        '......ODDDDDDDDO....',
+        '.......OODDDDOO.....',
+        '.........F..F.......',
+        '.........F..F.......',
+        '........FFF.FFF.....',
+        '....................',
       ],
-      eyeL: [4, 6], eyeR: [10, 6], beak: [7, 8], blushY: 8, blushL: 2, blushR: 12,
-      headTop: [8, 2], bellyC: [8, 10], wattle: false, wing: [3, 9],
+      eyeL: [15, 5], eyeR: [15, 5], beak: [16, 4],
+      blushY: 6, blushL: 13, blushR: 16,
+      headTop: [15, 2], bellyC: [10, 11], wattle: true, wing: [8, 10],
     },
     hen: {
       rows: [
-        '......C.C.......',
-        '.....CCCCC......',
-        '.....OOOOO...T..',
-        '...OOBBBBBOO.TT.',
-        '..OBBBBBBBBBOTT.',
-        '..OBBBBBBBBBBOT.',
-        '.OBBBBBBBBBBBBO.',
-        '.OBBBBBBBBBBBBO.',
-        '.OBBBBBBBBBBBBO.',
-        '.OBBBLLLLLLBBBO.',
-        '.OWBBLLLLLLBBWO.',
-        '..OWBLLLLLLBWO..',
-        '..OBBLLLLLLBBO..',
-        '...OBBBBBBBBO...',
-        '....OOOOOOOO....',
-        '....F......F....',
+        '..............C.C...',
+        '.............CCCCC..',
+        '..OO..........OBBO..',
+        '.OTTO........OLLBKK.',
+        '.OTTTO.......OLBEKO.',
+        'OTTTTTOOOOOOOLBBKO..',
+        'OTTTTTBLLLLLLLBCCO..',
+        '.OTTTBBBLLLLLBBBO...',
+        '..OOBBWWWWWWWBBBO...',
+        '...OBBWwWwWwWWBBO...',
+        '...OBBWwWwWwwWBBO...',
+        '...OBDWwWwWwWDDBO...',
+        '....ODDDWWWDDDDO....',
+        '.....OODDDDDOO......',
+        '.......F...F........',
+        '.......F...F........',
+        '......FFFF.FFFF.....',
+        '....................',
       ],
-      eyeL: [4, 6], eyeR: [10, 6], beak: [7, 8], blushY: 8, blushL: 2, blushR: 12,
-      headTop: [8, 2], bellyC: [8, 10], wattle: true, wing: [3, 9],
+      eyeL: [15, 4], eyeR: [15, 4], beak: [17, 3],
+      blushY: 5, blushL: 13, blushR: 16,
+      headTop: [15, 1], bellyC: [10, 11], wattle: true, wing: [8, 10],
     },
     fluff: {
       rows: [
-        '......U.U.......',
-        '.......U........',
-        '.....OOOOO......',
-        '...OOBBBBBOO....',
-        '..OBBBBBBBBBO...',
-        '.OBBBBBBBBBBBO..',
-        'OBBBBBBBBBBBBBO.',
-        'OBBBBBBBBBBBBBO.',
-        '.OBBBBBBBBBBBO..',
-        'OBBBBLLLLLLBBBO.',
-        'OBWBLLLLLLLLBWO.',
-        '.OBBLLLLLLLLBO..',
-        'OBBBLLLLLLLLBBO.',
-        '.OBBBBBBBBBBBO..',
-        '..OOOBBBBBOOO...',
-        '.....F...F......',
+        '....................',
+        '.............C.C....',
+        '............CCCCC...',
+        '...OOO.......OBBO...',
+        '..OTTTO.....OOLLBKK.',
+        '.OTTTTOOOOOOOLBEKO..',
+        '.OTTTBBLLLLLLLBCO...',
+        '.OOBBBBLLLLLLBBCO...',
+        'OBBBBWWWWWWWWWBBBO..',
+        'OBBBWwWwWwWwWWBBBO..',
+        'OBBBWwWwWwWwwWBBBO..',
+        'OBBDWwWwWwWwWDDBO...',
+        '.OBDDDWWWWWWDDDDO...',
+        '.ODDDDDDDDDDDDDO....',
+        '..OODDDDDDDDDOO.....',
+        '.....OOOOOOOOO......',
+        '.......F...F........',
+        '......FFF..FFF......',
       ],
-      eyeL: [4, 6], eyeR: [10, 6], beak: [7, 8], blushY: 8, blushL: 2, blushR: 12,
-      headTop: [8, 2], bellyC: [8, 11], wattle: false, wing: [2, 10],
+      eyeL: [15, 5], eyeR: [15, 5], beak: [17, 4],
+      blushY: 6, blushL: 13, blushR: 16,
+      headTop: [15, 2], bellyC: [10, 11], wattle: true, wing: [8, 10],
     },
     tall: {
       rows: [
-        '.......UU.......',
-        '.....OOOOO......',
-        '....OBBBBBO.....',
-        '...OBBBBBBBO....',
-        '...OBBBBBBBO....',
-        '..OBBBBBBBBBO...',
-        '..OBBBBBBBBBO...',
-        '..OBBBBBBBBBO...',
-        '..OBBBBBBBBBO...',
-        '..OBBLLLLLBBO...',
-        '..OWBLLLLLBWO...',
-        '..OBBLLLLLBBO...',
-        '...OBLLLLLBO....',
-        '...OBBBBBBBO....',
-        '....OOOOOOO.....',
-        '.....F...F......',
+        '.............C.C.C..',
+        '............CCCCCC..',
+        '.OO.........OOBBBO..',
+        'OTTO.......OOLLBKKK.',
+        'OTTTO......OLLBEKKO.',
+        'OTTTTO.....OLBBBKO..',
+        '.OTTTO.....OLBBCCO..',
+        '.OTTTOOOOOOOLBBCO...',
+        '..OTTBLLLLLLLLBBO...',
+        '..OOBBWWWWWWWBBBO...',
+        '...OBBWwWwWwWWBBO...',
+        '...OBBWwWwWwwWBBO...',
+        '....OBDWwWwWWDDBO...',
+        '....ODDDWWWDDDDO....',
+        '.....OODDDDDOO......',
+        '.......F...F........',
+        '.......F...F........',
+        '......FFFF.FFFF.....',
       ],
-      eyeL: [4, 5], eyeR: [9, 5], beak: [7, 7], blushY: 7, blushL: 3, blushR: 11,
-      headTop: [7, 1], bellyC: [7, 11], wattle: false, wing: [2, 10],
+      eyeL: [15, 4], eyeR: [15, 4], beak: [17, 3],
+      blushY: 5, blushL: 13, blushR: 16,
+      headTop: [15, 1], bellyC: [10, 11], wattle: true, wing: [8, 10],
     },
   };
 
@@ -709,44 +725,41 @@ const SPR = (() => {
      tail feathers sweeping off one flank, a folded wing inked onto the
      other, a bonnet and shawl on top and a stitched pinafore down the
      front. 34x33, drawn at 1x in the world. */
+  /* Mama Hen: a big broody hen settled low over her nest. Serrated comb,
+     short beak, wattles under the chin, an arched neck, feather partings
+     across a folded wing and sickle tail feathers off the back. Her legs
+     are tucked under her, the way a sitting hen's are. 34x26. */
   const MAMA_ROWS = [
-    '...............CCC.C..............',
-    '..............CCCCCC..............',
-    '.............OOOOOOOO.............',
-    '...........OOSSSSSSSSOO...........',
-    '..........OSSSSSSSSSSSSO..........',
-    '.........OSSSSSSSSSSSSSSO.........',
-    '.........OSSBBBBBBBBBBSSO.........',
-    '.........OBBBBBBBBBBBBBBO.........',
-    '.........OBBBBBBBBBBBBBBO.........',
-    '..........OBBBBBBBBBBBBO..........',
-    '...........OBBBBBBBBBBO...........',
-    '............OBBBBBBBBO............',
-    '............OSSSSSSSSO............',
-    '............OSSSSSSSSO............',
-    '..........OSSSSSSSSSSSSO..........',
-    '........OSSSSSSSSSSSSSSSSO........',
-    '..O....OSSSSSSSSSSSSSSSSSSO.......',
-    'OOTOO.OBBBBBBBhAAAAhBBooBBBO......',
-    'TOTTTOOBBBBBBhAAAAAAhoWWoBBO......',
-    'TTTTTTOBBBBBBhAAAAAhWWWWWoBO......',
-    'TTTTTOBBBBBBhAAAAAAAhWWWWWoBO.....',
-    'OTTTOOBBBBBBhAAaaaaAhWWWWWWBO.....',
-    '.OTTTOBBBBBBhAAaaaaAhWWWWWWBO.....',
-    '.OTTTOBBBBBBhAAaaaaAhWWWWWWBO.....',
-    '.OTTTTOBBBBBhAAAAAAAhWWWWWWO......',
-    '..OTTTOBBBBBhAAAAAAAhWWWWWBO......',
-    '...OTTTOBBBBBhAAAAAhWWWWWBO.......',
-    '....OTTOBBBBBhAAAAAAhoWWBBO.......',
-    '.....OTOOOBLLLhhhhhhLLLBOO........',
-    '......O...OOLLLLLLLLLLOO..........',
-    '............OOOOOOOOOO............',
-    '............OOO....OOO............',
-    '............OOO....OOO............',
+    '..................................',
+    '..................................',
+    '.........................COC......',
+    '.OO.....................CCCCCC....',
+    '.OTO....................OLLBBO....',
+    '..OTO...................OLLBBO....',
+    'OOTTTOO................OLLEBBK....',
+    'OTTTTTTO..............OLLLLBBK....',
+    'OTTTTTOO..............OLLLLBCC....',
+    '.OTTTO...........OOOOOLLLLLBC.....',
+    '..OTTTO.....OOOOOLLLLLLLLLLO......',
+    '...OTTO..OOOLLLLLLLLLLLLLLO.......',
+    '....OTO.OBBBBBBWWWWWWBBBBBBO......',
+    '.....OTOBBBBBwwwwwwWWWWBBBBBO.....',
+    '......OBBBBBWWWWWWWwwwwwBBBBO.....',
+    '......OBBBBwwWWWWWWWWWWWWBBBO.....',
+    '......OBBBWWWwwwwwwWWWWWWBBBO.....',
+    '......OBBBWWWWWWWWWwwwwwBBBBO.....',
+    '......OBBBBwwWWWWWWWWWWWBBBBO.....',
+    '.......ODDDWWwwwwwwWWWWDDDDO......',
+    '........ODDDDWWWWWWwwDDDDDO.......',
+    '.........OOODDDDDDDDDDDOOO........',
+    '............OOOOODOOOOO...........',
+    '..................................',
+    '..................................',
+    '..................................',
   ];
   const MAMA = {
-    rows: MAMA_ROWS, eyeL: [12, 7], eyeR: [20, 7], beak: [16, 9], blushY: 9,
-    blushL: 10, blushR: 22, headTop: [16, 2], wattle: true, w: 34, h: 33,
+    rows: MAMA_ROWS, eyeL: [26, 6], eyeR: [26, 6], beak: [29, 6], blushY: 8,
+    blushL: 24, blushR: 28, headTop: [26, 1], wattle: true, w: 34, h: 26,
   };
   const MAMA_TIER = [
     ['#e8d9bd', '#e8542f'], ['#bfe6a8', '#e8542f'], ['#a8d8f0', '#e8542f'],
@@ -856,20 +869,30 @@ const SPR = (() => {
     drawGrid(ctx, a.g, a.pal, gx * k, gy * k, k);
   }
 
-  const CELL = 20, OFF_X = 2, OFF_Y = 4;
+  const CELL = 20, OFF_X = 0, OFF_Y = 2;
 
   function paletteFor(sp) {
     const body = sp.body;
-    const dark = lum(body) < 0.22 ? '#14141c' : darken(body, 0.5);
+    const dark = lum(body) < 0.22 ? '#14141c' : darken(body, 0.52);
     return {
-      O: dark, B: body, L: lighten(body, 0.42), W: darken(body, 0.16),
-      C: '#e8542f', U: sp.accent, T: sp.accent, F: '#f2a03f',
+      O: dark, B: body,
+      L: lighten(body, 0.34),        /* the lit line along the back and neck */
+      D: darken(body, 0.26),         /* the underside, in its own shadow */
+      W: darken(body, 0.12),         /* the folded wing */
+      w: darken(body, 0.32),         /* the partings between its feathers */
+      T: darken(sp.accent, 0.10),    /* tail sickles take the accent colour */
+      t: darken(sp.accent, 0.34),
+      U: sp.accent,
+      C: '#cf3226',                  /* comb and wattle */
+      K: '#f0a422',                  /* beak */
+      F: '#e8a53f',                  /* scaly shanks and toes */
+      E: '#14100c',                  /* eye */
     };
   }
 
   /* volume pass: light from upper-left, shade lower-right, plus rim */
   function shadeBody(ctx, rows, ox, oy, k, body) {
-    const isB = (x, y) => rows[y] && (rows[y][x] === 'B' || rows[y][x] === 'L' || rows[y][x] === 'W');
+    const isB = (x, y) => rows[y] && 'BLWwD'.indexOf(rows[y][x]) >= 0;
     const light = lighten(body, 0.30), dark = darken(body, 0.22), deep = darken(body, 0.36);
     for (let y = 0; y < rows.length; y++) {
       for (let x = 0; x < rows[y].length; x++) {
@@ -898,34 +921,22 @@ const SPR = (() => {
     shadeBody(ctx, shape.rows, OFF_X, OFF_Y, k, sp.body);
     applyPattern(ctx, sp, shape.rows, OFF_X, OFF_Y, k);
 
-    /* wing crease */
-    const [wx, wy] = shape.wing;
-    px(ctx, OFF_X + wx, OFF_Y + wy, k, darken(sp.body, 0.3));
-    px(ctx, OFF_X + wx, OFF_Y + wy + 1, k, darken(sp.body, 0.42));
-    px(ctx, OFF_X + 15 - wx, OFF_Y + wy, k, darken(sp.body, 0.3));
-    px(ctx, OFF_X + 15 - wx, OFF_Y + wy + 1, k, darken(sp.body, 0.42));
-
-    /* face */
+    /* the comb, beak, wattle and shanks are drawn into the grid itself.
+       What is left is the modelling a flat grid cannot carry: a catchlight
+       in the eye, a darker underside to each shank, and the little pale
+       ear patch real hens have behind the eye. */
     const exL = OFF_X + shape.eyeL[0], eyL = OFF_Y + shape.eyeL[1];
-    const exR = OFF_X + shape.eyeR[0], eyR = OFF_Y + shape.eyeR[1];
-    const eyeCol = lum(sp.body) < 0.22 ? '#f5f0ff' : EYE;
-    drawEyes(ctx, sp.eyes, exL, eyL, k, eyeCol, true);
-    drawEyes(ctx, sp.eyes, exR, eyR, k, eyeCol, true);
-    /* beak with 2 tones + shadow */
-    px(ctx, OFF_X + shape.beak[0], OFF_Y + shape.beak[1], k, '#ffc14f');
-    px(ctx, OFF_X + shape.beak[0] + 1, OFF_Y + shape.beak[1], k, '#e0862f');
-    px(ctx, OFF_X + shape.beak[0], OFF_Y + shape.beak[1] + 1, k, shape.wattle ? '#e8542f' : '#c96a20');
-    /* blush */
-    ctx.globalAlpha = 0.75;
-    px(ctx, OFF_X + shape.blushL, OFF_Y + shape.blushY, k, BLUSH);
-    px(ctx, OFF_X + shape.blushR, OFF_Y + shape.blushY, k, BLUSH);
+    const exR = exL, eyR = eyL;
+    px(ctx, exL, eyL - 1, k, lighten(sp.body, 0.55));
+    px(ctx, exL - 1, eyL, k, lighten(sp.body, 0.30));
+    ctx.globalAlpha = 0.7;
+    px(ctx, exL, eyL, k, '#5a5040');            /* a highlight in the eye */
     ctx.globalAlpha = 1;
-    /* feet shading */
-    for (let x = 0; x < 16; x++) {
-      if (shape.rows[15] && shape.rows[15][x] === 'F') {
-        px(ctx, OFF_X + x, OFF_Y + 15, k, '#e0862f');
-      }
-    }
+    /* shade the shanks so they read as round */
+    for (let y = 0; y < shape.rows.length; y++)
+      for (let x = 0; x < shape.rows[y].length; x++)
+        if (shape.rows[y][x] === 'F' && shape.rows[y][x + 1] !== 'F')
+          px(ctx, OFF_X + x, OFF_Y + y, k, '#c9822c');
 
     /* accessory */
     if (sp.acc === 'eyepatch') {
@@ -1062,62 +1073,46 @@ const SPR = (() => {
   }
 
   function mamaSprite(tier, scale, mood) {
-    const key = 'mama' + tier + '_' + scale + '_' + mood;
+    const key = 'mama4_' + tier + '_' + scale + '_' + mood;
     if (cache.has(key)) return cache.get(key);
     const k = scale;
-    const c = newCanvas(38 * k, 37 * k);
+    const c = newCanvas(36 * k, 30 * k);
     const ctx = c.getContext('2d');
     const [body, comb] = MAMA_TIER[tier];
-    const ox = 2, oy = 2;
-    /* the shawl takes its colour from the comb, so a Divine grandma
-       knits herself something gold */
-    const shawl = darken(comb, 0.18), shawlDark = darken(comb, 0.42);
+    const ox = 1, oy = 2;
+    const dark = lum(body) < 0.22 ? '#14141c' : darken(body, 0.52);
     drawGrid(ctx, MAMA.rows, {
-      O: darken(body, 0.50), B: body, L: lighten(body, 0.30),
-      W: darken(body, 0.17), o: darken(body, 0.40), C: comb, T: darken(body, 0.30),
-      S: shawl, s: shawlDark, A: '#f8eeda', a: '#e0d0ab', h: '#b09468',
+      O: dark, B: body,
+      L: lighten(body, 0.34),
+      D: darken(body, 0.26),
+      W: darken(body, 0.12),
+      w: darken(body, 0.32),
+      T: darken(body, 0.40),
+      C: comb, K: '#f0a422', E: '#14100c',
     }, ox * k, oy * k, k);
     shadeBody(ctx, MAMA.rows, ox, oy, k, body);
 
-    /* apron strings coming up over the shawl to the shoulders */
-    [[13, 15], [14, 16], [20, 15], [19, 16]].forEach(([x, y]) => px(ctx, ox + x, oy + y, k, '#f8eeda'));
+    const ex = ox + MAMA.eyeL[0], ey = oy + MAMA.eyeL[1];
+    if (mood === 'blink') {
+      /* a hen blinks upward, so the lid comes from below */
+      px(ctx, ex, ey, k, lighten(body, 0.30));
+      px(ctx, ex, ey + 1, k, darken(body, 0.34));
+    } else {
+      px(ctx, ex, ey, k, '#14100c');
+      px(ctx, ex, ey - 1, k, lighten(body, 0.55));
+      if (mood === 'happy') px(ctx, ex + 1, ey - 1, k, lighten(body, 0.55));
+    }
+    /* the pale ear patch a laying hen has behind the eye */
+    px(ctx, ex - 2, ey + 1, k, lighten(body, 0.46));
+    px(ctx, ex - 2, ey + 2, k, lighten(body, 0.28));
 
-    if (tier === 6) [[8, 20], [26, 22], [16, 29]].forEach(([x, y]) => px(ctx, ox + x, oy + y, k, '#ffd23f'));
-    else if (tier === 7) [[7, 19], [27, 21], [16, 30]].forEach(([x, y]) => px(ctx, ox + x, oy + y, k, '#ffffff'));
-
-    const exL = ox + MAMA.eyeL[0], eyL = oy + MAMA.eyeL[1];
-    const exR = ox + MAMA.eyeR[0], eyR = oy + MAMA.eyeR[1];
-    if (mood === 'happy') { drawEyes(ctx, 'happy', exL, eyL, k); drawEyes(ctx, 'happy', exR, eyR, k); }
-    else if (mood === 'blink') { drawEyes(ctx, 'sleepy', exL, eyL, k); drawEyes(ctx, 'sleepy', exR, eyR, k); }
-    else { drawEyes(ctx, 'round', exL, eyL, k, null, true); drawEyes(ctx, 'round', exR, eyR, k, null, true); }
-    px(ctx, ox + MAMA.beak[0], oy + MAMA.beak[1], k, '#ffc14f');
-    px(ctx, ox + MAMA.beak[0] + 1, oy + MAMA.beak[1], k, '#e0862f');
-    px(ctx, ox + MAMA.beak[0], oy + MAMA.beak[1] + 1, k, comb);
-    px(ctx, ox + MAMA.beak[0] + 1, oy + MAMA.beak[1] + 1, k, darken(comb, 0.2));
-    ctx.globalAlpha = 0.75;
-    px(ctx, ox + MAMA.blushL, oy + MAMA.blushY, k, BLUSH);
-    px(ctx, ox + MAMA.blushL + 1, oy + MAMA.blushY, k, BLUSH);
-    px(ctx, ox + MAMA.blushR, oy + MAMA.blushY, k, BLUSH);
-    px(ctx, ox + MAMA.blushR + 1, oy + MAMA.blushY, k, BLUSH);
-    ctx.globalAlpha = 1;
-
-    /* spectacles: a wire rim round each eye and a bridge between them */
-    const WIRE = '#8a6b3a', GLINT = 'rgba(255,255,255,.55)';
-    [[MAMA.eyeL[0], MAMA.eyeL[1]], [MAMA.eyeR[0], MAMA.eyeR[1]]].forEach(([gx, gy]) => {
-      for (let i = -1; i <= 2; i++) { px(ctx, ox + gx + i, oy + gy - 1, k, WIRE); px(ctx, ox + gx + i, oy + gy + 2, k, WIRE); }
-      for (let i = 0; i <= 1; i++) { px(ctx, ox + gx - 2, oy + gy + i, k, WIRE); px(ctx, ox + gx + 3, oy + gy + i, k, WIRE); }
-      px(ctx, ox + gx - 1, oy + gy, k, GLINT);
-    });
-    px(ctx, ox + MAMA.eyeL[0] + 4, oy + MAMA.eyeL[1], k, WIRE);
-    px(ctx, ox + MAMA.eyeL[0] + 5, oy + MAMA.eyeL[1], k, WIRE);
-    /* arms of the frame, tucked back towards the bonnet */
-    px(ctx, ox + MAMA.eyeL[0] - 3, oy + MAMA.eyeL[1], k, WIRE);
-    px(ctx, ox + MAMA.eyeR[0] + 4, oy + MAMA.eyeR[1], k, WIRE);
-
+    if (tier === 6) [[12, 17], [20, 15], [16, 21]].forEach(([x, y]) => px(ctx, ox + x, oy + y, k, '#ffd23f'));
+    else if (tier === 7) [[11, 16], [21, 14], [16, 22]].forEach(([x, y]) => px(ctx, ox + x, oy + y, k, '#ffffff'));
     if (tier === 7) stampAcc(ctx, 'halo', MAMA.headTop, ox, oy, k);
     cache.set(key, c);
     return c;
   }
+
 
   /* ============================================================
      ICONS — 10x10 pixel glyphs (replace every emoji)
@@ -2024,29 +2019,44 @@ const SPR = (() => {
   }
 
   /* a baby version of any species: round, small, all fluff */
+  /* A day-old chick, in the same side profile as the grown birds: a
+     round downy body, a head that is far too big for it, a wing that is
+     still only a stub, and two thin shanks. 14x13. */
+  const CHICK_ROWS = [
+    '..............',
+    '.......OOOO...',
+    '.....OOBBBBO..',
+    '..OOOOBLLBEO..',
+    '.OBBBBBLLBBKK.',
+    'OBBBBBBBLLBKO.',
+    'OBBWwBBBBBBO..',
+    'OBBWwBBBBBO...',
+    '.OBWwBBBBO....',
+    '.OBBDDDDO.....',
+    '..OODDOO......',
+    '....F.F.......',
+    '...FFF.FFF....',
+  ];
   function chickSprite(sp, scale) {
-    const key = 'chick_' + sp.id + '_' + scale;
+    const key = 'chick2_' + sp.id + '_' + scale;
     if (cache.has(key)) return cache.get(key);
     const k = scale || 1;
-    const c = newCanvas(12 * k, 12 * k);
+    const c = newCanvas(14 * k, 13 * k);
     const ctx = c.getContext('2d');
-    const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
-    const body = sp.body, acc = sp.accent, OUT = '#2e2216';
-    /* body blob */
-    R(3, 3, 6, 1, OUT); R(2, 4, 8, 5, OUT); R(3, 9, 6, 1, OUT);
-    R(3, 4, 6, 5, body); R(4, 3, 4, 1, body);
-    R(4, 4, 3, 1, lighten(body, 0.3));
-    R(3, 8, 6, 1, darken(body, 0.22));
-    /* wing nub */
-    R(2, 6, 1, 2, darken(body, 0.3));
-    /* eye + beak */
-    R(7, 5, 1, 1, OUT);
-    R(9, 6, 2, 1, '#f2a03f'); R(9, 6, 1, 1, '#ffbf5f');
-    /* head tuft */
-    R(5, 2, 1, 1, acc); R(6, 1, 1, 2, acc);
-    /* feet */
-    R(4, 10, 1, 1, '#f2a03f'); R(7, 10, 1, 1, '#f2a03f');
-    R(3, 11, 2, 1, '#f2a03f'); R(7, 11, 2, 1, '#f2a03f');
+    /* a chick is downier and paler than the bird it grows into */
+    const down = lighten(sp.body, 0.28);
+    const pal = {
+      O: lum(down) < 0.22 ? '#14141c' : darken(down, 0.50),
+      B: down, L: lighten(down, 0.32), D: darken(down, 0.24),
+      W: darken(down, 0.10), w: darken(down, 0.28),
+      K: '#f0a422', F: '#e8a53f', E: '#14100c',
+    };
+    drawGrid(ctx, CHICK_ROWS, pal, 0, 0, k);
+    shadeBody(ctx, CHICK_ROWS, 0, 0, k, down);
+    /* a catchlight, and the first hint of a comb coming through */
+    px(ctx, 10, 2, k, lighten(down, 0.55));
+    px(ctx, 8, 1, k, darken('#cf3226', 0.25));
+    px(ctx, 9, 1, k, darken('#cf3226', 0.15));
     cache.set(key, c);
     return c;
   }

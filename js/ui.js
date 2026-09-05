@@ -1800,8 +1800,15 @@
     ctx.restore();
     /* a chick shows how far it has to grow; a hungry hen asks for food */
     if (chick) {
-      ctx.fillStyle = '#2e2216'; ctx.fillRect(Math.round(ch.x + 5), yy - 4, 12, 3);
-      ctx.fillStyle = '#7ac74f'; ctx.fillRect(Math.round(ch.x + 6), yy - 3, Math.round(10 * ch.age), 1);
+      /* two rails: what it has been fed on top, how long it has been
+         growing underneath. It is ready when both are full. */
+      const bx = Math.round(ch.x + 4), by = yy - 6;
+      const fed = Math.max(0, Math.min(1, ch.fed === undefined ? ch.age : ch.fed));
+      const timed = Math.max(0, Math.min(1, (ch.raised || 0) / GAME.growTime()));
+      ctx.fillStyle = '#2e2216'; ctx.fillRect(bx, by, 14, 5);
+      ctx.fillStyle = '#5a4a32'; ctx.fillRect(bx + 1, by + 1, 12, 3);
+      ctx.fillStyle = '#e8a53f'; ctx.fillRect(bx + 1, by + 1, Math.round(12 * fed), 1);
+      ctx.fillStyle = '#7ac74f'; ctx.fillRect(bx + 1, by + 3, Math.round(12 * timed), 1);
     } else if (ch.food <= 0 && Math.floor(now / 500) % 2) {
       ctx.fillStyle = '#fff9ec'; ctx.fillRect(Math.round(ch.x + 6), yy - 9, 9, 8);
       ctx.fillStyle = '#2e2216'; ctx.fillRect(Math.round(ch.x + 6), yy - 9, 9, 1); ctx.fillRect(Math.round(ch.x + 6), yy - 1, 9, 1);
@@ -1854,7 +1861,7 @@
     ctx.save();
     ctx.translate(m.x + 1, m.y + 14);
     ctx.scale(1 + squish * 0.12, 1 - squish * 0.12);
-    ctx.drawImage(mama, -19, -38 + Math.round(bob));
+    ctx.drawImage(mama, -18, -32 + Math.round(bob));
     ctx.restore();
 
     /* only once supper is wearing off: a small gauge on her nest rail */
@@ -3534,7 +3541,14 @@
       ipanel.appendChild(ipHead(chickEl(sp, 2, false), sp.name, TIERS[sp.tier].n + (GAME.isChick(ch) ? ' chick' : '')));
       if (GAME.isChick(ch)) {
         ipanel.appendChild(ipRow('grown up', () => Math.round((ch.age || 0) * 100) + '%'));
-        ipanel.appendChild(ipRow('needs', () => Math.ceil((1 - (ch.age || 0)) * GAME.growPellets()) + ' pellets'));
+        ipanel.appendChild(ipRow('still needs', () => {
+          const short = Math.ceil((1 - (ch.fed || 0)) * GAME.growPellets());
+          const wait = Math.max(0, GAME.growTime() - (ch.raised || 0));
+          if (short > 0 && wait > 0) return short + ' feeds, ' + GAME.fmtTime(wait);
+          if (short > 0) return short + ' more feeds';
+          if (wait > 0) return GAME.fmtTime(wait) + ' to grow';
+          return 'ready';
+        }));
       }
       ipanel.appendChild(ipRow('belly', () => ch.food <= 0 ? 'EMPTY - lays slow' : Math.round(ch.food * 100) + '% full'));
       ipanel.appendChild(ipRow('lays every', GAME.fmtTime(GAME.layTime(sp.tier) / (ch.buffT > 0 ? 2 : 1))));
