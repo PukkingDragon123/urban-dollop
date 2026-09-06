@@ -48,7 +48,26 @@ const ECON = {
   troughCap: 12,           // pellets a trough holds
   wellR: 44,               // px a well keeps watered
   sprinklerR: 30,          // px a sprinkler keeps watered
-  waterMult: 2.0,          // crop growth when watered
+  waterLast: 60,           // seconds one watering keeps a tile damp - dry crops do not grow
+  beehiveR: 48,            // px a beehive pollinates
+  beehiveBoost: 0.30,      // crop growth inside that circle
+  honeyEvery: 75,          // seconds between honey jars
+  honeyValue: 14,          // coins a jar of honey fetches
+  orderEvery: 70,          // seconds between customers pulling up
+  orderTime: 150,          // seconds a customer waits
+  orderPay: 2.4,           // what an order pays per egg, against the sell value
+  orderTip: 3,             // feathers tipped for a filled order
+  maxOrders: 2,            // cars that fit in the lay-by
+  carEvery: 9,             // seconds between passing cars, give or take
+  siteBase: 6,             // seconds the movers need for the cheapest building
+  storeyMult: 1.5,         // what a second storey does to a building's effect
+  storeyCost: 1.4,         // second storey price against the building's base
+  geneMax: 3,              // points a gene can carry
+  geneLay: 0.12, geneSize: 0.10, geneLuck: 0.01, genePlume: 0.15, geneHardy: 0.15,
+  spliceFeathers: 40, cloneFeathers: 30, crossFeathers: 80,
+  cloneCoins: 40,          // coins per point of egg value to clone a hen
+  stockTick: 6,            // seconds between market moves
+  stockVol: 0.035,         // how jumpy the market is
   polishMult: 1.5,         // what a polished egg is worth
   gradeChance: 0.12,       // chance a grader bumps an egg a tier
   dynamoR: 74,             // px a dynamo drives machines
@@ -96,15 +115,15 @@ const ECON = {
    keeps the flock laying. Growth is in seconds for a dry tile.
    ------------------------------------------------------------ */
 const CROPS = {
-  clover: { name:'Clover',    grow:28,  yield:4,  seed:4,  col:'#6ab04c', flower:'#fff', stages:3,
+  clover: { name:'Clover',    grow:90,  yield:4,  seed:4,  col:'#6ab04c', flower:'#fff', stages:3,
             desc:'Cheap ground cover. Chicks nibble it right up.' },
-  wheat:  { name:'Wheat',     grow:42,  yield:7,  seed:8,  col:'#e8c458', stages:4,
-            desc:'Quick and dependable.' },
-  corn:   { name:'Corn',      grow:80,  yield:16, seed:18, col:'#f2d24c', stages:4, needs:'corn',
+  wheat:  { name:'Wheat',     grow:150, yield:8,  seed:8,  col:'#e8c458', stages:4, needs:'wheat',
+            desc:'Slow and dependable.' },
+  corn:   { name:'Corn',      grow:280, yield:18, seed:18, col:'#f2d24c', stages:4, needs:'corn',
             desc:'Tall, slow and generous.' },
-  sunseed:{ name:'Sunflower', grow:120, yield:30, seed:36, col:'#f0a422', stages:4, needs:'sunflowers',
+  sunseed:{ name:'Sunflower', grow:420, yield:34, seed:36, col:'#f0a422', stages:4, needs:'sunflowers',
             desc:'Sunny seeds the flock adores.' },
-  berry:  { name:'Berry Bush',grow:70,  yield:10, seed:70, col:'#c94a6a', stages:4, needs:'berries', regrow:true,
+  berry:  { name:'Berry Bush',grow:240, yield:12, seed:70, col:'#c94a6a', stages:4, needs:'berries', regrow:true,
             desc:'Regrows after every picking.' },
 };
 const CROP_KEYS = Object.keys(CROPS);
@@ -114,8 +133,8 @@ const CROP_KEYS = Object.keys(CROPS);
    the tile grid; decorations sit on top of it.
    ------------------------------------------------------------ */
 const TERRAIN = {
-  soil:  { name:'Till',      icon:'hoe',    cost:0,  desc:'Turn grass into soil you can plant in.' },
-  path:  { name:'Path',      icon:'road',   cost:4,  desc:'Packed dirt. The crew walk a quarter faster on it.' },
+  soil:  { name:'Till',      icon:'hoe',    cost:0,  desc:'Turn grass into soil you can plant in.', needs:'hoe' },
+  path:  { name:'Path',      icon:'road',   cost:4,  desc:'Packed dirt. The crew walk a quarter faster on it.', needs:'paths' },
   stone: { name:'Stone Path',icon:'silo',   cost:14, desc:'Neat flagstones. Faster still, and very tidy.', needs:'paving' },
   high:  { name:'Raise',     icon:'house',  cost:22, desc:'Bank the ground up into a grassy terrace.', needs:'terracing' },
   water: { name:'Dig Pond',  icon:'water',  cost:30, desc:'Scoop out a pond. Nothing walks through it.', needs:'digging' },
@@ -125,19 +144,31 @@ const TERRAIN_KEYS = Object.keys(TERRAIN);
 
 /* things you can plant purely because they look nice */
 const DECOS = {
-  tree:      { name:'Oak',        cost:35,  kind:'tree' },
-  pine:      { name:'Pine',       cost:35,  kind:'pine' },
-  apple:     { name:'Apple Tree', cost:60,  kind:'apple' },
-  bush:      { name:'Bush',       cost:18,  kind:'bush' },
-  rock:      { name:'Rock',       cost:10,  kind:'rock' },
-  stump:     { name:'Stump',      cost:12,  kind:'stump' },
-  flower:    { name:'Flowers',    cost:8,   kind:'flower' },
-  tuft:      { name:'Grass Tuft', cost:4,   kind:'tuft' },
-  clover:    { name:'Clover',     cost:6,   kind:'clover' },
-  shroom:    { name:'Mushrooms',  cost:14,  kind:'shroom' },
-  reed:      { name:'Reeds',      cost:9,   kind:'reed' },
-  lavender:  { name:'Lavender',   cost:16,  kind:'lavender' },
-  sunflower: { name:'Sunflower',  cost:20,  kind:'sunflower' },
+  /* the garden centre */
+  flower:    { name:'Flowers',    cost:8,   kind:'flower',    needs:'garden' },
+  tuft:      { name:'Grass Tuft', cost:4,   kind:'tuft',      needs:'garden' },
+  clover:    { name:'Clover',     cost:6,   kind:'clover',    needs:'garden' },
+  bush:      { name:'Bush',       cost:18,  kind:'bush',      needs:'garden' },
+  rock:      { name:'Rock',       cost:10,  kind:'rock',      needs:'garden' },
+  /* the tree nursery */
+  tree:      { name:'Oak',        cost:35,  kind:'tree',      needs:'trees' },
+  pine:      { name:'Pine',       cost:35,  kind:'pine',      needs:'trees' },
+  stump:     { name:'Stump',      cost:12,  kind:'stump',     needs:'trees' },
+  shroom:    { name:'Mushrooms',  cost:14,  kind:'shroom',    needs:'trees' },
+  reed:      { name:'Reeds',      cost:9,   kind:'reed',      needs:'trees' },
+  /* the orchard */
+  apple:     { name:'Apple Tree', cost:60,  kind:'apple',     needs:'orchard' },
+  lavender:  { name:'Lavender',   cost:16,  kind:'lavender',  needs:'orchard' },
+  sunflower: { name:'Sunflower',  cost:20,  kind:'sunflower', needs:'orchard' },
+  /* furniture */
+  bench:     { name:'Bench',      cost:24,  kind:'bench',     needs:'furniture' },
+  lamp:      { name:'Lamp Post',  cost:30,  kind:'lamp',      needs:'furniture' },
+  barrel:    { name:'Barrel',     cost:14,  kind:'barrel',    needs:'furniture' },
+  birdbath:  { name:'Birdbath',   cost:40,  kind:'birdbath',  needs:'furniture' },
+  scarecrow: { name:'Scarecrow',  cost:36,  kind:'scarecrow', needs:'furniture' },
+  mailbox:   { name:'Mailbox',    cost:18,  kind:'mailbox',   needs:'furniture' },
+  hay:       { name:'Hay Bale',   cost:12,  kind:'hay',       needs:'furniture' },
+  planter:   { name:'Planter',    cost:22,  kind:'planter',   needs:'furniture' },
 };
 const DECO_KEYS = Object.keys(DECOS);
 
@@ -199,7 +230,7 @@ const BUILDS = {
                desc:'Every harvest on the ranch yields 25% more feed.', needs:'mill' },
   lovenest:  { name:'Love Nest', sec:'ranch', w:2, h:2, base:400, growth:1.8, refund:150,
                desc:'Drop two chickens in to breed a fancy egg.', needs:'court' },
-  staffhut:  { name:'Staff Hut', sec:'crew', w:2, h:2, base:500, growth:1.9, refund:200,
+  staffhut:  { name:'Staff Hut', sec:'crew', w:2, h:2, base:220, growth:1.8, refund:90,
                desc:'Hire farmhands and robots here. +3 staff slots each.', needs:'hiring' },
   silo:      { name:'Egg Silo',  sec:'factory', w:2, h:2, base:900, growth:1.8, refund:350,
                desc:'Stores eggs from belts and loads the truck by itself.', needs:'silo' },
@@ -221,8 +252,12 @@ const BUILDS = {
                desc:'On a belt: now and then it grades an egg up a whole tier.', needs:'grader' },
   dynamo:    { name:'Dynamo',    sec:'factory', w:2, h:2, base:9000, growth:2.0, refund:3600,
                desc:'Drives every belt and machine around it a good deal faster.', needs:'dynamo' },
-  hq:        { name:'Logistics HQ', sec:'crew', w:3, h:2, base:600, growth:2.2, refund:240,
-               desc:'A dispatch office with a wall map. Buy vehicles and open routes here.' },
+  hq:        { name:'Logistics HQ', sec:'crew', w:3, h:2, base:400, growth:2.2, refund:160,
+               desc:'A dispatch office with a wall map. Every trip runs 10% faster with one on the ranch.', needs:'logistics' },
+  beehive:   { name:'Beehive', sec:'farm', w:1, h:1, base:220, growth:1.5, refund:90,
+               desc:'Bees pollinate every crop nearby so it grows faster, and drip honey you can sell.', needs:'beehive' },
+  genelab:   { name:'Gene Lab', sec:'ranch', w:2, h:2, base:1500, growth:2.0, refund:600,
+               desc:'Read a hen\'s genes, splice two birds into one, clone the best, cross in animal traits.', needs:'genelab' },
   board:     { name:'Noticeboard', sec:'crew', w:1, h:1, base:40, growth:1.4, refund:15,
                desc:'Where flyers get pinned. Applicants walk up to it and wait.', needs:'hiring' },
   belt:      { name:'Conveyor',  sec:'factory', w:1, h:1, base:15, growth:1, refund:7,
@@ -230,6 +265,47 @@ const BUILDS = {
   fence:     { name:'Fence',     sec:'ranch', w:1, h:1, base:10, growth:1, refund:5,
                desc:'Chickens will not cross it. Pen them where you want them.', needs:'belts' },
 };
+
+/* ------------------------------------------------------------
+   GENES - every hen carries five, nought to three points each.
+   The Gene Lab reads them, splices, clones and crosses them.
+   ------------------------------------------------------------ */
+const GENES = {
+  lay:   { key:'lay',   name:'LAY',   icon:'egg',     col:'#f0a422', desc:'lays faster' },
+  size:  { key:'size',  name:'SIZE',  icon:'coin',    col:'#ffd23f', desc:'eggs worth more' },
+  luck:  { key:'luck',  name:'LUCK',  icon:'clover',  col:'#6ab04c', desc:'more golden eggs' },
+  plume: { key:'plume', name:'PLUME', icon:'feather', col:'#b06ee0', desc:'more feathers' },
+  hardy: { key:'hardy', name:'HARDY', icon:'flame',   col:'#e8542f', desc:'stays full longer' },
+};
+const GENE_KEYS = Object.keys(GENES);
+/* animals a hen can be crossed with, each pushing one gene and leaving a mark */
+const ANIMALS = [
+  { id:'cow',     name:'Cow',     gene:'size',  mark:'spots',   desc:'Big eggs. Patches on the plumage.' },
+  { id:'rabbit',  name:'Rabbit',  gene:'lay',   mark:'ears',    desc:'Lays quick as anything. Long ears.' },
+  { id:'peacock', name:'Peacock', gene:'plume', mark:'fan',     desc:'Feathers for days. A teal tail fan.' },
+  { id:'bee',     name:'Bee',     gene:'luck',  mark:'stripes', desc:'Lucky golden eggs. Striped body.' },
+  { id:'goat',    name:'Goat',    gene:'hardy', mark:'horns',   desc:'Never gets hungry. Little horns.' },
+];
+const ANIMAL_BY_ID = Object.fromEntries(ANIMALS.map(a => [a.id, a]));
+
+/* ------------------------------------------------------------
+   THE COMPANY - a raccoon inherited this farm and means to get
+   rich. Name it, pick a logo and two colours; the truck, the
+   sign and the paperwork wear them.
+   ------------------------------------------------------------ */
+const COMPANY_DEFAULT = { name:'INF EGG CO.', logo:'egg', col1:'#e8542f', col2:'#ffd23f', done:false };
+const LOGOS = ['egg', 'chick', 'star', 'crown', 'sparkle', 'heart', 'bolt', 'clover', 'gear', 'truck', 'flame', 'atom'];
+const BRAND_COLS = ['#e8542f', '#f0a422', '#ffd23f', '#6ab04c', '#3fa7d6', '#2f5f9e', '#b06ee0', '#ff5f9e',
+                    '#fff8ec', '#2e2216', '#8a5e2a', '#4fb8a8'];
+
+/* rival egg companies whose shares you can hold, once the market opens */
+const STOCKS = [
+  { id:'cluck',  name:'Cluck Corp',      col:'#e8542f', base:24,  drift:0.0006 },
+  { id:'yolk',   name:'Yolkford Farms',  col:'#f0a422', base:61,  drift:0.0004 },
+  { id:'shell',  name:'Shellington Ltd', col:'#3fa7d6', base:140, drift:0.0009 },
+  { id:'feath',  name:'Featherton Feed', col:'#6ab04c', base:9,   drift:0.0003 },
+];
+const STOCK_BY_ID = Object.fromEntries(STOCKS.map(s => [s.id, s]));
 
 /* ------------------------------------------------------------
    CREW - five stats, and roles that each lean on different ones.
@@ -550,184 +626,239 @@ const SPECIES_TOTAL = SPECIES.length;
 const SPECIES_BY_TIER = TIERS.map((_, t) => SPECIES.filter(s => s.tier === t));
 
 /* ------------------------------------------------------------
-   RESEARCH - the Lab runs EGGOS, a little terminal. Packages sit
-   in modules; a package only lists once its prerequisite is
-   installed, so the screen shows exactly what you can do now.
-   Cost in feathers: base * growth^level.
+   RESEARCH - the Lab runs EGGOS, a little terminal. Packages are
+   square nodes laid out in lanes, one lane per module, depth
+   running left to right from the kernel. A package only lists
+   once its prerequisite is installed, so the screen shows exactly
+   what you can do now. Cost in feathers: base * growth^level.
+   Nodes come in kinds: 'unlock' opens a tool, a building, a brush
+   or a screen; 'stat' stacks a bonus; the QUESTS lane is a chain
+   of goals that pay out when you reach them.
    ------------------------------------------------------------ */
 const MODULES = [
-  { name:'CREW',    code:'crew.sys', icon:'hands',  hue:'#9b6bd0' },
-  { name:'GATHER',  code:'gather.sys',icon:'basket',hue:'#6ab04c' },
-  { name:'HENS',    code:'hens.sys', icon:'chick',  hue:'#e8542f' },
-  { name:'HATCH',   code:'hatch.sys',icon:'egg',    hue:'#f0a422' },
-  { name:'LOVE',    code:'love.sys', icon:'heart',  hue:'#ff5f9e' },
-  { name:'FACTORY', code:'fact.sys', icon:'gear',   hue:'#3fa7d6' },
-  { name:'MARKET',  code:'mrkt.sys', icon:'truck',  hue:'#b8862f' },
-  { name:'FARM',    code:'farm.sys', icon:'seed',   hue:'#7ab648' },
+  { id:'quests',  name:'QUESTS',  code:'quest.sys', icon:'star',    hue:'#ffd23f' },
+  { id:'tools',   name:'TOOLS',   code:'tools.sys', icon:'hammer',  hue:'#9fb3c8' },
+  { id:'farm',    name:'FARM',    code:'farm.sys',  icon:'seed',    hue:'#7ab648' },
+  { id:'hens',    name:'HENS',    code:'hens.sys',  icon:'chick',   hue:'#e8542f' },
+  { id:'hatch',   name:'HATCH',   code:'hatch.sys', icon:'egg',     hue:'#f0a422' },
+  { id:'gather',  name:'GATHER',  code:'gather.sys',icon:'basket',  hue:'#6ab04c' },
+  { id:'market',  name:'MARKET',  code:'mrkt.sys',  icon:'truck',   hue:'#b8862f' },
+  { id:'crew',    name:'CREW',    code:'crew.sys',  icon:'hands',   hue:'#9b6bd0' },
+  { id:'factory', name:'FACTORY', code:'fact.sys',  icon:'gear',    hue:'#3fa7d6' },
+  { id:'love',    name:'LOVE',    code:'love.sys',  icon:'heart',   hue:'#ff5f9e' },
+  { id:'decor',   name:'DECOR',   code:'deco.sys',  icon:'tree',    hue:'#4fb8a8' },
 ];
+const MOD_BY_ID = Object.fromEntries(MODULES.map(m => [m.id, m]));
+const MOD_INDEX = Object.fromEntries(MODULES.map((m, i) => [m.id, i]));
 
+/* U(...) is an unlock: one level, it opens something. K(...) stacks. */
+const U = (id, br, d, pre, name, icon, base, desc) => ({ id, br, d, pre, name, icon, max:1, base, growth:1, desc, kind:'unlock' });
+const K = (id, br, d, pre, name, icon, max, base, growth, desc) => ({ id, br, d, pre, name, icon, max, base, growth, desc, kind:'stat' });
 const SKILLS = [
-  { id:'root', br:3, d:0, pre:null, name:'Egg Science', icon:'egg', max:1, base:0, growth:1, desc:'The kernel. It all starts with one egg.' },
+  { id:'root', br:'hens', d:0, pre:null, name:'Egg Science', icon:'egg', max:1, base:0, growth:1, desc:'The kernel. It all starts with one egg.', kind:'root' },
 
-  /* ---- CREW: flyers, wages, robots, roles ---- */
-  { id:'hiring',    br:0, d:1, pre:'root',      name:'Recruiting',    icon:'doc',    max:1, base:40,   growth:1,   desc:'Unlock the Staff Hut, flyers and hiring' },
-  { id:'posters',   br:0, d:2, pre:'hiring',    name:'Bigger Posters',icon:'doc',    max:5, base:30,   growth:2.1, desc:'+1 applicant per flyer run' },
-  { id:'wages',     br:0, d:2, pre:'hiring',    name:'Payroll Deals', icon:'coin',   max:6, base:30,   growth:2.3, desc:'-12% crew wages' },
-  { id:'crewspeed', br:0, d:2, pre:'hiring',    name:'Sturdy Boots',  icon:'wind',   max:5, base:25,   growth:2.2, desc:'+15% crew walking speed' },
-  { id:'agency',    br:0, d:3, pre:'posters',   name:'Hiring Agency', icon:'chart',  max:5, base:90,   growth:2.4, desc:'+1 to every stat an applicant rolls' },
-  { id:'overtime',  br:0, d:3, pre:'wages',     name:'Overtime Pay',  icon:'flame',  max:5, base:70,   growth:2.3, desc:'+25% stamina before a breather' },
-  { id:'cullbot',   br:0, d:3, pre:'crewspeed', name:'Cull-Bot',      icon:'remove', max:1, base:160,  growth:1,   desc:'Assemble Cull-Bots: they retire chickens you mark' },
-  { id:'keeper',    br:0, d:4, pre:'agency',    name:'Keeper Role',   icon:'hands',  max:1, base:220,  growth:1,   desc:'Hire Keepers: they pet the flock all day long' },
-  { id:'matchbot',  br:0, d:4, pre:'cullbot',   name:'Match-Bot',     icon:'cupid',  max:1, base:260,  growth:1,   desc:'Assemble Match-Bots: they fill love nests for you' },
-  { id:'crewcap',   br:0, d:4, pre:'overtime',  name:'Bunkhouse',     icon:'house',  max:6, base:140,  growth:2.4, desc:'+2 crew slots' },
-  { id:'foreman',   br:0, d:5, pre:'keeper',    name:'Foreman',       icon:'crown',  max:5, base:400,  growth:2.6, desc:'+35% reach on a Technician aura' },
-  { id:'union',     br:0, d:6, pre:'foreman',   name:'Egg Union',     icon:'star',   max:1, base:3200, growth:1,   desc:'The whole crew works 50% faster' },
-
-  /* ---- GATHER ---- */
-  { id:'basket1',  br:1, d:1, pre:'root',      name:'Bigger Basket', icon:'basket', max:6, base:4,   growth:2.0, desc:'+8 basket capacity' },
-  { id:'magnet',   br:1, d:2, pre:'basket1',   name:'Magnet Palm',   icon:'magnet', max:6, base:8,   growth:2.1, desc:'+12px scoop radius' },
-  { id:'feather1', br:1, d:2, pre:'basket1',   name:'Feather Finder',icon:'feather',max:6, base:10,  growth:2.2, desc:'+3% feathers when scooping eggs' },
-  { id:'feed',     br:1, d:3, pre:'magnet',    name:'Feeder Role',   icon:'seed',   max:1, base:25,  growth:1,   desc:'Unlock the Feeder role: crew scatter feed for you' },
-  { id:'sweepluck',br:1, d:3, pre:'feather1',  name:'Lucky Sweep',   icon:'clover', max:5, base:30,  growth:2.4, desc:'+2% scooped eggs duplicate' },
-  { id:'feedplus', br:1, d:4, pre:'feed',      name:'Tasty Mix',     icon:'bowl',   max:4, base:45,  growth:2.5, desc:'feed lasts +50% longer' },
-  { id:'basket2',  br:1, d:4, pre:'sweepluck', name:'Deep Basket',   icon:'basket2',max:4, base:60,  growth:2.6, desc:'+16 basket capacity' },
-  { id:'plumage',  br:1, d:5, pre:'basket2',   name:'Plume Press',   icon:'feather',max:5, base:180, growth:2.5, desc:'+25% value from every feather picked up' },
-
-  /* ---- HENS ---- */
-  { id:'happy',   br:2, d:1, pre:'root',   name:'Happy Hens',    icon:'heart',  max:12, base:4,   growth:1.9, desc:'+10% lay speed' },
-  { id:'flock',   br:2, d:2, pre:'happy',  name:'Bigger Flock',  icon:'house',  max:10, base:10,  growth:2.1, desc:'+4 chicken capacity' },
-  { id:'pets',    br:2, d:2, pre:'happy',  name:'Pet Therapy',   icon:'hands',  max:6,  base:6,   growth:2.2, desc:'-15% pet cooldown' },
-  { id:'golden',  br:2, d:3, pre:'flock',  name:'Golden Peck',   icon:'sparkle',max:6,  base:25,  growth:2.5, desc:'+3% golden eggs (worth 5x)' },
-  { id:'mutate',  br:2, d:3, pre:'pets',   name:'Mutation Vats', icon:'dna',    max:8,  base:30,  growth:2.3, desc:'+1.5% egg mutation chance' },
-  { id:'coops',   br:2, d:4, pre:'flock',  name:'Tower Coops',   icon:'silo',   max:6,  base:120, growth:2.6, desc:'+10 chicken capacity' },
-  { id:'rainbow', br:2, d:4, pre:'mutate', name:'Rainbow Genome',icon:'rainbow',max:3,  base:300, growth:5.0, desc:'+15% for mutations to jump 2 tiers' },
-
-  /* ---- HATCH ---- */
-  { id:'warm',    br:3, d:1, pre:'root',   name:'Warm Coils',    icon:'flame',  max:12, base:4,   growth:1.9, desc:'+15% incubator speed' },
-  { id:'inccap',  br:3, d:2, pre:'warm',   name:'Roomy Racks',   icon:'rack',   max:6,  base:20,  growth:2.4, desc:'+3 incubator queue' },
-  { id:'twins',   br:3, d:2, pre:'warm',   name:'Twin Yolks',    icon:'twins',  max:6,  base:30,  growth:2.4, desc:'+4% twin hatch chance' },
-  { id:'whisper', br:3, d:3, pre:'inccap', name:'Egg Whisperer', icon:'feather',max:6,  base:25,  growth:2.3, desc:'+20% feathers from hatching' },
-  { id:'miracle', br:3, d:3, pre:'twins',  name:'Miracle Hatch', icon:'star',   max:4,  base:120, growth:4.0, desc:'+5% hatchling is +1 tier' },
-  { id:'quantum', br:3, d:4, pre:'whisper',name:'Quantum Coils', icon:'atom',   max:6,  base:220, growth:2.6, desc:'+30% incubator speed' },
-  { id:'hatchery',br:3, d:5, pre:'quantum',name:'Grand Hatchery',icon:'rack',   max:1,  base:900, growth:1,   desc:'Unlock the Grand Hatchery: 24 eggs, double speed' },
-
-  /* ---- LOVE ---- */
-  { id:'court',     br:4, d:1, pre:'root',       name:'Courtship',      icon:'cupid',     max:1, base:15,  growth:1,   desc:'Unlock the LOVE NEST (breed chickens!)' },
-  { id:'candle',    br:4, d:2, pre:'court',      name:'Candlelight',    icon:'candle',    max:6, base:20,  growth:2.3, desc:'+20% breeding speed' },
-  { id:'genes',     br:4, d:2, pre:'court',      name:'Fine Genes',     icon:'flask',     max:6, base:35,  growth:2.5, desc:'+6% bred egg tier-up chance' },
-  { id:'twindate',  br:4, d:3, pre:'candle',     name:'Double Date',    icon:'hearts',    max:4, base:90,  growth:3.0, desc:'+10% breeding lays 2 eggs' },
-  { id:'rainbowegg',br:4, d:3, pre:'genes',      name:'Rainbow Clutch', icon:'rainbowegg',max:4, base:250, growth:4.0, desc:'+8% rainbow egg from Divine pairs' },
-  { id:'secretlore',br:4, d:4, pre:'rainbowegg', name:'Secret Lore',    icon:'scroll',    max:1, base:1200,growth:1,   desc:'Rainbow eggs hatch 3x faster' },
-
-  /* ---- FACTORY ---- */
-  { id:'belts',    br:5, d:1, pre:'root',      name:'Conveyor Tech', icon:'crate',  max:1, base:30,  growth:1,   desc:'Unlock conveyors, fences and the Technician role' },
-  { id:'beltspeed',br:5, d:2, pre:'belts',     name:'Belt Grease',   icon:'oil',    max:6, base:20,  growth:2.2, desc:'+20% belt speed' },
-  { id:'vacuum',   br:5, d:2, pre:'belts',     name:'Vacuum Bots',   icon:'robot',  max:1, base:80,  growth:1,   desc:'Unlock egg vacuums' },
-  { id:'sorter',   br:5, d:3, pre:'beltspeed', name:'Egg Sorter',    icon:'sorter', max:1, base:140, growth:1,   desc:'Unlock the Sorter: splits belts by rarity' },
-  { id:'vacradius',br:5, d:3, pre:'vacuum',    name:'Wide Suction',  icon:'spiral', max:6, base:40,  growth:2.2, desc:'+8px vacuum radius' },
-  { id:'splitter', br:5, d:4, pre:'sorter',    name:'Belt Splitter', icon:'sorter', max:1, base:220, growth:1,   desc:'Unlock the Splitter: feeds two lines in turn' },
-  { id:'blower',   br:5, d:4, pre:'sorter',    name:'Air Blower',    icon:'blower', max:1, base:260, growth:1,   desc:'Unlock the Blower: herds loose eggs along' },
-  { id:'vacspeed', br:5, d:4, pre:'vacradius', name:'Turbo Pumps',   icon:'wind',   max:6, base:40,  growth:2.2, desc:'+25% vacuum speed' },
-  { id:'loader',   br:5, d:5, pre:'splitter',  name:'Truck Loader',  icon:'crate',  max:1, base:700, growth:1,   desc:'Unlock the Loader: belts feed the truck directly' },
-  { id:'polisher', br:5, d:6, pre:'loader',    name:'Polishing',     icon:'sparkle',  max:1, base:1100, growth:1,  desc:'Unlock the Polisher: belt eggs come out worth half again' },
-  { id:'grader',   br:5, d:7, pre:'polisher',  name:'Grading Line',  icon:'star',   max:1, base:2600, growth:1,  desc:'Unlock the Grader: it bumps the odd egg a whole tier' },
-  { id:'dynamo',   br:5, d:8, pre:'grader',    name:'The Dynamo',    icon:'gear',   max:1, base:5200, growth:1,  desc:'Unlock the Dynamo: drives every machine around it faster' },
-  { id:'overclock',br:5, d:6, pre:'loader',    name:'Overclock',     icon:'bolt',   max:1, base:1500,growth:1,   desc:'ALL machines run 2x faster' },
+  /* ---- TOOLS: what goes on the rack ---- */
+  U('feedtool',   'tools', 1, 'root',       'Feed Bag',       'bowl',    2,   'Unlock the FEED tool: scatter pellets so chicks grow and hens lay double'),
+  U('hoe',        'tools', 1, 'root',       'The Hoe',        'hoe',     3,   'Unlock the FARM tool and the Till brush: turn grass to soil and sow clover'),
+  U('wateringcan','tools', 2, 'hoe',        'Watering Can',   'water',   4,   'Unlock WATER. Nothing grows on dry soil, not one leaf'),
+  U('sickle',     'tools', 3, 'wateringcan','Sickle',         'scythe',  5,   'Unlock HARVEST: cut ripe crops into feed pellets'),
+  U('buildtool',  'tools', 1, 'root',       'Toolbox',        'hammer',  6,   'Unlock the BUILD tool. The movers come and put things up for you'),
+  U('paths',      'tools', 2, 'buildtool',  'Dirt Paths',     'road',    8,   'Unlock the Path brush: the crew walk a quarter faster on it'),
+  U('paving',     'tools', 3, 'paths',      'Paving Stones',  'silo',    20,  'Unlock stone paths: the crew fairly skip along them'),
+  U('terracing',  'tools', 4, 'paving',     'Terracing',      'house',   55,  'Unlock Raise: bank the ground into grassy terraces'),
+  U('digging',    'tools', 5, 'terracing',  'Pond Digging',   'water',   130, 'Unlock Dig Pond: scoop out water wherever you like'),
+  U('storeys',    'tools', 3, 'buildtool',  'Second Storey',  'rack',    120, 'Unlock upgrades: LOOK at a building and add a floor for half again its effect'),
 
   /* ---- FARM: the field starts bare ---- */
-  { id:'farming',    br:7, d:1, pre:'root',       name:'Green Thumb',   icon:'seed',    max:6, base:3,   growth:1.9, desc:'+15% crop growth speed' },
-  { id:'bumper',     br:7, d:2, pre:'farming',    name:'Bumper Crop',   icon:'bowl',    max:6, base:8,   growth:2.1, desc:'+20% feed per harvest' },
-  { id:'corn',       br:7, d:2, pre:'farming',    name:'Corn Seed',     icon:'seed',    max:1, base:12,  growth:1,   desc:'Unlock corn: slow, tall, generous' },
-  { id:'trough',     br:7, d:2, pre:'farming',    name:'Feed Trough',   icon:'bowl',    max:1, base:15,  growth:1,   desc:'Unlock the Trough: the flock feeds itself' },
-  { id:'sprinkler',  br:7, d:3, pre:'bumper',     name:'Sprinklers',    icon:'spiral',  max:1, base:30,  growth:1,   desc:'Unlock the Sprinkler: keeps a circle watered' },
-  { id:'sunflowers', br:7, d:3, pre:'corn',       name:'Sunflower Seed',icon:'sparkle', max:1, base:45,  growth:1,   desc:'Unlock sunflowers: the richest feed' },
-  { id:'coopbuild',  br:7, d:3, pre:'trough',     name:'The Coop',      icon:'house',   max:1, base:40,  growth:1,   desc:'Unlock the Coop: chicks near it grow twice as fast' },
-  { id:'well',       br:7, d:4, pre:'sprinkler',  name:'The Well',      icon:'spiral',  max:1, base:90,  growth:1,   desc:'Unlock the Well: a wide watered circle' },
-  { id:'berries',    br:7, d:4, pre:'sunflowers', name:'Berry Bushes',  icon:'heart',   max:1, base:120, growth:1,   desc:'Unlock berry bushes: they regrow after picking' },
-  { id:'hearty',     br:7, d:4, pre:'coopbuild',  name:'Hearty Feed',   icon:'flame',   max:5, base:60,  growth:2.3, desc:'chicks need two feeds fewer and 12% less time' },
-  { id:'mill',       br:7, d:5, pre:'well',       name:'The Mill',      icon:'gear',    max:1, base:260, growth:1,   desc:'Unlock the Mill: +25% feed from every harvest' },
-  { id:'slowbelly',  br:7, d:5, pre:'hearty',     name:'Slow Bellies',  icon:'heart',   max:5, base:110, growth:2.3, desc:'the flock stays full 25% longer' },
-  { id:'harvestbot', br:7, d:6, pre:'mill',       name:'Auto Harvest',  icon:'robot',   max:1, base:900, growth:1,   desc:'ripe crops harvest themselves' },
+  K('farming',    'farm', 1, 'root',       'Green Thumb',    'seed',    6, 3,   1.9, '+15% crop growth speed'),
+  U('wheat',      'farm', 2, 'farming',    'Wheat Seed',     'seed',    6,   'Unlock wheat: slow and dependable'),
+  K('bumper',     'farm', 2, 'farming',    'Bumper Crop',    'bowl',    6, 8,   2.1, '+20% feed per harvest'),
+  U('trough',     'farm', 2, 'farming',    'Feed Trough',    'bowl',    15,  'Unlock the Trough: the flock feeds itself'),
+  U('corn',       'farm', 3, 'wheat',      'Corn Seed',      'seed',    12,  'Unlock corn: slow, tall, generous'),
+  U('sprinkler',  'farm', 3, 'bumper',     'Sprinklers',     'spiral',  30,  'Unlock the Sprinkler: keeps a circle watered'),
+  U('coopbuild',  'farm', 3, 'trough',     'The Coop',       'house',   40,  'Unlock the Coop: chicks near it grow twice as fast'),
+  U('sunflowers', 'farm', 4, 'corn',       'Sunflower Seed', 'sparkle', 45,  'Unlock sunflowers: the richest feed'),
+  U('well',       'farm', 4, 'sprinkler',  'The Well',       'spiral',  90,  'Unlock the Well: a wide watered circle'),
+  K('hearty',     'farm', 4, 'coopbuild',  'Hearty Feed',    'flame',   5, 60,  2.3, 'chicks need two feeds fewer and 12% less time'),
+  U('berries',    'farm', 5, 'sunflowers', 'Berry Bushes',   'heart',   120, 'Unlock berry bushes: they regrow after picking'),
+  U('mill',       'farm', 5, 'well',       'The Mill',       'gear',    260, 'Unlock the Mill: +25% feed from every harvest'),
+  K('slowbelly',  'farm', 5, 'hearty',     'Slow Bellies',   'heart',   5, 110, 2.3, 'the flock stays full 25% longer'),
+  U('harvestbot', 'farm', 6, 'mill',       'Auto Harvest',   'robot',   900, 'ripe crops harvest themselves'),
 
-  { id:'paving',     br:7, d:2, pre:'farming',    name:'Paving Stones', icon:'silo',    max:1, base:20,  growth:1,   desc:'Unlock stone paths: the crew fairly skip along them' },
-  { id:'terracing',  br:7, d:3, pre:'paving',     name:'Terracing',     icon:'house',   max:1, base:55,  growth:1,   desc:'Unlock Raise: bank the ground into grassy terraces' },
-  { id:'digging',    br:7, d:4, pre:'terracing',  name:'Pond Digging',  icon:'water',   max:1, base:130, growth:1,   desc:'Unlock Dig Pond: scoop out water wherever you like' },
+  /* ---- HENS ---- */
+  K('happy',      'hens', 1, 'root',   'Happy Hens',     'heart',   12, 4,  1.9, '+10% lay speed'),
+  K('flock',      'hens', 2, 'happy',  'Bigger Flock',   'house',   10, 10, 2.1, '+4 chicken capacity'),
+  K('pets',       'hens', 2, 'happy',  'Pet Therapy',    'hands',   6,  6,  2.2, '-15% pet cooldown'),
+  K('golden',     'hens', 3, 'flock',  'Golden Peck',    'sparkle', 6,  25, 2.5, '+3% golden eggs (worth 5x)'),
+  K('mutate',     'hens', 3, 'pets',   'Mutation Vats',  'dna',     8,  30, 2.3, '+1.5% egg mutation chance'),
+  K('coops',      'hens', 4, 'flock',  'Tower Coops',    'silo',    6,  120,2.6, '+10 chicken capacity'),
+  U('genelab',    'hens', 4, 'mutate', 'Gene Lab',       'dna',     90,  'Unlock the Gene Lab: read a hen\'s five genes and edit them'),
+  K('rainbow',    'hens', 5, 'coops',  'Rainbow Genome', 'rainbow', 3,  300,5.0, '+15% for mutations to jump 2 tiers'),
+  U('splice',     'hens', 5, 'genelab','Splicing',       'flask',   140, 'Splice two hens into one: the best of every gene, one bird'),
+  U('clone',      'hens', 5, 'genelab','Cloning',        'twins',   180, 'Clone your best hen, genes and all'),
+  U('crossbreed', 'hens', 6, 'splice', 'Crossbreeding',  'atom',    320, 'Cross a hen with a cow, rabbit, peacock, bee or goat'),
+
+  /* ---- HATCH ---- */
+  K('warm',       'hatch', 1, 'root',   'Warm Coils',     'flame',   12, 4,  1.9, '+15% incubator speed'),
+  K('inccap',     'hatch', 2, 'warm',   'Roomy Racks',    'rack',    6,  20, 2.4, '+3 incubator queue'),
+  K('twins',      'hatch', 2, 'warm',   'Twin Yolks',     'twins',   6,  30, 2.4, '+4% twin hatch chance'),
+  K('whisper',    'hatch', 3, 'inccap', 'Egg Whisperer',  'feather', 6,  25, 2.3, '+20% feathers from hatching'),
+  K('miracle',    'hatch', 3, 'twins',  'Miracle Hatch',  'star',    4,  120,4.0, '+5% hatchling is +1 tier'),
+  K('quantum',    'hatch', 4, 'whisper','Quantum Coils',  'atom',    6,  220,2.6, '+30% incubator speed'),
+  U('hatchery',   'hatch', 5, 'quantum','Grand Hatchery', 'rack',    900, 'Unlock the Grand Hatchery: 24 eggs, double speed'),
+
+  /* ---- GATHER ---- */
+  K('basket1',    'gather', 1, 'root',      'Bigger Basket',  'basket', 6, 3,  2.0, '+8 basket capacity'),
+  K('magnet',     'gather', 2, 'basket1',   'Magnet Palm',    'magnet', 6, 8,  2.1, '+12px scoop radius'),
+  K('feather1',   'gather', 2, 'basket1',   'Feather Finder', 'feather',6, 10, 2.2, '+3% feathers when scooping eggs'),
+  U('feed',       'gather', 3, 'magnet',    'Feeder Role',    'seed',   15,  'Unlock the Feeder role: crew scatter feed for you'),
+  K('sweepluck',  'gather', 3, 'feather1',  'Lucky Sweep',    'clover', 5, 30, 2.4, '+2% scooped eggs duplicate'),
+  K('feedplus',   'gather', 4, 'feed',      'Tasty Mix',      'bowl',   4, 45, 2.5, 'feed lasts +50% longer'),
+  K('basket2',    'gather', 4, 'sweepluck', 'Deep Basket',    'basket2',4, 60, 2.6, '+16 basket capacity'),
+  K('plumage',    'gather', 5, 'basket2',   'Plume Press',    'feather',5, 180,2.5, '+25% value from every feather picked up'),
 
   /* ---- MARKET ---- */
-  { id:'value',    br:6, d:1, pre:'root',      name:'Egg Polish',       icon:'egg',   max:12, base:5,   growth:1.9, desc:'+15% egg sell value' },
-  { id:'truckcap', br:6, d:2, pre:'value',     name:'Bigger Bed',       icon:'truck', max:8,  base:15,  growth:2.2, desc:'+5 truck capacity' },
-  { id:'route',    br:6, d:2, pre:'value',     name:'Express Route',    icon:'road',  max:6,  base:25,  growth:2.3, desc:'truck trips 15% faster' },
-  { id:'silo',     br:6, d:3, pre:'truckcap',  name:'Egg Silo',         icon:'silo',  max:1,  base:180, growth:1,   desc:'Unlock the Silo and the Packer role' },
-  { id:'fullbonus',br:6, d:3, pre:'route',     name:'Full Load Deal',   icon:'chart', max:6,  base:30,  growth:2.3, desc:'+6% payout for a full truck' },
-  { id:'autosend', br:6, d:4, pre:'silo',      name:'Auto-Dispatch',    icon:'key',   max:1,  base:250, growth:1,   desc:'truck departs by itself when full' },
-  { id:'contracts',br:6, d:4, pre:'fullbonus', name:'Premium Contracts',icon:'doc',   max:4,  base:400, growth:5.0, desc:'+1% value per species discovered' },
-  { id:'fleet',    br:6, d:5, pre:'autosend',  name:'Second Lorry',     icon:'truck', max:3,  base:1400,growth:3.0, desc:'-25% truck round trip' },
-  { id:'tycoon',   br:6, d:6, pre:'fleet',     name:'Egg Empire',       icon:'crown', max:1,  base:5000,growth:1,   desc:'ALL coin gains x2' },
+  K('value',      'market', 1, 'root',      'Egg Polish',       'egg',   12, 5,   1.9, '+15% egg sell value'),
+  U('logistics',  'market', 1, 'root',      'Logistics',        'truck', 6,   'Unlock the DEPOT: buy vehicles and open routes to richer towns'),
+  U('orders',     'market', 2, 'logistics', 'Roadside Orders',  'doc',   10,  'Customers pull up on the road with egg orders. Fill one in time for a bonus'),
+  K('truckcap',   'market', 2, 'logistics', 'Bigger Bed',       'truck', 8,  15,  2.2, '+5 truck capacity'),
+  K('route',      'market', 2, 'logistics', 'Express Route',    'road',  6,  25,  2.3, 'truck trips 15% faster'),
+  U('ledger',     'market', 3, 'orders',    'The Ledger',       'chart', 60,  'Unlock the LEDGER in the Index: a graph of what the company earns'),
+  U('silo',       'market', 3, 'truckcap',  'Egg Silo',         'silo',  180, 'Unlock the Silo and the Packer role'),
+  K('fullbonus',  'market', 3, 'route',     'Full Load Deal',   'chart', 6,  30,  2.3, '+6% payout for a full truck'),
+  U('stocks',     'market', 4, 'ledger',    'Stock Market',     'coin',  400, 'Unlock the market: buy and sell shares in rival egg companies'),
+  U('autosend',   'market', 4, 'silo',      'Auto-Dispatch',    'key',   250, 'truck departs by itself when full'),
+  K('contracts',  'market', 4, 'fullbonus', 'Premium Contracts','doc',   4,  400, 5.0, '+1% value per species discovered'),
+  K('fleet',      'market', 5, 'autosend',  'Second Lorry',     'truck', 3,  1400,3.0, '-25% truck round trip'),
+  U('tycoon',     'market', 6, 'fleet',     'Egg Empire',       'crown', 5000,'ALL coin gains x2'),
+
+  /* ---- CREW: flyers, wages, robots, roles ---- */
+  U('hiring',     'crew', 1, 'root',      'Recruiting',     'doc',    12,  'Unlock the Staff Hut, flyers and hiring'),
+  K('posters',    'crew', 2, 'hiring',    'Bigger Posters', 'doc',    5, 30,  2.1, '+1 applicant per flyer run'),
+  K('wages',      'crew', 2, 'hiring',    'Payroll Deals',  'coin',   6, 30,  2.3, '-12% crew wages'),
+  K('crewspeed',  'crew', 2, 'hiring',    'Sturdy Boots',   'wind',   5, 25,  2.2, '+15% crew walking speed'),
+  K('agency',     'crew', 3, 'posters',   'Hiring Agency',  'chart',  5, 90,  2.4, '+1 to every stat an applicant rolls'),
+  K('overtime',   'crew', 3, 'wages',     'Overtime Pay',   'flame',  5, 70,  2.3, '+25% stamina before a breather'),
+  U('cullbot',    'crew', 3, 'crewspeed', 'Cull-Bot',       'remove', 160, 'Assemble Cull-Bots: they retire chickens you mark'),
+  U('keeper',     'crew', 4, 'agency',    'Keeper Role',    'hands',  220, 'Hire Keepers: they pet the flock all day long'),
+  U('matchbot',   'crew', 4, 'cullbot',   'Match-Bot',      'cupid',  260, 'Assemble Match-Bots: they fill love nests for you'),
+  K('crewcap',    'crew', 4, 'overtime',  'Bunkhouse',      'house',  6, 140, 2.4, '+2 crew slots'),
+  K('foreman',    'crew', 5, 'keeper',    'Foreman',        'crown',  5, 400, 2.6, '+35% reach on a Technician aura'),
+  U('union',      'crew', 6, 'foreman',   'Egg Union',      'star',   3200,'The whole crew works 50% faster'),
+
+  /* ---- FACTORY ---- */
+  U('belts',      'factory', 1, 'root',      'Conveyor Tech', 'crate',  20,  'Unlock conveyors, fences and the Technician role'),
+  K('beltspeed',  'factory', 2, 'belts',     'Belt Grease',   'oil',    6, 20, 2.2, '+20% belt speed'),
+  U('vacuum',     'factory', 2, 'belts',     'Vacuum Bots',   'robot',  80,  'Unlock egg vacuums'),
+  U('sorter',     'factory', 3, 'beltspeed', 'Egg Sorter',    'sorter', 140, 'Unlock the Sorter: splits belts by rarity'),
+  K('vacradius',  'factory', 3, 'vacuum',    'Wide Suction',  'spiral', 6, 40, 2.2, '+8px vacuum radius'),
+  U('splitter',   'factory', 4, 'sorter',    'Belt Splitter', 'sorter', 220, 'Unlock the Splitter: feeds two lines in turn'),
+  U('blower',     'factory', 4, 'sorter',    'Air Blower',    'blower', 260, 'Unlock the Blower: herds loose eggs along'),
+  K('vacspeed',   'factory', 4, 'vacradius', 'Turbo Pumps',   'wind',   6, 40, 2.2, '+25% vacuum speed'),
+  U('loader',     'factory', 5, 'splitter',  'Truck Loader',  'crate',  700, 'Unlock the Loader: belts feed the truck directly'),
+  U('polisher',   'factory', 6, 'loader',    'Polishing',     'sparkle',1100,'Unlock the Polisher: belt eggs come out worth half again'),
+  U('overclock',  'factory', 6, 'loader',    'Overclock',     'bolt',   1500,'ALL machines run 2x faster'),
+  U('grader',     'factory', 7, 'polisher',  'Grading Line',  'star',   2600,'Unlock the Grader: it bumps the odd egg a whole tier'),
+  U('dynamo',     'factory', 8, 'grader',    'The Dynamo',    'gear',   5200,'Unlock the Dynamo: drives every machine around it faster'),
+
+  /* ---- LOVE ---- */
+  U('court',      'love', 1, 'root',       'Courtship',      'cupid',     15,  'Unlock the LOVE NEST (breed chickens!)'),
+  K('candle',     'love', 2, 'court',      'Candlelight',    'candle',    6, 20, 2.3, '+20% breeding speed'),
+  K('genes',      'love', 2, 'court',      'Fine Genes',     'flask',     6, 35, 2.5, '+6% bred egg tier-up chance'),
+  K('twindate',   'love', 3, 'candle',     'Double Date',    'hearts',    4, 90, 3.0, '+10% breeding lays 2 eggs'),
+  K('rainbowegg', 'love', 3, 'genes',      'Rainbow Clutch', 'rainbowegg',4, 250,4.0, '+8% rainbow egg from Divine pairs'),
+  U('secretlore', 'love', 4, 'rainbowegg', 'Secret Lore',    'scroll',    1200,'Rainbow eggs hatch 3x faster'),
+
+  /* ---- DECOR ---- */
+  U('garden',     'decor', 1, 'root',      'Garden Centre',  'flower',  4,   'Unlock flowers, tufts, clover, bushes and rocks in DECOR'),
+  U('trees',      'decor', 2, 'garden',    'Tree Nursery',   'tree',    10,  'Unlock oaks, pines, stumps, mushrooms and reeds'),
+  U('furniture',  'decor', 2, 'garden',    'Furniture',      'rack',    14,  'Unlock benches, lamp posts, barrels, birdbaths, scarecrows and more'),
+  U('orchard',    'decor', 3, 'trees',     'The Orchard',    'sparkle', 25,  'Unlock apple trees, lavender and sunflowers'),
+  U('beehive',    'decor', 3, 'furniture', 'Beekeeping',     'hexcomb', 40,  'Unlock the Beehive: crops near it grow faster, and the honey sells'),
 ];
 
 const SKILL_BY_ID = Object.fromEntries(SKILLS.map(s => [s.id, s]));
 function skillCost(sk, lvl) { return Math.ceil(sk.base * Math.pow(sk.growth, lvl)); }
 function skillPrereq(sk) { return sk.pre ? SKILL_BY_ID[sk.pre] : null; }
+
 /* ------------------------------------------------------------
-   HEX MAP LAYOUT - the Lab shows research as hexes on a map.
-   The root sits in the middle; each module fans out along its
-   own bearing, children sit one ring further out than their
-   parent, spread sideways so siblings never overlap. Positions
-   are axial hex coordinates (q, r), computed once here.
+   QUESTS - one chain, start to finish, each goal paying out
+   feathers or coins the moment you hit it. goal kinds:
+     stat   S.stats[s] >= n         skill  package installed
+     soil   tilled tiles >= n        disc   species found >= n
+     built  S.built[t] >= n
+   `where` is the thing on screen the quest card points at.
    ------------------------------------------------------------ */
-const HEX_POS = (() => {
-  const pos = { root: { q: 0, r: 0 } };
-  const taken = new Set(['0,0']);
-  const toPx = (q, r) => ({ x: 1.5 * q, y: Math.sqrt(3) * (r + q / 2) });   /* flat-top axial */
-  const axialRing = n => {
-    const out = [];
-    if (n === 0) return [[0, 0]];
-    let q = 0, r = -n;                  /* start at the top and walk the ring */
-    const dirs = [[1, 0], [0, 1], [-1, 1], [-1, 0], [0, -1], [1, -1]];
-    for (let side = 0; side < 6; side++) for (let i = 0; i < n; i++) {
-      out.push([q, r]);
-      q += dirs[side][0]; r += dirs[side][1];
-    }
-    return out;
-  };
-  const nMod = MODULES.length;
+const QUESTS = [
+  { id:'q_sweep',   name:'Sweep Up Eggs',   icon:'basket', goal:{ k:'stat', s:'collected', n:5 },   rw:{ f:5 },          hint:'Take the BASKET tool and sweep the eggs off the grass', where:'mama' },
+  { id:'q_sale',    name:'First Sale',      icon:'coin',   goal:{ k:'stat', s:'trips', n:1 },       rw:{ c:30, f:3 },    hint:'Drop eggs on the bike by the road, then tap it', where:'truck' },
+  { id:'q_feedbag', name:'The Feed Bag',    icon:'bowl',   goal:{ k:'skill', id:'feedtool' },        rw:{ c:20 },         hint:'Open the LAB and install the Feed Bag', where:'lab' },
+  { id:'q_grandma', name:'Feed Grandma',    icon:'crown',  goal:{ k:'stat', s:'mamaFed', n:1 },     rw:{ f:4 },          hint:'FEED tool: scatter pellets beside Mama\'s nest', where:'mama' },
+  { id:'q_hatch',   name:'Hatch A Chick',   icon:'egg',    goal:{ k:'stat', s:'hatched', n:1 },     rw:{ f:6 },          hint:'Drop an egg into the incubator and wait', where:'inc' },
+  { id:'q_hoe',     name:'The Hoe',         icon:'hoe',    goal:{ k:'skill', id:'hoe' },             rw:{ c:15 },         hint:'Install The Hoe in the Lab', where:'lab' },
+  { id:'q_till',    name:'Till The Field',  icon:'hoe',    goal:{ k:'soil', n:6 },                   rw:{ c:12 },         hint:'FARM tool, GROUND tab: drag the Till brush over grass', where:'field' },
+  { id:'q_water',   name:'Sow And Water',   icon:'water',  goal:{ k:'stat', s:'watered', n:3 },     rw:{ f:5 },          hint:'PLANT clover, install the Watering Can, then WATER it. Dry crops sit still', where:'field' },
+  { id:'q_harvest', name:'First Harvest',   icon:'scythe', goal:{ k:'stat', s:'harvested', n:1 },   rw:{ f:8, c:20 },    hint:'Install the Sickle. When a crop sparkles, HARVEST it', where:'field' },
+  { id:'q_grown',   name:'Raise A Hen',     icon:'chick',  goal:{ k:'stat', s:'grown', n:1 },       rw:{ c:40 },         hint:'Feed a chick a dozen times and give it five minutes', where:'mama' },
+  { id:'q_toolbox', name:'The Toolbox',     icon:'hammer', goal:{ k:'skill', id:'buildtool' },       rw:{ c:60 },         hint:'Install the Toolbox in the Lab', where:'lab' },
+  { id:'q_build',   name:'Break Ground',    icon:'house',  goal:{ k:'stat', s:'builtN', n:1 },      rw:{ f:8 },          hint:'BUILD tool: place something and watch the movers pull up', where:'field' },
+  { id:'q_depot',   name:'Open The Depot',  icon:'truck',  goal:{ k:'skill', id:'logistics' },       rw:{ c:80 },         hint:'Install Logistics. The DEPOT button wakes up', where:'lab' },
+  { id:'q_order',   name:'Roadside Order',  icon:'doc',    goal:{ k:'stat', s:'orders', n:1 },      rw:{ f:15 },         hint:'Install Roadside Orders, then hand eggs to a car that pulls up', where:'road' },
+  { id:'q_hire',    name:'Hire A Hand',     icon:'hands',  goal:{ k:'stat', s:'hired', n:1 },       rw:{ c:120 },        hint:'Recruiting, a Staff Hut, a flyer run, then a handshake', where:'lab' },
+  { id:'q_eight',   name:'Eight Species',   icon:'book',   goal:{ k:'disc', n:8 },                   rw:{ f:30 },         hint:'Hatch, breed and mutate your way to eight kinds of hen', where:'inc' },
+  { id:'q_belts',   name:'Belt Line',       icon:'crate',  goal:{ k:'built', t:'belt', n:4 },        rw:{ c:250 },        hint:'Conveyor Tech, then drag four belts toward the road', where:'field' },
+  { id:'q_genes',   name:'Gene Editor',     icon:'dna',    goal:{ k:'stat', s:'edits', n:1 },       rw:{ f:60 },         hint:'Build the Gene Lab and splice or clone a hen', where:'field' },
+  { id:'q_storey',  name:'Second Storey',   icon:'rack',   goal:{ k:'stat', s:'storeys', n:1 },     rw:{ c:400 },        hint:'LOOK at a building and add a floor', where:'field' },
+  { id:'q_tenk',    name:'Ten Thousand',    icon:'chart',  goal:{ k:'stat', s:'coinsEarned', n:10000 }, rw:{ f:120 },    hint:'Earn ten thousand coins all told', where:'truck' },
+  { id:'q_public',  name:'Go Public',       icon:'star',   goal:{ k:'skill', id:'stocks' },          rw:{ c:2000 },       hint:'Install the Stock Market and float the company', where:'lab' },
+];
+const QUEST_BY_ID = Object.fromEntries(QUESTS.map(q => [q.id, q]));
+
+/* ------------------------------------------------------------
+   GRID LAYOUT - the map is a board of square nodes. Each module
+   is a horizontal lane; a node's column is its depth; within a
+   lane rows are packed like a tidy tree (a parent sits level with
+   the middle of its children). The kernel is column 0, top-left,
+   with a trunk running down the left edge into every lane. The
+   QUESTS lane zigzags two rows deep so the chain stays compact.
+   ------------------------------------------------------------ */
+const LANE_ROWS = 2;   /* rows the quest lane takes */
+const GRID = (() => {
+  const pos = {}, lanes = [];
+  let row = 0;
+  /* quests: two rows, snaking */
+  lanes.push({ id:'quests', top: row, rows: 2 });
+  QUESTS.forEach((q, i) => { pos[q.id] = { col: 1 + Math.floor(i / 2), row: row + (i % 2), quest: true }; });
+  row += 2;
+  /* the kernel on its own row, then every module in order */
+  pos.root = { col: 0, row: row };
   const children = id => SKILLS.filter(sk => sk.pre === id);
-  MODULES.forEach((m, mi) => {
-    const ang = -Math.PI / 2 + (mi / nMod) * Math.PI * 2;
-    const dir = { x: Math.cos(ang), y: Math.sin(ang) };
-    const perp = { x: -dir.y, y: dir.x };
-    /* walk the module's tree depth by depth */
-    let layer = children('root').filter(sk => sk.br === mi);
-    let depth = 1;
-    while (layer.length) {
-      const n = layer.length;
-      layer.forEach((sk, k) => {
-        const spread = (k - (n - 1) / 2) * 1.9;
-        const ring = depth * 2 + (n > 3 ? 1 : 0);
-        const want = { x: dir.x * ring * 1.5 + perp.x * spread * 1.7, y: dir.y * ring * 1.5 + perp.y * spread * 1.7 };
-        /* nearest free hex to the wanted spot, searching outward */
-        let best = null, bd = 1e9;
-        for (let rad = 0; rad < 14 && !best; rad++) {
-          axialRing(rad).forEach(([dq, dr]) => {
-            const q = Math.round(want.x / 1.5) + dq;
-            const r = Math.round(want.y / Math.sqrt(3) - q / 2) + dr;
-            if (taken.has(q + ',' + r)) return;
-            const p = toPx(q, r);
-            const d = (p.x - want.x) ** 2 + (p.y - want.y) ** 2;
-            if (d < bd) { bd = d; best = { q, r }; }
-          });
-        }
-        pos[sk.id] = best;
-        taken.add(best.q + ',' + best.r);
-      });
-      layer = layer.flatMap(sk => children(sk.id));
-      depth++;
-    }
+  MODULES.forEach(m => {
+    if (m.id === 'quests') return;
+    const top = row;
+    let next = row;
+    const place = sk => {
+      const kids = children(sk.id).filter(k => k.br === m.id);
+      if (!kids.length) { pos[sk.id] = { col: sk.d, row: next++ }; return; }
+      kids.forEach(place);
+      const rs = kids.map(k => pos[k.id].row);
+      const mid = Math.floor((Math.min(...rs) + Math.max(...rs)) / 2);
+      /* a parent may not share a row with a sibling in its own column */
+      let r2 = mid;
+      while (Object.values(pos).some(p => p.col === sk.d && p.row === r2 && p.lane === m.id)) r2++;
+      pos[sk.id] = { col: sk.d, row: r2 };
+      next = Math.max(next, r2 + 1);
+    };
+    SKILLS.filter(sk => sk.br === m.id && sk.pre === 'root').forEach(place);
+    /* tag the lane on every node placed */
+    SKILLS.filter(sk => sk.br === m.id && sk.id !== 'root').forEach(sk => { pos[sk.id].lane = m.id; });
+    lanes.push({ id: m.id, top, rows: Math.max(1, next - top) });
+    row = next;
   });
-  return pos;
+  return { pos, lanes, rows: row };
 })();
-function hexToPx(q, r, size) { return { x: 1.5 * size * q, y: Math.sqrt(3) * size * (r + q / 2) }; }
+const GRID_POS = GRID.pos;
 
 /* modules keep their packages in dependency order */
-const SKILLS_BY_MODULE = MODULES.map((_, i) =>
-  SKILLS.filter(sk => sk.br === i && sk.id !== 'root').sort((a, b) => a.d - b.d || a.name.localeCompare(b.name)));
+const SKILLS_BY_MODULE = MODULES.map(m =>
+  SKILLS.filter(sk => sk.br === m.id && sk.id !== 'root').sort((a, b) => a.d - b.d || a.name.localeCompare(b.name)));

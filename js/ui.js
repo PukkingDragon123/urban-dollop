@@ -289,6 +289,18 @@
     }
     g.putImageData(img, 0, 0);
 
+    /* the gravel lay-by where customers pull up */
+    {
+      const L = W.layby;
+      for (let y = L.y; y < L.y + L.h; y++) for (let x = L.x; x < L.x + L.w; x++) {
+        const edge = y === L.y || x === L.x || x === L.x + L.w - 1;
+        const n = ((x * 31 + y * 17) % 11);
+        g.fillStyle = edge ? '#8a7a5a' : n < 3 ? '#c9b48c' : n < 7 ? '#b8a37a' : '#a8946c';
+        g.fillRect(x, y, 1, 1);
+      }
+      g.fillStyle = '#fff8ec';
+      for (let x = L.x + 4; x < L.x + L.w - 4; x += 12) g.fillRect(x, L.y + 2, 6, 1);
+    }
     /* road markings + ruts */
     g.fillStyle = 'rgba(120,86,44,.5)';
     for (let x = 0; x < W.W; x += 2) { g.fillRect(x, W.roadY + 9, 1, 1); g.fillRect(x + 1, W.roadY + 22, 1, 1); }
@@ -1223,6 +1235,197 @@
     ctx.fillStyle = '#ffe9c0'; ctx.fillRect(x + 6, y + 14, 3, 2);
   }
 
+  /* a beehive on legs, bees drifting round it */
+  function drawBeehive(c, r, b, now) {
+    const x = c * 16, y = r * 16;
+    ctx.fillStyle = 'rgba(40,58,26,.25)'; ctx.fillRect(x + 2, y + 14, 12, 2);
+    ctx.fillStyle = '#5e3d18'; ctx.fillRect(x + 3, y + 11, 2, 4); ctx.fillRect(x + 11, y + 11, 2, 4);
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 1, y + 3, 14, 9);
+    ctx.fillStyle = '#f2e2c8'; ctx.fillRect(x + 2, y + 4, 12, 7);
+    ctx.fillStyle = '#e0c9a0'; ctx.fillRect(x + 2, y + 7, 12, 1); ctx.fillRect(x + 2, y + 10, 12, 1);
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 6, y + 9, 4, 2);
+    ctx.fillStyle = '#c9924f'; ctx.fillRect(x, y + 1, 16, 2); ctx.fillStyle = '#e0bd82'; ctx.fillRect(x, y + 1, 16, 1);
+    const prog = b.t / ECON.honeyEvery;
+    if (prog > 0.6) { ctx.fillStyle = '#f0a422'; ctx.fillRect(x + 7, y + 11, 2, 1 + Math.round(prog * 2)); }
+    for (let i = 0; i < 3; i++) {
+      const a = now / 500 + i * 2.1, R = 9 + i * 2;
+      const bx = Math.round(x + 8 + Math.cos(a) * R), by = Math.round(y + 6 + Math.sin(a * 1.3) * 5);
+      ctx.fillStyle = '#ffd23f'; ctx.fillRect(bx, by, 2, 1);
+      ctx.fillStyle = '#2e2216'; ctx.fillRect(bx + 1, by, 1, 1);
+    }
+  }
+  /* the Gene Lab: white tiles, a glass dome, a helix on the door */
+  function drawGeneLab(c, r, gl, now) {
+    const x = c * 16, y = r * 16;
+    ctx.fillStyle = 'rgba(40,58,26,.26)'; ctx.fillRect(x + 2, y + 30, 28, 3);
+    ctx.fillStyle = '#2e2a3a'; ctx.fillRect(x + 1, y + 8, 30, 23);
+    ctx.fillStyle = '#e8ecf0'; ctx.fillRect(x + 2, y + 9, 28, 21);
+    ctx.fillStyle = '#c9d0d8'; for (let i = 0; i < 5; i++) ctx.fillRect(x + 2, y + 9 + i * 4, 28, 1);
+    ctx.fillStyle = '#4fb8a8'; ctx.fillRect(x + 2, y + 26, 28, 4);
+    /* dome */
+    ctx.fillStyle = '#2e2a3a'; ctx.fillRect(x + 8, y + 2, 16, 7); ctx.fillRect(x + 10, y, 12, 3);
+    ctx.fillStyle = '#9fe8ff'; ctx.fillRect(x + 9, y + 3, 14, 5); ctx.fillRect(x + 11, y + 1, 10, 3);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(x + 11, y + 2, 4, 1);
+    /* door with the helix */
+    ctx.fillStyle = '#2e2a3a'; ctx.fillRect(x + 12, y + 17, 8, 13);
+    ctx.fillStyle = '#3fa7d6'; ctx.fillRect(x + 13, y + 18, 6, 11);
+    for (let i = 0; i < 6; i++) { const o = Math.round(Math.sin(now / 400 + i) * 1.5); ctx.fillStyle = i % 2 ? '#ff5f9e' : '#ffd23f'; ctx.fillRect(x + 15 + o, y + 19 + i * 2, 2, 1); }
+    /* windows and a blinking readout */
+    ctx.fillStyle = '#2e2a3a'; ctx.fillRect(x + 4, y + 12, 6, 6); ctx.fillRect(x + 22, y + 12, 6, 6);
+    ctx.fillStyle = '#9fe8ff'; ctx.fillRect(x + 5, y + 13, 4, 4); ctx.fillRect(x + 23, y + 13, 4, 4);
+    ctx.fillStyle = Math.floor(now / 300) % 2 ? '#7ef2a8' : '#2f6a48'; ctx.fillRect(x + 5, y + 21, 2, 2);
+    ctx.fillStyle = Math.floor(now / 450) % 2 ? '#e8542f' : '#5a2a2a'; ctx.fillRect(x + 8, y + 21, 2, 2);
+  }
+  /* a building site: stakes and rope round a dirt patch, timber waiting,
+     and the frame going up as the movers work */
+  function drawSite(k, st, now) {
+    const [c, r] = k.split(',').map(Number);
+    const b = BUILDS[st.type];
+    const x = c * 16, y = r * 16, w = b.w * 16, h = b.h * 16;
+    const prog = Math.min(1, st.t / st.T);
+    if (st.kind === 'storey') {
+      /* scaffold poles up the sides of the building */
+      ctx.fillStyle = '#c9924f';
+      for (let i = 0; i < 3; i++) { ctx.fillRect(x - 2, y - 26 + i * 8, w + 4, 1); }
+      ctx.fillRect(x - 2, y - 26, 1, h + 26); ctx.fillRect(x + w + 1, y - 26, 1, h + 26);
+      ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 2, y - 30, w - 4, 3);
+      ctx.fillStyle = '#ffd23f'; ctx.fillRect(x + 3, y - 29, Math.round((w - 6) * prog), 1);
+      return;
+    }
+    /* churned dirt */
+    ctx.fillStyle = '#8a6a3a';
+    for (let yy = 2; yy < h - 1; yy += 2) for (let xx = 2 + (yy % 4) / 2; xx < w - 2; xx += 3) if (((xx * 7 + yy * 13 + c) % 5) < 3) ctx.fillRect(x + xx, y + yy, 2, 1);
+    /* stakes and rope */
+    ctx.fillStyle = '#e8542f';
+    [[1, 1], [w - 3, 1], [1, h - 3], [w - 3, h - 3]].forEach(([sx, sy]) => { ctx.fillRect(x + sx, y + sy - 4, 2, 6); });
+    ctx.fillStyle = '#fff8ec';
+    for (let i = 3; i < w - 3; i += 4) { ctx.fillRect(x + i, y - 1, 2, 1); ctx.fillRect(x + i, y + h - 3, 2, 1); }
+    for (let i = 1; i < h - 3; i += 4) { ctx.fillRect(x + 1, y + i, 1, 2); ctx.fillRect(x + w - 2, y + i, 1, 2); }
+    /* timber, and the frame rising */
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 3, y + h - 8, 8, 4);
+    ctx.fillStyle = '#c9924f'; ctx.fillRect(x + 4, y + h - 7, 6, 1); ctx.fillStyle = '#a8783f'; ctx.fillRect(x + 4, y + h - 5, 6, 1);
+    if (prog > 0.15) {
+      const fh = Math.round((h + 6) * Math.min(1, (prog - 0.15) / 0.7));
+      ctx.fillStyle = '#e0bd82';
+      ctx.fillRect(x + 4, y + h - 2 - fh, 1, fh); ctx.fillRect(x + w - 5, y + h - 2 - fh, 1, fh);
+      if (b.w > 1) ctx.fillRect(x + w / 2, y + h - 2 - fh, 1, fh);
+      for (let yy = y + h - 4; yy > y + h - 2 - fh; yy -= 5) ctx.fillRect(x + 4, yy, w - 8, 1);
+    }
+    if (prog > 0.85) { ctx.fillStyle = 'rgba(224,189,130,.6)'; ctx.fillRect(x + 3, y - 2, w - 6, h - 2); }
+    /* progress plank */
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x, y - 8, w, 4);
+    ctx.fillStyle = st.stage === 'work' ? '#ffd23f' : '#8a7a5a'; ctx.fillRect(x + 1, y - 7, Math.round((w - 2) * prog), 2);
+  }
+  /* a second floor: a lighter box with windows and a little roof, sat over
+     the building's own roof */
+  function drawStorey(k, now) {
+    const o = GAME.occAt(...k.split(',').map(Number));
+    if (!o || !BUILDS[o.type]) return;
+    const [c, r] = k.split(',').map(Number);
+    const b = BUILDS[o.type];
+    const x = c * 16 + 2, w = b.w * 16 - 4, y = r * 16 - 12 - (b.h > 1 ? 14 : 4), h = 14;
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#f2e2c8'; ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
+    ctx.fillStyle = '#e0c9a0'; for (let i = 3; i < h - 2; i += 4) ctx.fillRect(x + 1, y + i, w - 2, 1);
+    const nWin = Math.max(1, Math.floor((w - 4) / 10));
+    for (let i = 0; i < nWin; i++) {
+      const wx = x + 3 + i * Math.floor((w - 6) / nWin) + Math.floor(((w - 6) / nWin - 5) / 2);
+      ctx.fillStyle = '#3a2a16'; ctx.fillRect(wx, y + 4, 6, 6);
+      ctx.fillStyle = Math.floor(now / 2000 + i + c) % 3 ? '#ffe9a0' : '#7fc4e8'; ctx.fillRect(wx + 1, y + 5, 4, 4);
+      ctx.fillStyle = '#3a2a16'; ctx.fillRect(wx + 3, y + 5, 1, 4);
+    }
+    for (let i = 0; i < 4; i++) { ctx.fillStyle = i === 0 ? '#3a2a16' : (i % 2 ? '#c94a3a' : '#e06a58'); ctx.fillRect(x - 2 + i, y - i, w + 4 - i * 2, 1); }
+    ctx.fillStyle = '#8a9099'; ctx.fillRect(x + w - 6, y - 7, 3, 5);
+  }
+  /* traffic, the customers in the lay-by and the movers' van */
+  function drawCar(kind, col, x, y, dir, frame) {
+    const spr = SPR.carSprite(kind, col, frame, 1);
+    ctx.fillStyle = 'rgba(40,58,26,.28)'; ctx.fillRect(Math.round(x) + 2, Math.round(y) + spr.height - 2, spr.width - 4, 2);
+    ctx.save();
+    if (dir === -1) { ctx.translate(Math.round(x) + spr.width, Math.round(y)); ctx.scale(-1, 1); ctx.drawImage(spr, 0, 0); }
+    else ctx.drawImage(spr, Math.round(x), Math.round(y));
+    ctx.restore();
+    return spr;
+  }
+  function drawTraffic(now) {
+    const list = GAME.cars.slice().sort((a, b) => a.y - b.y);
+    list.forEach(c => {
+      if (c.x + 50 < cam().x || c.x - 10 > cam().x + W.view.w) return;
+      const spr = drawCar(c.kind, c.col, c.x, c.y - 2, c.dir, Math.floor(now / 80 + c.id) % 2);
+      /* a puff of exhaust */
+      if (Math.floor(now / 160 + c.id) % 3 === 0) {
+        ctx.fillStyle = 'rgba(200,200,190,.5)';
+        ctx.fillRect(Math.round(c.x + (c.dir === 1 ? -3 : spr.width + 1)), Math.round(c.y + spr.height - 6), 2, 2);
+      }
+    });
+  }
+  function drawOrders(now) {
+    S().orders.forEach(o => {
+      if (o.x + 40 < cam().x || o.x - 10 > cam().x + W.view.w) return;
+      const spr = drawCar(o.kind, o.col, o.x, o.y, -1, o.state === 'wait' ? 0 : Math.floor(now / 80) % 2);
+      if (o.state !== 'wait') return;
+      /* the order, in a bubble over the car */
+      const n = o.n, got = o.got;
+      const bw = Math.max(30, 8 + n * 5), bh = 15;
+      const bx = Math.round(o.x + spr.width / 2 - bw / 2), by = Math.round(o.y - bh - 8);
+      ctx.fillStyle = '#2e2216'; ctx.fillRect(bx - 1, by, bw + 2, bh); ctx.fillRect(bx, by - 1, bw, bh + 2);
+      ctx.fillStyle = '#fff8ec'; ctx.fillRect(bx, by, bw, bh);
+      ctx.fillStyle = '#2e2216'; ctx.fillRect(bx + bw / 2 - 2, by + bh, 4, 1); ctx.fillRect(bx + bw / 2 - 1, by + bh + 1, 2, 1); ctx.fillRect(bx + bw / 2, by + bh + 2, 1, 1);
+      ctx.fillStyle = '#fff8ec'; ctx.fillRect(bx + bw / 2 - 1, by + bh, 2, 1);
+      for (let i = 0; i < n; i++) {
+        const ex = bx + 4 + i * 5, ey = by + 3;
+        ctx.fillStyle = i < got ? TIERS[o.tier].c : '#2e2216'; ctx.fillRect(ex, ey, 3, 4); ctx.fillRect(ex + 1, ey - 1, 1, 1); ctx.fillRect(ex + 1, ey + 4, 1, 1);
+        if (i >= got) { ctx.fillStyle = EGG_SHELL[o.tier]; ctx.fillRect(ex + 1, ey + 1, 1, 2); }
+      }
+      /* the clock */
+      const f = Math.max(0, o.t / o.T);
+      ctx.fillStyle = '#e0c9a0'; ctx.fillRect(bx + 3, by + bh - 4, bw - 6, 2);
+      ctx.fillStyle = f < 0.2 && Math.floor(now / 250) % 2 ? '#e8542f' : f < 0.4 ? '#f0a422' : '#7ac74f'; ctx.fillRect(bx + 3, by + bh - 4, Math.round((bw - 6) * f), 2);
+      /* what it pays */
+      SPR.drawTiny(ctx, GAME.fmt(o.pay), bx + bw - 3 - SPR.tinyW(GAME.fmt(o.pay), 1), by + 9 - 6, '#8a5e2a', 1);
+    });
+  }
+  function drawMovers(now) {
+    const m = GAME.movers;
+    if (!m.van) return;
+    const v = m.van;
+    const moving = v.state !== 'parked';
+    drawCar('mover', null, v.x, v.y - 4 + (moving ? Math.round(Math.sin(now / 45)) : 0), 1, moving ? Math.floor(now / 80) % 2 : 0);
+    m.crew.forEach(w => {
+      if (w.state === 'van') return;
+      const spr = SPR.personSprite(w.look, w.state === 'walk' ? w.frame : 0, 1);
+      ctx.fillStyle = 'rgba(40,58,26,.26)'; ctx.fillRect(Math.round(w.x + 1), Math.round(w.y + spr.height - 2), 10, 2);
+      ctx.save();
+      if (w.dir === 1) { ctx.translate(Math.round(w.x) + spr.width, Math.round(w.y)); ctx.scale(-1, 1); ctx.drawImage(spr, 0, 0); }
+      else ctx.drawImage(spr, Math.round(w.x), Math.round(w.y));
+      ctx.restore();
+      if (w.state === 'work') {
+        /* hammer swinging, sparks flying */
+        const swing = Math.floor(now / 140 + w.id) % 2;
+        const hx = Math.round(w.x + (w.dir === 1 ? 10 : -2)), hy = Math.round(w.y + (swing ? 4 : 0));
+        ctx.fillStyle = '#8a5e2a'; ctx.fillRect(hx, hy + 2, 1, 5);
+        ctx.fillStyle = '#3a3a4a'; ctx.fillRect(hx - 1, hy, 3, 2);
+        if (!swing && Math.floor(now / 70) % 2) { ctx.fillStyle = '#ffd23f'; ctx.fillRect(hx + 2, hy + 6, 1, 1); ctx.fillRect(hx - 2, hy + 7, 1, 1); }
+        if (Math.floor(now / 500 + w.id) % 4 === 0 && Math.floor(now / 50) % 10 === 0) puff(w.x + 6, w.y + 12, '#c9a35f', 2, 10, 8);
+      }
+    });
+  }
+  /* the company sign by the road wears your colours */
+  function drawBrand(now) {
+    const st = W.stations.brand, co = S().company;
+    const x = st.x, y = st.y;
+    ctx.fillStyle = 'rgba(40,58,26,.25)'; ctx.fillRect(x + 6, y + st.h - 2, st.w - 12, 2);
+    ctx.fillStyle = '#5e3d18'; ctx.fillRect(x + 6, y + 14, 3, st.h - 15); ctx.fillRect(x + st.w - 9, y + 14, 3, st.h - 15);
+    ctx.fillStyle = '#2e2216'; ctx.fillRect(x, y, st.w, 16);
+    ctx.fillStyle = co.col1; ctx.fillRect(x + 1, y + 1, st.w - 2, 14);
+    ctx.fillStyle = SPR.lighten(co.col1, 0.35); ctx.fillRect(x + 1, y + 1, st.w - 2, 1);
+    ctx.fillStyle = co.col2; ctx.fillRect(x + 1, y + 13, st.w - 2, 2);
+    ctx.drawImage(SPR.iconSprite(co.logo, 1), x + 3, y + 3);
+    const name = co.name.slice(0, 14);
+    SPR.drawTiny(ctx, name, x + 15, y + 5, SPR.lum(co.col1) > 0.6 ? '#2e2216' : '#fff8ec', 1);
+    if (!co.done && Math.floor(now / 400) % 2) { ctx.fillStyle = '#ffd23f'; ctx.fillRect(x + st.w / 2 - 1, y - 5, 3, 3); }
+  }
+
   /* the Logistics HQ: a dispatch office with a loading bay and a wall clock */
   function drawHQ(c, r, hq, now) {
     const x = c * 16, y = r * 16;
@@ -1752,7 +1955,7 @@
     ctx.fillStyle = '#3a2a16'; ctx.fillRect(x - 2, y + 9, 17, 8); ctx.fillRect(x - 4, y + 11, 2, 4);
     ctx.fillStyle = '#e8542f'; ctx.fillRect(x - 1, y + 10, 15, 6); ctx.fillRect(x - 3, y + 12, 2, 2);
     ctx.fillStyle = '#ff8f6a'; ctx.fillRect(x - 1, y + 10, 15, 1);
-    SPR.drawTiny(ctx, GAME.hasHQ() ? 'DEPOT' : 'NO HQ', x + 1, y + 11, '#ffffff', 1);
+    SPR.drawTiny(ctx, GAME.depotOpen() ? 'DEPOT' : 'SHUT', x + 1, y + 11, '#ffffff', 1);
     /* a lamp that blinks when you can afford the next vehicle or route */
     const nextV = VEHICLES[S().vehicle + 1];
     const nextC = CITIES.find(c => !S().routes.includes(c.id));
@@ -1764,6 +1967,38 @@
   }
 
 
+  /* what crossbreeding leaves on a bird, drawn in the sprite's own frame
+     (head to the right, 20 x 18) */
+  function drawGeneMarks(ch, x, y, now) {
+    const has = m => ch.mods.includes(m);
+    if (has('spots')) {
+      ctx.fillStyle = '#2e2216';
+      ctx.fillRect(x + 7, y + 9, 3, 2); ctx.fillRect(x + 11, y + 11, 2, 2); ctx.fillRect(x + 8, y + 13, 2, 1); ctx.fillRect(x + 12, y + 8, 2, 1);
+    }
+    if (has('stripes')) {
+      ctx.fillStyle = '#2e2216'; ctx.fillRect(x + 7, y + 10, 6, 1); ctx.fillRect(x + 7, y + 13, 6, 1);
+      ctx.fillStyle = '#ffd23f'; ctx.fillRect(x + 7, y + 11, 6, 1);
+    }
+    if (has('ears')) {
+      ctx.fillStyle = '#2e2216'; ctx.fillRect(x + 13, y - 6, 3, 8); ctx.fillRect(x + 17, y - 6, 3, 8);
+      ctx.fillStyle = '#fff8ec'; ctx.fillRect(x + 14, y - 5, 1, 6); ctx.fillRect(x + 18, y - 5, 1, 6);
+      ctx.fillStyle = '#ffb0c8'; ctx.fillRect(x + 14, y - 3, 1, 3); ctx.fillRect(x + 18, y - 3, 1, 3);
+    }
+    if (has('horns')) {
+      ctx.fillStyle = '#2e2216'; ctx.fillRect(x + 13, y - 2, 2, 4); ctx.fillRect(x + 17, y - 2, 2, 4);
+      ctx.fillStyle = '#e0c9a0'; ctx.fillRect(x + 13, y - 2, 1, 3); ctx.fillRect(x + 18, y - 2, 1, 3);
+    }
+    if (has('fan')) {
+      const cols = ['#1f7a6a', '#2fa78f', '#3fa7d6', '#2fa78f', '#1f7a6a'];
+      for (let i = 0; i < 5; i++) {
+        const a = -1.2 + i * 0.45, len = 9;
+        const fx = x + 5 + Math.round(Math.cos(Math.PI + a) * len), fy = y + 7 + Math.round(Math.sin(Math.PI + a) * len * 0.8);
+        ctx.fillStyle = cols[i]; ctx.fillRect(fx, fy, 3, 3);
+        ctx.fillStyle = '#ffd23f'; ctx.fillRect(fx + 1, fy + 1, 1, 1);
+        ctx.fillStyle = cols[i]; ctx.fillRect(Math.round((fx + x + 5) / 2), Math.round((fy + y + 7) / 2), 1, 1);
+      }
+    }
+  }
   function drawChicken(ch, now) {
     if (ch.x + 24 < cam().x || ch.x > cam().x + W.view.w || ch.y + 24 < cam().y || ch.y > cam().y + W.view.h) return;
     const sp = SPECIES[ch.sp];
@@ -1796,7 +2031,11 @@
       ctx.translate(Math.round(ch.x) + spr.width, yy);
       ctx.scale(-1, 1);
       ctx.drawImage(spr, 0, 0);
-    } else ctx.drawImage(spr, Math.round(ch.x), yy);
+      if (!chick && ch.mods && ch.mods.length) drawGeneMarks(ch, 0, 0, now);
+    } else {
+      ctx.drawImage(spr, Math.round(ch.x), yy);
+      if (!chick && ch.mods && ch.mods.length) drawGeneMarks(ch, Math.round(ch.x), yy, now);
+    }
     ctx.restore();
     /* a chick shows how far it has to grow; a hungry hen asks for food */
     if (chick) {
@@ -2101,6 +2340,16 @@
           ctx.fillStyle = '#fff8ec'; ctx.fillRect(c * 16 + 12, r * 16 - 6, 2, 2);
           ctx.fillStyle = '#ffd23f'; ctx.fillRect(c * 16 + 3, r * 16 - 3, 1, 1);
         }
+        /* a dry crop asks for water; with the farm tool out, every crop shows how far along it is */
+        const dry = t.growth < 1 && t.water <= 0 && !GAME.wateredBy(c, r);
+        if (dry && Math.floor(now / 600 + c) % 2) {
+          ctx.fillStyle = '#2e2216'; ctx.fillRect(c * 16 + 6, r * 16 - 9, 4, 5); ctx.fillRect(c * 16 + 7, r * 16 - 10, 2, 1);
+          ctx.fillStyle = '#5fa8e8'; ctx.fillRect(c * 16 + 7, r * 16 - 8, 2, 3); ctx.fillStyle = '#b5e0f5'; ctx.fillRect(c * 16 + 7, r * 16 - 8, 1, 1);
+        }
+        if (S().tool === 'farm' && t.growth < 1) {
+          ctx.fillStyle = '#2e2216'; ctx.fillRect(c * 16 + 2, r * 16 + 13, 12, 3);
+          ctx.fillStyle = dry ? '#8a7a5a' : '#7ac74f'; ctx.fillRect(c * 16 + 3, r * 16 + 14, Math.round(10 * t.growth), 1);
+        }
       }
     }
     /* watered circles from wells and sprinklers, faint */
@@ -2109,6 +2358,8 @@
       const ring = (x, y, R) => { for (let dy = -R; dy <= R; dy += 2) { const half = Math.round(Math.sqrt(R * R - dy * dy)); ctx.fillRect(x - half, y + dy, half * 2, 1); } };
       Object.keys(S().wells).forEach(k => { const [c, r] = k.split(',').map(Number); ring(c * 16 + 8, r * 16 + 8, ECON.wellR); });
       Object.keys(S().sprinklers).forEach(k => { const [c, r] = k.split(',').map(Number); ring(c * 16 + 8, r * 16 + 8, ECON.sprinklerR); });
+      ctx.fillStyle = 'rgba(255,210,63,.10)';
+      Object.keys(S().beehives).forEach(k => { const [c, r] = k.split(',').map(Number); ring(c * 16 + 8, r * 16 + 8, ECON.beehiveR); });
     }
     drawLab(now); drawStand(now); drawMamaSign(now); drawDepot(now);
 
@@ -2135,6 +2386,11 @@
     for (const k of Object.keys(S().barns)) { const [c, r] = k.split(',').map(Number); drawBarn(c, r, S().barns[k], now); }
     for (const k of Object.keys(S().mills)) { const [c, r] = k.split(',').map(Number); drawMill(c, r, S().mills[k], now); }
     for (const k of Object.keys(S().coops)) { const [c, r] = k.split(',').map(Number); drawCoop(c, r, S().coops[k], now); }
+    for (const k of Object.keys(S().beehives)) { const [c, r] = k.split(',').map(Number); drawBeehive(c, r, S().beehives[k], now); }
+    for (const k of Object.keys(S().genelabs)) { const [c, r] = k.split(',').map(Number); drawGeneLab(c, r, S().genelabs[k], now); }
+    for (const k of Object.keys(S().storeys)) drawStorey(k, now);
+    for (const k of Object.keys(S().sites)) drawSite(k, S().sites[k], now);
+    drawBrand(now);
     S().applicants.forEach(a => drawApplicant(a, now));
     /* things you planted for the look of them */
     for (const k of Object.keys(S().deco)) {
@@ -2173,6 +2429,9 @@
     S().chickens.forEach(ch => drawChicken(ch, now));
     S().staff.forEach(w => drawStaff(w, now));
     drawTruck(now);
+    drawTraffic(now);
+    drawOrders(now);
+    drawMovers(now);
     drawSaleSigns(now);
 
     /* butterflies */
@@ -2303,6 +2562,8 @@
 
   const TOOL_ICON = { hand: 'hand', basket: 'basket', feed: 'bowl', farm: 'hoe', build: 'hammer', inspect: 'magnify' };
   const TOOL_LABEL = { hand: 'HAND', basket: 'BASKET', feed: 'FEED', farm: 'FARM', build: 'BUILD', inspect: 'LOOK' };
+  /* the research that hands you each tool; the rack shows a padlock until then */
+  const TOOL_UNLOCK = { feed: 'feedtool', farm: 'hoe', build: 'buildtool' };
   let farmSel = 't:soil', farmSec = 'ground', palSec = 'ranch';
   /* ------------------------------------------------------------
      THE DESK BAR
@@ -2323,7 +2584,11 @@
       tip: 'The crew - flyers, applications and the payroll',
       open: () => GAME.lvl('hiring'), why: 'research Recruiting' },
     { act: 'open-depot', icon: 'truck',  name: 'DEPOT',
-      tip: 'Logistics - vehicles, routes and the wall map', open: () => true },
+      tip: 'Logistics - vehicles, routes and the wall map',
+      open: () => GAME.depotOpen(), why: 'research Logistics' },
+    { act: 'open-genes', icon: 'dna',    name: 'GENES',
+      tip: 'The Gene Lab - read, splice, clone and cross your hens',
+      open: () => GAME.hasGeneLab(), why: GAME.lvl('genelab') ? 'build a Gene Lab' : 'research the Gene Lab' },
   ];
   let crewBadgeDesk = null;
   function renderDeskbar() {
@@ -2335,8 +2600,10 @@
       b.className = 'desk-btn' + (open ? '' : ' locked');
       b.dataset.act = d.act;
       b.disabled = !open;
-      b.title = open ? d.tip : d.tip + ' (' + d.why + ')';
+      const why = typeof d.why === 'function' ? d.why() : d.why;
+      b.title = open ? d.tip : d.tip + ' (' + why + ')';
       b.appendChild(mkIcon(d.icon, 3));
+      if (!open) { const lk = document.createElement('i'); lk.className = 'lock-badge'; lk.appendChild(mkIcon('lock', 2)); b.appendChild(lk); }
       const nm = document.createElement('small');
       nm.textContent = d.name;
       b.appendChild(nm);
@@ -2355,9 +2622,11 @@
     el.toolbelt.innerHTML = '';
     ['hand', 'basket', 'feed', 'farm', 'build', 'inspect'].forEach((id, i) => {
       const b = document.createElement('button');
-      b.className = 'tool-btn' + (S().tool === id ? ' active' : '');
+      const open = GAME.toolOpen(id);
+      b.className = 'tool-btn' + (S().tool === id ? ' active' : '') + (open ? '' : ' locked');
       b.dataset.tool = id;
-      b.title = {
+      if (!open) b.title = 'Locked - install ' + SKILL_BY_ID[TOOL_UNLOCK[id]].name + ' in the Lab';
+      else b.title = {
         hand: 'Hand - pet, carry chickens and eggs, pick ripe crops, drag to pan',
         basket: 'Basket - sweep up eggs and feathers',
         feed: 'Feed - scatter pellets from the barn; chicks grow, hens lay faster',
@@ -2374,6 +2643,7 @@
       key.className = 'tool-key';
       key.textContent = String(i + 1);
       b.appendChild(key);
+      if (!open) { const lk = document.createElement('i'); lk.className = 'lock-badge'; lk.appendChild(mkIcon('lock', 2)); b.appendChild(lk); }
       el.toolbelt.appendChild(b);
     });
     renderDeskbar();
@@ -2445,12 +2715,17 @@
 
   /* how much of the field the open dock is standing on, in world pixels */
   function syncCamPad() {
-    const dock = !el.palette.hidden ? el.palette : !el.farmPalette.hidden ? el.farmPalette : null;
-    if (!dock) { GAME.setCamPad(0); return; }
     const r = cv.getBoundingClientRect();
     if (!r.width) return;
-    const d = dock.getBoundingClientRect();
-    GAME.setCamPad(Math.max(0, (r.bottom - d.top) / (r.width / W.view.w)));
+    /* whatever sits over the foot of the view - a dock, or just the tool
+       strap - the camera may scroll that much further so the road, the
+       truck and the customers are never stuck behind it */
+    const dock = !el.palette.hidden ? el.palette : !el.farmPalette.hidden ? el.farmPalette : null;
+    let top = Math.min(el.toolbelt.getBoundingClientRect().top, el.deskbar.getBoundingClientRect().top);
+    if (dock) top = Math.min(top, dock.getBoundingClientRect().top);
+    GAME.setCamPad(Math.max(0, (r.bottom - top) / (r.width / W.view.w)));
+    /* a new ranch opens looking at the road, where the bike and the sign are */
+    if (!S().camSet) { S().camSet = true; S().cam.y += 200; GAME.clampCam(); }
   }
 
   function renderPalette() {
@@ -2463,10 +2738,13 @@
     /* section tabs run down the left edge of the dock */
     const tabs = document.createElement('div');
     tabs.className = 'dock-tabs';
+    const buildOpen = t => !BUILDS[t].needs || GAME.lvl(BUILDS[t].needs) > 0;
+    if (!Object.keys(BUILDS).some(t => BUILDS[t].sec === palSec && buildOpen(t))) palSec = 'ranch';
     BUILD_SECTIONS.forEach(sec => {
-      const anyOpen = Object.keys(BUILDS).some(t => BUILDS[t].sec === sec.id && (!BUILDS[t].needs || GAME.lvl(BUILDS[t].needs)));
+      const anyOpen = Object.keys(BUILDS).some(t => BUILDS[t].sec === sec.id && buildOpen(t));
+      if (!anyOpen) return;
       const b = document.createElement('button');
-      b.className = 'pal-tab' + (palSec === sec.id ? ' active' : '') + (anyOpen ? '' : ' dim');
+      b.className = 'pal-tab' + (palSec === sec.id ? ' active' : '');
       b.dataset.palsec = sec.id;
       b.appendChild(mkIcon(sec.icon, 2));
       b.appendChild(document.createTextNode(sec.name));
@@ -2477,9 +2755,10 @@
     shelf.className = 'dock-shelf';
     const row = document.createElement('div');
     row.className = 'pal-row';
-    Object.keys(BUILDS).filter(t => BUILDS[t].sec === palSec).forEach(type => {
+    const lockedN = Object.keys(BUILDS).filter(t => BUILDS[t].sec === palSec && !buildOpen(t)).length;
+    Object.keys(BUILDS).filter(t => BUILDS[t].sec === palSec && buildOpen(t)).forEach(type => {
       const b = BUILDS[type];
-      const locked = b.needs && !GAME.lvl(b.needs);
+      const locked = false;
       const cost = buildCost(type, S().built[type]);
       const btn = document.createElement('button');
       btn.className = 'pal-btn' + (buildSel === type ? ' active' : '');
@@ -2499,6 +2778,7 @@
       btn.title = b.name + ' - ' + b.desc + (locked ? ' (research first)' : '');
       row.appendChild(btn);
     });
+    if (lockedN) row.appendChild(moreInLab(lockedN));
     shelf.appendChild(row);
     el.palette.appendChild(shelf);
 
@@ -2530,19 +2810,37 @@
      TEND them, and DECOR the place with trees and flowers. */
   /* ids are namespaced - t: terrain, c: crop, d: decoration - so the clover
      seed packet and the clover patch never get mistaken for one another */
+  /* a quiet tag at the end of a shelf: how much more the Lab still holds */
+  function moreInLab(n) {
+    const more = document.createElement('div');
+    more.className = 'pal-more';
+    more.appendChild(mkIcon('lock', 2));
+    more.appendChild(document.createTextNode(n + ' MORE IN THE LAB'));
+    more.title = 'Research in the Lab opens more';
+    return more;
+  }
+  /* how many things in this tab research still hides */
+  function farmLocked() {
+    if (farmSec === 'ground') return TERRAIN_KEYS.filter(k => !GAME.terrainOpen(k)).length;
+    if (farmSec === 'plant') return CROP_KEYS.filter(k => !GAME.cropOpen(k)).length;
+    if (farmSec === 'tend') return (GAME.lvl('wateringcan') ? 0 : 1) + (GAME.lvl('sickle') ? 0 : 1);
+    return DECO_KEYS.filter(k => DECOS[k].needs && !GAME.lvl(DECOS[k].needs)).length;
+  }
   function farmItems() {
     if (farmSec === 'ground') {
-      return TERRAIN_KEYS.map(k => ({ id: 't:' + k, terrain: k, name: TERRAIN[k].name.toUpperCase(), icon: TERRAIN[k].icon }));
+      return TERRAIN_KEYS.filter(k => GAME.terrainOpen(k)).map(k => ({ id: 't:' + k, terrain: k, name: TERRAIN[k].name.toUpperCase(), icon: TERRAIN[k].icon }));
     }
     if (farmSec === 'plant') {
-      return CROP_KEYS.map(k => ({ id: 'c:' + k, crop: k, name: CROPS[k].name.toUpperCase() }));
+      return CROP_KEYS.filter(k => GAME.cropOpen(k)).map(k => ({ id: 'c:' + k, crop: k, name: CROPS[k].name.toUpperCase() }));
     }
     if (farmSec === 'tend') {
-      return [{ id: 'do:water', icon: 'water', name: 'WATER', tip: 'Watered crops grow twice as fast' },
-              { id: 'do:harvest', icon: 'scythe', name: 'HARVEST', tip: 'Cut ripe crops into feed' },
-              { id: 'do:clear', icon: 'remove', name: 'CLEAR', tip: 'Lift a decoration, bare soil or shaped ground' }];
+      const out = [];
+      if (GAME.lvl('wateringcan')) out.push({ id: 'do:water', icon: 'water', name: 'WATER', tip: 'A watering lasts a minute. Nothing grows dry' });
+      if (GAME.lvl('sickle')) out.push({ id: 'do:harvest', icon: 'scythe', name: 'HARVEST', tip: 'Cut ripe crops into feed' });
+      out.push({ id: 'do:clear', icon: 'remove', name: 'CLEAR', tip: 'Lift a decoration, bare soil or shaped ground' });
+      return out;
     }
-    return DECO_KEYS.map(k => ({ id: 'd:' + k, deco: k, name: DECOS[k].name.toUpperCase() }));
+    return DECO_KEYS.filter(k => !DECOS[k].needs || GAME.lvl(DECOS[k].needs)).map(k => ({ id: 'd:' + k, deco: k, name: DECOS[k].name.toUpperCase() }));
   }
   /* what the current selection actually is */
   function farmPick() {
@@ -2597,6 +2895,9 @@
       btn.title = it.name + ' - ' + tip;
       row.appendChild(btn);
     });
+    const lockedN = farmLocked();
+    if (lockedN) row.appendChild(moreInLab(lockedN));
+    if (!farmItems().some(it => it.id === farmSel)) { const first = farmItems()[0]; if (first) farmSel = first.id; }
     shelf.appendChild(row);
     el.farmPalette.appendChild(shelf);
 
@@ -2624,8 +2925,10 @@
     info.className = 'farm-info';
     const st = S();
     const ripeN = Object.values(st.soil).filter(t => GAME.ripe(t)).length;
+    const dryN = Object.values(st.soil).filter(t => t.crop && t.growth < 1 && t.water <= 0 && !GAME.wateredBy(...Object.keys(st.soil).find(k => st.soil[k] === t).split(',').map(Number))).length;
     [['hoe', Object.keys(st.soil).length, 'Tiles tilled'],
      ['sprout', Object.values(st.soil).filter(t => t.crop).length, 'Growing'],
+     ['water', dryN, 'Dry crops - they are not growing'],
      ['scythe', ripeN, 'Ripe now'],
      ['road', GAME.paintedCells(), 'Ground painted'],
      ['tree', Object.keys(st.deco).length, 'Decorations']].forEach(([ic, v, tip]) => {
@@ -2649,6 +2952,8 @@
     let anchor = null, text = null;
     if (GAME.mamaHungry()) { anchor = [W.mama.x, W.mama.y - 34]; text = 'grandma is hungry - scatter feed by her nest'; }
     else if (stats.pets === 0) { anchor = [W.mama.x, W.mama.y - 34]; text = 'pet me!'; }
+    else if (S().orders.some(o => o.state === 'wait' && o.t < 25)) { const o = S().orders.find(o2 => o2.state === 'wait' && o2.t < 25); anchor = [o.x + 14, o.y - 22]; text = o.who.toLowerCase() + ' is about to drive off - hand over ' + (o.n - o.got) + ' more eggs'; }
+    else if (Object.keys(st.sites).length && !GAME.movers.van) { anchor = null; text = 'the movers are on their way'; }
     else if (stats.collected === 0 && st.eggs.length > 1) { anchor = [W.mama.x + 34, W.mama.y - 6]; text = 'take the basket tool and sweep up eggs'; }
     else if (stats.hatched === 0 && (st.basket.length > 0 || st.held)) { anchor = incPos ? [incPos[0] * 16 + 16, incPos[1] * 16 - 8] : null; text = 'drop eggs in the incubator to hatch them'; }
     else if (stats.sold === 0 && (st.basket.length > 2 || st.truck.load.length)) { anchor = [W.truckHome.x + 26, W.truckHome.y - 24]; text = st.truck.load.length ? 'tap the truck to sell' : 'drop eggs on the truck'; }
@@ -2692,7 +2997,10 @@
     updateCursorChip();
     updateCrewBadge();
     hintLogic();
+    renderQuestCard();
     refreshInspect();
+    /* the card under the Lab screen keeps up with your feathers */
+    if (!$('#modal-skills').hidden && skillCardFeathers !== S().feathers) { renderSkillCard(); $('#research-sub').textContent = GAME.fmt(S().feathers) + ' FEATHERS'; }
     if (!$('#modal-depot').hidden) {
       const dsig = S().truck.state + '|' + S().truck.load.length + '|' + S().coins.toFixed(0) + '|' + S().vehicle + '|' + S().routes.length + '|' + S().route;
       if (dsig !== depotSig) { depotSig = dsig; renderDepot(); }
@@ -2702,6 +3010,48 @@
       if (sig !== hireSig) { hireSig = sig; renderHire(); }
     }
     if (GAME.dirty.build) { renderPalette(); renderToolbelt(); }
+  }
+
+  /* ================= THE QUEST CARD =================
+     A slip of paper pinned under the resource pills: the current
+     quest, how far along it is, and where to go for it. Tap it
+     and the Lab opens on that very cube.
+     ================================================ */
+  let questSig = '';
+  function renderQuestCard() {
+    const card = $('#quest-card');
+    if (!card) return;
+    const q = GAME.currentQuest();
+    const hide = !q || !titleEl.hidden || !!inspect;
+    if (hide) { if (!card.hidden) card.hidden = true; questSig = ''; return; }
+    const [cur, n] = GAME.questProgress(q);
+    const sig = q.id + '|' + cur + '|' + n;
+    if (sig === questSig && !card.hidden) return;
+    questSig = sig;
+    card.hidden = false;
+    card.innerHTML = '';
+    card.dataset.act = 'quest-card';
+    card.title = 'Open the Lab on this quest';
+    card.appendChild(mkIcon(q.icon, 3));
+    const mid = document.createElement('div');
+    const tag = document.createElement('small');
+    tag.textContent = 'QUEST ' + (QUESTS.indexOf(q) + 1) + ' / ' + QUESTS.length;
+    mid.appendChild(tag);
+    const b = document.createElement('b');
+    b.textContent = q.name.toUpperCase();
+    mid.appendChild(b);
+    const bar = document.createElement('u');
+    const fill = document.createElement('s');
+    fill.style.width = Math.round(cur / n * 100) + '%';
+    bar.appendChild(fill);
+    const num = document.createElement('i');
+    num.textContent = cur + '/' + n;
+    bar.appendChild(num);
+    mid.appendChild(bar);
+    const hint = document.createElement('span');
+    hint.textContent = q.hint;
+    mid.appendChild(hint);
+    card.appendChild(mid);
   }
 
   /* ================= TITLE SCREEN ================= */
@@ -2849,8 +3199,372 @@
     const blink = Math.floor(now / 480) % 2;
     SPR.drawText(tctx, line, px0 + 7, py0, blink ? '#fff8ec' : '#e8d5a8', 1, '#1a120a');
   }
-  function showTitle() { titleEl.hidden = false; el.bubble.hidden = true; setInspect(null); }
-  function hideTitle() { titleEl.hidden = true; S().seenTitle = true; }
+  function showTitle() { titleEl.hidden = false; el.bubble.hidden = true; setInspect(null); introMode = null; $('#intro-ui').hidden = true; $('#company-form').hidden = true; $('#title-buttons').hidden = false; }
+  function hideTitle() { titleEl.hidden = true; S().seenTitle = true; introMode = null; }
+
+  /* ================= THE INTRO =================
+     A raccoon gets a letter: Grandmama's farm is theirs. One old
+     hen, a bare field and a bicycle. The raccoon, being a raccoon,
+     decides to get super rich, and founds a company: you name it,
+     pick its mark and paint its colours before the first egg.
+     ============================================ */
+  const INTRO = [
+    { bg: 'night', pose: 'read', lines: ['A LETTER CAME FOR A RACCOON.', '"GRANDMAMA HAS LEFT YOU THE FARM.', 'MIND THE HEN. SHE IS PARTICULAR."'] },
+    { bg: 'day',   pose: 'walk', lines: ['ONE OLD HEN. ONE BARE FIELD.', 'ONE BICYCLE WITH A BASKET.', 'NOT MUCH OF AN INHERITANCE.'] },
+    { bg: 'dream', pose: 'boss', lines: ['BUT A RACCOON HAS PLANS.', 'EGGS. LOTS OF EGGS. TRUCKS OF EGGS.', 'TIME TO START A COMPANY.'] },
+  ];
+  let introMode = null, introScene = 0, introT = 0;
+  function startIntro() {
+    introMode = 'scene'; introScene = 0; introT = 0;
+    $('#title-buttons').hidden = true;
+    $('#intro-ui').hidden = false;
+    $('#company-form').hidden = true;
+    snd.plop();
+  }
+  function introNext() {
+    if (introMode !== 'scene') return;
+    if (introT < 1.2) { introT = 6; return; }          /* finish the typing first */
+    introScene++; introT = 0; snd.plop();
+    if (introScene >= INTRO.length) showCompanyForm(true);
+  }
+  function introSkip() { if (introMode === 'scene') showCompanyForm(true); }
+  function drawIntro(dt) {
+    introT += dt;
+    const sc = INTRO[Math.min(introScene, INTRO.length - 1)];
+    const now = titleT * 1000; titleT += dt;
+    tctx.imageSmoothingEnabled = false;
+    /* sky */
+    const bands = sc.bg === 'night' ? ['#0b1020', '#111a34', '#16203c', '#1d2b4a', '#26375c', '#2f4470']
+                : sc.bg === 'day' ? ['#7fb8e8', '#8fc4ec', '#a2d0f0', '#b8dcf4', '#cfe8f8', '#e4f2fb']
+                : ['#2a1a3c', '#3a2454', '#4d2f6e', '#5f3a86', '#7a4aa8', '#9a62c8'];
+    const per = Math.ceil(TH / bands.length);
+    bands.forEach((b, i) => { tctx.fillStyle = b; tctx.fillRect(0, i * per, TW, per); });
+    if (sc.bg !== 'day') for (let i = 0; i < 40; i++) { if (Math.floor(now / 500 + i) % 7 === 0) continue; tctx.fillStyle = 'rgba(255,255,255,.7)'; tctx.fillRect((i * 97) % TW, (i * 43) % 120, 1, 1); }
+    /* ground */
+    const gy = TH - 62;
+    tctx.fillStyle = sc.bg === 'night' ? '#22301e' : sc.bg === 'day' ? '#6fae4a' : '#3a2a4a'; tctx.fillRect(0, gy, TW, TH - gy);
+    tctx.fillStyle = sc.bg === 'night' ? '#2c3d26' : sc.bg === 'day' ? '#7fbf58' : '#4a3a5a'; tctx.fillRect(0, gy, TW, 2);
+    if (sc.bg === 'night') {
+      /* the town: dark house fronts and a lamp post */
+      for (let i = 0; i < 6; i++) { const hx = i * 66 + 10, hh = 30 + (i * 13) % 20; tctx.fillStyle = '#141a2c'; tctx.fillRect(hx, gy - hh, 48, hh); tctx.fillStyle = (i + Math.floor(now / 1700)) % 3 ? '#ffe9a0' : '#3a3a5a'; tctx.fillRect(hx + 10, gy - hh + 8, 6, 6); tctx.fillRect(hx + 30, gy - hh + 8, 6, 6); }
+      const lamp = SPR.furnitureSprite('lamp', 3, 3);
+      tctx.drawImage(lamp, 236, gy - lamp.height + 4);
+      tctx.fillStyle = 'rgba(255,230,150,.10)'; tctx.fillRect(196, gy - 40, 100, 44); tctx.fillRect(210, gy - 60, 72, 20);
+      const rac = SPR.raccoonSprite('read', 4);
+      tctx.drawImage(rac, 150, gy - rac.height + 6);
+      /* the envelope drifting in for the first second */
+      if (introT < 1.4) { const f = Math.min(1, introT / 1.4); tctx.fillStyle = '#fff8ec'; tctx.fillRect(Math.round(60 + f * 100), Math.round(30 + f * 60 + Math.sin(introT * 6) * 4), 16, 11); tctx.fillStyle = '#e8542f'; tctx.fillRect(Math.round(66 + f * 100), Math.round(33 + f * 60 + Math.sin(introT * 6) * 4), 4, 4); }
+    } else if (sc.bg === 'day') {
+      /* the farm gate: fence posts, the nest, the bicycle, a FOR SALE sign or two */
+      for (let x = 0; x < TW; x += 14) { tctx.fillStyle = '#8a5e2a'; tctx.fillRect(x, gy - 14, 3, 16); }
+      tctx.fillStyle = '#a8783f'; tctx.fillRect(0, gy - 10, TW, 2); tctx.fillRect(0, gy - 4, TW, 2);
+      const mama = SPR.mamaSprite(0, 2, Math.floor(now / 3000) % 5 === 4 ? 'blink' : 'idle');
+      const nest = SPR.nestSprite(2);
+      tctx.drawImage(nest, 300 - nest.width / 2, gy - 16);
+      tctx.drawImage(mama, 300 - mama.width / 2, gy - mama.height - 2);
+      const bike = SPR.vehicleSprite('bike', 0, 2);
+      tctx.drawImage(bike, 30, gy - bike.height + 2);
+      const wx = Math.min(150, 40 + introT * 40);
+      const rac = SPR.raccoonSprite(wx < 150 && Math.floor(now / 160) % 2 ? 'walk1' : 'stand', 4);
+      tctx.drawImage(rac, Math.round(wx), gy - rac.height + 6);
+      const case2 = SPR.iconSprite('suitcase', 3);
+      tctx.drawImage(case2, Math.round(wx) - 26, gy - 28);
+      /* dust as it walks */
+      if (wx < 150 && Math.floor(now / 200) % 2) { tctx.fillStyle = 'rgba(200,180,140,.6)'; tctx.fillRect(Math.round(wx) - 6, gy + 2, 4, 2); }
+    } else {
+      /* the dream: coins piling, a tower rising, the raccoon in a top hat */
+      const rac = SPR.raccoonSprite('boss', 4);
+      tctx.drawImage(rac, 60, gy - rac.height + 6);
+      const bx = 170, by = 30, bw = 190, bh = 110;
+      tctx.fillStyle = '#2e2216'; tctx.fillRect(bx - 1, by, bw + 2, bh); tctx.fillRect(bx, by - 1, bw, bh + 2);
+      tctx.fillStyle = '#fff8ec'; tctx.fillRect(bx, by, bw, bh);
+      tctx.fillStyle = '#2e2216'; tctx.fillRect(bx - 14, by + bh - 20, 8, 8); tctx.fillRect(bx - 22, by + bh - 8, 5, 5);
+      tctx.fillStyle = '#fff8ec'; tctx.fillRect(bx - 13, by + bh - 19, 6, 6); tctx.fillRect(bx - 21, by + bh - 7, 3, 3);
+      const rise = Math.min(1, introT / 2.5);
+      /* a skyscraper with the company mark on top */
+      const th = Math.round(80 * rise);
+      tctx.fillStyle = '#3fa7d6'; tctx.fillRect(bx + 110, by + bh - 6 - th, 40, th);
+      tctx.fillStyle = '#7fc4e8'; for (let yy = 4; yy < th - 4; yy += 8) for (let xx = 4; xx < 36; xx += 8) tctx.fillRect(bx + 114 + xx, by + bh - 6 - th + yy, 4, 4);
+      if (rise >= 1) tctx.drawImage(SPR.iconSprite(S().company.logo || 'egg', 2), bx + 120, by + bh - 6 - th - 22);
+      /* coins stacking */
+      const nC = Math.floor(rise * 18);
+      for (let i = 0; i < nC; i++) { const cx = bx + 12 + (i % 6) * 14, cy = by + bh - 12 - Math.floor(i / 6) * 6; tctx.fillStyle = '#e0a416'; tctx.fillRect(cx, cy, 10, 5); tctx.fillStyle = '#ffd23f'; tctx.fillRect(cx, cy, 10, 3); tctx.fillStyle = '#fff3c4'; tctx.fillRect(cx + 2, cy, 3, 1); }
+      /* trucks rolling along the bottom of the thought */
+      const tr = SPR.vehicleSprite('truck', Math.floor(now / 90) % 2, 1);
+      tctx.drawImage(tr, bx + 6 + Math.round((introT * 30) % 120), by + 8);
+      SPR.drawTiny(tctx, 'SUPER RICH', bx + 8, by + 6, '#8a5e2a', 1);
+    }
+    /* the caption plate, typed out */
+    const plateY = TH - 52;
+    tctx.fillStyle = 'rgba(24,18,12,.82)'; tctx.fillRect(12, plateY, TW - 24, 44);
+    tctx.fillStyle = 'rgba(255,232,180,.35)'; tctx.fillRect(12, plateY, TW - 24, 1); tctx.fillRect(12, plateY + 43, TW - 24, 1);
+    let budget = Math.floor(introT * 28);
+    sc.lines.forEach((ln, i) => {
+      const shown = ln.slice(0, Math.max(0, budget));
+      budget -= ln.length + 4;
+      SPR.drawText(tctx, shown, 20, plateY + 7 + i * 12, i === 0 ? '#ffd23f' : '#fff8ec', 1, '#1a120a');
+    });
+    SPR.drawTiny(tctx, (introScene + 1) + ' / ' + INTRO.length, TW - 30, plateY - 8, '#e8d5a8', 1);
+  }
+
+  /* ---- the company form: name, mark and colours ---- */
+  let companyDraft = null, companyHost = null, companyInIntro = false;
+  function showCompanyForm(fromIntro) {
+    introMode = 'form';
+    companyInIntro = !!fromIntro;
+    companyDraft = Object.assign({}, COMPANY_DEFAULT, S().company);
+    companyHost = $('#company-form');
+    $('#intro-ui').hidden = true;
+    companyHost.hidden = false;
+    renderCompanyForm();
+    snd.build();
+  }
+  function openCompany() {
+    companyInIntro = false;
+    companyDraft = Object.assign({}, COMPANY_DEFAULT, S().company);
+    companyHost = $('#company-body');
+    renderCompanyForm();
+    openModal('#modal-company');
+  }
+  function brandPreview(draft) {
+    const c = SPR.newCanvas(120, 40);
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    /* the roadside sign */
+    g.fillStyle = '#2e2216'; g.fillRect(0, 0, 120, 26);
+    g.fillStyle = draft.col1; g.fillRect(1, 1, 118, 24);
+    g.fillStyle = SPR.lighten(draft.col1, 0.35); g.fillRect(1, 1, 118, 1);
+    g.fillStyle = draft.col2; g.fillRect(1, 22, 118, 3);
+    g.drawImage(SPR.iconSprite(draft.logo, 2), 4, 3);
+    const nm = (draft.name || 'YOUR COMPANY').slice(0, 16);
+    const dark = SPR.lum(draft.col1) > 0.6;
+    SPR.drawTiny(g, nm, 26, 8, dark ? '#2e2216' : '#fff8ec', 1);
+    g.fillStyle = '#5e3d18'; g.fillRect(10, 26, 4, 14); g.fillRect(106, 26, 4, 14);
+    const out = document.createElement('canvas');
+    out.width = 360; out.height = 120; out.className = 'brand-preview';
+    const og = out.getContext('2d'); og.imageSmoothingEnabled = false; og.drawImage(c, 0, 0, 360, 120);
+    return out;
+  }
+  function renderCompanyForm() {
+    const host = companyHost;
+    if (!host) return;
+    const d = companyDraft;
+    host.innerHTML = '';
+    const head = document.createElement('div');
+    head.className = 'cf-head';
+    head.appendChild(cloneCanvas(SPR.raccoonSprite('boss', 1), 3));
+    const ttl = document.createElement('div');
+    const h = document.createElement('b'); h.textContent = companyInIntro ? 'FOUND YOUR COMPANY' : 'THE COMPANY'; ttl.appendChild(h);
+    const p = document.createElement('span'); p.textContent = companyInIntro ? 'Name it, pick its mark and paint its colours. The sign by the road, the paperwork and the receipts will wear them.' : 'Repaint the sign whenever you like. The customers will not mind.'; ttl.appendChild(p);
+    head.appendChild(ttl);
+    host.appendChild(head);
+    host.appendChild(brandPreview(d));
+    const nameRow = document.createElement('label');
+    nameRow.className = 'cf-row';
+    const nl = document.createElement('i'); nl.textContent = 'NAME'; nameRow.appendChild(nl);
+    const inp = document.createElement('input');
+    inp.type = 'text'; inp.maxLength = 16; inp.id = 'company-name'; inp.value = d.name; inp.autocomplete = 'off'; inp.spellcheck = false;
+    inp.placeholder = 'INF EGG CO.';
+    nameRow.appendChild(inp);
+    host.appendChild(nameRow);
+    const logoRow = document.createElement('div');
+    logoRow.className = 'cf-row';
+    const ll = document.createElement('i'); ll.textContent = 'MARK'; logoRow.appendChild(ll);
+    const grid = document.createElement('div'); grid.className = 'cf-grid';
+    LOGOS.forEach(lg => {
+      const b = document.createElement('button');
+      b.className = 'cf-pick' + (d.logo === lg ? ' active' : '');
+      b.dataset.act = 'company-logo'; b.dataset.logo = lg; b.type = 'button';
+      b.appendChild(mkIcon(lg, 3));
+      grid.appendChild(b);
+    });
+    logoRow.appendChild(grid);
+    host.appendChild(logoRow);
+    [['col1', 'PAINT'], ['col2', 'TRIM']].forEach(([k, label]) => {
+      const row = document.createElement('div');
+      row.className = 'cf-row';
+      const l2 = document.createElement('i'); l2.textContent = label; row.appendChild(l2);
+      const g2 = document.createElement('div'); g2.className = 'cf-grid';
+      BRAND_COLS.forEach(col => {
+        const b = document.createElement('button');
+        b.className = 'cf-pick swatch' + (d[k] === col ? ' active' : '');
+        b.dataset.act = 'company-' + k; b.dataset.col = col; b.type = 'button';
+        b.style.background = col;
+        g2.appendChild(b);
+      });
+      row.appendChild(g2);
+      host.appendChild(row);
+    });
+    const foot = document.createElement('div');
+    foot.className = 'cf-foot';
+    const save = document.createElement('button');
+    save.className = 'btn btn-green'; save.dataset.act = 'company-save'; save.type = 'button';
+    save.textContent = companyInIntro ? 'FOUND THE COMPANY' : 'REPAINT THE SIGN';
+    foot.appendChild(save);
+    host.appendChild(foot);
+  }
+  document.addEventListener('input', ev => {
+    if (ev.target && ev.target.id === 'company-name' && companyDraft) {
+      companyDraft.name = ev.target.value;
+      const old = companyHost && companyHost.querySelector('.brand-preview');
+      if (old) old.replaceWith(brandPreview(companyDraft));
+    }
+  });
+  function saveCompany() {
+    if (!companyDraft) return;
+    GAME.setCompany(companyDraft);
+    snd.grand();
+    if (companyInIntro) {
+      $('#company-form').hidden = true;
+      $('#title-buttons').hidden = false;
+      hideTitle();
+      const q = GAME.currentQuest();
+      toast({ icon: S().company.logo, title: S().company.name + ' IS OPEN', body: q ? 'First job: ' + q.name.toLowerCase() + '. ' + q.hint + '.' : 'Good luck.', long: true });
+    } else closeModals();
+    companyDraft = null;
+  }
+
+  /* ================= THE GENE LAB =================
+     Pick a hen, read its five genes, then splice another into it,
+     clone it, or cross it with an animal. The best bird on the
+     ranch wears a crown.
+     ============================================== */
+  let geneTarget = null, geneMode = null;
+  function openGenes(id) {
+    if (!GAME.hasGeneLab()) { toast({ icon: 'lock', title: 'NO GENE LAB', body: GAME.lvl('genelab') ? 'Build one from the BUILD tool, RANCH tab.' : 'Research the Gene Lab in the HENS lane first.' }); return; }
+    if (id) geneTarget = id;
+    if (!S().chickens.some(c => c.id === geneTarget)) { const best = GAME.bestChickens(1)[0]; geneTarget = best ? best.id : null; }
+    geneMode = null;
+    renderGenes();
+    openModal('#modal-genes');
+  }
+  function genePick(id) {
+    if (geneMode === 'splice' && geneTarget && id !== geneTarget) {
+      if (GAME.splice(geneTarget, id)) { geneMode = null; renderGenes(); refreshInspect(); }
+      else { snd.error(); }
+      return;
+    }
+    geneTarget = id; snd.plop(); renderGenes();
+  }
+  function genePips(ch) {
+    const box = document.createElement('div');
+    box.className = 'gene-rows compact';
+    GENE_KEYS.forEach(k => {
+      const g = GENES[k], v = GAME.gene(ch, k);
+      const row = document.createElement('div');
+      row.className = 'gene-row';
+      row.title = g.name + ' - ' + g.desc;
+      row.appendChild(mkIcon(g.icon, 2));
+      for (let i = 0; i < ECON.geneMax; i++) { const pip = document.createElement('i'); if (i < v) { pip.className = 'on'; pip.style.background = g.col; } row.appendChild(pip); }
+      box.appendChild(row);
+    });
+    return box;
+  }
+  function renderGenes() {
+    const body = $('#genes-body');
+    body.innerHTML = '';
+    const st = S();
+    const adults = st.chickens.filter(c => !GAME.isChick(c)).slice().sort((a, b) => GAME.chScore(b) - GAME.chScore(a));
+    $('#genes-sub').textContent = adults.length + ' HENS - ' + st.stats.edits + ' EDITS - ' + GAME.fmt(st.feathers) + ' FEATHERS';
+    const cols = document.createElement('div');
+    cols.className = 'gl-cols';
+    /* the flock, best first */
+    const list = document.createElement('div');
+    list.className = 'gl-list';
+    const lh = document.createElement('div');
+    lh.className = 'gl-listhead';
+    lh.textContent = geneMode === 'splice' ? 'PICK THE DONOR - IT WILL BE GONE' : 'THE FLOCK, BEST EARNER FIRST';
+    if (geneMode === 'splice') lh.classList.add('warn');
+    list.appendChild(lh);
+    if (!adults.length) { const none = document.createElement('p'); none.className = 'pedia-intro'; none.textContent = 'No grown hens yet. Chicks have to grow up before their genes can be read.'; list.appendChild(none); }
+    adults.forEach((ch, i) => {
+      const sp = SPECIES[ch.sp];
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'gl-card' + (ch.id === geneTarget ? ' active' : '') + (geneMode === 'splice' && ch.id !== geneTarget ? ' donor' : '');
+      card.dataset.act = 'gene-pick'; card.dataset.id = String(ch.id);
+      card.appendChild(chickEl(sp, 2, false));
+      const mid = document.createElement('div');
+      const nm = document.createElement('b');
+      if (i === 0) nm.appendChild(mkIcon('crown', 2));
+      nm.appendChild(document.createTextNode(sp.name));
+      mid.appendChild(nm);
+      const sub = document.createElement('small');
+      sub.textContent = TIERS[sp.tier].n + ' - ' + GAME.fmt(Math.round(GAME.chScore(ch))) + '/min' + (ch.mods && ch.mods.length ? ' - ' + ch.mods.length + ' cross' : '');
+      mid.appendChild(sub);
+      card.appendChild(mid);
+      card.appendChild(genePips(ch));
+      list.appendChild(card);
+    });
+    cols.appendChild(list);
+    /* the bench: the picked hen and what can be done to it */
+    const bench = document.createElement('div');
+    bench.className = 'gl-bench';
+    const ch = st.chickens.find(c => c.id === geneTarget);
+    if (!ch) {
+      const p = document.createElement('p'); p.className = 'pedia-intro'; p.textContent = 'Pick a hen from the list to put it on the bench.'; bench.appendChild(p);
+    } else {
+      const sp = SPECIES[ch.sp];
+      const top = document.createElement('div');
+      top.className = 'gl-top';
+      top.appendChild(chickEl(sp, 4, false));
+      const t2 = document.createElement('div');
+      const b2 = document.createElement('b'); b2.textContent = sp.name.toUpperCase(); t2.appendChild(b2);
+      const s2 = document.createElement('span'); s2.textContent = TIERS[sp.tier].n + ' - lays every ' + GAME.fmtTime(GAME.chLayTime(ch)) + ' - worth ' + GAME.fmt(Math.round(GAME.chScore(ch))) + ' a minute'; t2.appendChild(s2);
+      if (ch.mods && ch.mods.length) { const m2 = document.createElement('span'); m2.textContent = 'crossed with: ' + ch.mods.map(m => (ANIMALS.find(a => a.mark === m) || { name: m }).name.toLowerCase()).join(', '); t2.appendChild(m2); }
+      top.appendChild(t2);
+      bench.appendChild(top);
+      const gl = document.createElement('div');
+      gl.className = 'gl-genes';
+      GENE_KEYS.forEach(k => {
+        const g = GENES[k], v = GAME.gene(ch, k);
+        const row = document.createElement('div');
+        row.className = 'gl-gene';
+        row.appendChild(mkIcon(g.icon, 2));
+        const nm = document.createElement('b'); nm.textContent = g.name; nm.style.color = g.col; row.appendChild(nm);
+        const pips = document.createElement('u');
+        for (let i = 0; i < ECON.geneMax; i++) { const pip = document.createElement('i'); if (i < v) { pip.className = 'on'; pip.style.background = g.col; } pips.appendChild(pip); }
+        row.appendChild(pips);
+        const d2 = document.createElement('span'); d2.textContent = g.desc + (v ? ' (+' + Math.round(v * ({ lay: ECON.geneLay, size: ECON.geneSize, luck: ECON.geneLuck, plume: ECON.genePlume, hardy: ECON.geneHardy }[k]) * 100) + '%)' : ''); row.appendChild(d2);
+        gl.appendChild(row);
+      });
+      bench.appendChild(gl);
+      const ops = document.createElement('div');
+      ops.className = 'gl-ops';
+      const op = (title, desc, btnDefs, locked) => {
+        const box = document.createElement('div');
+        box.className = 'gl-op' + (locked ? ' locked' : '');
+        const h3 = document.createElement('b'); h3.textContent = title; box.appendChild(h3);
+        const p3 = document.createElement('span'); p3.textContent = desc; box.appendChild(p3);
+        const row = document.createElement('div'); row.className = 'ip-btns';
+        btnDefs.forEach(def => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'btn' + (def.green ? ' btn-green' : '');
+          Object.keys(def.data).forEach(k2 => b.dataset[k2] = def.data[k2]);
+          b.disabled = !!def.disabled;
+          if (def.icon) b.appendChild(mkIcon(def.icon, 2));
+          b.appendChild(document.createTextNode(def.label));
+          row.appendChild(b);
+        });
+        box.appendChild(row);
+        ops.appendChild(box);
+      };
+      const spliceOk = GAME.lvl('splice') > 0;
+      op('SPLICE', spliceOk ? 'Pick a donor from the list. Every gene keeps the better of the two; the donor is gone. ' + GAME.spliceCost() + ' feathers.' : 'Research Splicing in the HENS lane.',
+         [{ label: geneMode === 'splice' ? 'CANCEL' : 'SPLICE INTO THIS HEN', data: { act: 'gene-splice' }, green: spliceOk && geneMode !== 'splice', disabled: !spliceOk || st.feathers < GAME.spliceCost() || adults.length < 2, icon: 'flask' }], !spliceOk);
+      const cloneOk = GAME.lvl('clone') > 0;
+      const cc = GAME.cloneCost(ch);
+      op('CLONE', cloneOk ? 'A second bird, genes and marks and all. ' + GAME.fmt(cc.c) + ' coins and ' + cc.f + ' feathers.' : 'Research Cloning in the HENS lane.',
+         [{ label: 'CLONE ' + GAME.fmt(cc.c), data: { act: 'gene-clone', id: String(ch.id) }, green: GAME.canClone(ch), disabled: !GAME.canClone(ch), icon: 'twins' }], !cloneOk);
+      const crossOk = GAME.lvl('crossbreed') > 0;
+      op('CROSS', crossOk ? 'One animal, one gene up, one mark on the plumage. ' + GAME.crossCost() + ' feathers each.' : 'Research Crossbreeding in the HENS lane.',
+         ANIMALS.map(a => ({ label: a.name.toUpperCase() + ' +' + GENES[a.gene].name, data: { act: 'gene-cross', id: String(ch.id), animal: a.id }, green: GAME.canCross(ch, a.id), disabled: !GAME.canCross(ch, a.id), icon: GENES[a.gene].icon })), !crossOk);
+      bench.appendChild(ops);
+    }
+    cols.appendChild(bench);
+    body.appendChild(cols);
+  }
 
   /* ================= MODAL PLUMBING ================= */
   function openModal(sel) {
@@ -2873,7 +3587,9 @@
   const SCR = { x: 18, y: 10, w: 344, h: 166 };     /* the glass */
   const MAPW = { x: SCR.x + 4, y: SCR.y + 4, w: 236, h: 146 };
   const RDW = { x: SCR.x + 244, y: SCR.y + 4, w: 96, h: 146 };
-  const HEXR = 11;
+  /* the board: 14px cubes, columns are depth, rows are packed lanes */
+  const NODE = 14, COLW = 24, ROWH = 18, GUT = 32;
+  const MAP_BG = '#081a14';
   let termCv = null, termCtx = null;
   let termSel = null, termHover = null, termHits = [];
   let mapPan = { x: 0, y: 0 }, mapDrag = null;
@@ -2891,29 +3607,60 @@
     const pre = skillPrereq(sk);
     return !pre || GAME.lvl(pre.id) > 0;
   }
-  function hexCenter(sk) {
-    const p = HEX_POS[sk.id] || { q: 0, r: 0 };
-    const px2 = hexToPx(p.q, p.r, HEXR);
-    return { x: Math.round(MAPW.x + MAPW.w / 2 + px2.x + mapPan.x), y: Math.round(MAPW.y + 9 + (MAPW.h - 9) / 2 + px2.y + mapPan.y) };
+  /* quests show the chain up to one past the current goal */
+  function questIndex(q) { return QUESTS.indexOf(q); }
+  function questVisible(q) {
+    const cur = GAME.currentQuest();
+    const ci = cur ? questIndex(cur) : QUESTS.length;
+    return questIndex(q) <= ci + 1;
+  }
+  function questState(q) {
+    if (GAME.questDone(q)) return 'done';
+    const cur = GAME.currentQuest();
+    return cur && cur.id === q.id ? 'current' : 'later';
+  }
+  const mapInner = () => ({ x: MAPW.x + 1, y: MAPW.y + 10, w: MAPW.w - 2, h: MAPW.h - 11 });
+  /* top-left of a node's front face on the glass */
+  function nodePos(id) {
+    const p = GRID_POS[id] || { col: 0, row: 0 };
+    const inner = mapInner();
+    return { x: Math.round(inner.x + GUT + p.col * COLW + mapPan.x), y: Math.round(inner.y + 8 + p.row * ROWH + mapPan.y), col: p.col, row: p.row };
+  }
+  function clampPan() {
+    const inner = mapInner();
+    const boardW = 13 * COLW + 8, boardH = GRID.rows * ROWH + 12;
+    mapPan.x = Math.min(0, Math.max(-(boardW - (inner.w - GUT)), mapPan.x));
+    mapPan.y = Math.min(0, Math.max(-(boardH - inner.h), mapPan.y));
   }
   function centerOn(id) {
-    const p = HEX_POS[id] || { q: 0, r: 0 };
-    const px2 = hexToPx(p.q, p.r, HEXR);
-    mapPan = { x: -px2.x, y: -px2.y };
+    const p = GRID_POS[id] || { col: 0, row: 0 };
+    const inner = mapInner();
+    mapPan = { x: -(p.col * COLW) + (inner.w - GUT) / 2 - NODE / 2, y: -(p.row * ROWH) + inner.h / 2 - NODE / 2 - 8 };
+    clampPan();
   }
-  /* Every hex wears its module's colour, always - the branch is the thing
-     you are trying to read at a glance. State is carried by how bright it
-     is: installed burns full, affordable is lit and gets a gold rim
-     pulsing round it, and one you cannot pay for yet sits dark. */
-  function hexPal(state, hue) {
+  /* Every node wears its lane's colour, always - the lane is the thing you
+     read at a glance. State is carried by how bright it is: installed burns
+     full, affordable is lit with a gold rim pulsing round it, and one you
+     cannot pay for yet sits dark. */
+  function nodePal(state, hue) {
     if (state === 'root') return { base: '#c9a35f', light: '#eccf95', dark: '#8a5e2a', out: '#3e2810' };
-    if (state === 'done') return { base: hue, light: SPR.lighten(hue, 0.40), dark: SPR.darken(hue, 0.28), out: SPR.darken(hue, 0.68) };
+    if (state === 'done' || state === 'current') return { base: hue, light: SPR.lighten(hue, 0.40), dark: SPR.darken(hue, 0.28), out: SPR.darken(hue, 0.68) };
     if (state === 'ready') {
       const b = SPR.darken(hue, 0.18);
       return { base: b, light: SPR.lighten(b, 0.30), dark: SPR.darken(b, 0.28), out: '#ffc72f' };
     }
-    const d = SPR.darken(hue, 0.68);
+    const d = SPR.darken(hue, 0.66);
     return { base: d, light: SPR.lighten(d, 0.14), dark: SPR.darken(d, 0.35), out: '#0f1f16' };
+  }
+  /* the current quest points at a node; if that node is still dark, at the
+     nearest lit one on the way to it */
+  function questTarget() {
+    const q = GAME.currentQuest();
+    if (!q || q.goal.k !== 'skill') return null;
+    let sk = SKILL_BY_ID[q.goal.id];
+    const path = [];
+    while (sk && !pkgVisible(sk)) { path.push(sk.id); sk = skillPrereq(sk); }
+    return sk ? { id: sk.id, hidden: path } : null;
   }
 
   function drawTerm(now) {
@@ -2996,7 +3743,7 @@
     /* ---------- the pointer ---------- */
     if (termMouse.inside) {
       const over = termHitAt(termMouse.x, termMouse.y);
-      const kind = over && (over.kind === 'hex' || over.kind === 'install' || over.kind === 'mod' || over.kind === 'home' || over.kind === 'close') ? 'hand' : 'arrow';
+      const kind = over && (over.kind === 'node' || over.kind === 'quest' || over.kind === 'install' || over.kind === 'mod' || over.kind === 'home' || over.kind === 'close') ? 'hand' : 'arrow';
       const cur = SPR.cursorSprite(kind, 1);
       g.drawImage(cur, Math.round(termMouse.x) - (kind === 'hand' ? 4 : 0), Math.round(termMouse.y) - (kind === 'hand' ? 2 : 0));
     }
@@ -3014,7 +3761,6 @@
   }
 
   function drawDesktop(g, now) {
-    const T = SPR.TERM;
     /* wallpaper */
     g.fillStyle = '#0f2a24'; g.fillRect(SCR.x, SCR.y, SCR.w, SCR.h);
     g.fillStyle = '#123229';
@@ -3022,110 +3768,178 @@
 
     /* ---- SKILLMAP window ---- */
     drawWindow(g, MAPW, 'SKILLMAP.EXE', now);
-    const inner = { x: MAPW.x + 1, y: MAPW.y + 10, w: MAPW.w - 2, h: MAPW.h - 11 };
+    const inner = mapInner();
     g.save();
-    g.beginPath(); g.rect(inner.x * TK, inner.y * TK, inner.w * TK, inner.h * TK); g.clip();
-    /* the drag area goes in first so every hex drawn on top of it wins the hit test */
+    g.beginPath(); g.rect(inner.x, inner.y, inner.w, inner.h); g.clip();
+    /* the drag area goes in first so every node drawn on top of it wins the hit test */
     termHits.push({ kind: 'map', x: inner.x, y: inner.y, w: inner.w, h: inner.h });
-    /* map background grid */
-    g.fillStyle = '#081a14'; g.fillRect(inner.x, inner.y, inner.w, inner.h);
-    g.fillStyle = '#0d2a1f';
-    for (let x = inner.x + ((mapPan.x % 12) + 12) % 12; x < inner.x + inner.w; x += 12) g.fillRect(x, inner.y, 1, inner.h);
-    for (let y = inner.y + ((mapPan.y % 12) + 12) % 12; y < inner.y + inner.h; y += 12) g.fillRect(inner.x, y, inner.w, 1);
+    g.fillStyle = MAP_BG; g.fillRect(inner.x, inner.y, inner.w, inner.h);
+    /* dotted board */
+    g.fillStyle = '#0f2e22';
+    const ox = inner.x + GUT + mapPan.x, oy = inner.y + 8 + mapPan.y;
+    for (let x = ox + NODE / 2; x < inner.x + inner.w; x += COLW) for (let y = oy + NODE / 2; y < inner.y + inner.h; y += ROWH) if (x > inner.x + GUT) g.fillRect(Math.round(x), Math.round(y), 1, 1);
+    /* lane bands */
+    GRID.lanes.forEach((L, i) => {
+      const y0 = Math.round(oy + L.top * ROWH - 3), h = L.rows * ROWH;
+      if (i % 2) { g.fillStyle = 'rgba(255,255,255,.028)'; g.fillRect(inner.x, y0, inner.w, h); }
+      g.fillStyle = 'rgba(126,242,168,.12)'; g.fillRect(inner.x, y0, inner.w, 1);
+    });
+
+    /* axis-aligned 1px segments; dotted when the way is not yet open */
+    const seg = (x0, y0, x1, y1, col, dotted) => {
+      const dx = Math.sign(x1 - x0), dy = Math.sign(y1 - y0);
+      const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+      g.fillStyle = col;
+      for (let i = 0; i <= n; i++) {
+        if (dotted && (i % 4) > 1) continue;
+        g.fillRect(x0 + dx * i, y0 + dy * i, 1, 1);
+      }
+    };
+    /* an elbow from the right edge of a to the left edge of b */
+    const elbow = (a, b, col, dotted) => {
+      const ax = a.x + NODE, ay = a.y + NODE / 2, bx = b.x, by = b.y + NODE / 2;
+      if (a.col === b.col) { seg(a.x + NODE / 2, a.y + NODE, a.x + NODE / 2, b.y - 1, col, dotted); return; }
+      const mx = bx - 6;
+      seg(ax, ay, mx, ay, col, dotted);
+      if (by !== ay) seg(mx, ay, mx, by, col, dotted);
+      seg(mx, by, bx - 1, by, col, dotted);
+    };
+    const target = questTarget();
+    const onPath = new Set();
+    if (target) { let sk = SKILL_BY_ID[target.id]; while (sk) { onPath.add(sk.id); sk = skillPrereq(sk); } }
 
     const visible = SKILLS.filter(pkgVisible);
-    /* paths first: installed -> child */
+    const root = nodePos('root');
+    /* the trunk: every first package hangs off the kernel down the left edge */
+    const firsts = visible.filter(sk => sk.pre === 'root');
+    let trunkEnd = root.y + NODE;
+    firsts.forEach(sk => { trunkEnd = Math.max(trunkEnd, nodePos(sk.id).y + NODE / 2); });
+    seg(root.x + NODE / 2, root.y + NODE, root.x + NODE / 2, trunkEnd, 'rgba(201,163,95,.55)', false);
+    /* paths: installed -> child */
     visible.forEach(sk => {
       if (!sk.pre) return;
-      const a2 = hexCenter(SKILL_BY_ID[sk.pre]), b2 = hexCenter(sk);
+      const a = nodePos(sk.pre), b = nodePos(sk.id);
       const st = pkgState(sk);
-      const hue = MODULES[sk.br].hue;
-      const steps = Math.max(Math.abs(b2.x - a2.x), Math.abs(b2.y - a2.y));
-      for (let i = 0; i <= steps; i++) {
-        const t = steps ? i / steps : 0;
-        if (st !== 'done' && (i % 4 > 1)) continue;             /* dotted when not yet installed */
-        const x = Math.round(a2.x + (b2.x - a2.x) * t), y = Math.round(a2.y + (b2.y - a2.y) * t);
-        g.fillStyle = st === 'done' ? hue : st === 'ready' ? '#ffc72f' : '#2f6a48';
-        g.fillRect(x - 1, y - 1, 2, 2);
-      }
+      const hue = MOD_BY_ID[sk.br].hue;
+      const col = onPath.has(sk.id) && st !== 'done' ? '#ffffff' : st === 'done' ? hue : st === 'ready' ? '#ffc72f' : '#2f6a48';
+      if (sk.pre === 'root') seg(root.x + NODE / 2 + 1, b.y + NODE / 2, b.x - 1, b.y + NODE / 2, col, st !== 'done');
+      else elbow(a, b, col, st !== 'done');
     });
     /* hidden children hint: short stubs with a ? */
     visible.forEach(sk => {
       SKILLS.filter(c2 => c2.pre === sk.id && !pkgVisible(c2)).forEach(c2 => {
-        const a2 = hexCenter(sk), b2 = hexCenter(c2);
-        const dx = b2.x - a2.x, dy = b2.y - a2.y, d = Math.hypot(dx, dy) || 1;
-        for (let i = 12; i < 22; i += 3) { g.fillStyle = 'rgba(126,242,168,.22)'; g.fillRect(Math.round(a2.x + dx / d * i), Math.round(a2.y + dy / d * i), 1, 1); }
-        if (Math.floor(now / 700 + c2.d) % 2) SPR.drawTiny(g, '?', Math.round(a2.x + dx / d * 25) - 1, Math.round(a2.y + dy / d * 25) - 2, 'rgba(126,242,168,.5)', 1);
+        const a = nodePos(sk.id), b = nodePos(c2.id);
+        const col = onPath.has(c2.id) ? 'rgba(255,255,255,.45)' : 'rgba(126,242,168,.22)';
+        for (let i = 2; i < 10; i += 3) g.fillRect(a.x + NODE + i, a.y + NODE / 2, 1, 1);
+        g.fillStyle = col;
+        for (let i = 2; i < 10; i += 3) g.fillRect(a.x + NODE + i, a.y + NODE / 2, 1, 1);
+        if (Math.floor(now / 700 + c2.d) % 2) SPR.drawTiny(g, '?', b.x + 4, b.y + 4, col, 1);
       });
     });
-    /* branch names floating over each cluster, in that branch's colour,
-       so the map says what its limbs are without being clicked */
-    MODULES.forEach((m, i) => {
-      const own = SKILLS_BY_MODULE[i].filter(pkgVisible);
-      if (own.length < 2) return;
-      let sx = 0, sy = 0, minY = 1e9;
-      own.forEach(sk => { const c3 = hexCenter(sk); sx += c3.x; sy += c3.y; minY = Math.min(minY, c3.y); });
-      const lx = Math.round(sx / own.length), ly = Math.round(minY - HEXR - 8);
-      if (lx < inner.x - 20 || lx > inner.x + inner.w + 20 || ly < inner.y - 8 || ly > inner.y + inner.h) return;
-      const w2 = SPR.tinyW(m.name.toUpperCase(), 1);
-      g.fillStyle = 'rgba(4,20,14,.75)';
-      g.fillRect(lx - w2 / 2 - 2, ly - 1, w2 + 4, 7);
-      SPR.drawTiny(g, m.name.toUpperCase(), Math.round(lx - w2 / 2), ly, m.hue, 1);
+    /* the quest chain zigzags along the top */
+    QUESTS.forEach((q, i) => {
+      if (!i || !questVisible(q)) return;
+      const a = nodePos(QUESTS[i - 1].id), b = nodePos(q.id);
+      const done = GAME.questDone(QUESTS[i - 1]);
+      const col = done ? '#ffd23f' : '#4a4a2a';
+      if (a.col === b.col) seg(a.x + NODE / 2, a.y + NODE, a.x + NODE / 2, b.y - 1, col, !done);
+      else { seg(a.x + NODE, a.y + NODE / 2, b.x - 6, a.y + NODE / 2, col, !done); seg(b.x - 6, a.y + NODE / 2, b.x - 6, b.y + NODE / 2, col, !done); seg(b.x - 6, b.y + NODE / 2, b.x - 1, b.y + NODE / 2, col, !done); }
     });
 
-    /* hexes */
-    visible.forEach(sk => {
-      const c2 = hexCenter(sk);
-      if (c2.x < inner.x - 14 || c2.x > inner.x + inner.w + 14 || c2.y < inner.y - 14 || c2.y > inner.y + inner.h + 14) return;
-      const st = sk.id === 'root' ? 'root' : pkgState(sk);
-      const hue = MODULES[sk.br].hue;
-      const sel = termSel === sk.id, hov = termHover === sk.id;
-      /* shadow */
-      SPR.drawHex(g, c2.x, c2.y + 2, HEXR, { base: '#03110a', light: '#03110a', dark: '#03110a', out: '#03110a' });
-      SPR.drawHex(g, c2.x, c2.y, HEXR, hexPal(st, hue), { rim: true });
-      if (sel || hov) SPR.drawHex(g, c2.x, c2.y, HEXR + 2, { base: 'rgba(0,0,0,0)', light: 'rgba(0,0,0,0)', dark: 'rgba(0,0,0,0)', out: sel ? '#ffffff' : 'rgba(255,255,255,.55)' });
-      if (st === 'ready' && Math.floor(now / 340) % 2) {
-        SPR.drawHex(g, c2.x, c2.y, HEXR + 3, { base: 'rgba(0,0,0,0)', light: 'rgba(0,0,0,0)', dark: 'rgba(0,0,0,0)', out: 'rgba(255,214,80,.8)' });
-      }
-      if (installFx && installFx.id === sk.id && now - installFx.t < 600) {
-        const f = (now - installFx.t) / 600;
-        SPR.drawHex(g, c2.x, c2.y, HEXR + 3 + Math.round(f * 10), { base: 'rgba(0,0,0,0)', light: 'rgba(0,0,0,0)', dark: 'rgba(0,0,0,0)', out: 'rgba(255,255,255,' + (1 - f) + ')' });
-      }
-      const icon = SPR.iconSprite(sk.icon, 1);
-      g.globalAlpha = st === 'short' ? 0.55 : 1;
-      g.drawImage(icon, c2.x - 5, c2.y - 7);
+    /* a node: shadow, cube, glyph, then what state it is in */
+    const ring = (x, y, col) => {
+      g.fillStyle = col;
+      g.fillRect(x - 2, y - 2, NODE + 4, 1); g.fillRect(x - 2, y + NODE + 1, NODE + 4, 1);
+      g.fillRect(x - 2, y - 2, 1, NODE + 4); g.fillRect(x + NODE + 1, y - 2, 1, NODE + 4);
+    };
+    const drawNode = (id, hue, st, icon, kind, sel, hov) => {
+      const p = nodePos(id);
+      if (p.x < inner.x + GUT - NODE || p.x > inner.x + inner.w + 4 || p.y < inner.y - NODE - 4 || p.y > inner.y + inner.h + 4) return;
+      g.fillStyle = 'rgba(0,0,0,.4)'; g.fillRect(p.x + 1, p.y + 2, NODE + 1, NODE);
+      SPR.drawCube(g, p.x, p.y, NODE, nodePal(st, hue), { depth: st === 'short' || st === 'later' ? 1 : 2, bg: MAP_BG });
+      g.globalAlpha = st === 'short' || st === 'later' ? 0.5 : 1;
+      g.drawImage(SPR.iconSprite(icon, 1), p.x + 2, p.y + 2);
       g.globalAlpha = 1;
-      if (sk.id !== 'root' && sk.max > 1) {
-        const lab = GAME.lvl(sk.id) + '/' + sk.max;
-        SPR.drawTiny(g, lab, c2.x - Math.floor(SPR.tinyW(lab, 1) / 2), c2.y + 3, st === 'short' ? '#7ef2a8' : '#1a1410', 1);
-      } else if (sk.id !== 'root' && GAME.lvl(sk.id)) {
-        SPR.drawTiny(g, 'ON', c2.x - 3, c2.y + 3, '#1a1410', 1);
+      if (sel || hov) ring(p.x, p.y, sel ? '#ffffff' : 'rgba(255,255,255,.55)');
+      if ((st === 'ready' || st === 'current') && Math.floor(now / 340) % 2) ring(p.x, p.y, st === 'ready' ? 'rgba(255,214,80,.85)' : 'rgba(255,255,255,.7)');
+      if (installFx && installFx.id === id && now - installFx.t < 600) {
+        const f = (now - installFx.t) / 600;
+        const r2 = Math.round(f * 8);
+        g.fillStyle = 'rgba(255,255,255,' + (1 - f) + ')';
+        g.fillRect(p.x - r2, p.y - r2, NODE + r2 * 2, 1); g.fillRect(p.x - r2, p.y + NODE + r2 - 1, NODE + r2 * 2, 1);
+        g.fillRect(p.x - r2, p.y - r2, 1, NODE + r2 * 2); g.fillRect(p.x + NODE + r2 - 1, p.y - r2, 1, NODE + r2 * 2);
       }
-      termHits.push({ kind: 'hex', id: sk.id, x: c2.x - HEXR, y: c2.y - 9, w: HEXR * 2, h: 18, cx: c2.x, cy: c2.y });
+      /* kind badges in the bottom-right corner */
+      if (kind === 'unlock' && st !== 'done') {
+        g.fillStyle = '#0f1f16'; g.fillRect(p.x + NODE - 5, p.y + NODE - 6, 5, 6);
+        g.fillStyle = st === 'ready' ? '#ffd23f' : '#4fb072'; g.fillRect(p.x + NODE - 4, p.y + NODE - 3, 3, 2); g.fillRect(p.x + NODE - 3, p.y + NODE - 5, 1, 2);
+      } else if (kind === 'unlock' || (kind === 'quest' && st === 'done')) {
+        g.fillStyle = '#0f1f16'; g.fillRect(p.x + NODE - 6, p.y + NODE - 6, 6, 6);
+        g.fillStyle = '#7ef2a8'; g.fillRect(p.x + NODE - 5, p.y + NODE - 3, 1, 1); g.fillRect(p.x + NODE - 4, p.y + NODE - 2, 1, 1); g.fillRect(p.x + NODE - 3, p.y + NODE - 3, 1, 1); g.fillRect(p.x + NODE - 2, p.y + NODE - 4, 1, 1);
+      } else if (kind === 'quest') {
+        g.fillStyle = '#0f1f16'; g.fillRect(p.x + NODE - 5, p.y + NODE - 6, 5, 6);
+        g.fillStyle = st === 'current' ? '#ffffff' : '#7a6a2a'; g.fillRect(p.x + NODE - 4, p.y + NODE - 5, 1, 4); g.fillRect(p.x + NODE - 3, p.y + NODE - 5, 2, 2);
+      }
+      return p;
+    };
+    visible.forEach(sk => {
+      const st = sk.id === 'root' ? 'root' : pkgState(sk);
+      const hue = MOD_BY_ID[sk.br].hue;
+      const p = drawNode(sk.id, hue, st, sk.icon, sk.kind, termSel === sk.id, termHover === sk.id);
+      if (!p) return;
+      /* stat nodes carry their level as pips along the foot */
+      if (sk.kind === 'stat') {
+        const cur = GAME.lvl(sk.id), n = Math.min(sk.max, 6);
+        for (let i = 0; i < n; i++) {
+          const lit = cur > Math.round(i * sk.max / n);
+          g.fillStyle = lit ? '#fff8ec' : 'rgba(0,0,0,.5)';
+          g.fillRect(p.x + 1 + i * 2, p.y + NODE + 3, 1, 1);
+        }
+        if (sk.max > 6 && cur >= sk.max) { g.fillStyle = '#ffd23f'; g.fillRect(p.x + 1, p.y + NODE + 3, 12, 1); }
+      }
+      termHits.push({ kind: 'node', id: sk.id, x: p.x - 1, y: p.y - 2, w: NODE + 3, h: NODE + 3 });
     });
+    QUESTS.forEach(q => {
+      if (!questVisible(q)) return;
+      const st = questState(q);
+      const p = drawNode(q.id, '#ffd23f', st, q.icon, 'quest', termSel === q.id, termHover === q.id);
+      if (!p) return;
+      if (st === 'current') {
+        const [cur, n] = GAME.questProgress(q);
+        g.fillStyle = '#0f1f16'; g.fillRect(p.x - 1, p.y + NODE + 2, NODE + 2, 3);
+        g.fillStyle = '#ffd23f'; g.fillRect(p.x, p.y + NODE + 3, Math.round(NODE * cur / n), 1);
+      }
+      termHits.push({ kind: 'quest', id: q.id, x: p.x - 1, y: p.y - 2, w: NODE + 3, h: NODE + 3 });
+    });
+    /* the way forward: a bouncing arrow over the current quest, and over
+       the package it wants you to install */
+    const bounce = Math.round(Math.abs(Math.sin(now / 260)) * 2);
+    const arrow = (p, col) => {
+      const ax = p.x + NODE / 2, ay = p.y - 7 - bounce;
+      g.fillStyle = col;
+      g.fillRect(ax - 1, ay - 3, 2, 3); g.fillRect(ax - 2, ay, 4, 1); g.fillRect(ax - 1, ay + 1, 2, 1);
+    };
+    const cq = GAME.currentQuest();
+    if (cq && cq.id !== termSel) arrow(nodePos(cq.id), '#fff8ec');
+    if (target && target.id !== termSel) arrow(nodePos(target.id), '#fff8ec');
 
-    /* branch names, drawn last so they sit legibly on top of their own
-       cluster rather than under the first hex that happens to overlap */
-    MODULES.forEach((m, i) => {
-      const own = SKILLS_BY_MODULE[i].filter(pkgVisible);
-      if (own.length < 2) return;
-      let sx = 0, minY = 1e9;
-      own.forEach(sk => { const c3 = hexCenter(sk); sx += c3.x; minY = Math.min(minY, c3.y); });
-      const name = m.name.toUpperCase(), w2 = SPR.tinyW(name, 1);
-      let lx = Math.round(sx / own.length);
-      const ly = Math.round(minY - HEXR - 9);
-      lx = Math.max(inner.x + w2 / 2 + 3, Math.min(inner.x + inner.w - w2 / 2 - 3, lx));
-      if (ly < inner.y || ly > inner.y + inner.h - 12) return;
-      g.fillStyle = 'rgba(4,20,14,.86)';
-      g.fillRect(lx - w2 / 2 - 3, ly - 2, w2 + 6, 9);
-      g.fillStyle = m.hue;
-      g.fillRect(lx - w2 / 2 - 3, ly - 2, w2 + 6, 1);
-      SPR.drawTiny(g, name, Math.round(lx - w2 / 2), ly, m.hue, 1);
+    /* the gutter: lane names, frozen while the board pans sideways */
+    g.fillStyle = MAP_BG; g.fillRect(inner.x, inner.y, GUT - 2, inner.h);
+    GRID.lanes.forEach((L, i) => {
+      const y0 = Math.round(oy + L.top * ROWH - 3), h = L.rows * ROWH;
+      if (i % 2) { g.fillStyle = 'rgba(255,255,255,.028)'; g.fillRect(inner.x, y0, GUT - 2, h); }
+      const m = MOD_BY_ID[L.id];
+      const ready = L.id === 'quests' ? false : SKILLS_BY_MODULE[MOD_INDEX[L.id]].some(sk => pkgVisible(sk) && pkgState(sk) === 'ready');
+      g.fillStyle = m.hue; g.fillRect(inner.x, y0 + 1, 2, h - 1);
+      SPR.drawTiny(g, m.name, inner.x + 4, y0 + 4, m.hue, 1);
+      if (ready && Math.floor(now / 340) % 2) { g.fillStyle = '#ffd23f'; g.fillRect(inner.x + 4 + SPR.tinyW(m.name, 1) + 2, y0 + 5, 2, 2); }
     });
+    g.fillStyle = 'rgba(126,242,168,.18)'; g.fillRect(inner.x + GUT - 2, inner.y, 1, inner.h);
     g.restore();
     /* window status line */
     const vis = visible.length - 1, tot = SKILLS.length - 1;
-    const status = vis + ' ON MAP  ' + (tot - vis) + ' DARK  DRAG TO PAN';
+    const doneQ = QUESTS.filter(GAME.questDone).length;
+    const status = vis + ' ON MAP  ' + (tot - vis) + ' DARK  QUESTS ' + doneQ + '/' + QUESTS.length;
     g.fillStyle = 'rgba(8,26,20,.85)'; g.fillRect(inner.x + 1, inner.y + inner.h - 9, SPR.tinyW(status, 1) + 4, 8);
     SPR.drawTiny(g, status, inner.x + 3, inner.y + inner.h - 7, '#4fb072', 1);
 
@@ -3133,24 +3947,26 @@
     drawWindow(g, RDW, 'README.TXT', now);
     const rx = RDW.x + 4, ry = RDW.y + 14;
     g.fillStyle = '#0b1f18'; g.fillRect(RDW.x + 1, RDW.y + 10, RDW.w - 2, RDW.h - 11);
-    const sk = termSel ? SKILL_BY_ID[termSel] : null;
-    if (sk) {
-      const st = sk.id === 'root' ? 'root' : pkgState(sk);
-      const hue = MODULES[sk.br].hue;
-      SPR.drawBox(g, rx, ry, 18, 18, SPR.darken(hue, 0.45), hue, '#0f1f16');
-      g.drawImage(SPR.iconSprite(sk.icon, 1), rx + 4, ry + 4);
-      const words = sk.name.toUpperCase().split(' ');
-      words.slice(0, 2).forEach((w, i) => SPR.drawTiny(g, w, rx + 21, ry + 1 + i * 7, '#d8ffe8', 1));
-      SPR.drawTiny(g, MODULES[sk.br].code, rx + 21, ry + 15, '#4fb072', 1);
-      /* description wrapped */
-      const desc = sk.desc.toUpperCase();
-      let line = '', y2 = ry + 24;
-      desc.split(' ').forEach(w => {
-        if (SPR.tinyW(line + ' ' + w, 1) > RDW.w - 10) { SPR.drawTiny(g, line, rx, y2, '#7ef2a8', 1); y2 += 7; line = w; }
+    const wrap = (text, x, y, col) => {
+      let line = '', y2 = y;
+      text.toUpperCase().split(' ').forEach(w => {
+        if (SPR.tinyW(line + ' ' + w, 1) > RDW.w - 10) { SPR.drawTiny(g, line, x, y2, col, 1); y2 += 7; line = w; }
         else line = line ? line + ' ' + w : w;
       });
-      if (line) { SPR.drawTiny(g, line, rx, y2, '#7ef2a8', 1); y2 += 7; }
-      y2 += 4;
+      if (line) { SPR.drawTiny(g, line, x, y2, col, 1); y2 += 7; }
+      return y2;
+    };
+    const sk = termSel && SKILL_BY_ID[termSel] ? SKILL_BY_ID[termSel] : null;
+    const q = termSel && QUEST_BY_ID[termSel] ? QUEST_BY_ID[termSel] : null;
+    if (sk) {
+      const st = sk.id === 'root' ? 'root' : pkgState(sk);
+      const hue = MOD_BY_ID[sk.br].hue;
+      SPR.drawCube(g, rx + 1, ry + 3, 16, nodePal(st, hue), { depth: 2, bg: '#0b1f18' });
+      g.drawImage(SPR.iconSprite(sk.icon, 1), rx + 4, ry + 6);
+      const words = sk.name.toUpperCase().split(' ');
+      words.slice(0, 2).forEach((w, i) => SPR.drawTiny(g, w, rx + 22, ry + 1 + i * 7, '#d8ffe8', 1));
+      SPR.drawTiny(g, sk.kind === 'unlock' ? 'UNLOCK' : MOD_BY_ID[sk.br].code, rx + 22, ry + 15, sk.kind === 'unlock' ? '#ffd23f' : '#4fb072', 1);
+      let y2 = wrap(sk.desc, rx, ry + 25, '#7ef2a8') + 4;
       const cur = GAME.lvl(sk.id);
       if (sk.id !== 'root') {
         SPR.drawTiny(g, 'LEVEL ' + cur + ' / ' + sk.max, rx, y2, '#d8ffe8', 1); y2 += 7;
@@ -3158,7 +3974,6 @@
         if (st !== 'done') {
           const cost = skillCost(sk, cur);
           SPR.drawTiny(g, 'COST ' + GAME.fmt(cost) + ' FEATHERS', rx, y2, st === 'ready' ? '#ffd23f' : '#e8607a', 1); y2 += 9;
-          /* the INSTALL button */
           const bw = RDW.w - 10, bh = 13, bx = rx, by = RDW.y + RDW.h - 20;
           const busy = installFx && now - installFx.t < 500;
           SPR.drawBox(g, bx, by, bw, bh, st === 'ready' ? SPR.darken('#ffc72f', 0.35) : '#1d2a22', st === 'ready' ? '#ffc72f' : null, st === 'ready' ? '#ffc72f' : '#2f6a48');
@@ -3176,10 +3991,36 @@
         }
       } else {
         SPR.drawTiny(g, 'THE KERNEL.', rx, y2, '#d8ffe8', 1);
-        SPR.drawTiny(g, 'EVERY PATH STARTS HERE.', rx, y2 + 7, '#7ef2a8', 1);
+        SPR.drawTiny(g, 'EVERY LANE STARTS HERE.', rx, y2 + 7, '#7ef2a8', 1);
       }
+    } else if (q) {
+      const st = questState(q);
+      SPR.drawCube(g, rx + 1, ry + 3, 16, nodePal(st, '#ffd23f'), { depth: 2, bg: '#0b1f18' });
+      g.drawImage(SPR.iconSprite(q.icon, 1), rx + 4, ry + 6);
+      q.name.toUpperCase().split(' ').slice(0, 2).forEach((w, i) => SPR.drawTiny(g, w, rx + 22, ry + 1 + i * 7, '#d8ffe8', 1));
+      SPR.drawTiny(g, 'QUEST ' + (questIndex(q) + 1), rx + 22, ry + 15, '#ffd23f', 1);
+      let y2 = wrap(q.hint, rx, ry + 25, '#7ef2a8') + 4;
+      const [cur, n] = GAME.questProgress(q);
+      SPR.drawTiny(g, st === 'done' ? 'DONE' : 'PROGRESS ' + cur + ' / ' + n, rx, y2, st === 'done' ? '#4fb072' : '#d8ffe8', 1); y2 += 8;
+      g.fillStyle = '#1d3628'; g.fillRect(rx, y2, RDW.w - 10, 3);
+      g.fillStyle = '#ffd23f'; g.fillRect(rx, y2, Math.round((RDW.w - 10) * (st === 'done' ? 1 : cur / n)), 3); y2 += 7;
+      const rw = [];
+      if (q.rw.c) rw.push(GAME.fmt(q.rw.c) + ' COINS');
+      if (q.rw.f) rw.push(q.rw.f + ' FEATHERS');
+      SPR.drawTiny(g, 'REWARD ' + rw.join(' + '), rx, y2, '#ffd23f', 1);
+      if (st === 'later') SPR.drawTiny(g, 'AFTER THE ONE BEFORE', rx, RDW.y + RDW.h - 16, '#4fb072', 1);
+      if (st === 'current') SPR.drawTiny(g, 'PAYS OUT BY ITSELF', rx, RDW.y + RDW.h - 16, '#4fb072', 1);
     } else {
-      ['CLICK A HEX', 'TO READ IT.', '', 'GOLD HEXES', 'CAN BE', 'INSTALLED', 'RIGHT NOW.', '', 'DARK PATHS', 'LEAD ON TO', 'MORE.'].forEach((l, i) => SPR.drawTiny(g, l, rx, ry + i * 7, i < 2 ? '#d8ffe8' : '#7ef2a8', 1));
+      const cq2 = GAME.currentQuest();
+      SPR.drawTiny(g, 'CLICK A CUBE', rx, ry, '#d8ffe8', 1);
+      SPR.drawTiny(g, 'TO READ IT.', rx, ry + 7, '#d8ffe8', 1);
+      let y2 = wrap('gold rims install now. padlocks open a tool or a building. the top lane is your quest chain.', rx, ry + 18, '#7ef2a8') + 6;
+      if (cq2) {
+        SPR.drawTiny(g, 'NEXT STEP', rx, y2, '#ffd23f', 1); y2 += 8;
+        y2 = wrap(cq2.name, rx, y2, '#fff8ec');
+        const [cur, n] = GAME.questProgress(cq2);
+        SPR.drawTiny(g, cur + ' / ' + n, rx, y2, '#d8ffe8', 1);
+      } else SPR.drawTiny(g, 'EVERY QUEST DONE', rx, y2, '#ffd23f', 1);
     }
 
     /* ---- taskbar ---- */
@@ -3190,16 +4031,15 @@
     g.drawImage(SPR.iconSprite('egg', 1), tb.x + 5, tb.y + 2);
     SPR.drawTiny(g, 'EGGOS', tb.x + 16, tb.y + 4, '#d8ffe8', 1);
     termHits.push({ kind: 'home', x: tb.x + 3, y: tb.y + 2, w: 34, h: 10 });
-    /* module chips: click to pan there */
+    /* lane chips: click to pan there */
     MODULES.forEach((m, i) => {
       const cx = tb.x + 42 + i * 14;
-      const has = SKILLS_BY_MODULE[i].some(pkgVisible);
-      const ready = SKILLS_BY_MODULE[i].some(sk => pkgVisible(sk) && pkgState(sk) === 'ready');
+      const has = m.id === 'quests' || SKILLS_BY_MODULE[i].some(pkgVisible);
+      const ready = m.id === 'quests' ? false : SKILLS_BY_MODULE[i].some(sk => pkgVisible(sk) && pkgState(sk) === 'ready');
       SPR.drawBox(g, cx, tb.y + 2, 12, 10, has ? SPR.darken(m.hue, 0.5) : '#142a20', has ? m.hue : null, '#0f1f16');
       g.globalAlpha = has ? 1 : 0.4;
       g.drawImage(SPR.iconSprite(m.icon, 1), cx + 1, tb.y + 2);
       g.globalAlpha = 1;
-      /* a swatch of the branch colour, so the chips read as a key */
       g.fillStyle = has ? m.hue : '#24382c';
       g.fillRect(cx + 1, tb.y + 10, 10, 1);
       if (ready && Math.floor(now / 340) % 2) { g.fillStyle = '#ffd23f'; g.fillRect(cx + 9, tb.y + 2, 3, 3); }
@@ -3207,8 +4047,6 @@
     });
     const fx = 'FEATHERS ' + GAME.fmt(S().feathers);
     SPR.drawTiny(g, fx, tb.x + tb.w - 4 - SPR.tinyW(fx, 1), tb.y + 4, '#ffd23f', 1);
-    const clock = 'DAY ' + S().day;
-    SPR.drawTiny(g, clock, tb.x + tb.w - 60 - SPR.tinyW(fx, 1), tb.y + 4, '#7ef2a8', 1);
   }
 
   function drawWindow(g, r, title, now) {
@@ -3226,7 +4064,6 @@
   function termHitAt(cx, cy) {
     for (let i = termHits.length - 1; i >= 0; i--) {
       const h = termHits[i];
-      if (h.kind === 'hex') { if (SPR.hexHit(cx - h.cx, cy - h.cy, HEXR)) return h; continue; }
       if (cx >= h.x && cx <= h.x + h.w && cy >= h.y && cy <= h.y + h.h) return h;
     }
     return null;
@@ -3242,21 +4079,51 @@
       snd.skill();
       termSel = id;
       installFx = { t: performance.now(), id };
-      toast({ icon: sk.icon, title: sk.name.toUpperCase() + ' INSTALLED', body: sk.desc });
+      const tool = Object.keys(TOOL_UNLOCK).find(t => TOOL_UNLOCK[t] === id);
+      toast({ icon: sk.icon, title: sk.name.toUpperCase() + ' INSTALLED', body: tool ? 'A new tool is on the rack: ' + TOOL_LABEL[tool] : sk.desc });
       renderSkillCard();
       renderToolbelt();
+      renderPalette();
       GAME.mark('build');
     } else snd.error();
   }
 
+  let skillCardFeathers = -1;
   function renderSkillCard() {
     const card = $('#skill-card');
     card.innerHTML = '';
-    const sk = termSel ? SKILL_BY_ID[termSel] : null;
+    skillCardFeathers = S().feathers;
+    const sk = termSel && SKILL_BY_ID[termSel] ? SKILL_BY_ID[termSel] : null;
+    const q = termSel && QUEST_BY_ID[termSel] ? QUEST_BY_ID[termSel] : null;
+    if (q) {
+      const st = questState(q);
+      card.appendChild(mkIcon(q.icon, 4));
+      const mid = document.createElement('div');
+      mid.className = 'skc-mid';
+      const b = document.createElement('b');
+      b.textContent = q.name;
+      const small = document.createElement('small');
+      const [cur, n] = GAME.questProgress(q);
+      small.textContent = '  QUEST ' + (questIndex(q) + 1) + ' OF ' + QUESTS.length + (st === 'done' ? '  DONE' : '  ' + cur + '/' + n);
+      b.appendChild(small);
+      mid.appendChild(b);
+      const desc = document.createElement('span');
+      desc.textContent = q.hint + '. Reward: ' + [q.rw.c ? q.rw.c + ' coins' : '', q.rw.f ? q.rw.f + ' feathers' : ''].filter(Boolean).join(' and ') + '.';
+      mid.appendChild(desc);
+      card.appendChild(mid);
+      const btn = document.createElement('button');
+      btn.className = 'btn';
+      btn.disabled = true;
+      btn.textContent = st === 'done' ? 'PAID OUT' : st === 'current' ? 'IN PROGRESS' : 'LATER';
+      card.appendChild(btn);
+      return;
+    }
     if (!sk) {
       const hint = document.createElement('span');
       hint.className = 'sk-hint';
-      hint.textContent = 'click a hex on the screen. gold ones install right now; dark paths lead on to more.';
+      const cq = GAME.currentQuest();
+      hint.textContent = cq ? 'next step: ' + cq.name.toLowerCase() + ' - ' + cq.hint.toLowerCase() + '.'
+                            : 'click a cube on the screen. gold rims install right now; padlocks open tools and buildings.';
       card.appendChild(hint);
       return;
     }
@@ -3269,7 +4136,7 @@
     const b = document.createElement('b');
     b.textContent = sk.name;
     const small = document.createElement('small');
-    small.textContent = ' ' + cur + '/' + sk.max + '  ' + MODULES[sk.br].code;
+    small.textContent = ' ' + cur + '/' + sk.max + '  ' + MOD_BY_ID[sk.br].code + (sk.kind === 'unlock' ? '  UNLOCK' : '');
     b.appendChild(small);
     mid.appendChild(b);
     const desc = document.createElement('span');
@@ -3301,11 +4168,11 @@
         termMouse = { x: p.x, y: p.y, inside: true };
         if (mapDrag) {
           mapPan = { x: mapDrag.px + (p.x - mapDrag.x), y: mapDrag.py + (p.y - mapDrag.y) };
-          mapPan.x = Math.max(-260, Math.min(260, mapPan.x)); mapPan.y = Math.max(-260, Math.min(260, mapPan.y));
+          clampPan();
           return;
         }
         const h = termHitAt(p.x, p.y);
-        termHover = h && h.kind === 'hex' ? h.id : null;
+        termHover = h && (h.kind === 'node' || h.kind === 'quest') ? h.id : null;
       });
       termCv.addEventListener('pointerleave', () => { termMouse.inside = false; termHover = null; mapDrag = null; });
       termCv.addEventListener('pointerdown', ev => {
@@ -3315,22 +4182,37 @@
         termMouse = { x: p.x, y: p.y, inside: true };
         const h = termHitAt(p.x, p.y);
         if (!h) return;
-        if (h.kind === 'hex') { termSel = h.id; snd.plop(); renderSkillCard(); mapDrag = null; return; }
+        if (h.kind === 'node' || h.kind === 'quest') { termSel = h.id; snd.plop(); renderSkillCard(); mapDrag = null; return; }
         if (h.kind === 'install') { installPkg(h.id); return; }
-        if (h.kind === 'mod') { const first = SKILLS_BY_MODULE[h.i][0]; if (first) { centerOn(first.id); snd.plop(); } return; }
-        if (h.kind === 'home') { centerOn('root'); snd.plop(); return; }
+        if (h.kind === 'mod') {
+          const m = MODULES[h.i];
+          const first = m.id === 'quests' ? (GAME.currentQuest() || QUESTS[0]) : SKILLS_BY_MODULE[h.i][0];
+          if (first) { centerOn(first.id); snd.plop(); }
+          return;
+        }
+        if (h.kind === 'home') { mapPan = { x: 0, y: 0 }; snd.plop(); return; }
         if (h.kind === 'close') { closeModals(); snd.plop(); return; }
         if (h.kind === 'map') { mapDrag = { x: p.x, y: p.y, px: mapPan.x, py: mapPan.y }; }
       });
       termCv.addEventListener('pointerup', () => { mapDrag = null; });
       termCv.addEventListener('wheel', ev => {
         ev.preventDefault();
-        mapPan.y -= ev.deltaY > 0 ? 12 : -12;
-        mapPan.y = Math.max(-260, Math.min(260, mapPan.y));
+        if (ev.shiftKey || Math.abs(ev.deltaX) > Math.abs(ev.deltaY)) mapPan.x -= (ev.shiftKey ? ev.deltaY : ev.deltaX) > 0 ? 14 : -14;
+        else mapPan.y -= ev.deltaY > 0 ? 14 : -14;
+        clampPan();
       }, { passive: false });
     }
-    labOpenedAt = performance.now();
-    if (!termSel) centerOn('root');
+    /* opening the Lab starts at the top-left of the board, where the quests
+       and the kernel are; a selection off that first screen is panned to.
+       A refresh while the Lab is already open leaves the board where it is. */
+    if ($('#modal-skills').hidden) {
+      labOpenedAt = performance.now();
+      mapPan = { x: 0, y: 0 };
+      if (termSel) {
+        const p = nodePos(termSel), inner = mapInner();
+        if (p.x + NODE > inner.x + inner.w || p.y + NODE > inner.y + inner.h) centerOn(termSel);
+      }
+    }
     $('#research-sub').textContent = GAME.fmt(S().feathers) + ' FEATHERS';
     renderSkillCard();
     GAME.dirty.skills = false;
@@ -3524,6 +4406,8 @@
       ipanel.appendChild(ipRow('species', () => GAME.disc() + ' / ' + SPECIES_TOTAL));
       ipanel.appendChild(ipRow('land owned', GAME.ownedPlots() + ' / ' + PLOTS.length));
       ipanel.appendChild(ipRow('total sold', () => GAME.fmt(S().stats.sold)));
+      ipanel.appendChild(ipRow('orders filled', () => S().stats.orders + (S().stats.ordersMissed ? ' (' + S().stats.ordersMissed + ' missed)' : '')));
+      ipanel.appendChild(ipRow('honey jars', () => String(S().stats.honey)));
       ipanel.appendChild(ipRow('retired', () => GAME.fmt(S().stats.culled)));
       if (st.unpaid) {
         const w = document.createElement('p');
@@ -3551,8 +4435,23 @@
         }));
       }
       ipanel.appendChild(ipRow('belly', () => ch.food <= 0 ? 'EMPTY - lays slow' : Math.round(ch.food * 100) + '% full'));
-      ipanel.appendChild(ipRow('lays every', GAME.fmtTime(GAME.layTime(sp.tier) / (ch.buffT > 0 ? 2 : 1))));
+      ipanel.appendChild(ipRow('lays every', GAME.fmtTime(GAME.chLayTime(ch) / (ch.buffT > 0 ? 2 : 1))));
       ipanel.appendChild(ipRow('egg value', GAME.fmt(GAME.eggValue(sp.tier, false))));
+      ipanel.appendChild(ipRow('worth / min', () => GAME.fmt(Math.round(GAME.chScore(ch)))));
+      /* the five genes, as little pip rows */
+      const gbox = document.createElement('div');
+      gbox.className = 'gene-rows';
+      GENE_KEYS.forEach(k => {
+        const g = GENES[k], v = GAME.gene(ch, k);
+        const row = document.createElement('div');
+        row.className = 'gene-row';
+        row.title = g.name + ' - ' + g.desc;
+        row.appendChild(mkIcon(g.icon, 2));
+        for (let i = 0; i < ECON.geneMax; i++) { const pip = document.createElement('i'); if (i < v) { pip.className = 'on'; pip.style.background = g.col; } row.appendChild(pip); }
+        gbox.appendChild(row);
+      });
+      ipanel.appendChild(gbox);
+      if (ch.mods && ch.mods.length) ipanel.appendChild(ipRow('crossed with', ch.mods.map(m => (ANIMALS.find(a => a.mark === m) || { name: m }).name.toLowerCase()).join(', ')));
       ipanel.appendChild(ipRow('next egg in', () => GAME.fmtTime(Math.max(0, ch.lay))));
       ipanel.appendChild(ipRow('well fed', () => ch.buffT > 0 ? GAME.fmtTime(ch.buffT) : 'no'));
       ipanel.appendChild(ipRow('petting', () => ch.petCd > 0 ? GAME.fmtTime(ch.petCd) : 'ready'));
@@ -3561,10 +4460,27 @@
       note.className = 'ip-note';
       note.textContent = sp.quip;
       ipanel.appendChild(note);
-      ipanel.appendChild(ipBtns([
+      const cbtns = [
         { label: () => ch.marked ? 'UNMARK' : 'MARK CULL', data: { act: 'mark-chicken' }, cls: () => ch.marked ? '' : 'btn-green' },
         { label: 'RETIRE NOW', data: { act: 'retire-chicken' } },
-      ]));
+      ];
+      if (GAME.hasGeneLab()) cbtns.push({ label: 'GENE LAB', data: { act: 'open-genes', id: String(ch.id) }, cls: 'btn-green' });
+      ipanel.appendChild(ipBtns(cbtns));
+      return;
+    }
+
+    if (kind === 'order') {
+      const o = inspect.ref;
+      if (st.orders.indexOf(o) === -1 || o.state !== 'wait') { setInspect(null); return; }
+      ipanel.appendChild(ipHead(cloneCanvas(SPR.carSprite(o.kind, o.col, 0, 1), 2), o.who, 'waiting in the lay-by'));
+      ipanel.appendChild(ipRow('wants', o.n + ' eggs, ' + TIERS[o.tier].n + ' or better'));
+      ipanel.appendChild(ipRow('handed over', () => o.got + ' / ' + o.n));
+      ipanel.appendChild(ipRow('pays', GAME.fmt(o.pay) + ' + ' + ECON.orderTip + ' feathers'));
+      ipanel.appendChild(ipRow('leaves in', () => GAME.fmtTime(Math.max(0, o.t))));
+      const note = document.createElement('p');
+      note.className = 'ip-note';
+      note.textContent = 'Sweep eggs into the BASKET and let go over the car, or carry one egg over with the HAND.';
+      ipanel.appendChild(note);
       return;
     }
 
@@ -3634,22 +4550,23 @@
           const tt = st.soil[inspect.ref];
           if (!tt || !tt.crop) return '-';
           if (tt.growth >= 1) return 'now';
-          const rate = 1 / d.grow * (1 + 0.15 * GAME.lvl('farming')) * (tt.water > 0 ? ECON.waterMult : 1);
-          return GAME.fmtTime((1 - tt.growth) / rate);
+          if (tt.water <= 0 && !GAME.wateredBy(c, r)) return 'DRY - not growing';
+          return GAME.fmtTime(GAME.cropTimeLeft(tt, c, r)) + ' if watered';
         }));
+        if (GAME.beeBoost(c, r) > 1) ipanel.appendChild(ipRow('bees', '+' + Math.round(ECON.beehiveBoost * 100) + '% growth'));
         ipanel.appendChild(ipRow('feed', GAME.harvestYield(t.crop) + ' pellets'));
       }
       ipanel.appendChild(ipRow('watered', () => {
         const tt = st.soil[inspect.ref];
         const by = GAME.wateredBy(c, r);
-        return by ? 'by a ' + by : tt && tt.water > 0 ? GAME.fmtTime(tt.water * 70) + ' left' : 'dry';
+        return by ? 'by a ' + by : tt && tt.water > 0 ? GAME.fmtTime(tt.water * ECON.waterLast) + ' left' : 'DRY';
       }));
       const note = document.createElement('p');
       note.className = 'ip-note';
-      note.textContent = d ? d.desc : 'Bare soil. Plant something with a seed packet from the farm tool.';
+      note.textContent = d ? d.desc + (t.water <= 0 && t.growth < 1 && !GAME.wateredBy(c, r) ? ' It is dry: water it or it sits still.' : '') : 'Bare soil. Plant something with a seed packet from the farm tool.';
       ipanel.appendChild(note);
       const btns = [];
-      if (d) btns.push({ label: 'HARVEST', data: { act: 'harvest-here', k: inspect.ref }, green: GAME.ripe(t), disabled: !GAME.ripe(t) });
+      if (d) btns.push({ label: GAME.lvl('sickle') ? 'HARVEST' : 'NEEDS SICKLE', data: { act: 'harvest-here', k: inspect.ref }, green: GAME.ripe(t), disabled: !GAME.ripe(t) || !GAME.lvl('sickle') });
       else btns.push({ label: 'CLEAR', data: { act: 'untill-here', k: inspect.ref } });
       ipanel.appendChild(ipBtns(btns));
       return;
@@ -3692,16 +4609,44 @@
       return;
     }
 
+    if (kind === 'build' && inspect.ref.type === 'site') {
+      const o = inspect.ref;
+      const site = st.sites[o.k];
+      if (!site) { setInspect({ kind: 'farm' }); return; }
+      const b = BUILDS[site.type];
+      ipanel.appendChild(ipHead(buildingThumb(site.type), b.name.toUpperCase(), 'under construction'));
+      ipanel.appendChild(ipRow('progress', () => { const s2 = S().sites[o.k]; return s2 ? Math.round(Math.min(1, s2.t / s2.T) * 100) + '%' : 'done'; }));
+      ipanel.appendChild(ipRow('movers', () => { const s2 = S().sites[o.k]; return !s2 ? 'gone' : s2.stage === 'work' ? 'on site' : GAME.movers.van ? 'on their way' : 'called'; }));
+      const note = document.createElement('p');
+      note.className = 'ip-note';
+      note.textContent = 'The moving van pulls up on the road and two movers walk over to put it up. Cancel and the coins come back.';
+      ipanel.appendChild(note);
+      ipanel.appendChild(ipBtns([{ label: 'CANCEL', data: { act: 'demolish-here', k: o.k } }]));
+      return;
+    }
+
     if (kind === 'build') {
       const o = inspect.ref;    /* {type, k} */
       const b = BUILDS[o.type];
       const [c, r] = o.k.split(',').map(Number);
-      ipanel.appendChild(ipHead(buildingThumb(o.type), b.name.toUpperCase(), 'tile ' + c + ',' + r));
+      ipanel.appendChild(ipHead(buildingThumb(o.type), b.name.toUpperCase(), (st.storeys[o.k] ? 'two floors, ' : '') + 'tile ' + c + ',' + r));
       const btns = [];
-      if (o.type === 'incubator') {
+      if (o.type === 'beehive') {
+        const bh = st.beehives[o.k];
+        if (!bh) { setInspect({ kind: 'farm' }); return; }
+        ipanel.appendChild(ipRow('next jar', () => { const b2 = S().beehives[o.k]; return b2 ? GAME.fmtTime(Math.max(0, (ECON.honeyEvery - b2.t) / GAME.storeyMult(o.k))) : '-'; }));
+        ipanel.appendChild(ipRow('a jar sells for', GAME.fmt(ECON.honeyValue)));
+        ipanel.appendChild(ipRow('pollinating', () => Object.keys(S().soil).filter(k => { const t = S().soil[k]; const [cc, rr] = k.split(',').map(Number); return t.crop && GAME.beeBoost(cc, rr) > 1; }).length + ' crops'));
+        ipanel.appendChild(ipRow('honey so far', () => String(S().stats.honey)));
+      } else if (o.type === 'genelab') {
+        ipanel.appendChild(ipRow('edits made', () => String(S().stats.edits)));
+        const best = GAME.bestChickens(1)[0];
+        ipanel.appendChild(ipRow('best hen', best ? SPECIES[best.sp].name : 'none yet'));
+        btns.push({ label: 'OPEN GENE LAB', data: { act: 'open-genes' }, cls: 'btn-green' });
+      } else if (o.type === 'incubator') {
         const inc = st.incs[o.k];
         if (!inc) { setInspect({ kind: 'farm' }); return; }
-        ipanel.appendChild(ipRow('queue', () => inc.queue.length + ' / ' + GAME.incCap()));
+        ipanel.appendChild(ipRow('queue', () => inc.queue.length + ' / ' + GAME.incCapAt(o.k)));
         if (inc.queue.length) {
           const q = inc.queue[0];
           ipanel.appendChild(ipRow('hatching', () => inc.queue.length ? TIERS[inc.queue[0].tier].n : 'empty'));
@@ -3778,6 +4723,16 @@
       note.className = 'ip-note';
       note.textContent = b.desc;
       ipanel.appendChild(note);
+      /* a second floor, once researched */
+      if (GAME.lvl('storeys') && !st.storeys[o.k] && !st.sites[o.k] && GAME.canStorey(o.k) !== undefined && ['incubator', 'coop', 'barn', 'staffhut', 'silo', 'hq', 'mill', 'well', 'sprinkler', 'beehive', 'trough', 'hatchery', 'lovenest'].includes(o.type)) {
+        btns.push({
+          label: () => 'ADD A FLOOR ' + GAME.fmt(GAME.storeyCost(o.type)),
+          data: { act: 'add-storey', k: o.k },
+          disabled: () => !GAME.canStorey(o.k),
+          cls: () => GAME.canStorey(o.k) ? 'btn-green' : '',
+        });
+      }
+      if (st.sites[o.k] && st.sites[o.k].kind === 'storey') ipanel.appendChild(ipRow('second floor', () => { const s2 = S().sites[o.k]; return s2 ? Math.round(Math.min(1, s2.t / s2.T) * 100) + '% built' : 'done'; }));
       btns.push({ label: 'REMOVE', data: { act: 'demolish-here', k: o.k } });
       ipanel.appendChild(ipBtns(btns));
       return;
@@ -4463,23 +5418,23 @@
     const wrap = $('#depot-map-wrap');
 
     /* ---- no HQ yet: a blueprint and what to do about it ---- */
-    if (!GAME.hasHQ()) {
+    if (!GAME.depotOpen()) {
       wrap.hidden = true;
-      $('#depot-sub').textContent = 'NO DISPATCH OFFICE';
+      $('#depot-sub').textContent = 'NOT YET OPEN';
       const need = document.createElement('div');
       need.className = 'hq-needed';
-      need.appendChild(cloneCanvas(buildingThumb('hq'), 1));
+      need.appendChild(mkIcon('lock', 5));
       const mid = document.createElement('div');
       const b2 = document.createElement('b');
-      b2.textContent = 'BUILD A LOGISTICS HQ';
+      b2.textContent = 'RESEARCH LOGISTICS';
       mid.appendChild(b2);
       const p2 = document.createElement('p');
-      p2.textContent = 'Build one to open the wall map. BUILD, then CREW.';
+      p2.textContent = 'One cheap cube in the Lab, MARKET lane. Then vehicles and routes open right here.';
       mid.appendChild(p2);
       const p3 = document.createElement('p');
       p3.className = 'hq-cost';
-      p3.appendChild(mkIcon('coin', 2));
-      p3.appendChild(document.createTextNode(GAME.fmt(buildCost('hq', st.built.hq))));
+      p3.appendChild(mkIcon('feather', 2));
+      p3.appendChild(document.createTextNode(String(SKILL_BY_ID.logistics.base)));
       mid.appendChild(p3);
       need.appendChild(mid);
       box.appendChild(need);
@@ -4656,9 +5611,110 @@
     page.classList.add('flip');
     snd.plop();
   }
+  /* the LEDGER page: an income graph, where the coins came from, and
+     once the market is open, the rival companies' shares */
+  function graphCanvas(vals, w, h, col, fill) {
+    const c = document.createElement('canvas');
+    c.width = w * 2; c.height = h * 2; c.className = 'ledger-graph';
+    c.style.width = w + 'px'; c.style.height = h + 'px';
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    g.setTransform(2, 0, 0, 2, 0, 0);
+    g.fillStyle = fill || '#fdf6e3'; g.fillRect(0, 0, w, h);
+    g.fillStyle = 'rgba(82,53,31,.12)'; for (let y = h / 4; y < h; y += h / 4) g.fillRect(0, Math.round(y), w, 1);
+    const n = vals.length;
+    if (!n) { SPR.drawTiny(g, 'NOTHING YET', 4, h / 2 - 3, '#7a5a3a', 1); return c; }
+    const mx = Math.max(1, ...vals), mn = Math.min(...vals);
+    const span = Math.max(1e-6, mx - (fill ? mn : 0));
+    const bw = Math.max(1, Math.floor(w / Math.max(n, 30)));
+    for (let i = 0; i < n; i++) {
+      const v = vals[i];
+      const hh = Math.max(1, Math.round((v - (fill ? mn : 0)) / span * (h - 8)));
+      const x = w - (n - i) * bw;
+      g.fillStyle = col;
+      if (fill) g.fillRect(x, h - 2 - hh, bw, 2); else g.fillRect(x, h - 2 - hh, Math.max(1, bw - 1), hh);
+    }
+    SPR.drawTiny(g, GAME.fmt(Math.round(mx)), 2, 2, '#52351f', 1);
+    if (fill) SPR.drawTiny(g, GAME.fmt(Math.round(mn)), 2, h - 8, '#7a5a3a', 1);
+    return c;
+  }
+  function renderLedger(box) {
+    const st = S();
+    const L = st.ledger;
+    $('#pedia-sub').textContent = GAME.fmt(st.stats.coinsEarned) + ' EARNED ALL TOLD';
+    const intro = document.createElement('p');
+    intro.className = 'pedia-intro';
+    intro.textContent = 'Coins a minute, sampled every ten seconds. The company is worth what it earns.';
+    box.appendChild(intro);
+    const sec = document.createElement('div');
+    sec.className = 'ledger-sec';
+    const h = document.createElement('b'); h.textContent = 'INCOME'; sec.appendChild(h);
+    sec.appendChild(graphCanvas(L.hist, 320, 90, '#6ab04c'));
+    const now2 = L.hist.length ? L.hist[L.hist.length - 1] : 0;
+    const row = document.createElement('div');
+    row.className = 'tally';
+    [['coin', GAME.fmt(now2) + '/min', 'Right now'], ['truck', GAME.fmt(L.sales), 'Truck sales'], ['doc', GAME.fmt(L.orders), 'Roadside orders'],
+     ['honey', GAME.fmt(L.honey), 'Honey'], ['star', GAME.fmt(L.quests), 'Quest rewards'], ['chart', GAME.fmt(GAME.companyValue()), 'Company value']].forEach(([ic, v, tip]) => {
+      const cell = document.createElement('div');
+      cell.title = tip;
+      cell.appendChild(mkIcon(ic, 3));
+      const n = document.createElement('b'); n.textContent = String(v); cell.appendChild(n);
+      const l2 = document.createElement('small'); l2.textContent = tip.toUpperCase(); cell.appendChild(l2);
+      row.appendChild(cell);
+    });
+    sec.appendChild(row);
+    box.appendChild(sec);
+    if (!GAME.lvl('stocks')) {
+      const lock = document.createElement('p');
+      lock.className = 'pedia-intro';
+      lock.appendChild(mkIcon('lock', 2));
+      lock.appendChild(document.createTextNode(' The market opens with Stock Market, in the MARKET lane of the Lab.'));
+      box.appendChild(lock);
+      return;
+    }
+    const msec = document.createElement('div');
+    msec.className = 'ledger-sec';
+    const mh = document.createElement('b'); mh.textContent = 'THE MARKET - ' + GAME.fmt(Math.round(GAME.portfolio())) + ' IN SHARES'; msec.appendChild(mh);
+    const own = document.createElement('div');
+    own.className = 'stock-row own';
+    own.appendChild(mkIcon(st.company.logo, 3));
+    const on = document.createElement('b'); on.textContent = st.company.name; own.appendChild(on);
+    const ov = document.createElement('span'); ov.textContent = 'yours - valued at ' + GAME.fmt(GAME.companyValue()); own.appendChild(ov);
+    msec.appendChild(own);
+    STOCKS.forEach(sk => {
+      const price = GAME.stockPrice(sk.id);
+      const hist = (st.market.hist[sk.id] || []);
+      const first = hist.length ? hist[0] : price;
+      const chg = first ? (price - first) / first * 100 : 0;
+      const held = st.market.held[sk.id] || 0;
+      const r2 = document.createElement('div');
+      r2.className = 'stock-row';
+      const sw = document.createElement('i'); sw.className = 'stock-swatch'; sw.style.background = sk.col; r2.appendChild(sw);
+      const nm = document.createElement('b'); nm.textContent = sk.name; r2.appendChild(nm);
+      const pr = document.createElement('span'); pr.className = 'stock-price ' + (chg >= 0 ? 'up' : 'down'); pr.textContent = price.toFixed(2) + ' (' + (chg >= 0 ? '+' : '') + chg.toFixed(1) + '%)'; r2.appendChild(pr);
+      r2.appendChild(graphCanvas(hist.length ? hist : [price], 80, 24, sk.col, '#fffaf0'));
+      const hd = document.createElement('span'); hd.className = 'stock-held'; hd.textContent = held + ' held'; r2.appendChild(hd);
+      const btns = document.createElement('div'); btns.className = 'ip-btns';
+      [['buy-stock', 1, 'BUY 1'], ['buy-stock', 10, 'BUY 10'], ['sell-stock', 1, 'SELL 1'], ['sell-stock', 10, 'SELL 10']].forEach(([act, n, label]) => {
+        const b = document.createElement('button');
+        b.className = 'btn' + (act === 'buy-stock' ? ' btn-green' : '');
+        b.dataset.act = act; b.dataset.id = sk.id; b.dataset.n = String(n);
+        b.disabled = act === 'buy-stock' ? st.coins < price * n : held < n;
+        b.textContent = label;
+        btns.appendChild(b);
+      });
+      r2.appendChild(btns);
+      msec.appendChild(r2);
+    });
+    box.appendChild(msec);
+  }
+
   function renderPedia() {
     const box = $('#pedia');
     box.innerHTML = '';
+    const ledgerBtn = document.querySelector('#index-tabs [data-tab="ledger"]');
+    if (ledgerBtn) ledgerBtn.hidden = !GAME.lvl('ledger');
+    if (indexTab === 'ledger' && !GAME.lvl('ledger')) indexTab = 'chickens';
     document.querySelectorAll('#index-tabs .tab-btn').forEach(b =>
       b.classList.toggle('active', b.dataset.tab === indexTab));
 
@@ -4821,6 +5877,8 @@
       });
       box.appendChild(list);
 
+    } else if (indexTab === 'ledger') {
+      renderLedger(box);
     } else if (indexTab === 'eggs') {
       $('#pedia-sub').textContent = 'EGG VALUES';
       const intro = document.createElement('p');
@@ -4929,6 +5987,9 @@
     if (st === 'lab') { renderSkills(); openModal('#modal-skills'); snd.build(); return true; }
     if (st === 'stand') { renderPedia(); openModal('#modal-pedia'); snd.build(); return true; }
     if (st === 'depot') { renderDepot(); openModal('#modal-depot'); snd.build(); return true; }
+    if (st === 'brand') { openCompany(); snd.build(); return true; }
+    const ord = GAME.orderAt(x, y);
+    if (ord) { setInspect({ kind: 'order', ref: ord }); snd.plop(); return true; }
     if (st === 'mamaSign') {
       if (S().tool === 'inspect') { setInspect({ kind: 'mama' }); return true; }
       if (GAME.upgradeMama()) {
@@ -4962,6 +6023,8 @@
     if (o && o.type === 'lovenest' && S().tool === 'hand' && !S().held) {
       if (GAME.ejectNest(o.k)) { snd.plop(); return true; }
     }
+    if (o && o.type === 'genelab' && S().tool !== 'build') { openGenes(); snd.build(); return true; }
+    if (o && o.type === 'site' && S().tool !== 'build') { setInspect({ kind: 'build', ref: o }); return true; }
     return false;
   }
 
@@ -4974,6 +6037,8 @@
     if (overMama(x, y)) { setInspect({ kind: 'mama' }); return; }
     const ap = GAME.applicantAt(x, y);
     if (ap) { setInspect({ kind: 'applicant', ref: ap }); return; }
+    const ord = GAME.orderAt(x, y);
+    if (ord) { setInspect({ kind: 'order', ref: ord }); return; }
     const o = GAME.occAt(Math.floor(x / 16), Math.floor(y / 16));
     if (o) { setInspect({ kind: 'build', ref: o }); return; }
     const sk = Math.floor(x / 16) + ',' + Math.floor(y / 16);
@@ -5060,7 +6125,7 @@
       {
         const tc = Math.floor(x / 16), trr = Math.floor(y / 16);
         const soil = S().soil[tc + ',' + trr];
-        if (soil && GAME.ripe(soil)) { GAME.harvest(tc, trr); return; }
+        if (soil && GAME.ripe(soil)) { if (!GAME.harvest(tc, trr)) { snd.error(); floatWorld('NEEDS THE SICKLE', x, y - 14, 'pink', 'lock'); } return; }
       }
       if (cand.ch) {
         if (GAME.petChicken(cand.ch)) {
@@ -5084,6 +6149,14 @@
     }
     if (tool === 'basket') {
       if (S().basket.length) {
+        const ord = GAME.orderAt(x, y);
+        if (ord) {
+          const n = GAME.basketToOrder(ord);
+          if (n) { for (let i = 0; i < Math.min(n, 6); i++) setTimeout(() => snd.clink(), i * 60); floatWorld('+' + n + ' HANDED OVER', ord.x + 14, ord.y - 30, 'green'); }
+          else floatWorld('WANTS ' + TIERS[ord.tier].n.toUpperCase() + '+', ord.x + 14, ord.y - 30, 'pink');
+          updateCursorChip();
+          return;
+        }
         if (GAME.hitTruck(x, y)) {
           const n = GAME.basketToTruck();
           if (n) {
@@ -5137,6 +6210,7 @@
     if (result === 'nested') { snd.breed(); heart(x, y - 8, 3); }
     else if (result === 'graduated') { snd.sparkle(); floatWorld('GRADUATED', x, y - 14, 'green', 'feather'); }
     else if (result === 'incubated') { snd.plop(); floatWorld('INCUBATING', x, y - 12, 'green'); }
+    else if (result === 'ordered') { snd.clink(); floatWorld('HANDED OVER', x, y - 14, 'green'); }
     else if (result === 'loaded') snd.clink();
     else snd.plop();
   }
@@ -5183,7 +6257,7 @@
       return;
     }
     if (sel.id === 'water') { if (GAME.water(c, r2)) snd.sprinkle(); return; }
-    if (sel.id === 'harvest') { GAME.harvest(c, r2); return; }
+    if (sel.id === 'harvest') { if (GAME.harvest(c, r2)) snd.plop(); return; }
     if (sel.id === 'clear') {
       if (GAME.undecorate(c, r2)) { snd.demolish(); renderFarmPalette(); return; }
       if (GAME.untill(c, r2)) { snd.demolish(); terrainTouched(wx, wy, wx, wy, 24); renderFarmPalette(); return; }
@@ -5240,6 +6314,12 @@
 
   function setTool(t) {
     if (S().tool === t) return;
+    if (!GAME.toolOpen(t)) {
+      snd.error();
+      const sk = SKILL_BY_ID[TOOL_UNLOCK[t]];
+      toast({ icon: 'lock', title: TOOL_LABEL[t] + ' IS LOCKED', body: 'Install ' + sk.name + ' in the Lab (' + sk.base + ' feathers).' });
+      return;
+    }
     S().tool = t;
     if (t === 'build' && !buildSel) buildSel = 'incubator';
     renderToolbelt(); renderPalette(); updateCursorChip();
@@ -5277,7 +6357,7 @@
       case 'menu': $('#menu-pop').hidden = !$('#menu-pop').hidden; break;
       case 'close-modal': closeModals(); break;
       case 'close-inspect': setInspect(null); break;
-      case 'start-game': hideTitle(); snd.sparkle(); break;
+      case 'start-game': { if (!S().company.done) startIntro(); else { hideTitle(); snd.sparkle(); } break; }
       case 'title': showTitle(); $('#menu-pop').hidden = true; break;
       case 'crew': {
         renderHire();
@@ -5399,6 +6479,36 @@
         if (GAME.demolish(c, r)) { snd.demolish(); setInspect({ kind: 'farm' }); }
         break;
       }
+      case 'add-storey': {
+        if (GAME.addStorey(btn.dataset.k)) { snd.build(); refreshInspect(); } else snd.error();
+        break;
+      }
+      case 'open-genes': { openGenes(btn.dataset.id ? +btn.dataset.id : null); snd.build(); break; }
+      case 'gene-pick': { genePick(+btn.dataset.id); break; }
+      case 'gene-splice': { geneMode = geneMode === 'splice' ? null : 'splice'; renderGenes(); snd.plop(); break; }
+      case 'gene-clone': {
+        if (GAME.cloneChicken(+btn.dataset.id)) { snd.grand(); renderGenes(); } else snd.error();
+        break;
+      }
+      case 'gene-cross': {
+        if (GAME.crossAnimal(+btn.dataset.id, btn.dataset.animal)) { snd.grand(); renderGenes(); } else snd.error();
+        break;
+      }
+      case 'open-company': { openCompany(); $('#menu-pop').hidden = true; break; }
+      case 'company-logo': { companyDraft.logo = btn.dataset.logo; renderCompanyForm(); snd.plop(); break; }
+      case 'company-col1': { companyDraft.col1 = btn.dataset.col; renderCompanyForm(); snd.plop(); break; }
+      case 'company-col2': { companyDraft.col2 = btn.dataset.col; renderCompanyForm(); snd.plop(); break; }
+      case 'company-save': { saveCompany(); break; }
+      case 'intro-next': { introNext(); break; }
+      case 'intro-skip': { introSkip(); break; }
+      case 'quest-card': {
+        const cq = GAME.currentQuest();
+        termSel = cq ? cq.id : null;
+        renderSkills(); openModal('#modal-skills'); snd.build();
+        break;
+      }
+      case 'buy-stock': { if (GAME.buyStock(btn.dataset.id, +btn.dataset.n)) { snd.clink(); renderPedia(); } else snd.error(); break; }
+      case 'sell-stock': { if (GAME.sellStock(btn.dataset.id, +btn.dataset.n)) { snd.clink(); renderPedia(); } else snd.error(); break; }
       case 'fire': { GAME.fireStaff(+btn.dataset.id); snd.demolish(); refreshCrewViews(); break; }
       case 'cycle-automark': {
         const st = S();
@@ -5480,6 +6590,29 @@
     floatWorld('TO ' + to.name.toUpperCase(), W.truckHome.x + 20, W.roadY - 26, 'gold');
   });
   GAME.on('home', () => { puff(W.truckHome.x + 30, W.roadY + 8, '#c9a35f', 6, 30, 12); });
+  GAME.on('quest', ({ q }) => {
+    snd.grand();
+    const rw = [q.rw.c ? '+' + q.rw.c + ' coins' : '', q.rw.f ? '+' + q.rw.f + ' feathers' : ''].filter(Boolean).join(', ');
+    toast({ icon: q.icon, title: 'QUEST DONE: ' + q.name.toUpperCase(), body: rw + '. ' + (GAME.currentQuest() ? 'Next: ' + GAME.currentQuest().name.toLowerCase() + '.' : 'That was the last one.'), long: true });
+    questSig = '';
+  });
+  GAME.on('customer', ({ o }) => { snd.plop(); floatWorld(o.who + ': ' + o.n + ' EGGS', o.x + 14, o.y - 28, 'gold', 'doc'); });
+  GAME.on('orderdone', ({ o }) => { snd.grand(); puff(o.x + 14, o.y, '#ffd23f', 10, 34, 26); floatWorld('+' + GAME.fmt(o.pay), o.x + 14, o.y - 30, 'gold', 'coin'); });
+  GAME.on('ordermiss', ({ o }) => { snd.error(); puff(o.x + 14, o.y + 4, '#8a8f98', 6, 24, 14); floatWorld('DROVE OFF', o.x + 14, o.y - 26, 'pink'); });
+  GAME.on('site', ({ type, c, r, kind }) => { snd.build(); if (c !== undefined) floatWorld(kind === 'storey' ? 'MOVERS CALLED' : 'MOVERS CALLED', c * 16 + 16, r * 16 - 12, 'gold', 'hammer'); });
+  GAME.on('movers', ({ state, x }) => { if (state === 'here') { snd.engine(); floatWorld('MOVERS', x + 20, W.roadY - 16, 'gold'); } else if (state === 'coming') snd.engine(); });
+  GAME.on('built', ({ type, c, r, kind }) => {
+    snd.grand();
+    const b = BUILDS[type];
+    puff(c * 16 + b.w * 8, r * 16 + b.h * 8, '#e0bd82', 14, 40, 30);
+    floatWorld(kind === 'storey' ? 'SECOND FLOOR' : b.name.toUpperCase() + ' BUILT', c * 16 + b.w * 8, r * 16 - 14, 'green');
+  });
+  GAME.on('honey', ({ x, y, v }) => { floatWorld('+' + v, x, y - 6, 'gold', 'honey'); snd.clink(); });
+  GAME.on('splice', ({ ch, x, y }) => { snd.grand(); puff(x, y, '#ff5f9e', 12, 34, 28); toast({ icon: 'dna', title: 'SPLICED', body: SPECIES[ch.sp].name + ' carries the best of both birds now.' }); });
+  GAME.on('clone', ({ ch, x, y }) => { snd.grand(); puff(x, y, '#9fe8ff', 12, 34, 28); bornFx.set(ch.id, performance.now()); toast({ icon: 'twins', title: 'CLONED', body: 'A second ' + SPECIES[ch.sp].name + ', genes and all.' }); });
+  GAME.on('cross', ({ ch, animal, x, y }) => { snd.grand(); puff(x, y, '#ffd23f', 12, 34, 28); toast({ icon: 'atom', title: 'CROSSED WITH A ' + animal.name.toUpperCase(), body: animal.desc }); });
+  GAME.on('company', ({ c }) => { toast({ icon: c.logo, title: c.name, body: 'The sign by the road is painted.' }); });
+  GAME.on('market', () => { if (!$('#modal-pedia').hidden && indexTab === 'ledger') GAME.mark('pedia'); });
   GAME.on('vehicle', ({ v }) => { snd.grand(); toast({ icon: 'truck', title: v.name.toUpperCase(), body: v.cap + ' eggs' }); });
   GAME.on('route', ({ city }) => { snd.grand(); toast({ icon: 'city', title: city.name.toUpperCase(), body: 'pays x' + city.mult.toFixed(2) }); });
   GAME.on('grown', ({ ch }) => { puff(ch.x + 10, ch.y + 6, '#fff8ec', 8, 30, 26); heart(ch.x + 10, ch.y - 4, 2); snd.sparkle(); bornFx.set(ch.id, performance.now()); });
@@ -5514,7 +6647,9 @@
     renderToolbelt();
     renderPalette();
     updateCursorChip();
+    requestAnimationFrame(syncCamPad);
     if (S().seenTitle) titleEl.hidden = true;
+    if (!$('#quest-card')) { const qc = document.createElement('div'); qc.id = 'quest-card'; qc.hidden = true; $('#stage-wrap').appendChild(qc); }
     const mb = $('#btn-mute');
     if (mb) mb.textContent = S().muted ? 'SOUND OFF' : 'SOUND ON';
     if (off && (off.laid > 0 || off.hatched > 0 || off.pay > 0)) {
@@ -5554,7 +6689,7 @@
         if (ey < 0.05) pdy -= 1; if (ey > 0.95) pdy += 1;
       }
       if (pdx || pdy) { cam().x += pdx * 150 * dt; cam().y += pdy * 150 * dt; GAME.clampCam(); }
-      if (!titleEl.hidden) drawTitleScreen(dt);
+      if (!titleEl.hidden) { if (introMode) drawIntro(dt); else drawTitleScreen(dt); }
       render(now, dt);
       if (!$('#modal-skills').hidden) drawTerm(now);
       if (!$('#modal-depot').hidden && mapCv) drawValleyMap(now);

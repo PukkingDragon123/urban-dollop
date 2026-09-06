@@ -590,8 +590,75 @@ const SPR = (() => {
       case 'sunflower': return sunflowerSprite(seed, k);
       case 'lavender': return lavenderSprite(seed, k);
       case 'clover': return cloverSprite(seed, k);
+      case 'bench': case 'lamp': case 'barrel': case 'birdbath': case 'scarecrow':
+      case 'mailbox': case 'hay': case 'planter':
+        return furnitureSprite(kind, seed, k);
       default: return tuftSprite(seed, k);
     }
+  }
+
+  /* things you buy at the furniture counter: all small, all wooden or stone */
+  function furnitureSprite(kind, seed, k) {
+    const key = 'furn_' + kind + '_' + (seed % 6) + '_' + k;
+    if (cache.has(key)) return cache.get(key);
+    const rnd = mulberry(seed * 31 + 7);
+    const dims = { bench: [16, 10], lamp: [8, 22], barrel: [10, 12], birdbath: [14, 16], scarecrow: [16, 24],
+                   mailbox: [10, 18], hay: [14, 10], planter: [14, 11] }[kind];
+    const c = newCanvas(dims[0] * k, dims[1] * k);
+    const ctx = c.getContext('2d');
+    const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
+    const O = '#2e2216', WOOD = '#c9924f', WOODL = '#e0bd82', WOODD = '#8a5e2a', IRON = '#3a3a4a', STONE = '#9b9b90';
+    if (kind === 'bench') {
+      R(1, 2, 14, 3, O); R(2, 3, 12, 1, WOODL); R(2, 4, 12, 1, WOOD);
+      R(1, 6, 14, 2, O); R(2, 6, 12, 1, WOOD);
+      R(2, 5, 2, 5, O); R(12, 5, 2, 5, O); R(3, 8, 1, 1, WOODD); R(12, 8, 1, 1, WOODD);
+      R(3, 0, 10, 2, O); R(4, 0, 8, 1, WOODL);
+    } else if (kind === 'lamp') {
+      R(3, 6, 2, 16, O); R(3, 6, 1, 15, IRON);
+      R(1, 20, 6, 2, O); R(2, 20, 4, 1, IRON);
+      R(1, 0, 6, 7, O); R(2, 1, 4, 5, '#fff3c4'); R(3, 2, 2, 3, '#ffd23f'); R(2, 1, 1, 1, '#ffffff');
+      R(3, 0, 2, 1, IRON);
+    } else if (kind === 'barrel') {
+      R(1, 1, 8, 10, O); R(2, 2, 6, 8, WOOD); R(3, 2, 1, 8, WOODL); R(6, 2, 1, 8, WOODD);
+      R(2, 3, 6, 1, IRON); R(2, 8, 6, 1, IRON);
+      R(3, 0, 4, 2, O); R(4, 1, 2, 1, WOODD);
+    } else if (kind === 'birdbath') {
+      R(1, 3, 12, 5, O); R(2, 4, 10, 3, STONE); R(2, 4, 10, 1, lighten(STONE, 0.3));
+      R(3, 4, 8, 2, '#5fa8e8'); R(4, 4, 3, 1, '#b5e0f5');
+      R(5, 8, 4, 6, O); R(6, 8, 2, 6, STONE);
+      R(3, 14, 8, 2, O); R(4, 14, 6, 1, STONE);
+      if (rnd() < 0.5) { R(8, 1, 3, 3, O); R(9, 2, 1, 1, '#e8542f'); R(10, 2, 1, 1, '#ffd23f'); }
+    } else if (kind === 'scarecrow') {
+      R(7, 6, 2, 18, O); R(7, 6, 1, 17, WOODD);
+      R(1, 9, 14, 2, O); R(2, 9, 12, 1, WOODD);
+      /* shirt and straw hands */
+      R(4, 8, 8, 8, O); R(5, 9, 6, 6, '#3fa7d6'); R(5, 9, 6, 1, '#7fc4e8'); R(8, 9, 1, 6, '#2f5f9e');
+      R(0, 9, 2, 2, '#ffd23f'); R(14, 9, 2, 2, '#ffd23f');
+      /* sack head and straw hat */
+      R(4, 1, 8, 8, O); R(5, 2, 6, 6, '#e0bd82'); R(6, 4, 1, 1, O); R(9, 4, 1, 1, O); R(7, 6, 2, 1, O);
+      R(2, 1, 12, 2, O); R(3, 1, 10, 1, '#ffd23f'); R(5, 0, 6, 1, O);
+    } else if (kind === 'mailbox') {
+      R(4, 8, 2, 10, O); R(4, 8, 1, 9, WOODD);
+      R(1, 1, 8, 8, O); R(2, 2, 6, 6, '#3fa7d6'); R(2, 2, 6, 1, '#7fc4e8'); R(2, 7, 6, 1, '#2f5f9e');
+      R(2, 4, 1, 3, IRON); R(8, 0, 1, 4, '#e8542f'); R(7, 1, 2, 1, '#e8542f');
+    } else if (kind === 'hay') {
+      const round = rnd() < 0.5;
+      R(1, 1, 12, 8, O);
+      R(2, 2, 10, 6, '#e8c458'); R(2, 2, 10, 1, '#f5dd8a'); R(2, 7, 10, 1, '#c9a035');
+      if (round) { ctx.clearRect(1 * k, 1 * k, k, k); ctx.clearRect(12 * k, 1 * k, k, k); R(6, 3, 2, 4, '#c9a035'); R(4, 4, 6, 2, '#e8c458'); }
+      else { R(4, 2, 1, 6, '#8a5e2a'); R(9, 2, 1, 6, '#8a5e2a'); }
+      for (let i = 0; i < 6; i++) R(2 + Math.floor(rnd() * 10), 2 + Math.floor(rnd() * 6), 1, 1, '#f5dd8a');
+    } else {
+      /* planter box with a row of blooms */
+      R(1, 5, 12, 6, O); R(2, 6, 10, 4, WOOD); R(2, 6, 10, 1, WOODL); R(5, 6, 1, 4, WOODD); R(8, 6, 1, 4, WOODD);
+      const cols = ['#ff8ab5', '#ffd23f', '#ff9f6b', '#c9a8f0', '#fff5e8'];
+      for (let i = 0; i < 4; i++) {
+        const x = 2 + i * 3;
+        R(x + 1, 3, 1, 3, '#3a7d3a'); R(x, 1, 3, 2, O); R(x, 1, 3, 1, cols[(i + seed) % cols.length]); R(x + 1, 0, 1, 1, cols[(i + seed) % cols.length]);
+      }
+    }
+    cache.set(key, c);
+    return c;
   }
 
   /* ============================================================
@@ -1158,6 +1225,36 @@ const SPR = (() => {
     egg: [
       '...oooo...', '..owwsso..', '.owwwwsso.', 'owwwwwssso', 'owwwwwssso',
       'owwwwwssso', 'owwwwwssso', '.owwwwsso.', '..osssso..', '...oooo...'],
+    lock: [
+      '...oooo...', '..oWWWWo..', '..oW..Wo..', '..oW..Wo..', 'oooooooooo',
+      'oyyyyyyyyo', 'oyyyooyyyo', 'oyyyooyyyo', 'oyyyyyyyyo', 'oooooooooo'],
+    flag: [
+      '.oo.......', '.oro......', '.orro.....', '.orrro....', '.orrrro...',
+      '.orrro....', '.orro.....', '.oro......', '.oo.......', '.oo.......'],
+    tick: [
+      '..........', '........oo', '.......oGo', '......oGo.', '.oo..oGo..',
+      'oGGooGo...', '.oGGGo....', '..oGo.....', '...o......', '..........'],
+    hexcomb: [
+      '...oooo...', '..oyyyyo..', '.oyYyyYyo.', 'oyyyyyyyyo', 'oyYyyYyyyo',
+      'oyyyyyyYyo', 'oyYyyyyyyo', '.oyyYyyyo.', '..oyyyyo..', '...oooo...'],
+    raccoon: [
+      '..o....o..', '.oko..oko.', 'okkkookkko', 'okwkkkkwko', 'okookkooko',
+      '.okkkkkko.', '..okWWko..', '...okko...', '....oo....', '..........'],
+    honey: [
+      '...oooo...', '..oNNNNo..', '.oyyyyyyo.', 'oyyYyyyyyo', 'oyyyyyyyyo',
+      'oyyyyyYyyo', 'oyYyyyyyyo', '.oyyyyyyo.', '..oyyyyo..', '...oooo...'],
+    bee: [
+      '..........', '..o....o..', '.oWo..oWo.', '..oyyyyo..', '.oykkyyko.',
+      '.oyyykkyo.', '.oykyyyko.', '..oyyyyo..', '...oooo...', '..........'],
+    cube: [
+      '..oooooo..', '.obbbbbbo.', 'obBBBBBBbo', 'obBBBBBBbo', 'obBBBBBBbo',
+      'obBBBBBBbo', 'obBBBBBBbo', 'obBBBBBBbo', '.oBBBBBBo.', '..oooooo..'],
+    suitcase: [
+      '....oo....', '...onno...', '.oooooooo.', 'oNNNNNNNNo', 'oNnNNNNnNo',
+      'oNNNNNNNNo', 'oNNNoNNNNo', 'oNNNNNNNNo', '.oooooooo.', '..........'],
+    car: [
+      '..........', '...oooo...', '..obbbbo..', '.obwwbwbo.', 'oooooooooo',
+      'orrrrrrrro', 'oyrrrrrryo', 'oooooooooo', '.okko.okko', '..oo...oo.'],
     basket: [
       '...oooo...', '..o....o..', '.oooooooo.', '.onNnNnNo.', '.oNnNnNno.',
       '.onNnNnNo.', '..oNnNno..', '...oooo...', '..........', '..........'],
@@ -2270,6 +2367,152 @@ const SPR = (() => {
     return Math.abs(dx) <= size * (1 - t * 0.5);
   }
 
+  /* a little extruded block: a dark back face up and to the right,
+     then the front face with a lit top edge. (x, y) is the front face. */
+  function drawCube(ctx, x, y, s, pal, opts) {
+    opts = opts || {};
+    const d = opts.depth === undefined ? 2 : opts.depth;
+    if (d) {
+      ctx.fillStyle = pal.out; ctx.fillRect(x + d, y - d, s, s);
+      ctx.fillStyle = pal.dark; ctx.fillRect(x + d + 1, y - d + 1, s - 2, s - 2);
+      ctx.fillStyle = pal.light; ctx.fillRect(x + d + 1, y - d + 1, s - 2, 1);
+    }
+    ctx.fillStyle = pal.out; ctx.fillRect(x, y, s, s);
+    ctx.fillStyle = pal.base; ctx.fillRect(x + 1, y + 1, s - 2, s - 2);
+    ctx.fillStyle = pal.light; ctx.fillRect(x + 1, y + 1, s - 2, 1); ctx.fillRect(x + 1, y + 1, 1, s - 2);
+    ctx.fillStyle = pal.dark; ctx.fillRect(x + 1, y + s - 2, s - 2, 1); ctx.fillRect(x + s - 2, y + 1, 1, s - 2);
+    if (opts.bg) {
+      ctx.fillStyle = opts.bg;
+      ctx.fillRect(x, y, 1, 1); ctx.fillRect(x, y + s - 1, 1, 1); ctx.fillRect(x + s - 1, y + s - 1, 1, 1);
+      if (!d) ctx.fillRect(x + s - 1, y, 1, 1);
+    }
+  }
+
+  /* ============================================================
+     CARS - traffic on the road. Every car faces east; the caller
+     flips it to drive west. `col` is the paint job.
+     ============================================================ */
+  function carSprite(kind, col, frame, scale) {
+    const key = 'car_' + kind + '_' + col + '_' + frame + '_' + scale;
+    if (cache.has(key)) return cache.get(key);
+    const k = scale || 1;
+    const dims = { sedan: [26, 13], hatch: [22, 13], pickup: [28, 13], van: [28, 15], bus: [42, 17], mover: [40, 19] }[kind] || [26, 13];
+    const c = newCanvas(dims[0] * k, dims[1] * k);
+    const ctx = c.getContext('2d');
+    const R = (x, y, w, h, col2) => { ctx.fillStyle = col2; ctx.fillRect(x * k, y * k, w * k, h * k); };
+    const OUT = '#2e2216';
+    const body = col || '#e8542f', light = lighten(body, 0.4), dark = darken(body, 0.32);
+    const wheel = (x, y) => {
+      R(x - 2, y - 1, 5, 3, OUT); R(x - 1, y - 2, 3, 5, OUT);
+      R(x - 1, y - 1, 3, 3, '#3a3a4a');
+      R(x + (frame ? 0 : -1), y + (frame ? -1 : 0), 1, 1, '#c9ced6');
+    };
+    const win = (x, y, w, h) => { R(x, y, w, h, OUT); R(x + 1, y + 1, w - 2, h - 2, '#d8f2fa'); R(x + 1, y + 1, Math.max(1, w - 4), 1, '#ffffff'); };
+    const H = dims[1];
+    if (kind === 'sedan') {
+      R(1, 5, 24, 6, OUT); R(2, 6, 22, 4, body); R(2, 6, 22, 1, light); R(2, 9, 22, 1, dark);
+      R(6, 1, 14, 5, OUT); R(7, 2, 12, 4, body); R(7, 2, 12, 1, light);
+      win(8, 2, 5, 4); win(14, 2, 5, 4);
+      R(24, 7, 1, 2, '#ffd23f'); R(1, 7, 1, 2, '#e8542f');
+      wheel(6, H - 3); wheel(19, H - 3);
+    } else if (kind === 'hatch') {
+      R(1, 5, 20, 6, OUT); R(2, 6, 18, 4, body); R(2, 6, 18, 1, light); R(2, 9, 18, 1, dark);
+      R(4, 1, 13, 5, OUT); R(5, 2, 11, 4, body); R(5, 2, 11, 1, light);
+      win(6, 2, 4, 4); win(11, 2, 5, 4);
+      R(20, 7, 1, 2, '#ffd23f'); R(1, 7, 1, 2, '#e8542f');
+      wheel(5, H - 3); wheel(16, H - 3);
+    } else if (kind === 'pickup') {
+      R(1, 5, 26, 6, OUT); R(2, 6, 24, 4, body); R(2, 6, 24, 1, light); R(2, 9, 24, 1, dark);
+      R(15, 1, 10, 5, OUT); R(16, 2, 8, 4, body); R(16, 2, 8, 1, light);
+      win(17, 2, 6, 4);
+      R(2, 4, 12, 2, OUT); R(3, 5, 10, 1, dark);
+      R(4, 3, 3, 3, '#c9924f'); R(8, 3, 4, 3, '#e0bd82');
+      R(26, 7, 1, 2, '#ffd23f'); R(1, 7, 1, 2, '#e8542f');
+      wheel(6, H - 3); wheel(21, H - 3);
+    } else if (kind === 'van') {
+      R(1, 1, 26, 12, OUT); R(2, 2, 24, 10, body); R(2, 2, 24, 1, light); R(2, 11, 24, 1, dark);
+      win(19, 3, 7, 5); R(4, 4, 10, 3, dark); R(5, 5, 8, 1, light);
+      R(26, 8, 1, 2, '#ffd23f'); R(1, 8, 1, 2, '#e8542f');
+      wheel(7, H - 3); wheel(21, H - 3);
+    } else if (kind === 'bus') {
+      R(1, 1, 40, 14, OUT); R(2, 2, 38, 12, body); R(2, 2, 38, 1, light); R(2, 13, 38, 1, dark);
+      for (let i = 0; i < 6; i++) win(3 + i * 6, 3, 6, 5);
+      R(2, 9, 38, 1, '#fff8ec');
+      R(40, 10, 1, 2, '#ffd23f'); R(1, 10, 1, 2, '#e8542f');
+      wheel(8, H - 3); wheel(19, H - 3); wheel(32, H - 3);
+    } else {
+      /* the movers' box van: white box, blue stripe, the name on the side */
+      R(1, 1, 30, 16, OUT); R(2, 2, 28, 14, '#f2ece0'); R(2, 2, 28, 1, '#ffffff'); R(2, 15, 28, 1, '#b8b0a0');
+      R(2, 10, 28, 3, '#3fa7d6'); R(2, 10, 28, 1, '#7fc4e8');
+      drawTiny(ctx, 'MOVERS', 4 * k, 4 * k, '#2f5f9e', k);
+      R(30, 5, 9, 12, OUT); R(31, 6, 7, 10, '#3fa7d6'); R(31, 6, 7, 1, '#7fc4e8');
+      win(32, 7, 6, 5);
+      R(38, 13, 1, 2, '#ffd23f'); R(1, 13, 1, 2, '#e8542f');
+      wheel(7, H - 3); wheel(33, H - 3);
+    }
+    cache.set(key, c);
+    return c;
+  }
+
+  /* ============================================================
+     THE RACCOON - who inherited the farm and means to get rich.
+     20 x 26, facing right. Poses: stand, walk0, walk1, read,
+     cheer, boss (top hat and tie).
+     ============================================================ */
+  const RACCOON_ROWS = [
+    '......oo......oo....',
+    '.....ogpo....opgo...',
+    '.....ogggoooogggo...',
+    '.....ogggggggggggo..',
+    '....ogGGGgggggGGGgo.',
+    '....ogkkkkgggkkkkgo.',
+    '....ogkwkkgGgkkwkgo.',
+    '....ogkkkkgGgkkkkgo.',
+    '.....oGGGGGGGGGGGo..',
+    '.....oGGGGGonoGGGo..',
+    '......oGGGGGGGGGo...',
+    '.......ooooooooo....',
+    '......ogggggggggo...',
+    '.....oggGGGGGGGggo..',
+    '..oo.oggGGGGGGGggo..',
+    '.otgooggGGGGGGGggo..',
+    'ogttgooggGGGGGgggo..',
+    'ogggtgooggggggggo...',
+    'otttggo.ogggoogggo..',
+    '.oggggo.oggo..oggo..',
+    '..ottgo.okko..okko..',
+    '...oooo.oooo..oooo..',
+  ];
+  const RACCOON_PAL = { o: '#1e1a1e', g: '#8a8f98', G: '#c9cdd4', k: '#2c2a36', w: '#ffffff', n: '#1a1a1a', p: '#d98a8a', t: '#4d4f58' };
+  function raccoonSprite(pose, scale) {
+    const key = 'racc_' + pose + '_' + scale;
+    if (cache.has(key)) return cache.get(key);
+    const k = scale || 1;
+    const c = newCanvas(20 * k, 26 * k);
+    const ctx = c.getContext('2d');
+    const OFF = 4;   /* room above the head for a hat */
+    drawGrid(ctx, RACCOON_ROWS, RACCOON_PAL, 0, OFF, k);
+    const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, (y + OFF) * k, w * k, h * k); };
+    const O = RACCOON_PAL.o, g = RACCOON_PAL.g, G = RACCOON_PAL.G;
+    /* arms */
+    if (pose === 'cheer') {
+      R(4, 8, 2, 6, O); R(5, 9, 1, 4, g); R(17, 8, 2, 6, O); R(17, 9, 1, 4, g);
+      R(3, 7, 3, 2, O); R(4, 7, 1, 1, G); R(17, 7, 3, 2, O); R(18, 7, 1, 1, G);
+    } else if (pose === 'read') {
+      R(7, 13, 10, 7, O); R(8, 14, 8, 5, '#fff8ec'); R(9, 15, 6, 1, '#b8b0a0'); R(9, 17, 4, 1, '#b8b0a0');
+      R(6, 15, 2, 4, O); R(7, 16, 1, 2, g); R(16, 15, 2, 4, O); R(16, 16, 1, 2, g);
+    } else if (pose === 'boss') {
+      R(10, 12, 3, 5, O); R(11, 12, 1, 4, '#e8542f');
+      R(4, 0, 12, 2, O); R(5, 0, 10, 1, '#2e2216'); R(6, -4, 8, 5, O); R(7, -3, 6, 4, '#2e2216'); R(7, -1, 6, 1, '#e8542f');
+      R(15, 12, 3, 5, O); R(16, 13, 1, 3, g); R(15, 10, 4, 4, O); R(16, 11, 2, 2, '#ffd23f');
+    } else {
+      R(6, 13, 2, 5, O); R(6, 14, 1, 3, g); R(17, 13, 2, 5, O); R(17, 14, 1, 3, g);
+    }
+    if (pose === 'walk1') { ctx.clearRect(8 * k, (19 + OFF) * k, 4 * k, 3 * k); R(8, 18, 4, 3, O); R(9, 18, 2, 2, g); }
+    cache.set(key, c);
+    return c;
+  }
+
 
   /* ============================================================
      TERRAIN - what the landscaping tool paints
@@ -2477,7 +2720,8 @@ const SPR = (() => {
     pathSprite, terraceSprite, waterSprite, inkLine, parchment, compassRose, botSprite,
     plumeSprite, signSprite, treeSprite, eggCrackSprite, shellHalfSprite,
     drawText, textW, drawTiny, tinyW, drawTitle,
-    drawBezel, drawScanlines, drawPips, drawBox, TERM, drawHex, hexHit, hexRows,
+    drawBezel, drawScanlines, drawPips, drawBox, TERM, drawHex, hexHit, hexRows, drawCube,
+    carSprite, raccoonSprite, furnitureSprite,
     newMask, mRect, mCircle, renderMask, mulberry, newCanvas,
     darken, lighten, warm, cool, lum, px, CELL, ICONS,
   };

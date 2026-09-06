@@ -34,6 +34,7 @@
     <div id="menu-pop" hidden>
       <button class="btn" id="btn-mute" data-act="mute">SOUND ON</button>
       <button class="btn" data-act="crew">CREW</button>
+      <button class="btn" data-act="open-company">COMPANY</button>
       <button class="btn" data-act="save">SAVE</button>
       <button class="btn" data-act="title">TITLE</button>
       <button class="btn" data-act="reset">RESET</button>
@@ -45,7 +46,13 @@
       <div id="title-buttons">
         <button class="btn btn-green" data-act="start-game">START</button>
       </div>
+      <div id="intro-ui" hidden>
+        <button class="btn btn-green" data-act="intro-next">NEXT</button>
+        <button class="btn" data-act="intro-skip">SKIP</button>
+      </div>
+      <div id="company-form" hidden></div>
     </div>
+    <div id="quest-card" hidden></div>
     <div id="bubble" hidden></div>
     <div id="cursor-chip" hidden></div>
   </div>
@@ -109,9 +116,33 @@
         <button class="tab-btn" data-act="index-tab" data-tab="routes">ROUTES</button>
         <button class="tab-btn" data-act="index-tab" data-tab="eggs">EGGS</button>
         <button class="tab-btn" data-act="index-tab" data-tab="diary">DIARY</button>
+        <button class="tab-btn" data-act="index-tab" data-tab="ledger" hidden>LEDGER</button>
       </div>
       <div id="pedia"></div>
       <div class="book-corner"></div>
+    </div>
+  </div>
+
+  <!-- THE GENE LAB: read, splice, clone and cross the flock -->
+  <div class="modal" id="modal-genes" hidden>
+    <div class="modal-panel genes">
+      <div class="modal-head">
+        <h2>THE GENE LAB</h2>
+        <span class="panel-sub" id="genes-sub"></span>
+        <button class="btn btn-tiny" data-act="close-modal">CLOSE</button>
+      </div>
+      <div id="genes-body"></div>
+    </div>
+  </div>
+
+  <!-- THE COMPANY: name, mark and colours -->
+  <div class="modal" id="modal-company" hidden>
+    <div class="modal-panel company">
+      <div class="modal-head">
+        <h2>THE COMPANY</h2>
+        <button class="btn btn-tiny" data-act="close-modal">CLOSE</button>
+      </div>
+      <div id="company-body"></div>
     </div>
   </div>
 

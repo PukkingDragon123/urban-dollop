@@ -17,11 +17,13 @@ const WORLD = {
   view: { w: 384, h: 208 },                  /* camera viewport */
   mama: { x: 118, y: 688 },
   truckHome: { x: 150, y: 796, w: 56, h: 32 },
+  layby: { x: 236, y: 784, w: 96, h: 16 },      /* gravel shoulder where customers pull up */
   stations: {
     lab:      { x: 18,  y: 638, w: 30, h: 32 },   /* the Lab, home of EGGOS */
     stand:    { x: 56,  y: 644, w: 16, h: 24 },   /* the Index bookstand */
     mamaSign: { x: 88,  y: 666, w: 14, h: 20 },   /* upgrade-mama signpost */
     depot:    { x: 216, y: 770, w: 16, h: 26 },   /* the road sign: vehicles and routes */
+    brand:    { x: 72,  y: 766, w: 72, h: 30 },   /* the company sign, in your colours */
   },
   starterInc: [3, 44],                      /* prebuilt incubator anchor tile */
 };
@@ -51,6 +53,16 @@ const GAME = (() => {
       hatchers: {}, splitters: {}, loaders: {},
       polishers: {}, graders: {}, dynamos: {},
       barns: {}, troughs: {}, wells: {}, sprinklers: {}, mills: {}, coops: {}, boards: {}, hqs: {},
+      beehives: {}, genelabs: {},
+      sites: {},             /* "c,r" -> {type, dir, t, T, kind:'build'|'storey'} the movers are on */
+      storeys: {},           /* "c,r" -> 2 for a building with a second floor */
+      orders: [],            /* customers at the lay-by, and their egg orders */
+      orderT: 45,            /* seconds to the next customer */
+      quests: {},            /* quest id -> true once it has paid out */
+      company: Object.assign({}, COMPANY_DEFAULT),
+      ledger: { hist: [], acc: 0, t: 0, sales: 0, orders: 0, honey: 0, quests: 0, stocks: 0 },
+      market: { t: 0, px: {}, hist: {}, held: {} },
+      seenIntro: false,
       soil: {},              /* "c,r" -> {crop, growth, water, seed} tilled ground */
       paint: {},             /* "cx,cy" at 8px -> 'path'|'stone'|'high'|'water', painted ground */
       brush: 2,              /* brush radius, in 8px cells */
@@ -80,7 +92,9 @@ const GAME = (() => {
       cam: { x: 0, y: WORLD.H - 208 },
       stats: { pets: 0, laid: 0, collected: 0, sold: 0, coinsEarned: 0, hatched: 0, mutations: 0,
                bred: 0, plumes: 0, culled: 0, wagesPaid: 0, staffEggs: 0, hired: 0, flyers: 0,
-               planted: 0, harvested: 0, feedMade: 0, grown: 0, trips: 0, shaped: 0, planted2: 0 },
+               planted: 0, harvested: 0, feedMade: 0, grown: 0, trips: 0, shaped: 0, planted2: 0,
+               mamaFed: 0, watered: 0, builtN: 0, orders: 0, ordersMissed: 0, edits: 0, storeys: 0,
+               honey: 0, questsDone: 0, trades: 0 },
       muted: false, last: Date.now(),
     };
   }
@@ -115,14 +129,16 @@ const GAME = (() => {
     return time;
   }
   function chickenCap() {
-    return ECON.baseChickenCap + 4 * lvl('flock') + 10 * lvl('coops') + 6 * Object.keys(S.coops).length
+    return ECON.baseChickenCap + 4 * lvl('flock') + 10 * lvl('coops')
+         + Math.round(Object.keys(S.coops).reduce((a, k) => a + 6 * storeyMult(k), 0))
          + ECON.capPerPlot * (ownedPlots() - 1);
   }
-  function feedCap() { return ECON.baseFeedCap + ECON.barnCap * Object.keys(S.barns).length; }
+  function feedCap() { return ECON.baseFeedCap + Math.round(Object.keys(S.barns).reduce((a, k) => a + ECON.barnCap * storeyMult(k), 0)); }
   function vehicle() { return VEHICLES[Math.min(S.vehicle, VEHICLES.length - 1)]; }
   function city() { return CITY_BY_ID[S.route] || CITIES[0]; }
   function mamaLayTime() { return layTime(S.mamaTier) * ECON.mamaLayMult; }
   function incCap() { return 6 + 3 * lvl('inccap'); }
+  function incCapAt(k) { return Math.round(incCap() * storeyMult(k)); }
   function basketCap() { return ECON.baseBasketCap + 8 * lvl('basket1') + 16 * lvl('basket2'); }
   function scoopR() { return ECON.baseScoopR + 12 * lvl('magnet'); }
   function vacR() { return ECON.baseVacR + 8 * lvl('vacradius'); }
@@ -130,7 +146,12 @@ const GAME = (() => {
   function vacIntervalAt(x, y) { return vacInterval() / machineBoost(x, y); }
   function beltSpeed() { return ECON.beltSpeed * (1 + 0.20 * lvl('beltspeed')) * overclock(); }
   function truckCap() { return vehicle().cap + 5 * lvl('truckcap'); }
-  function tripTime() { return vehicle().trip * city().dist * Math.pow(0.85, lvl('route')) * Math.pow(0.75, lvl('fleet')); }
+  function hqMult() {
+    const ks = Object.keys(S.hqs);
+    if (!ks.length) return 1;
+    return ks.some(k => S.storeys[k]) ? 0.85 : 0.9;      /* a dispatch office trims every trip */
+  }
+  function tripTime() { return vehicle().trip * city().dist * Math.pow(0.85, lvl('route')) * Math.pow(0.75, lvl('fleet')) * hqMult(); }
   function mutationChance() { return ECON.baseMutation + 0.015 * lvl('mutate'); }
   function goldenChance() { return 0.03 * lvl('golden'); }
   function mamaCost() { return ECON.mamaCost(S.mamaTier); }
@@ -274,14 +295,29 @@ const GAME = (() => {
     Object.keys(S.polishers).forEach(k => occ[k] = { type: 'polisher', k });
     box(S.graders, 'grader', 2, 1);
     two(S.dynamos, 'dynamo');
+    Object.keys(S.beehives).forEach(k => occ[k] = { type: 'beehive', k });
+    two(S.genelabs, 'genelab');
+    /* a site holds its footprint until the movers are done */
+    Object.keys(S.sites).forEach(k => {
+      const s = S.sites[k];
+      if (s.kind !== 'build' || !BUILDS[s.type]) return;
+      const [c, r] = k.split(',').map(Number);
+      const b = BUILDS[s.type];
+      for (let dc = 0; dc < b.w; dc++) for (let dr = 0; dr < b.h; dr++) occ[key(c + dc, r + dr)] = { type: 'site', k };
+    });
   }
   function isFence(x, y) { return !!S.fences[key(Math.floor(x / 16), Math.floor(y / 16))]; }
   const ROAD_ROW = Math.floor(WORLD.roadY / WORLD.T);   /* derived, never hardcode it */
+  function inLayby(px, py) {
+    const L = WORLD.layby;
+    return px + 16 > L.x && px < L.x + L.w && py + 16 > L.y && py < L.y + L.h;
+  }
   function tileBuildable(c, r) {
     const x = c * 16 + 8, y = r * 16 + 8;
     const p = plotAt(x, y);
     if (!p || !S.plots[p.id]) return false;
     if (r >= ROAD_ROW) return false;                    /* the road */
+    if (inLayby(c * 16, r * 16)) return false;          /* the customers' lay-by */
     if (tileHasWater(c, r)) return false;               /* not in the water */
     if (r === p.tr && p.tr === 0) return false;         /* top tree line */
     const px = c * 16, py = r * 16;
@@ -319,10 +355,10 @@ const GAME = (() => {
   }
 
   /* ---------- egg creation ---------- */
-  function rollTier(base) {
+  function rollTier(base, extra) {
     let t = base, mutated = false;
     const capT = TIERS.length - 2;   /* mutations never reach Secret */
-    if (t < capT && Math.random() < mutationChance()) {
+    if (t < capT && Math.random() < mutationChance() + (extra || 0)) {
       let jump = 1;
       if (Math.random() < 0.15 * lvl('rainbow')) jump = 2;
       t = Math.min(capT, t + jump);
@@ -342,10 +378,10 @@ const GAME = (() => {
     S.eggs.push(egg);
     return egg;
   }
-  function layEgg(x, y, baseTier, fromPet) {
+  function layEgg(x, y, baseTier, fromPet, ch) {
     if (S.eggs.length >= ECON.groundEggCap) return null;
-    const { tier, mutated } = rollTier(baseTier);
-    const golden = Math.random() < goldenChance();
+    const { tier, mutated } = rollTier(baseTier, ch ? ECON.geneSize * gene(ch, 'size') : 0);
+    const golden = Math.random() < goldenChance() + (ch ? ECON.geneLuck * gene(ch, 'luck') : 0);
     const egg = spawnEgg(x + (Math.random() * 22 - 11), y + (Math.random() * 14 - 4), tier, golden, false);
     if (!egg) return null;
     S.stats.laid++;
@@ -396,9 +432,94 @@ const GAME = (() => {
       dir: Math.random() < 0.5 ? -1 : 1, state: 'idle', t: Math.random() * 2,
       lay: layTime(sp.tier) * (0.3 + Math.random() * 0.7), petCd: 0, buffT: 0,
       age: 1, fed: 1, raised: 1e9, food: 1,
+      genes: rollGenes(sp.tier), mods: [],
     };
     S.chickens.push(ch);
     return ch;
+  }
+
+  /* ---------- genes: five per bird, the Gene Lab edits them ---------- */
+  function rollGenes(tier) {
+    const g = {};
+    GENE_KEYS.forEach(k => { g[k] = Math.random() < 0.16 + tier * 0.04 ? 1 : 0; });
+    return g;
+  }
+  function genesOf(ch) { if (!ch.genes) ch.genes = rollGenes(SPECIES[ch.sp].tier); return ch.genes; }
+  function gene(ch, k) { return genesOf(ch)[k] || 0; }
+  function chLayTime(ch) { return layTime(SPECIES[ch.sp].tier) / (1 + ECON.geneLay * gene(ch, 'lay')); }
+  /* coins a minute this bird is good for, every gene counted */
+  function chScore(ch) {
+    const sp = SPECIES[ch.sp];
+    const perMin = 60 / chLayTime(ch);
+    const up = Math.min(TIERS.length - 2, sp.tier + 1);
+    const pUp = Math.min(0.9, mutationChance() + ECON.geneSize * gene(ch, 'size'));
+    const gold = Math.min(1, goldenChance() + ECON.geneLuck * gene(ch, 'luck'));
+    const v = (eggValue(sp.tier, false) * (1 - pUp) + eggValue(up, false) * pUp) * (1 - gold + gold * ECON.goldenMult);
+    return perMin * v;
+  }
+  function bestChickens(n) { return S.chickens.slice().sort((a, b) => chScore(b) - chScore(a)).slice(0, n || 3); }
+  function hasGeneLab() { return Object.keys(S.genelabs).length > 0; }
+  function geneLabSpot() {
+    const k = Object.keys(S.genelabs)[0];
+    if (!k) return { x: WORLD.mama.x + 30, y: WORLD.mama.y };
+    const [c, r] = k.split(',').map(Number);
+    return { x: c * 16 + 4, y: r * 16 + 34 };
+  }
+  function spliceCost() { return ECON.spliceFeathers; }
+  function crossCost() { return ECON.crossFeathers; }
+  function cloneCost(ch) { return { c: ECON.cloneCoins * eggValue(SPECIES[ch.sp].tier, false), f: ECON.cloneFeathers }; }
+  function canSplice(t, d) {
+    return lvl('splice') > 0 && hasGeneLab() && !!t && !!d && t !== d && S.feathers >= spliceCost();
+  }
+  /* the donor goes into the target: every gene the better of the two, one bird left */
+  function splice(targetId, donorId) {
+    const t = S.chickens.find(c => c.id === targetId), d = S.chickens.find(c => c.id === donorId);
+    if (!canSplice(t, d)) return false;
+    S.feathers -= spliceCost();
+    const gt = genesOf(t), gd = genesOf(d);
+    GENE_KEYS.forEach(k => { gt[k] = Math.min(ECON.geneMax, Math.max(gt[k] || 0, gd[k] || 0)); });
+    t.mods = Array.from(new Set((t.mods || []).concat(d.mods || [])));
+    S.chickens.splice(S.chickens.indexOf(d), 1);
+    S.stats.edits++;
+    note('genes', 'Spliced a ' + SPECIES[d.sp].name + ' into a ' + SPECIES[t.sp].name + '.', t.sp);
+    emit('splice', { ch: t, x: t.x + 10, y: t.y });
+    return true;
+  }
+  function canClone(ch) {
+    if (!ch || lvl('clone') < 1 || !hasGeneLab() || S.chickens.length >= chickenCap()) return false;
+    const c = cloneCost(ch);
+    return S.coins >= c.c && S.feathers >= c.f;
+  }
+  function cloneChicken(id) {
+    const ch = S.chickens.find(c => c.id === id);
+    if (!canClone(ch)) return false;
+    const cost = cloneCost(ch);
+    S.coins -= cost.c; S.feathers -= cost.f;
+    const p = geneLabSpot();
+    const twin = spawnChicken(ch.sp, p.x, p.y);
+    twin.genes = Object.assign({}, genesOf(ch));
+    twin.mods = (ch.mods || []).slice();
+    S.stats.edits++;
+    note('genes', 'Cloned a ' + SPECIES[ch.sp].name + '.', ch.sp);
+    emit('clone', { ch: twin, x: twin.x + 10, y: twin.y });
+    return true;
+  }
+  function canCross(ch, animalId) {
+    const a = ANIMAL_BY_ID[animalId];
+    return !!ch && !!a && lvl('crossbreed') > 0 && hasGeneLab() && S.feathers >= crossCost() && gene(ch, a.gene) < ECON.geneMax;
+  }
+  function crossAnimal(id, animalId) {
+    const ch = S.chickens.find(c => c.id === id);
+    if (!canCross(ch, animalId)) return false;
+    const a = ANIMAL_BY_ID[animalId];
+    S.feathers -= crossCost();
+    genesOf(ch)[a.gene] = Math.min(ECON.geneMax, gene(ch, a.gene) + 1);
+    ch.mods = ch.mods || [];
+    if (!ch.mods.includes(a.mark)) ch.mods.push(a.mark);
+    S.stats.edits++;
+    note('genes', 'Crossed a ' + SPECIES[ch.sp].name + ' with a ' + a.name.toLowerCase() + '.', ch.sp);
+    emit('cross', { ch, animal: a, x: ch.x + 10, y: ch.y });
+    return true;
   }
   function isChick(ch) { return (ch.age === undefined ? 1 : ch.age) < 1; }
   /* A chick has two things to get through before it is a laying bird:
@@ -512,7 +633,12 @@ const GAME = (() => {
         if (S.stats.grown === 1) note('grown', 'The first chick grew up. It lays now.', ch.sp);
       }
     }
-    ch.food = Math.max(0, ch.food - dt / (ECON.hungerTime * (1 + 0.25 * lvl('slowbelly'))));
+    ch.food = Math.max(0, ch.food - dt / (ECON.hungerTime * (1 + 0.25 * lvl('slowbelly')) * (1 + ECON.geneHardy * gene(ch, 'hardy'))));
+    /* a plumed bird sheds the odd feather for you to sweep up */
+    if (!chick && gene(ch, 'plume')) {
+      ch.shed = (ch.shed || 0) + dt;
+      if (ch.shed > 150 / gene(ch, 'plume')) { ch.shed = 0; dropPlumes(ch.x + 10, ch.y + 10, 1); }
+    }
     /* seek feed: the hungry and the little ones look further */
     const keen = chick || ch.food < 0.5;
     if (ch.state !== 'seek' && (keen || ch.buffT <= 0) && (S.feed.length || Object.keys(S.troughs).length)) {
@@ -556,8 +682,8 @@ const GAME = (() => {
     const belly = ch.food <= 0 ? ECON.hungryLay : 1;
     ch.lay -= dt * (ch.buffT > 0 ? 2 : 1) * belly * careBoost(ch.x + 10, ch.y + 10);
     if (ch.lay <= 0) {
-      ch.lay = layTime(sp.tier);
-      layEgg(ch.x + 10, ch.y + 16, sp.tier, false);
+      ch.lay = chLayTime(ch);
+      layEgg(ch.x + 10, ch.y + 16, sp.tier, false, ch);
     }
   }
 
@@ -633,10 +759,12 @@ const GAME = (() => {
     /* egg */
     const e = held.egg;
     const c = Math.floor(x / 16), r = Math.floor(y / 16);
+    const ord = orderAt(x, y);
+    if (ord && giveEgg(ord, e)) return 'ordered';
     const o = occ[key(c, r)];
     if (o && o.type === 'incubator') {
       const inc = S.incs[o.k];
-      if (inc.queue.length < incCap()) { inc.queue.push(e); return 'incubated'; }
+      if (inc.queue.length < incCapAt(o.k)) { inc.queue.push(e); return 'incubated'; }
     }
     if (S.truck.state === 'parked' && hitTruck(x, y)) {
       if (S.truck.load.length < truckCap()) { S.truck.load.push(e); return 'loaded'; }
@@ -672,7 +800,7 @@ const GAME = (() => {
     const inc = S.incs[k];
     if (!inc) return 0;
     let n = 0;
-    while (S.basket.length && inc.queue.length < incCap()) { inc.queue.push(S.basket.pop()); n++; }
+    while (S.basket.length && inc.queue.length < incCapAt(k)) { inc.queue.push(S.basket.pop()); n++; }
     return n;
   }
   function basketToGround(x, y) {
@@ -722,6 +850,7 @@ const GAME = (() => {
     const p = plotAt(x, y);
     if (!p || !S.plots[p.id]) return false;
     if (r >= ROAD_ROW) return false;
+    if (inLayby(c * 16, r * 16)) return false;
     if (r === p.tr && p.tr === 0) return false;
     const px = c * 16, py = r * 16;
     if (Math.abs(px + 8 - WORLD.mama.x) < 18 && Math.abs(py + 8 - WORLD.mama.y) < 18) return false;
@@ -892,20 +1021,47 @@ const GAME = (() => {
   }
   function water(c, r) {
     const t = S.soil[key(c, r)];
-    if (!t) return false;
+    if (!t || lvl('wateringcan') < 1) return false;
+    if (t.water <= 0) S.stats.watered++;
     t.water = 1;
     emit('water', { c, r });
     return true;
+  }
+  /* bees nearby hurry a crop along */
+  function beeBoost(c, r) {
+    const x = c * 16 + 8, y = r * 16 + 8;
+    for (const k of Object.keys(S.beehives)) {
+      const [bc, br] = k.split(',').map(Number);
+      if (Math.hypot(bc * 16 + 8 - x, br * 16 + 8 - y) < ECON.beehiveR * (S.storeys[k] ? 1.25 : 1)) return 1 + ECON.beehiveBoost;
+    }
+    return 1;
+  }
+  function cropSpeed(c, r) { return (1 + 0.15 * lvl('farming')) * beeBoost(c, r); }
+  /* seconds to ripe if it stays watered */
+  function cropTimeLeft(t, c, r) { return t.crop ? Math.max(0, (1 - t.growth) * CROPS[t.crop].grow / cropSpeed(c, r)) : 0; }
+  function tickBees(dt) {
+    for (const k of Object.keys(S.beehives)) {
+      const b = S.beehives[k];
+      b.t = (b.t || 0) + dt * storeyMult(k);
+      if (b.t >= ECON.honeyEvery) {
+        b.t -= ECON.honeyEvery;
+        const [c, r] = k.split(',').map(Number);
+        const v = Math.round(ECON.honeyValue * tycoon());
+        earn(v, 'honey');
+        S.stats.honey++;
+        emit('honey', { x: c * 16 + 8, y: r * 16, v });
+      }
+    }
   }
   function wateredBy(c, r) {
     const x = c * 16 + 8, y = r * 16 + 8;
     for (const k of Object.keys(S.wells)) {
       const [wc, wr] = k.split(',').map(Number);
-      if (Math.hypot(wc * 16 + 8 - x, wr * 16 + 8 - y) < ECON.wellR) return 'well';
+      if (Math.hypot(wc * 16 + 8 - x, wr * 16 + 8 - y) < ECON.wellR * (S.storeys[k] ? 1.25 : 1)) return 'well';
     }
     for (const k of Object.keys(S.sprinklers)) {
       const [wc, wr] = k.split(',').map(Number);
-      if (Math.hypot(wc * 16 + 8 - x, wr * 16 + 8 - y) < ECON.sprinklerR) return 'sprinkler';
+      if (Math.hypot(wc * 16 + 8 - x, wr * 16 + 8 - y) < ECON.sprinklerR * (S.storeys[k] ? 1.25 : 1)) return 'sprinkler';
     }
     return null;
   }
@@ -915,38 +1071,40 @@ const GAME = (() => {
   }
   function ripe(t) { return !!t.crop && t.growth >= 1; }
   function harvestYield(crop) {
-    return Math.round(CROPS[crop].yield * (1 + 0.20 * lvl('bumper')) * (1 + 0.25 * Object.keys(S.mills).length));
+    return Math.round(CROPS[crop].yield * (1 + 0.20 * lvl('bumper')) * (1 + 0.25 * Object.keys(S.mills).reduce((a, k) => a + storeyMult(k), 0)));
   }
-  function harvest(c, r) {
+  function harvest(c, r, auto) {
     const k = key(c, r), t = S.soil[k];
     if (!t || !ripe(t)) return 0;
+    if (!auto && lvl('sickle') < 1) return 0;            /* you need the sickle in hand */
     const d = CROPS[t.crop];
     const n = harvestYield(t.crop);
     addFeed(n, c * 16 + 8, r * 16 + 8);
     S.stats.harvested++;
-    /* every harvest hands back a couple of seeds of its own kind */
-    S.seeds[t.crop] = (S.seeds[t.crop] || 0) + (d.regrow ? 0 : 2);
+    /* no seeds come back: the next packet is bought */
     if (d.regrow) t.growth = 0.3;
     else { t.crop = null; t.growth = 0; }
     emit('harvest', { c, r, crop: d, n });
     return n;
   }
   function tickFarm(dt) {
-    const speed = (1 + 0.15 * lvl('farming'));
     for (const k of Object.keys(S.soil)) {
       const t = S.soil[k];
       const [c, r] = k.split(',').map(Number);
       const auto = wateredBy(c, r);
       if (auto) t.water = 1;
-      else t.water = Math.max(0, t.water - dt / 70);
+      else t.water = Math.max(0, (t.water || 0) - dt / ECON.waterLast);
       if (!t.crop) continue;
       if (t.growth < 1) {
+        /* a dry crop simply waits */
+        if (t.water <= 0) { t.dry = (t.dry || 0) + dt; continue; }
+        t.dry = 0;
         const d = CROPS[t.crop];
-        t.growth = Math.min(1, t.growth + dt / d.grow * speed * (t.water > 0 ? ECON.waterMult : 1));
+        t.growth = Math.min(1, t.growth + dt / d.grow * cropSpeed(c, r));
         if (t.growth >= 1) emit('ripe', { c, r });
       } else if (lvl('harvestbot')) {
         t.auto = (t.auto || 0) + dt;
-        if (t.auto > 4) { t.auto = 0; harvest(c, r); }
+        if (t.auto > 4) { t.auto = 0; harvest(c, r, true); }
       }
     }
   }
@@ -971,9 +1129,10 @@ const GAME = (() => {
     return { f, out: f < 0.5, city: city(), vehicle: vehicle(), n: tr.n, pay: tr.pay };
   }
   function hasHQ() { return Object.keys(S.hqs).length > 0; }
+  function depotOpen() { return lvl('logistics') > 0; }
   function buyVehicle() {
     const next = VEHICLES[S.vehicle + 1];
-    if (!hasHQ() || !next || S.coins < next.cost || S.truck.state !== 'parked') return false;
+    if (!depotOpen() || !next || S.coins < next.cost || S.truck.state !== 'parked') return false;
     S.coins -= next.cost;
     S.vehicle++;
     note('wheels', 'Traded up to the ' + next.name + '.');
@@ -982,7 +1141,7 @@ const GAME = (() => {
   }
   function buyRoute(id) {
     const c = CITY_BY_ID[id];
-    if (!hasHQ() || !c || S.routes.includes(id) || S.coins < c.cost) return false;
+    if (!depotOpen() || !c || S.routes.includes(id) || S.coins < c.cost) return false;
     /* routes open in order down the road */
     const idx = CITIES.indexOf(c);
     if (idx > 0 && !S.routes.includes(CITIES[idx - 1].id)) return false;
@@ -1008,8 +1167,7 @@ const GAME = (() => {
       if (!tr.sold && tr.t <= T / 2) {
         const pay = tr.pay || truckPayout();
         const n = tr.load.length;
-        S.coins += pay;
-        S.stats.coinsEarned += pay;
+        earn(pay, 'sales');
         S.stats.sold += n;
         tr.load = [];
         tr.sold = true;
@@ -1274,7 +1432,7 @@ const GAME = (() => {
       if (!inc.queue.length) { inc.prog = 0; continue; }
       const egg = inc.queue[0];
       const [c, r] = k.split(',').map(Number);
-      inc.prog += dt * machineBoost(c * 16 + 16, r * 16 + 16);
+      inc.prog += dt * machineBoost(c * 16 + 16, r * 16 + 16) * storeyMult(k);
       if (inc.prog >= incHatchTime(egg.tier, egg.rainbow)) {
         if (S.chickens.length >= chickenCap()) continue;
         inc.queue.shift();
@@ -1289,7 +1447,7 @@ const GAME = (() => {
       const [c, r] = k.split(',').map(Number);
       const cx = c * 16 + 24, cy = r * 16 + 24;
       const lanes = Math.min(3, h.queue.length);
-      h.prog += dt * 2 * machineBoost(cx, cy);
+      h.prog += dt * 2 * machineBoost(cx, cy) * storeyMult(k);
       const egg = h.queue[0];
       const need = incHatchTime(egg.tier, egg.rainbow) / lanes;
       if (h.prog >= need) {
@@ -1326,7 +1484,7 @@ const GAME = (() => {
       const a = SPECIES[nest.slots[0].sp], b = SPECIES[nest.slots[1].sp];
       let need = breedTime();
       if (a.id === b.id) need *= 0.6;
-      nest.prog += dt;
+      nest.prog += dt * storeyMult(k);
       if (nest.prog < need) continue;
       /* breeding complete! */
       const [c, r] = k.split(',').map(Number);
@@ -1377,7 +1535,7 @@ const GAME = (() => {
      who you put where actually matters.
      ============================================================ */
   function staffSlots() {
-    return ECON.staffBaseSlots + ECON.hutSlots * Object.keys(S.huts).length + 2 * lvl('crewcap');
+    return ECON.staffBaseSlots + Math.round(Object.keys(S.huts).reduce((a, k) => a + ECON.hutSlots * storeyMult(k), 0)) + 2 * lvl('crewcap');
   }
   function unionMult() { return lvl('union') ? 1.5 : 1; }
   function wageMult() { return Math.pow(0.88, lvl('wages')); }
@@ -1986,7 +2144,7 @@ const GAME = (() => {
   /* live production readouts for the inspect panel */
   function rates() {
     let eggsPerMin = 60 / layTime(S.mamaTier);
-    S.chickens.forEach(ch => { eggsPerMin += 60 / layTime(SPECIES[ch.sp].tier) * (ch.buffT > 0 ? 2 : 1); });
+    S.chickens.forEach(ch => { if (!isChick(ch)) eggsPerMin += 60 / chLayTime(ch) * (ch.buffT > 0 ? 2 : 1); });
     let value = 0, n = 0;
     S.chickens.forEach(ch => { value += eggValue(SPECIES[ch.sp].tier, false); n++; });
     const avg = n ? value / n : eggValue(S.mamaTier, false);
@@ -2010,14 +2168,313 @@ const GAME = (() => {
 
 
   /* ---------- building ---------- */
-  function build(type, c, r, dir) {
-    const cost = buildCost(type, S.built[type]);
-    if (S.coins < cost || !canPlace(type, c, r)) return false;
-    const b0 = BUILDS[type];
-    for (let dc = 0; dc < b0.w; dc++) for (let dr = 0; dr < b0.h; dr++) delete S.deco[key(c + dc, r + dr)];
+  /* the whole tool rack: which tools research has handed you */
+  const TOOL_NEEDS = { feed: 'feedtool', farm: 'hoe', build: 'buildtool' };
+  function toolOpen(t) { const n = TOOL_NEEDS[t]; return !n || lvl(n) > 0; }
+
+  /* ---------- quests: one chain, paid out the moment a goal is met ---------- */
+  function questProgress(q) {
+    const g = q.goal;
+    if (g.k === 'skill') return [lvl(g.id) > 0 ? 1 : 0, 1];
+    let cur = 0;
+    if (g.k === 'stat') cur = S.stats[g.s] || 0;
+    else if (g.k === 'soil') cur = Object.keys(S.soil).length;
+    else if (g.k === 'disc') cur = S.disc.length;
+    else if (g.k === 'built') cur = S.built[g.t] || 0;
+    return [Math.min(cur, g.n), g.n];
+  }
+  function questDone(q) { return !!S.quests[q.id]; }
+  function currentQuest() { return QUESTS.find(q => !S.quests[q.id]) || null; }
+  function tickQuests() {
+    const q = currentQuest();
+    if (!q) return;
+    const [cur, n] = questProgress(q);
+    if (cur < n) return;
+    S.quests[q.id] = true;
+    S.stats.questsDone++;
+    if (q.rw.c) earn(q.rw.c, 'quests');
+    if (q.rw.f) S.feathers += q.rw.f;
+    note('quest', 'Quest done: ' + q.name + '.');
+    mark('skills');
+    emit('quest', { q });
+  }
+
+  /* ---------- the ledger and the market ---------- */
+  function earn(a, src) {
+    a = Math.round(a);
+    S.coins += a;
+    S.stats.coinsEarned += a;
+    const L = S.ledger;
+    L.acc += a;
+    L[src] = (L[src] || 0) + a;
+  }
+  function tickLedger(dt) {
+    const L = S.ledger;
+    L.t += dt;
+    if (L.t >= 10) { L.hist.push(Math.round(L.acc * 6)); L.acc = 0; L.t = 0; if (L.hist.length > 90) L.hist.shift(); }
+  }
+  function stockPrice(id) { return S.market.px[id] || STOCK_BY_ID[id].base; }
+  function tickMarket(dt) {
+    if (!lvl('stocks')) return;
+    const M = S.market;
+    M.t += dt;
+    if (M.t < ECON.stockTick) return;
+    M.t = 0;
+    STOCKS.forEach(st => {
+      const p = stockPrice(st.id);
+      const anchor = st.base * (1 + 0.03 * S.day);
+      const shock = (Math.random() - 0.5) * 2 * ECON.stockVol;
+      const pull = (anchor - p) / anchor * 0.02;
+      const np = Math.max(0.5, p * (1 + shock + pull + st.drift));
+      M.px[st.id] = Math.round(np * 100) / 100;
+      (M.hist[st.id] = M.hist[st.id] || []).push(M.px[st.id]);
+      if (M.hist[st.id].length > 60) M.hist[st.id].shift();
+    });
+    emit('market', {});
+  }
+  function buyStock(id, n) {
+    if (!lvl('stocks') || !STOCK_BY_ID[id]) return false;
+    const cost = stockPrice(id) * n;
+    if (n < 1 || S.coins < cost) return false;
     S.coins -= cost;
-    S.built[type]++;
-    const k = key(c, r);
+    S.market.held[id] = (S.market.held[id] || 0) + n;
+    S.stats.trades++;
+    return true;
+  }
+  function sellStock(id, n) {
+    const have = S.market.held[id] || 0;
+    if (!lvl('stocks') || n < 1 || have < n) return false;
+    S.market.held[id] = have - n;
+    earn(stockPrice(id) * n, 'stocks');
+    S.stats.trades++;
+    return true;
+  }
+  function portfolio() { return STOCKS.reduce((a, st) => a + (S.market.held[st.id] || 0) * stockPrice(st.id), 0); }
+  /* what the company itself is worth: its earnings, capitalised */
+  function companyValue() { return Math.round(rates().coinsPerMin * 20 + S.coins + portfolio()); }
+  function setCompany(o) {
+    const c = S.company;
+    if (typeof o.name === 'string') {
+      const nm = o.name.toUpperCase().replace(/[^A-Z0-9 .&'-]/g, '').replace(/\s+/g, ' ').trim().slice(0, 16);
+      if (nm) c.name = nm;
+    }
+    if (LOGOS.includes(o.logo)) c.logo = o.logo;
+    if (BRAND_COLS.includes(o.col1)) c.col1 = o.col1;
+    if (BRAND_COLS.includes(o.col2)) c.col2 = o.col2;
+    c.done = true;
+    mark('build');
+    emit('company', { c });
+    return c;
+  }
+
+  /* ---------- traffic: cars go by on the road ---------- */
+  const CAR_KINDS = ['sedan', 'sedan', 'hatch', 'pickup', 'van', 'bus'];
+  const CUSTOMER_CARS = ['sedan', 'hatch', 'pickup', 'van'];
+  const CAR_COLS = ['#e8542f', '#3fa7d6', '#ffd23f', '#6ab04c', '#fff8ec', '#b06ee0', '#2e2216', '#f0a422', '#ff5f9e', '#c9ced6', '#8a5e2a'];
+  const cars = [];
+  let carT = 3;
+  const pickOne = a => a[Math.floor(Math.random() * a.length)];
+  function laneY(dir) { return dir === 1 ? WORLD.roadY + 15 : WORLD.roadY + 2; }
+  function tickTraffic(dt) {
+    carT -= dt;
+    if (carT <= 0 && cars.length < 4) {
+      carT = ECON.carEvery * (0.5 + Math.random());
+      const dir = Math.random() < 0.5 ? 1 : -1;
+      cars.push({ id: nextId++, kind: pickOne(CAR_KINDS), col: pickOne(CAR_COLS), dir,
+                  x: dir === 1 ? -70 : WORLD.W + 70, y: laneY(dir), v: 36 + Math.random() * 34 });
+    }
+    for (let i = cars.length - 1; i >= 0; i--) {
+      const c = cars[i];
+      /* nobody drives through the car in front */
+      const ahead = cars.find(o => o !== c && o.dir === c.dir && (o.x - c.x) * c.dir > 0 && (o.x - c.x) * c.dir < 44);
+      c.x += c.dir * (ahead ? Math.min(c.v, ahead.v) : c.v) * dt;
+      if (c.x < -120 || c.x > WORLD.W + 120) cars.splice(i, 1);
+    }
+  }
+
+  /* ---------- customers: cars pull into the lay-by with an order ---------- */
+  const CUSTOMER_NAMES = ['MRS PLUME', 'OLD TOM', 'THE BAKER', 'A CHEF', 'MISS YOLK', 'GRAN B', 'THE VICAR',
+                          'DEL THE DRIVER', 'TWO KIDS', 'THE MAYOR', 'A PAINTER', 'NURSE KAY', 'THE TWINS', 'A BUSKER'];
+  function orderSpots() {
+    const L = WORLD.layby;
+    return [{ x: L.x + 6, y: L.y - 8 }, { x: L.x + 54, y: L.y - 8 }];
+  }
+  function orderTierPool() {
+    const pool = [S.mamaTier];
+    S.chickens.forEach(ch => { if (!isChick(ch)) pool.push(SPECIES[ch.sp].tier); });
+    return pool;
+  }
+  function newOrder(spot) {
+    const tier = pickOne(orderTierPool());
+    const n = 2 + Math.floor(Math.random() * Math.min(7, 2 + Math.floor(S.day / 2) + Math.floor(S.chickens.length / 4)));
+    const unit = Math.round(eggValue(tier, false) * ECON.orderPay);
+    return { id: nextId++, tier, n, got: 0, unit, pay: unit * n, t: ECON.orderTime, T: ECON.orderTime,
+             who: pickOne(CUSTOMER_NAMES), kind: pickOne(CUSTOMER_CARS), col: pickOne(CAR_COLS),
+             state: 'arrive', x: WORLD.W + 60, y: laneY(-1), spot };
+  }
+  function tickOrders(dt) {
+    if (lvl('orders')) {
+      S.orderT -= dt;
+      if (S.orderT <= 0) {
+        S.orderT = ECON.orderEvery * (0.6 + Math.random() * 0.8);
+        const spot = [0, 1].find(i => !S.orders.some(q => q.spot === i && q.state !== 'leave'));
+        if (spot !== undefined && S.orders.filter(o => o.state !== 'leave').length < ECON.maxOrders) S.orders.push(newOrder(spot));
+      }
+    }
+    for (let i = S.orders.length - 1; i >= 0; i--) {
+      const o = S.orders[i];
+      const sp = orderSpots()[o.spot] || orderSpots()[0];
+      if (o.state === 'arrive') {
+        const d = o.x - sp.x;
+        o.x -= Math.min(d, 64 * dt);
+        if (d < 50) o.y = laneY(-1) + (sp.y - laneY(-1)) * (1 - Math.max(0, d) / 50);
+        if (d <= 0.5) { o.x = sp.x; o.y = sp.y; o.state = 'wait'; emit('customer', { o }); }
+      } else if (o.state === 'wait') {
+        o.t -= dt;
+        if (o.t <= 0) { o.state = 'leave'; o.miss = true; S.stats.ordersMissed++; emit('ordermiss', { o }); }
+      } else {
+        o.x -= 72 * dt;
+        o.y += (laneY(-1) - o.y) * Math.min(1, dt * 3);
+        if (o.x < -80) S.orders.splice(i, 1);
+      }
+    }
+  }
+  function orderAt(x, y) {
+    return S.orders.find(o => o.state === 'wait' && x > o.x - 4 && x < o.x + 30 && y > o.y - 22 && y < o.y + 16) || null;
+  }
+  function eggFits(o, e) { return e.tier >= o.tier; }
+  function completeOrder(o) {
+    o.state = 'leave'; o.done = true;
+    earn(o.pay, 'orders');
+    S.feathers += ECON.orderTip;
+    S.stats.orders++;
+    note('order', o.who + ' drove off with ' + o.n + ' eggs and paid ' + o.pay + '.');
+    emit('orderdone', { o });
+  }
+  function giveEgg(o, e) {
+    if (!o || o.state !== 'wait' || !eggFits(o, e)) return false;
+    o.got++;
+    if (o.got >= o.n) completeOrder(o);
+    return true;
+  }
+  function basketToOrder(o) {
+    if (!o || o.state !== 'wait') return 0;
+    let n = 0;
+    for (let i = S.basket.length - 1; i >= 0 && o.got < o.n; i--) {
+      if (eggFits(o, S.basket[i])) { S.basket.splice(i, 1); o.got++; n++; }
+    }
+    if (o.got >= o.n) completeOrder(o);
+    return n;
+  }
+
+  /* ---------- construction: a moving van pulls up and two movers build it ---------- */
+  const INSTANT = { belt: 1, fence: 1 };
+  const MOVER_LOOKS = [
+    { skin: '#f2c9a0', hair: '#5e3d18', style: 'short', shirt: '#f0a422', pants: '#3a3a4a', boot: '#2e2216', hat: 'cap' },
+    { skin: '#8d5a3a', hair: '#2e2216', style: 'bun',   shirt: '#f0a422', pants: '#2f5f9e', boot: '#2e2216', hat: 'cap' },
+  ];
+  function siteTime(type) { return ECON.siteBase + Math.sqrt(BUILDS[type].base) / 3; }
+  function siteFor(k) { return S.sites[k] || null; }
+  const STOREY_OK = ['incubator', 'coop', 'barn', 'staffhut', 'silo', 'hq', 'mill', 'well', 'sprinkler', 'beehive', 'trough', 'hatchery', 'lovenest'];
+  function storeyMult(k) { return S.storeys && S.storeys[k] ? ECON.storeyMult : 1; }
+  function storeyCost(type) { return Math.round(BUILDS[type].base * ECON.storeyCost); }
+  function canStorey(k) {
+    const o = occ[k];
+    if (!o || o.k !== k || o.type === 'site') return false;
+    if (lvl('storeys') < 1 || !STOREY_OK.includes(o.type) || S.storeys[k] || S.sites[k]) return false;
+    return S.coins >= storeyCost(o.type);
+  }
+  function addStorey(k) {
+    if (!canStorey(k)) return false;
+    const o = occ[k];
+    S.coins -= storeyCost(o.type);
+    S.sites[k] = { type: o.type, dir: 0, t: 0, T: siteTime(o.type) * 0.8, kind: 'storey', stage: 'wait' };
+    mark('build');
+    emit('site', { type: o.type, kind: 'storey' });
+    return true;
+  }
+  function finishSite(k) {
+    const s = S.sites[k];
+    if (!s) return;
+    delete S.sites[k];
+    const [c, r] = k.split(',').map(Number);
+    if (s.kind === 'storey') {
+      S.storeys[k] = 2;
+      S.stats.storeys++;
+      note('storey', 'Added a second floor to the ' + BUILDS[s.type].name + '.');
+    } else placeBuilding(s.type, k, s.dir);
+    rebuildOcc();
+    mark('build');
+    emit('built', { type: s.type, c, r, kind: s.kind });
+  }
+  const movers = { van: null, crew: [] };
+  function moverWalk(w, tx, ty, dt) {
+    const dx = tx - w.x, dy = ty - w.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 2.5) return true;
+    const sp = 34 * groundSpeed(w.x + 6, w.y + 12) * dt;
+    w.dir = dx > 0 ? 1 : -1;
+    w.x += (dx / d) * Math.min(d, sp); w.y += (dy / d) * Math.min(d, sp);
+    w.anim += sp;
+    if (w.anim > 5) { w.anim = 0; w.frame ^= 1; }
+    return false;
+  }
+  function moversTick(dt) {
+    const pending = Object.keys(S.sites);
+    if (!movers.van) {
+      if (!pending.length) return;
+      movers.van = { x: -90, y: WORLD.roadY + 15, tx: 0, state: 'arrive', anim: 0 };
+      movers.crew = MOVER_LOOKS.map((look, i) => ({ id: 9000 + i, x: -90, y: WORLD.roadY, dir: 1, frame: 0, anim: 0, state: 'van', look, job: null, hammer: 0 }));
+      emit('movers', { state: 'coming' });
+    }
+    const van = movers.van;
+    van.anim += dt;
+    if (van.state === 'arrive') {
+      const k = pending[0];
+      if (!k) { van.state = 'leave'; return; }
+      const c = +k.split(',')[0];
+      van.tx = Math.max(10, Math.min(WORLD.W - 70, c * 16 - 24));
+      const d = van.tx - van.x;
+      van.x += Math.sign(d) * Math.min(Math.abs(d), 72 * dt);
+      if (Math.abs(d) < 1) {
+        van.state = 'parked';
+        movers.crew.forEach((w, i) => { w.x = van.x + 14 + i * 12; w.y = WORLD.roadY - 10; w.state = 'idle'; });
+        emit('movers', { state: 'here', x: van.x });
+      }
+      return;
+    }
+    if (van.state === 'leave') {
+      /* another job comes in as they pull away: they turn straight round */
+      if (pending.length) { van.state = 'arrive'; movers.crew.forEach(w => { w.state = 'van'; }); return; }
+      van.x += 72 * dt;
+      if (van.x > WORLD.W + 110) { movers.van = null; movers.crew = []; }
+      return;
+    }
+    /* parked: the crew work the sites, then climb back in */
+    if (!pending.length) {
+      let all = true;
+      movers.crew.forEach((w, i) => { w.state = 'walk'; if (!moverWalk(w, van.x + 14 + i * 12, WORLD.roadY - 10, dt)) all = false; });
+      if (all) { van.state = 'leave'; emit('movers', { state: 'leaving' }); }
+      return;
+    }
+    movers.crew.forEach((w, i) => {
+      const k = pending[Math.min(i, pending.length - 1)];
+      const st = S.sites[k];
+      const [c, r] = k.split(',').map(Number);
+      const b = BUILDS[st.type];
+      const tx = c * 16 + b.w * 8 - 6 + (i ? 7 : -9), ty = r * 16 + b.h * 16 - 4;
+      w.job = k;
+      if (moverWalk(w, tx, ty, dt)) {
+        w.state = 'work';
+        w.hammer += dt;
+        st.stage = 'work';
+        st.t += dt * (lvl('union') ? 1.5 : 1);
+      } else w.state = 'walk';
+    });
+    pending.forEach(k => { const st = S.sites[k]; if (st && st.t >= st.T) finishSite(k); });
+  }
+
+  function placeBuilding(type, k, dir) {
     if (type === 'belt') S.belts[k] = { dir: dir || 0 };
     else if (type === 'vacuum') S.vacs[k] = { dir: dir || 0, hold: [], cd: 0 };
     else if (type === 'incubator') S.incs[k] = { queue: [], prog: 0 };
@@ -2041,8 +2498,24 @@ const GAME = (() => {
     else if (type === 'coop') S.coops[k] = { built: Date.now() };
     else if (type === 'board') S.boards[k] = { built: Date.now() };
     else if (type === 'hq') S.hqs[k] = { built: Date.now() };
+    else if (type === 'beehive') S.beehives[k] = { t: 0 };
+    else if (type === 'genelab') S.genelabs[k] = { built: Date.now() };
+  }
+  function build(type, c, r, dir) {
+    const cost = buildCost(type, S.built[type]);
+    if (S.coins < cost || !canPlace(type, c, r)) return false;
+    const b0 = BUILDS[type];
+    for (let dc = 0; dc < b0.w; dc++) for (let dr = 0; dr < b0.h; dr++) delete S.deco[key(c + dc, r + dr)];
+    S.coins -= cost;
+    S.built[type]++;
+    S.stats.builtN++;
+    const k = key(c, r);
+    if (INSTANT[type]) { placeBuilding(type, k, dir); rebuildOcc(); mark('build'); return true; }
+    /* everything else is a site until the movers have been */
+    S.sites[k] = { type, dir: dir || 0, t: 0, T: siteTime(type), kind: 'build', stage: 'wait' };
     rebuildOcc();
     mark('build');
+    emit('site', { type, c, r, kind: 'build' });
     return true;
   }
   function setBeltDir(c, r, dir) { const b = S.belts[key(c, r)]; if (b) b.dir = dir; }
@@ -2051,6 +2524,17 @@ const GAME = (() => {
     if (!o) return false;
     const k = o.k;
     const [kc, kr] = k.split(',').map(Number);
+    if (o.type === 'site') {
+      /* call the movers off: the money comes straight back */
+      const st = S.sites[k];
+      delete S.sites[k];
+      S.built[st.type] = Math.max(0, S.built[st.type] - 1);
+      S.coins += buildCost(st.type, S.built[st.type]);
+      rebuildOcc(); mark('build');
+      return true;
+    }
+    if (S.sites[k] && S.sites[k].kind === 'storey') { S.coins += storeyCost(o.type); delete S.sites[k]; }
+    delete S.storeys[k];
     if (o.type === 'belt') { delete S.belts[k]; S.built.belt = Math.max(0, S.built.belt - 1); }
     else if (o.type === 'vacuum') {
       S.vacs[k].hold.forEach(e => spawnEgg(kc * 16 + 8, kr * 16 + 10, e.tier, e.golden, e.rainbow));
@@ -2104,6 +2588,10 @@ const GAME = (() => {
     } else if (o.type === 'board') {
       delete S.boards[k]; S.built.board = Math.max(0, S.built.board - 1);
       S.applicants.forEach(a => { a.state = 'leaving'; });
+    } else if (o.type === 'beehive') {
+      delete S.beehives[k]; S.built.beehive = Math.max(0, S.built.beehive - 1);
+    } else if (o.type === 'genelab') {
+      delete S.genelabs[k]; S.built.genelab = Math.max(0, S.built.genelab - 1);
     }
     S.coins += BUILDS[o.type].refund;
     S.eggs.forEach(e => { if (e.suck === k) e.suck = null; });
@@ -2144,6 +2632,7 @@ const GAME = (() => {
   function feedMama(n) {
     if (mamaBelly() >= 1) return false;
     S.mama.belly = Math.min(1, mamaBelly() + n / ECON.mamaPellets);
+    S.stats.mamaFed++;
     emit('mamafed', {});
     return true;
   }
@@ -2184,6 +2673,13 @@ const GAME = (() => {
     tickNests(dt);
     tickTruck(dt);
     tickRecruit(dt);
+    tickBees(dt);
+    tickTraffic(dt);
+    tickOrders(dt);
+    moversTick(dt);
+    tickQuests();
+    tickLedger(dt);
+    tickMarket(dt);
   }
 
   /* ---------- offline ---------- */
@@ -2255,7 +2751,7 @@ const GAME = (() => {
     if (S.truck.state === 'away') {
       if (!S.truck.sold) {
         pay = S.truck.pay || truckPayout();
-        S.coins += pay; S.stats.coinsEarned += pay; S.stats.sold += S.truck.load.length;
+        earn(pay, 'sales'); S.stats.sold += S.truck.load.length;
       }
       S.truck.load = []; S.truck.state = 'parked'; S.truck.sold = false;
     }
@@ -2264,8 +2760,12 @@ const GAME = (() => {
       const t = S.soil[k];
       if (!t.crop) continue;
       const [c, r] = k.split(',').map(Number);
-      t.growth = Math.min(1, t.growth + dt / CROPS[t.crop].grow * (1 + 0.15 * lvl('farming')) * (wateredBy(c, r) ? ECON.waterMult : 1));
+      const span = wateredBy(c, r) ? dt : Math.min(dt, (t.water || 0) * ECON.waterLast);
+      t.growth = Math.min(1, t.growth + span / CROPS[t.crop].grow * cropSpeed(c, r));
+      if (!wateredBy(c, r)) t.water = Math.max(0, (t.water || 0) - dt / ECON.waterLast);
     }
+    Object.keys(S.sites).forEach(finishSite);
+    S.orders = [];
     S.eggs.forEach(e => { e.z = 0; e.vz = 0; });
     return { seconds: dt, laid, hatched, pay, feathersGot, wages };
   }
@@ -2286,6 +2786,7 @@ const GAME = (() => {
       slim.items.forEach(i => { i.x = Math.round(i.x); i.y = Math.round(i.y); });
       slim.plumes.forEach(p => { p.x = Math.round(p.x); p.y = Math.round(p.y); p.z = 0; });
       slim.staff.forEach(w => { w.x = Math.round(w.x); w.y = Math.round(w.y); w.target = null; });
+      slim.orders.forEach(o => { o.x = Math.round(o.x); o.y = Math.round(o.y); });
       localStorage.setItem(SAVE_KEY, JSON.stringify(slim));
       return true;
     } catch (e) { return false; }
@@ -2310,7 +2811,17 @@ const GAME = (() => {
       S.bots = Object.assign({ cull: 0, match: 0 }, S.bots);
       ['huts', 'silos', 'blowers', 'sorters', 'fences', 'hatchers', 'splitters', 'loaders',
        'barns', 'troughs', 'wells', 'sprinklers', 'mills', 'coops', 'boards', 'hqs', 'soil',
-       'paint', 'deco', 'polishers', 'graders', 'dynamos'].forEach(m => { if (!S[m]) S[m] = {}; });
+       'paint', 'deco', 'polishers', 'graders', 'dynamos', 'beehives', 'genelabs', 'sites', 'storeys', 'quests'].forEach(m => { if (!S[m]) S[m] = {}; });
+      if (!Array.isArray(S.orders)) S.orders = [];
+      S.orders = S.orders.filter(o => o && o.state && typeof o.x === 'number');
+      if (typeof S.orderT !== 'number') S.orderT = 45;
+      S.company = Object.assign({}, COMPANY_DEFAULT, S.company || {});
+      S.ledger = Object.assign({ hist: [], acc: 0, t: 0, sales: 0, orders: 0, honey: 0, quests: 0, stocks: 0 }, S.ledger || {});
+      if (!Array.isArray(S.ledger.hist)) S.ledger.hist = [];
+      S.market = Object.assign({ t: 0, px: {}, hist: {}, held: {} }, S.market || {});
+      S.stats = Object.assign(freshState().stats, S.stats || {});
+      Object.values(S.sites).forEach(st => { if (typeof st.t !== 'number') st.t = 0; });
+      if (!toolOpen(S.tool)) S.tool = 'hand';
       if (typeof S.brush !== 'number') S.brush = 2;
       S.built = Object.assign(zeroCounts(), S.built);
       Object.keys(S.built).forEach(t => { if (typeof S.built[t] !== 'number' || !isFinite(S.built[t])) S.built[t] = 0; });
@@ -2323,6 +2834,8 @@ const GAME = (() => {
         /* saves from before growing took time: carry their progress over */
         if (c.fed === undefined) c.fed = c.age;
         if (c.raised === undefined) c.raised = c.age >= 1 ? 1e9 : c.age * ECON.growTime;
+        if (!c.genes) c.genes = rollGenes(SPECIES[c.sp] ? SPECIES[c.sp].tier : 0);
+        if (!Array.isArray(c.mods)) c.mods = [];
       });
       if (!Array.isArray(S.routes) || !S.routes.length) S.routes = ['hamlet'];
       if (!CITY_BY_ID[S.route]) S.route = S.routes[0];
@@ -2391,6 +2904,15 @@ const GAME = (() => {
     seedCount, cropOpen, wateredBy, isChick, growPellets, growTime, growAge, nearCoop, mamaLayTime, mamaBelly, mamaHungry, feedMama,
     vehicle, city, tripPhase, buyVehicle, buyRoute, setRoute, applicantAt, boardSpot,
     note,
+    toolOpen, depotOpen, incCapAt,
+    questProgress, questDone, currentQuest,
+    get cars() { return cars; }, get movers() { return movers; },
+    orderAt, orderSpots, giveEgg, basketToOrder,
+    siteFor, storeyMult, canStorey, addStorey, storeyCost, finishSites: () => Object.keys(S.sites).forEach(finishSite),
+    cropSpeed, cropTimeLeft, beeBoost,
+    genesOf, gene, chScore, bestChickens, hasGeneLab, chLayTime,
+    canSplice, splice, spliceCost, canClone, cloneChicken, cloneCost, canCross, crossAnimal, crossCost,
+    stockPrice, buyStock, sellStock, portfolio, companyValue, setCompany, earn,
     tick, applyOffline, save, load, reset, fmt, fmtTime,
   };
 })();
