@@ -113,6 +113,7 @@ const SPR = (() => {
     '*': ['# #', ' # ', '# #', '   ', '   '],
     '=': ['   ', '###', '   ', '###', '   '],
     '>': ['#  ', ' # ', '  #', ' # ', '#  '],
+    '<': ['  #', ' # ', '#  ', ' # ', '  #'],
     ' ': ['   ', '   ', '   ', '   ', '   '],
   };
   function tinyW(str, k) { k = k || 1; return str.length * 4 * k - k; }
@@ -1024,6 +1025,33 @@ const SPR = (() => {
       blushY: 5, blushL: 13, blushR: 16,
       headTop: [15, 1], bellyC: [10, 11], wattle: true, wing: [8, 10],
     },
+    /* the dinosaur: a long tail sweeping off to the left, a heavy body on
+       two big legs, and a jaw that means business. Feathered, of course. */
+    dino: {
+      rows: [
+        '.............OOOOO..',
+        '............OBBBBBO.',
+        '...........OBLLBBEBO',
+        '...........OBLBBBBKK',
+        '.........OOOBBBBBOOO',
+        '.OO.....OBBBBBBBOOO.',
+        'OTTOO..OBBBBBBBBO...',
+        'OTTTTOOBBWWWWBBBO...',
+        '.OTTTTBBBWwWwWBBO...',
+        '..OTTBBBBWwWwWBBO...',
+        '...OOBBBBWWWWWBBO...',
+        '....OBBDDDDDDDBBO...',
+        '.....ODDDDDDDDDO....',
+        '......OODDDOODDO....',
+        '........OFO..OFO....',
+        '........OFO..OFO....',
+        '.......OFFFO.OFFFO..',
+        '....................',
+      ],
+      eyeL: [17, 2], eyeR: [17, 2], beak: [18, 3],
+      blushY: 3, blushL: 14, blushR: 16,
+      headTop: [15, 1], bellyC: [10, 11], wattle: false, wing: [10, 8],
+    },
   };
 
   /* Mama Hen: a big, fat grandma of a bird. Bonnet and shawl on top,
@@ -1127,6 +1155,11 @@ const SPR = (() => {
     antenna:{ g: ['a.....a', 's.....s', 's.....s'], pal: { s: '#4a4a4a', a: '#ffd23f' }, dx: 0, dy: -2 },
     horns:  { g: ['h.....h', 'h.....h', '.h...h.'], pal: { h: '#f0e2c8' }, dx: 0, dy: -1 },
     tiara:  { g: ['..p..', 's.s.s', 'sssss'], pal: { s: '#e8e8f5', p: '#ff8ab5' }, dx: 0, dy: -1 },
+    /* what the dinosaurs wear: a crest on the head, or plates, spikes and a sail down the back */
+    crest:  { g: ['c.c.c', '.ccc.'], pal: { c: '#e8542f' }, dx: 0, dy: -1 },
+    plates: { g: ['p.p.p.p', 'ppppppp'], pal: { p: '#3fa7d6' }, dx: -6, dy: 6 },
+    sail:   { g: ['...s...', '..sss..', '.sssss.', 'sssssss'], pal: { s: '#c98fe0' }, dx: -6, dy: 7 },
+    spikes: { g: ['s.s.s.s', '.s.s.s.'], pal: { s: '#f0e2c8' }, dx: -6, dy: 6 },
   };
 
   const EYE = '#2e2216', SHINE = '#ffffff', BLUSH = '#ff9eb5';
@@ -1314,6 +1347,16 @@ const SPR = (() => {
         px(ctx, x, y, k, tc);
         if (rnd() < 0.6) px(ctx, x + 1, y, k, darken(tc, 0.2));
       });
+    } else if (tier === 9) {
+      /* a fossil egg: stone, hairline cracks, a fleck of amber */
+      const crk = darken(shell, 0.45);
+      [[3, 4], [4, 5], [5, 5], [5, 6], [6, 7], [3, 8], [4, 8], [6, 3], [7, 4]].forEach(([x, y]) => px(ctx, x, y, k, crk));
+      px(ctx, 6, 6, k, '#f0a422'); px(ctx, 2, 6, k, darken(shell, 0.2));
+    } else if (tier === 10) {
+      /* a moon egg: craters, and a rim that glows */
+      const cr = darken(shell, 0.18);
+      [[3, 5], [6, 4], [5, 8], [7, 7]].forEach(([x, y]) => { px(ctx, x, y, k, cr); px(ctx, x + 1, y, k, darken(shell, 0.08)); });
+      px(ctx, 2, 7, k, '#5fd0ff'); px(ctx, 7, 2, k, '#5fd0ff'); px(ctx, 4, 10, k, '#5fd0ff');
     } else if (tier >= 6) {
       const cx = 4, cy = 6;
       [[0, -1], [-1, 0], [1, 0], [0, 1]].forEach(([dx, dy]) => px(ctx, cx + dx, cy + dy, k, tc));
@@ -1652,7 +1695,7 @@ const SPR = (() => {
       '..oooo....', '.oWWWWo...', 'oWwwwwWo..', 'oWwwwwWo..', 'oWwwwwWo..',
       '.oWWWWo...', '..oooo.o..', '.......oo.', '........oo', '.........o'],
     fence: [
-      '..o....o..', '.oNo..oNo.', 'oNNNooNNNo', 'oNnNooNnNo', 'ooooooooooo',
+      '..o....o..', '.oNo..oNo.', 'oNNNooNNNo', 'oNnNooNnNo', 'oooooooooo',
       'oNnNooNnNo', 'oNNNooNNNo', '.oNo..oNo.', '..o....o..', '..........'],
     person: [
       '...oooo...', '..oNNNNo..', '.oNNNNNNo.', '...osso...', '...oeso...',
@@ -1660,6 +1703,36 @@ const SPR = (() => {
     bot: [
       '....o.....', '...oyo....', '..oWWWWo..', '.oWbbbbWo.', '.oWWWWWWo.',
       'ooWWWWWWoo', 'oWWkWWkWWo', 'oWWWWWWWWo', '.okkookko.', '..........'],
+    globe: [
+      '..oooooo..', '.obbGGbbo.', 'obGGbbGbbo', 'obbGbbbGbo', 'oGbbbGGbbo',
+      'oGGbbGGbbo', 'obbGbbbbbo', 'obbbbGGbbo', '.obbbGbbo.', '..oooooo..'],
+    dino: [
+      '.....oooo.', '....oGGGGo', '....oGwGGo', '.o..oGGGGo', 'oGo.oGGGoo',
+      'oGGooGGGo.', '.oGGGGGGo.', '..oGGGGo..', '...oGoGo..', '...oo.oo..'],
+    fossil: [
+      '..........', '.oo....oo.', 'owwo..owwo', '.owwoowwo.', '..owwwwo..',
+      '..owwwwo..', '.owwoowwo.', 'owwo..owwo', '.oo....oo.', '..........'],
+    pan: [
+      '..........', '..........', '.oooooo...', 'okkkkkko..', 'okwwwwkooo',
+      'okwyywkkno', 'okwwwwko..', '.oooooo...', '..........', '..........'],
+    cake: [
+      '....y.....', '....o.....', '.oooooooo.', 'opwpwpwppo', 'oppppppppo',
+      '.oooooooo.', 'onnnnnnnno', 'onnnnnnnno', '.oooooooo.', '..........'],
+    drumstick: [
+      '..........', '....ooooo.', '...onnnnno', '..onnNnnno', '..onnnnno.',
+      '.ooonnno..', 'oww.ooo...', 'owwo......', '.oo.......', '..........'],
+    ticket: [
+      '..........', '.oooooooo.', 'oyyyoYYYYo', 'oyyyoYYYYo', 'oyyyoYwYYo',
+      'oyyyoYYYYo', 'oyyyoYYYYo', '.oooooooo.', '..........', '..........'],
+    medal: [
+      '..oo..oo..', '..oro.ro..', '..oro.ro..', '...oooo...', '..oyyyyo..',
+      '.oyyYyyyo.', '.oyYyyyyo.', '.oyyyyyyo.', '..oyyyyo..', '...oooo...'],
+    moon: [
+      '...oooo...', '..owwwwo..', '.owwoooo..', '.owwo.....', 'owwwo.....',
+      'owwwo.....', '.owwo.....', '.owwwoooo.', '..owwwwo..', '...oooo...'],
+    quest: [
+      '..oooooo..', '.owwwwwwo.', 'owwoooowwo', 'oooo..owwo', '....oowwo.',
+      '...owwoo..', '...owwo...', '...oooo...', '...owwo...', '...oooo...'],
   };
   function iconSprite(name, scale) {
     const key = 'ic_' + name + '_' + scale;
@@ -3007,9 +3080,46 @@ const SPR = (() => {
     ctx.fillRect(cx - 1, cy - r - 5, 1, 3); ctx.fillRect(cx, cy - r - 4, 1, 1); ctx.fillRect(cx + 1, cy - r - 5, 1, 3);
   }
 
+  /* ============================================================
+     FOSSILS AND FOOD - a bone in the dirt, and what the Kitchen
+     puts on a plate
+     ============================================================ */
+  function fossilSprite(seed, scale) {
+    const key = 'fossil_' + (seed % 3) + '_' + scale;
+    if (cache.has(key)) return cache.get(key);
+    const k = scale || 1;
+    const c = newCanvas(9 * k, 7 * k);
+    const ctx = c.getContext('2d');
+    const rows = (seed % 3) === 2 ? [
+      '.ooooooo.', 'owwwwwwwo', 'owoowoowo', 'owwwwwwwo', '.owwowwo.', '.oo.o.oo.', '.........'] : [
+      '.oo...oo.', 'owwo.owwo', '.owwwwwo.', '..owwwo..', '.owwwwwo.', 'owwo.owwo', '.oo...oo.'];
+    drawGrid(ctx, rows, { o: '#5e4a2a', w: '#f2e8d0' }, 0, 0, k);
+    px(ctx, 4, 3, k, '#d9c9a8');
+    cache.set(key, c);
+    return c;
+  }
+  function dishSprite(id, scale) {
+    const key = 'dish_' + id + '_' + scale;
+    if (cache.has(key)) return cache.get(key);
+    const k = scale || 1;
+    const c = newCanvas(10 * k, 7 * k);
+    const ctx = c.getContext('2d');
+    /* the plate */
+    ctx.fillStyle = '#2e2216'; ctx.fillRect(0, 4 * k, 10 * k, 3 * k);
+    ctx.fillStyle = '#fff8ec'; ctx.fillRect(k, 5 * k, 8 * k, k);
+    ctx.fillStyle = '#c9c0a8'; ctx.fillRect(2 * k, 6 * k, 6 * k, k);
+    const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
+    if (id === 'omelette') { R(2, 2, 6, 3, '#f2c94c'); R(2, 2, 6, 1, '#ffe27a'); R(4, 3, 2, 1, '#e8a52f'); }
+    else if (id === 'scotch') { R(3, 1, 4, 4, '#a8703a'); R(3, 1, 4, 1, '#c9924f'); R(4, 2, 2, 2, '#ffd23f'); }
+    else if (id === 'cake') { R(2, 3, 6, 2, '#c9924f'); R(2, 1, 6, 2, '#ff8ab5'); R(3, 0, 4, 1, '#fff8ec'); R(4, 0, 1, 1, '#e8542f'); }
+    else { R(1, 2, 6, 3, '#b8843f'); R(1, 2, 6, 1, '#d9a066'); R(6, 1, 3, 2, '#fff8ec'); R(7, 3, 1, 1, '#fff8ec'); if (id === 'dino') { R(0, 1, 2, 2, '#b8843f'); R(2, 1, 4, 1, '#d9a066'); } }
+    cache.set(key, c);
+    return c;
+  }
+
   return {
     chickenSprite, eggSprite, nestSprite, mamaSprite, decoSprite,
-    cloudBubble,
+    cloudBubble, fossilSprite, dishSprite,
     uiSprite, iconSprite, basketSprite, feedbagSprite, hammerSprite, staffSprite,
     personSprite, faceSprite, flyerSprite,
     soilSprite, cropSprite, chickSprite, vehicleSprite, skylineSprite, cursorSprite,

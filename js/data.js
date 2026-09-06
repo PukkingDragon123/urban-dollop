@@ -13,17 +13,35 @@ const TIERS = [
   { n:'Cosmic',    c:'#6457d6' },
   { n:'Divine',    c:'#f0b429' },
   { n:'Secret',    c:'#ff5fd0' },   /* breed-only: hatches from rainbow eggs */
+  { n:'Prehistoric', c:'#8a6a3a' }, /* fossil-only: the Time Machine brings them back */
+  { n:'Celestial', c:'#5fd0ff' },   /* moon-only: hatch from eggs the Moon branch sends home */
 ];
+/* the tiers that the rest of the game reasons about by name */
+const TIER_DIVINE = 7, TIER_SECRET = 8, TIER_DINO = 9, TIER_MOON = 10;
 
 /* pale egg shell colors per tier (spots use TIERS[t].c) */
-const EGG_SHELL = ['#f8efe0','#dcf2c8','#cfe9fb','#ead4f8','#ffe4b8','#ffd3dc','#d3ccf8','#fff1c4','#fff0fa'];
+const EGG_SHELL = ['#f8efe0','#dcf2c8','#cfe9fb','#ead4f8','#ffe4b8','#ffd3dc','#d3ccf8','#fff1c4','#fff0fa','#c9b89a','#e8f6ff'];
 
-/* how many species live in each tier — totals 112 */
-const TIER_COUNTS = [18,16,14,13,12,10,9,8,12];
+/* how many species live in each tier — totals 128 */
+const TIER_COUNTS = [18,16,14,13,12,10,9,8,12,10,6];
+
+/* ------------------------------------------------------------
+   RANKS - every hen earns stars for the eggs she lays. Each star
+   is worth a little more speed and value once Pecking Order is
+   installed; a Champion draws a crowd at the park.
+   ------------------------------------------------------------ */
+const RANKS = [
+  { n:'Rookie',   eggs:0,   col:'#a09a8f' },
+  { n:'Layer',    eggs:20,  col:'#8fd14f' },
+  { n:'Veteran',  eggs:60,  col:'#3fa7d6' },
+  { n:'Elite',    eggs:150, col:'#b06ee0' },
+  { n:'Champion', eggs:400, col:'#ffd23f' },
+];
 
 const ECON = {
-  eggValue: t => 5 * Math.pow(5, t),
-  layTime:  t => 22 * Math.pow(1.5, t),        // seconds between eggs per chicken
+  /* the price curve flattens past Secret: a dinosaur egg is a fortune, not the economy */
+  eggValue: t => t <= 8 ? 5 * Math.pow(5, t) : t === 9 ? 3e6 : 8e6,
+  layTime:  t => 22 * Math.pow(1.5, Math.min(t, 9)),   // seconds between eggs per chicken
   incHatch: t => 10 * Math.pow(1.55, t),       // seconds inside an incubator
   feathers:  t => Math.pow(2, t),
   discoveryBonus: t => 5 * Math.pow(2, t),
@@ -112,6 +130,20 @@ const ECON = {
   decoRefund: 0.5,         // what you get back for lifting a decoration
   loaderRate: 0.35,        // seconds per egg a Loader pushes into the truck
   hatcheryCap: 24,         // eggs a Grand Hatchery holds
+  rankLay: 0.06,           // lay speed per rank star, once Pecking Order is installed
+  rankValue: 0.06,         // egg value per rank star
+  kitchenPantry: 24,       // eggs a kitchen keeps in the larder
+  kitchenCounter: 8,       // dishes that fit on the counter
+  dinerEvery: 16,          // seconds between walk-up diners while there is food
+  parkSlots: 4,            // exhibits in a park (six with a second floor)
+  parkBusEvery: 32,        // seconds between tour buses
+  ticketBase: 4,           // coins per visitor per point of appeal
+  parkWatch: 9,            // seconds a visitor spends gawping
+  fossilChance: 0.012,     // odds a freshly dug pond cell turns up a fossil
+  dinoFossils: 3,          // fossils the Time Machine burns per dinosaur
+  dinoTime: 240,           // seconds the Time Machine counts down
+  moonEggEvery: 300,       // seconds between eggs the Moon branch sends home
+  ageBonus: 0.08,          // coin gains per age reached
 };
 
 /* ------------------------------------------------------------
@@ -233,6 +265,7 @@ const BUILD_SECTIONS = [
   { id:'farm',    name:'FARM',    icon:'seed' },
   { id:'factory', name:'FACTORY', icon:'gear' },
   { id:'crew',    name:'CREW',    icon:'hands' },
+  { id:'empire',  name:'EMPIRE',  icon:'crown' },
 ];
 const BUILDS = {
   incubator: { name:'Incubator', sec:'ranch', w:2, h:2, base:120, growth:1.6, refund:50,
@@ -279,6 +312,12 @@ const BUILDS = {
                desc:'Bees pollinate every crop nearby so it grows faster, and drip honey you can sell.', needs:'beehive' },
   genelab:   { name:'Gene Lab', sec:'ranch', w:2, h:2, base:1500, growth:2.0, refund:600,
                desc:'Read a hen\'s genes, splice two birds into one, clone the best, cross in animal traits.', needs:'genelab' },
+  kitchen:   { name:'Kitchen', sec:'empire', w:2, h:2, base:900, growth:1.9, refund:350,
+               desc:'Eggs go in, dishes come out, and diners walk up to pay for them. Drop a hen on it for a roast.', needs:'kitchen' },
+  park:      { name:'Chicken Park', sec:'empire', w:3, h:3, base:4000, growth:2.0, refund:1600,
+               desc:'Put your finest hens on show. Tour buses bring visitors who pay at the gate.', needs:'park' },
+  timemachine: { name:'Time Machine', sec:'empire', w:2, h:2, base:250000, growth:2.5, refund:100000,
+               desc:'Three fossils in, one dinosaur out, sixty-five million years later.', needs:'timemachine' },
   board:     { name:'Noticeboard', sec:'crew', w:1, h:1, base:40, growth:1.4, refund:15,
                desc:'Where flyers get pinned. Applicants walk up to it and wait.', needs:'hiring' },
   belt:      { name:'Conveyor',  sec:'factory', w:1, h:1, base:15, growth:1, refund:7,
@@ -336,18 +375,81 @@ const STOCK_BY_ID = Object.fromEntries(STOCKS.map(s => [s.id, s]));
    x, y sit on the 380 x 200 world map.
    ------------------------------------------------------------ */
 const REGIONS = [
-  { id:'valley',       name:'Cluckton Valley', flag:['#6ab04c', '#ffd23f'], x:96,  y:96,  cost:0,     branchBase:0,      cap:0,  yield:0,    home:true, blurb:'Home. The ranch itself.' },
-  { id:'featherland',  name:'Featherland',     flag:['#3fa7d6', '#fff8ec'], x:64,  y:62,  cost:8000,  branchBase:3000,   cap:4,  yield:24,   blurb:'Cold, tidy, mad for eggs.' },
-  { id:'yolkshire',    name:'Yolkshire',       flag:['#e8542f', '#fff8ec'], x:190, y:66,  cost:20000, branchBase:6000,   cap:5,  yield:40,   blurb:'Tea, rain and a boiled egg.' },
-  { id:'shellvador',   name:'Shellvador',      flag:['#ffd23f', '#6ab04c'], x:116, y:146, cost:45000, branchBase:12000,  cap:5,  yield:70,   blurb:'Sun all year. Hens lay double.' },
-  { id:'eggypt',       name:'Eggypt',          flag:['#f0a422', '#2e2216'], x:208, y:112, cost:90000, branchBase:22000,  cap:6,  yield:120,  blurb:'Pyramids of eggs, literally.' },
-  { id:'cluckistan',   name:'Cluckistan',      flag:['#b06ee0', '#ffd23f'], x:252, y:84,  cost:180000,branchBase:40000,  cap:6,  yield:200,  blurb:'High plains. Very large hens.' },
-  { id:'peckoslovakia',name:'Peckoslovakia',   flag:['#ff5f9e', '#fff8ec'], x:166, y:44,  cost:320000,branchBase:70000,  cap:6,  yield:320,  blurb:'The egg opera capital.' },
-  { id:'coopisland',   name:'Coop Island',     flag:['#4fb8a8', '#fff8ec'], x:302, y:146, cost:650000,branchBase:130000, cap:8,  yield:520,  blurb:'An island shaped like a hen.' },
-  { id:'henmark',      name:'Henmark',         flag:['#e8324a', '#fff8ec'], x:130, y:34,  cost:1.2e6, branchBase:250000, cap:8,  yield:850,  blurb:'Designer eggs. Very dear.' },
-  { id:'moon',         name:'The Moon',        flag:['#c9ced6', '#2e2216'], x:338, y:36,  cost:8e6,   branchBase:2e6,    cap:10, yield:6000, moon:true, blurb:'No air. No foxes. Eggs float.' },
+  { id:'valley',       name:'Cluckton Valley', flag:['#6ab04c', '#ffd23f'], lat:22,  lon:0,    size:26, land:'green', cost:0,     branchBase:0,      cap:0,  yield:0,    home:true, blurb:'Home. The ranch itself.' },
+  { id:'featherland',  name:'Featherland',     flag:['#3fa7d6', '#fff8ec'], lat:56,  lon:-46,  size:22, land:'cold',  cost:8000,  branchBase:3000,   cap:4,  yield:24,   blurb:'Cold, tidy, mad for eggs.' },
+  { id:'yolkshire',    name:'Yolkshire',       flag:['#e8542f', '#fff8ec'], lat:46,  lon:38,   size:20, land:'green', cost:20000, branchBase:6000,   cap:5,  yield:40,   blurb:'Tea, rain and a boiled egg.' },
+  { id:'shellvador',   name:'Shellvador',      flag:['#ffd23f', '#6ab04c'], lat:-14, lon:-28,  size:24, land:'lush',  cost:45000, branchBase:12000,  cap:5,  yield:70,   blurb:'Sun all year. Hens lay double.' },
+  { id:'eggypt',       name:'Eggypt',          flag:['#f0a422', '#2e2216'], lat:22,  lon:74,   size:24, land:'sand',  cost:90000, branchBase:22000,  cap:6,  yield:120,  blurb:'Pyramids of eggs, literally.' },
+  { id:'cluckistan',   name:'Cluckistan',      flag:['#b06ee0', '#ffd23f'], lat:40,  lon:118,  size:26, land:'high',  cost:180000,branchBase:40000,  cap:6,  yield:200,  blurb:'High plains. Very large hens.' },
+  { id:'peckoslovakia',name:'Peckoslovakia',   flag:['#ff5f9e', '#fff8ec'], lat:52,  lon:164,  size:18, land:'green', cost:320000,branchBase:70000,  cap:6,  yield:320,  blurb:'The egg opera capital.' },
+  { id:'coopisland',   name:'Coop Island',     flag:['#4fb8a8', '#fff8ec'], lat:-30, lon:-124, size:11, land:'lush',  cost:650000,branchBase:130000, cap:8,  yield:520,  blurb:'An island shaped like a hen.' },
+  { id:'henmark',      name:'Henmark',         flag:['#e8324a', '#fff8ec'], lat:68,  lon:-150, size:20, land:'cold',  cost:1.2e6, branchBase:250000, cap:8,  yield:850,  blurb:'Designer eggs. Very dear.' },
+  { id:'moon',         name:'The Moon',        flag:['#c9ced6', '#2e2216'], lat:0,   lon:0,    size:0,  land:'moon',  cost:8e6,   branchBase:2e6,    cap:10, yield:6000, moon:true, blurb:'No air. No foxes. Eggs float.' },
 ];
 const REGION_BY_ID = Object.fromEntries(REGIONS.map(r => [r.id, r]));
+
+/* ------------------------------------------------------------
+   AGES - the company grows through six eras. Each one is reached
+   by milestones, tints the valley its own way, adds a little to
+   every coin earned, and opens a lane of the research board.
+   ------------------------------------------------------------ */
+const AGES = [
+  { id:'straw',    name:'Straw Age',    icon:'seed',   hue:'#c9a35f', tint:null,                   blurb:'One hen, one field, one bicycle.',
+    need:{} },
+  { id:'iron',     name:'Iron Age',     icon:'hammer', hue:'#9fb3c8', tint:'rgba(70,80,100,.07)',   blurb:'Tools, sheds and the first machines.',
+    need:{ hatched:5, coinsEarned:600, builtN:2 } },
+  { id:'steam',    name:'Steam Age',    icon:'gear',   hue:'#c98f3f', tint:'rgba(150,95,40,.09)',   blurb:'Boilers, belts and a kitchen full of steam.',
+    need:{ disc:14, coinsEarned:15000, hired:1, builtN:8 } },
+  { id:'electric', name:'Electric Age', icon:'bolt',   hue:'#ffd23f', tint:'rgba(255,225,130,.07)', blurb:'Lamps in the windows and crowds at the gate.',
+    need:{ disc:30, coinsEarned:250000, orders:10, belts:8 } },
+  { id:'space',    name:'Space Age',    icon:'atom',   hue:'#5fd0ff', tint:'rgba(70,110,200,.09)',  blurb:'Branches abroad and a rocket on the pad.',
+    need:{ disc:50, coinsEarned:5e6, regions:1 } },
+  { id:'jurassic', name:'Jurassic Age', icon:'dino',   hue:'#6a8a3a', tint:'rgba(60,120,40,.11)',   blurb:'The company bought a time machine.',
+    need:{ disc:70, coinsEarned:6e7, moon:true } },
+];
+const AGE_INDEX = Object.fromEntries(AGES.map((a, i) => [a.id, i]));
+/* what each requirement key is called on the age's card */
+const AGE_NEED_NAMES = { hatched:'eggs hatched', coinsEarned:'coins earned', builtN:'things built', disc:'species found',
+                         hired:'crew hired', orders:'orders filled', belts:'belts laid', regions:'countries opened', moon:'the Moon opened' };
+
+/* ------------------------------------------------------------
+   SECRETS - things the game never tells you to do. Each one pays
+   out once, the moment it happens, and gets its page in the Index.
+   ------------------------------------------------------------ */
+const SECRETS = [
+  { id:'nightowl',   name:'Night Owl',           icon:'clock',   rw:{ f:20 },   desc:'Ran the ranch between midnight and five.' },
+  { id:'eggtower',   name:'Egg Tower',           icon:'egg',     rw:{ f:25 },   desc:'A hundred eggs on the grass at once.' },
+  { id:'goldrush',   name:'Gold Rush',           icon:'sparkle', rw:{ c:500 },  desc:'Three golden eggs in one sweep of the basket.' },
+  { id:'rainbow',    name:'Rainbow Connection',  icon:'rainbow', rw:{ f:100 },  desc:'Hatched a rainbow egg.' },
+  { id:'moonname',   name:'Moon Unit',           icon:'moon',    rw:{ f:30 },   desc:'Named the company after the Moon.' },
+  { id:'petfan',     name:'Grandma\'s Favourite', icon:'crown',  rw:{ f:40 },   desc:'Petted Mama a hundred times.' },
+  { id:'vanmover',   name:'Tip The Movers',      icon:'car',     rw:{ c:200 },  desc:'Tapped the movers\' van while they worked.' },
+  { id:'fossil',     name:'Bone Digger',         icon:'fossil',  rw:{ f:60 },   desc:'Dug up a fossil.' },
+  { id:'butterfly',  name:'Butterfly Catcher',   icon:'heart',   rw:{ f:15 },   desc:'Tapped a butterfly on the wing.' },
+  { id:'fullhouse',  name:'Full House',          icon:'house',   rw:{ c:300 },  desc:'Filled the ranch to capacity.' },
+  { id:'longhaul',   name:'Long Haul',           icon:'road',    rw:{ f:50 },   desc:'A whole hour on the ranch in one sitting.' },
+  { id:'soaked',     name:'Soaked',              icon:'water',   rw:{ f:30 },   desc:'Stood through five showers.' },
+  { id:'moonwalk',   name:'One Small Peck',      icon:'atom',    rw:{ f:500 },  desc:'Opened the Moon.' },
+  { id:'dinopet',    name:'Clever Girl',         icon:'dino',    rw:{ f:300 },  desc:'Petted a dinosaur and kept every finger.' },
+  { id:'chef',       name:'Chef\'s Kiss',        icon:'pan',     rw:{ c:5000 }, desc:'Cooked every recipe on the menu.' },
+  { id:'sleeper',    name:'Sleeper',             icon:'clock',   rw:{ f:80 },   desc:'Came back after eight hours away.' },
+  { id:'typist',     name:'The Password',        icon:'key',     rw:{ f:200 },  desc:'Typed E, G, G on the keyboard.' },
+  { id:'champion',   name:'Champion Layer',      icon:'medal',   rw:{ c:2000 }, desc:'A hen reached Champion rank.' },
+];
+const SECRET_BY_ID = Object.fromEntries(SECRETS.map(s => [s.id, s]));
+
+/* ------------------------------------------------------------
+   THE KITCHEN - recipes. Eggs (and, later, whole hens) become
+   dishes worth a multiple of what the eggs would have fetched.
+   ------------------------------------------------------------ */
+const RECIPES = [
+  { id:'omelette', name:'Omelette',       icon:'pan',       eggs:3, feed:0, time:20, mult:5,  desc:'Three eggs, one pan.' },
+  { id:'scotch',   name:'Scotch Egg',     icon:'egg',       eggs:1, feed:3, time:14, mult:4,  needs:'scotch',    desc:'An egg in a coat of feed.' },
+  { id:'cake',     name:'Egg Cake',       icon:'cake',      eggs:6, feed:6, time:45, mult:12, needs:'bakery',    desc:'Six eggs tall.' },
+  { id:'roast',    name:'Roast Hen',      icon:'drumstick', hen:true, time:60, mult:40, needs:'roast',          desc:'A whole bird, slow and low.' },
+  { id:'dino',     name:'Dino Drumstick', icon:'drumstick', hen:true, dino:true, time:90, mult:80, needs:'dinoroast', desc:'Serves forty.' },
+];
+const RECIPE_BY_ID = Object.fromEntries(RECIPES.map(r => [r.id, r]));
 
 /* ------------------------------------------------------------
    CREW - five stats, and roles that each lean on different ones.
@@ -644,6 +746,26 @@ const SPECIES_RAW = [
   ['Circuit Chick','chick','#3a3a4a','#33ffcc','stripes','antenna','round','01001100 01001111 01010110 01000101.'],
   ['Grand Cluck', 'hen',  '#7a5fd0','#ffd23f','star',   'wizard', 'round', 'Wrote the book on clucking. Twice.'],
   ['Infinity Yolk','chick','#fff5d9','#ff5fd0','star',  'halo',   'sleepy','Contains this game. Somehow.'],
+
+  /* ---- PREHISTORIC (10) — fossils only: the Time Machine brings them back ---- */
+  ['Cluckosaurus Rex','dino','#6a8a3a','#3a5a22','stripes','none',  'round', 'Tiny arms. Enormous opinions.'],
+  ['Velocirooster','dino', '#c98f3f','#7a5230','spots',  'crest',  'round', 'Clever girl.'],
+  ['Tricerachick', 'dino', '#8a9a5a','#5a6a3a','solid',  'horns',  'sleepy','Three horns, one attitude.'],
+  ['Stegocluck',   'dino', '#5f8ad3','#3a5a9e','solid',  'plates', 'round', 'Plates for days.'],
+  ['Pteracluck',   'dino', '#b06ee0','#6a3a9e','solid',  'sail',   'happy', 'Not technically a dinosaur. Still counts.'],
+  ['Brontobawk',   'dino', '#4fb8a8','#2a7a6a','spots',  'none',   'sleepy','Long neck. Longer naps.'],
+  ['Ankylocluck',  'dino', '#8a6a3a','#5a4222','solid',  'spikes', 'round', 'Armoured. Grumpy.'],
+  ['Raptor Roo',   'dino', '#e8542f','#a8321c','stripes','crest',  'round', 'Fast. Loud. Feathery.'],
+  ['Spinocluck',   'dino', '#3a9e4a','#1f6a2a','solid',  'sail',   'round', 'Swims. Sort of.'],
+  ['Mega Mama Saurus','dino','#ffd23f','#e8542f','star', 'crown',  'happy', 'Queen of the Cretaceous coop.'],
+
+  /* ---- CELESTIAL (6) — hatch only from eggs the Moon branch sends home ---- */
+  ['Moon Hen',     'fluff','#e8f6ff','#5fd0ff','solid',  'halo',   'sleepy','Lays in low gravity.'],
+  ['Crater Chick', 'chick','#c9ced6','#8a9099','spots',  'none',   'round', 'Pockmarked and proud.'],
+  ['Selene',       'hen',  '#d0d8ff','#7a8ad3','star',   'tiara',  'happy', 'Waxes and wanes.'],
+  ['Apollo Bird',  'tall', '#fff8ec','#e8542f','stripes','antenna','round', 'One small peck for henkind.'],
+  ['Lunar Lantern','fluff','#fff3c4','#ffd23f','solid',  'none',   'happy', 'Glows on the dark side.'],
+  ['The Far Side', 'hen',  '#24242e','#5fd0ff','star',   'none',   'sleepy','Nobody has seen her face.'],
 ];
 
 /* build SPECIES with tier + id resolved */
@@ -660,7 +782,7 @@ const SPECIES = (() => {
       idx++;
     }
   });
-  if (out.length !== 112) throw new Error('species count ' + out.length);
+  if (out.length !== 128) throw new Error('species count ' + out.length);
   return out;
 })();
 const SPECIES_TOTAL = SPECIES.length;
@@ -679,6 +801,7 @@ const SPECIES_BY_TIER = TIERS.map((_, t) => SPECIES.filter(s => s.tier === t));
    ------------------------------------------------------------ */
 const MODULES = [
   { id:'quests',  name:'QUESTS',  code:'quest.sys', icon:'star',    hue:'#ffd23f' },
+  { id:'ages',    name:'AGES',    code:'age.sys',   icon:'scroll',  hue:'#f0a422' },
   { id:'tools',   name:'TOOLS',   code:'tools.sys', icon:'hammer',  hue:'#9fb3c8' },
   { id:'farm',    name:'FARM',    code:'farm.sys',  icon:'seed',    hue:'#7ab648' },
   { id:'hens',    name:'HENS',    code:'hens.sys',  icon:'chick',   hue:'#e8542f' },
@@ -689,6 +812,10 @@ const MODULES = [
   { id:'factory', name:'FACTORY', code:'fact.sys',  icon:'gear',    hue:'#3fa7d6' },
   { id:'love',    name:'LOVE',    code:'love.sys',  icon:'heart',   hue:'#ff5f9e' },
   { id:'decor',   name:'DECOR',   code:'deco.sys',  icon:'tree',    hue:'#4fb8a8' },
+  /* lanes an age has to open first */
+  { id:'kitchen', name:'KITCHEN', code:'cook.sys',  icon:'pan',     hue:'#e8a52f', age:'iron' },
+  { id:'park',    name:'PARK',    code:'park.sys',  icon:'ticket',  hue:'#5fd0a0', age:'steam' },
+  { id:'jurassic',name:'JURASSIC',code:'dino.sys',  icon:'dino',    hue:'#8a9a5a', age:'jurassic' },
 ];
 const MOD_BY_ID = Object.fromEntries(MODULES.map(m => [m.id, m]));
 const MOD_INDEX = Object.fromEntries(MODULES.map((m, i) => [m.id, i]));
@@ -734,6 +861,8 @@ const SKILLS = [
   K('happy',      'hens', 1, 'root',   'Happy Hens',     'heart',   12, 4,  1.9, '+10% lay speed'),
   K('flock',      'hens', 2, 'happy',  'Bigger Flock',   'house',   10, 10, 2.1, '+4 chicken capacity'),
   K('pets',       'hens', 2, 'happy',  'Pet Therapy',    'hands',   6,  6,  2.2, '-15% pet cooldown'),
+  U('ranks',      'hens', 2, 'happy',  'Pecking Order',  'medal',   20,  'Hens earn stars for the eggs they lay: every star is 6% more speed and value'),
+  K('medals',     'hens', 3, 'ranks',  'Medal Table',    'medal',   5,  60, 2.3, '+4% more per star on every ranked hen'),
   K('golden',     'hens', 3, 'flock',  'Golden Peck',    'sparkle', 6,  25, 2.5, '+3% golden eggs (worth 5x)'),
   K('mutate',     'hens', 3, 'pets',   'Mutation Vats',  'dna',     8,  30, 2.3, '+1.5% egg mutation chance'),
   K('coops',      'hens', 4, 'flock',  'Tower Coops',    'silo',    6,  120,2.6, '+10 chicken capacity'),
@@ -779,6 +908,7 @@ const SKILLS = [
   U('worldmap',   'market', 6, 'fleet',     'World Map',        'city',  2500,'Unlock the WORLD: open branches in other countries'),
   K('airfreight', 'market', 7, 'worldmap',  'Air Freight',      'wind',  4, 4000, 2.2, '+50% income from every branch abroad'),
   U('moonshot',   'market', 8, 'airfreight','Moonshot',         'atom',  20000,'Unlock the Moon: the last place left to sell eggs'),
+  U('moonegg',    'market', 9, 'moonshot',  'Moon Eggs',        'moon',  50000,'A Moon branch sends an egg home now and then: Celestial birds hatch from them'),
 
   /* ---- CREW: flyers, wages, robots, roles ---- */
   U('hiring',     'crew', 1, 'root',      'Recruiting',     'doc',    12,  'Unlock the Staff Hut, flyers and hiring'),
@@ -823,6 +953,34 @@ const SKILLS = [
   U('furniture',  'decor', 2, 'garden',    'Furniture',      'rack',    14,  'Unlock benches, lamp posts, barrels, birdbaths, scarecrows and more'),
   U('orchard',    'decor', 3, 'trees',     'The Orchard',    'sparkle', 25,  'Unlock apple trees, lavender and sunflowers'),
   U('beehive',    'decor', 3, 'furniture', 'Beekeeping',     'hexcomb', 40,  'Unlock the Beehive: crops near it grow faster, and the honey sells'),
+
+  /* ---- KITCHEN: opens with the Iron Age ---- */
+  U('kitchen',    'kitchen', 1, 'root',     'The Kitchen',    'pan',      30,  'Unlock the Kitchen: eggs become omelettes, and diners walk up to buy them'),
+  U('scotch',     'kitchen', 2, 'kitchen',  'Scotch Eggs',    'egg',      40,  'A recipe: one egg in a coat of feed, four times the price'),
+  K('chef',       'kitchen', 2, 'kitchen',  'Quick Chef',     'flame',    6, 35,  2.2, '-12% cooking time'),
+  U('bakery',     'kitchen', 3, 'scotch',   'The Bakery',     'cake',     120, 'A recipe: egg cake, six eggs tall, twelve times the price'),
+  K('menu',       'kitchen', 3, 'chef',     'Bigger Menu',    'doc',      5, 80,  2.4, '+20% on every dish sold'),
+  U('roast',      'kitchen', 4, 'bakery',   'Sunday Roast',   'drumstick',300, 'Drop a hen on the Kitchen: a roast worth forty of her eggs'),
+  U('diner',      'kitchen', 4, 'menu',     'The Diner',      'house',    260, 'Diners come twice as often'),
+  U('dinoroast',  'kitchen', 5, 'roast',    'Jurassic Grill', 'dino',     2500,'Roast a dinosaur: a drumstick that serves forty'),
+  U('foodtruck',  'kitchen', 5, 'diner',    'Food Truck',     'truck',    900, 'Dishes on the counter ride out with the egg truck and sell in town'),
+
+  /* ---- PARK: opens with the Steam Age ---- */
+  U('park',       'park', 1, 'root',       'Chicken Park',   'ticket',   60,  'Unlock the Chicken Park: put hens on show and sell tickets at the gate'),
+  K('tickets',    'park', 2, 'park',       'Dearer Tickets', 'coin',     8, 60,  2.2, '+15% ticket price'),
+  U('busstop',    'park', 2, 'park',       'Bus Stop',       'car',      150, 'Tour buses come half again as often'),
+  U('giftshop',   'park', 3, 'tickets',    'Gift Shop',      'crate',    400, '+30% from every visitor'),
+  K('crowds',     'park', 3, 'busstop',    'Word Of Beak',   'hands',    6, 200, 2.4, '+1 visitor on every bus'),
+  U('dinopen',    'park', 4, 'giftshop',   'Dino Pen',       'dino',     3000,'Dinosaurs allowed in the park: four times the appeal'),
+  U('nightshow',  'park', 4, 'crowds',     'Night Show',     'candle',   2400,'Visitors pay half again after dark'),
+
+  /* ---- JURASSIC: opens with the Jurassic Age ---- */
+  U('fossilhunt', 'jurassic', 1, 'root',       'Fossil Hunt',    'fossil',  500,  'Digging ponds turns up fossils three times as often'),
+  U('timemachine','jurassic', 2, 'fossilhunt', 'Time Machine',   'clock',   5000, 'Unlock the Time Machine: three fossils in, one dinosaur out'),
+  K('deextinct',  'jurassic', 3, 'timemachine','De-Extinction',  'dna',     5, 3000, 2.4, '-15% Time Machine countdown'),
+  U('amber',      'jurassic', 3, 'timemachine','Amber',          'honey',   4000, 'Harvests turn up the odd fossil too'),
+  K('dinofeed',   'jurassic', 4, 'deextinct',  'Dino Feed',      'bowl',    5, 6000, 2.5, 'dinosaurs lay 20% faster'),
+  U('bigeggs',    'jurassic', 4, 'amber',      'Big Eggs',       'egg',     20000,'dinosaur eggs sell for double'),
 ];
 
 const SKILL_BY_ID = Object.fromEntries(SKILLS.map(s => [s.id, s]));
@@ -853,19 +1011,38 @@ const QUESTS = [
   { id:'q_depot',   name:'Open The Depot',  icon:'truck',  goal:{ k:'skill', id:'logistics' },       rw:{ c:80 },         hint:'Install Logistics', where:'lab' },
   { id:'q_order',   name:'Roadside Order',  icon:'doc',    goal:{ k:'stat', s:'orders', n:1 },      rw:{ f:15 },         hint:'Fill an order', where:'road' },
   { id:'q_hire',    name:'Hire A Hand',     icon:'hands',  goal:{ k:'stat', s:'hired', n:1 },       rw:{ c:120 },        hint:'Hire someone', where:'lab' },
+  { id:'q_iron',    name:'Iron Age',        icon:'hammer', goal:{ k:'age', id:'iron' },              rw:{ c:100 },        hint:'Reach the Iron Age', where:'lab' },
+  { id:'q_cook',    name:'First Omelette',  icon:'pan',    goal:{ k:'stat', s:'cooked', n:1 },      rw:{ f:20 },         hint:'Cook a dish', where:'field' },
   { id:'q_eight',   name:'Eight Species',   icon:'book',   goal:{ k:'disc', n:8 },                   rw:{ f:30 },         hint:'Find 8 species', where:'inc' },
   { id:'q_belts',   name:'Belt Line',       icon:'crate',  goal:{ k:'built', t:'belt', n:4 },        rw:{ c:250 },        hint:'Build 4 belts', where:'field' },
+  { id:'q_rank',    name:'Star Layer',      icon:'medal',  goal:{ k:'stat', s:'ranked', n:1 },      rw:{ f:30 },         hint:'Rank up a hen', where:'mama' },
   { id:'q_genes',   name:'Gene Editor',     icon:'dna',    goal:{ k:'stat', s:'edits', n:1 },       rw:{ f:60 },         hint:'Edit a gene', where:'field' },
   { id:'q_storey',  name:'Second Storey',   icon:'rack',   goal:{ k:'stat', s:'storeys', n:1 },     rw:{ c:400 },        hint:'Add a floor', where:'field' },
+  { id:'q_dishes',  name:'Ten Dishes',      icon:'pan',    goal:{ k:'stat', s:'dishes', n:10 },     rw:{ c:500 },        hint:'Sell 10 dishes', where:'field' },
   { id:'q_regulars',name:'Regulars',        icon:'doc',    goal:{ k:'stat', s:'orders', n:5 },      rw:{ c:300 },        hint:'Fill 5 orders', where:'road' },
+  { id:'q_secret',  name:'A Secret',        icon:'key',    goal:{ k:'stat', s:'secrets', n:1 },     rw:{ f:50 },         hint:'Find a secret', where:'field' },
   { id:'q_land',    name:'More Land',       icon:'house',  goal:{ k:'plots', n:3 },                  rw:{ f:80 },         hint:'Own 3 plots', where:'field' },
+  { id:'q_steam',   name:'Steam Age',       icon:'gear',   goal:{ k:'age', id:'steam' },             rw:{ c:1500 },       hint:'Reach the Steam Age', where:'lab' },
+  { id:'q_park',    name:'Open The Park',   icon:'ticket', goal:{ k:'built', t:'park', n:1 },        rw:{ f:100 },        hint:'Build the park', where:'field' },
   { id:'q_flock',   name:'A Real Flock',    icon:'chick',  goal:{ k:'flock', n:20 },                 rw:{ c:600 },        hint:'Keep 20 hens', where:'mama' },
+  { id:'q_visitors',name:'A Hundred Visitors', icon:'hands', goal:{ k:'stat', s:'visitors', n:100 }, rw:{ c:3000 },     hint:'100 visitors', where:'field' },
   { id:'q_fingers', name:'Green Fingers',   icon:'sprout', goal:{ k:'stat', s:'harvested', n:25 },  rw:{ f:60 },         hint:'Harvest 25 crops', where:'field' },
+  { id:'q_roast',   name:'Sunday Roast',    icon:'drumstick', goal:{ k:'stat', s:'roasts', n:1 },   rw:{ c:2000 },       hint:'Roast a hen', where:'field' },
   { id:'q_tenk',    name:'Ten Thousand',    icon:'chart',  goal:{ k:'stat', s:'coinsEarned', n:10000 }, rw:{ f:120 },    hint:'Earn 10,000 coins', where:'truck' },
   { id:'q_public',  name:'Go Public',       icon:'star',   goal:{ k:'skill', id:'stocks' },          rw:{ c:2000 },       hint:'Go public', where:'lab' },
+  { id:'q_champion',name:'Champion',        icon:'medal',  goal:{ k:'stat', s:'champions', n:1 },   rw:{ c:5000 },       hint:'Raise a Champion', where:'mama' },
+  { id:'q_electric',name:'Electric Age',    icon:'bolt',   goal:{ k:'age', id:'electric' },          rw:{ f:300 },        hint:'Reach the Electric Age', where:'lab' },
   { id:'q_abroad',  name:'Go Abroad',       icon:'city',   goal:{ k:'regions', n:1 },                rw:{ f:200 },        hint:'Open a country', where:'lab' },
+  { id:'q_secrets5',name:'Five Secrets',    icon:'key',    goal:{ k:'stat', s:'secrets', n:5 },     rw:{ f:400 },        hint:'Find 5 secrets', where:'field' },
   { id:'q_branches',name:'Ten Branches',    icon:'house',  goal:{ k:'stat', s:'branches', n:10 },   rw:{ c:50000 },      hint:'Build 10 branches', where:'lab' },
-  { id:'q_moon',    name:'The Moon',        icon:'atom',   goal:{ k:'region', id:'moon' },           rw:{ f:2000 },       hint:'Reach the Moon', where:'lab' },
+  { id:'q_space',   name:'Space Age',       icon:'atom',   goal:{ k:'age', id:'space' },             rw:{ c:200000 },     hint:'Reach the Space Age', where:'lab' },
+  { id:'q_moon',    name:'The Moon',        icon:'moon',   goal:{ k:'region', id:'moon' },           rw:{ f:2000 },       hint:'Reach the Moon', where:'lab' },
+  { id:'q_moonegg', name:'Moon Egg',        icon:'moon',   goal:{ k:'stat', s:'celestial', n:1 },   rw:{ f:3000 },       hint:'Hatch a Moon egg', where:'inc' },
+  { id:'q_fossil',  name:'Bone Digger',     icon:'fossil', goal:{ k:'stat', s:'fossils', n:1 },     rw:{ f:500 },        hint:'Dig up a fossil', where:'field' },
+  { id:'q_jurassic',name:'Jurassic Age',    icon:'dino',   goal:{ k:'age', id:'jurassic' },          rw:{ c:1e6 },        hint:'Reach the Jurassic Age', where:'lab' },
+  { id:'q_dino',    name:'Hatch A Dinosaur',icon:'dino',   goal:{ k:'stat', s:'dinos', n:1 },       rw:{ f:5000 },       hint:'Hatch a dinosaur', where:'field' },
+  { id:'q_dinopark',name:'Jurassic Park',   icon:'ticket', goal:{ k:'stat', s:'dinoShown', n:1 },   rw:{ c:5e6 },        hint:'A dino in the park', where:'field' },
+  { id:'q_keeper',  name:'Secret Keeper',   icon:'key',    goal:{ k:'stat', s:'secrets', n:12 },    rw:{ f:10000 },      hint:'Find 12 secrets', where:'field' },
 ];
 const QUEST_BY_ID = Object.fromEntries(QUESTS.map(q => [q.id, q]));
 
@@ -885,11 +1062,15 @@ const GRID = (() => {
   lanes.push({ id:'quests', top: row, rows: 2 });
   QUESTS.forEach((q, i) => { pos[q.id] = { col: 1 + Math.floor(i / 2), row: row + (i % 2), quest: true }; });
   row += 2;
+  /* the ages: one row, the eras in order */
+  lanes.push({ id:'ages', top: row, rows: 1 });
+  AGES.forEach((a, i) => { pos[a.id] = { col: 1 + i, row, age: true }; });
+  row += 1;
   /* the kernel on its own row, then every module in order */
   pos.root = { col: 0, row: row };
   const children = id => SKILLS.filter(sk => sk.pre === id);
   MODULES.forEach(m => {
-    if (m.id === 'quests') return;
+    if (m.id === 'quests' || m.id === 'ages') return;
     const top = row;
     let next = row;
     const place = sk => {
@@ -910,7 +1091,9 @@ const GRID = (() => {
     lanes.push({ id: m.id, top, rows: Math.max(1, next - top) });
     row = next;
   });
-  return { pos, lanes, rows: row };
+  let cols = 0;
+  Object.values(pos).forEach(p => { cols = Math.max(cols, p.col + 1); });
+  return { pos, lanes, rows: row, cols };
 })();
 const GRID_POS = GRID.pos;
 

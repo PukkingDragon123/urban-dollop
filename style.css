@@ -304,7 +304,17 @@ button:focus-visible{ outline:3px dashed var(--pink); outline-offset:2px; }
 .stock-row .ledger-graph{ border-width:2px; }
 .stock-row .ip-btns{ margin:0; margin-left:auto; }
 .stock-row .ip-btns .btn{ font-size:12px; padding:5px 6px; }
-.modal-panel.book .tab-btn:nth-child(7){ background:#f2c14e; color:#4a3410; }
+.modal-panel.book .tab-btn:nth-child(7){ background:#3a3a4a; color:#ffd23f; }
+.modal-panel.book .tab-btn:nth-child(8){ background:#f2c14e; color:#4a3410; }
+/* the secrets page: cards stay face down until found */
+.egg-card.unknown{ background:#e8dbc0; }
+.egg-card.unknown b{ color:var(--ink-soft); }
+.egg-card i{ display:block; font-size:19px; color:var(--pink-dark); font-style:normal; }
+.egg-grid.secrets{ grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); }
+/* the age pill is the one pill you can press */
+#pill-age{ pointer-events:auto; cursor:pointer; font-family:var(--font-px); transition:transform .1s var(--pop); }
+#pill-age:hover{ transform:translateY(-2px); filter:brightness(1.05); }
+#pill-age b{ font-size:12px; letter-spacing:0; }
 
 /* ============================================================
    THE DOCK
@@ -637,6 +647,7 @@ button:focus-visible{ outline:3px dashed var(--pink); outline-offset:2px; }
   position:fixed; bottom:14px; right:14px;
   display:flex; flex-direction:column; gap:8px; z-index:95;
   width:min(380px, calc(100vw - 30px));
+  pointer-events:none;                       /* news never blocks a button under it */
 }
 .toast{
   position:relative; color:var(--ink);

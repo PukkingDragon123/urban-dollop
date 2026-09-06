@@ -1278,6 +1278,151 @@
     ctx.fillStyle = Math.floor(now / 300) % 2 ? '#7ef2a8' : '#2f6a48'; ctx.fillRect(x + 5, y + 21, 2, 2);
     ctx.fillStyle = Math.floor(now / 450) % 2 ? '#e8542f' : '#5a2a2a'; ctx.fillRect(x + 8, y + 21, 2, 2);
   }
+  /* the Kitchen: white tiles, a red awning, a chimney that steams while
+     something is on, and the dish of the day chalked on the board */
+  function drawKitchen(c, r, kt, now) {
+    const x = c * 16, y = r * 16;
+    ctx.fillStyle = 'rgba(40,58,26,.26)'; ctx.fillRect(x + 2, y + 30, 28, 3);
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 1, y + 9, 30, 22);
+    ctx.fillStyle = '#f2ece0'; ctx.fillRect(x + 2, y + 10, 28, 20);
+    ctx.fillStyle = '#d8d0c0'; for (let i = 0; i < 5; i++) ctx.fillRect(x + 2, y + 13 + i * 4, 28, 1); for (let i = 0; i < 7; i++) ctx.fillRect(x + 2 + i * 4, y + 10, 1, 20);
+    /* the awning */
+    for (let i = 0; i < 8; i++) { ctx.fillStyle = i % 2 ? '#e8542f' : '#fff8ec'; ctx.fillRect(x + i * 4, y + 6, 4, 4); }
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x, y + 5, 32, 1); ctx.fillRect(x, y + 10, 32, 1);
+    /* the hatch, with dishes on the counter */
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 4, y + 13, 14, 10);
+    ctx.fillStyle = '#5a4030'; ctx.fillRect(x + 5, y + 14, 12, 8);
+    ctx.fillStyle = '#c9924f'; ctx.fillRect(x + 3, y + 22, 16, 2); ctx.fillStyle = '#e0bd82'; ctx.fillRect(x + 3, y + 22, 16, 1);
+    for (let i = 0; i < Math.min(kt.counter.length, 3); i++) ctx.drawImage(SPR.dishSprite(kt.counter[i].recipe, 1), x + 4 + i * 5, y + 16);
+    /* the menu board */
+    ctx.fillStyle = '#2e2216'; ctx.fillRect(x + 20, y + 12, 10, 10);
+    ctx.fillStyle = '#1d3628'; ctx.fillRect(x + 21, y + 13, 8, 8);
+    const rec = RECIPE_BY_ID[kt.cook ? kt.cook.recipe : kt.recipe] || RECIPES[0];
+    ctx.drawImage(SPR.iconSprite(rec.icon, 1), x + 20, y + 12);
+    /* the door */
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 22, y + 23, 6, 8); ctx.fillStyle = '#8a5e2a'; ctx.fillRect(x + 23, y + 24, 4, 7); ctx.fillStyle = '#ffd23f'; ctx.fillRect(x + 26, y + 27, 1, 1);
+    /* chimney, and the steam of something cooking */
+    ctx.fillStyle = '#5e3d18'; ctx.fillRect(x + 25, y - 2, 4, 8); ctx.fillStyle = '#8a8a80'; ctx.fillRect(x + 24, y - 3, 6, 2);
+    if (kt.cook) {
+      ctx.fillStyle = 'rgba(255,255,255,.6)';
+      for (let i = 0; i < 3; i++) { const t = (now / 600 + i * 0.33) % 1; ctx.fillRect(x + 26 + Math.round(Math.sin(t * 6 + i) * 2), Math.round(y - 5 - t * 12), 2 + i, 2); }
+      ctx.fillStyle = '#2e2216'; ctx.fillRect(x + 4, y + 25, 14, 3);
+      ctx.fillStyle = '#f0a422'; ctx.fillRect(x + 5, y + 26, Math.round(12 * Math.min(1, kt.cook.t / kt.cook.T)), 1);
+    } else {
+      SPR.drawTiny(ctx, kt.pantry.length + '/' + ECON.kitchenPantry, x + 4, y + 25, '#5a4030', 1);
+    }
+    /* a diner's bell */
+    ctx.fillStyle = '#ffd23f'; ctx.fillRect(x + 18, y + 20, 2, 2); ctx.fillStyle = '#2e2216'; ctx.fillRect(x + 18, y + 22, 2, 1);
+  }
+
+  /* the Chicken Park: a lawn behind a picket fence, a striped ticket booth,
+     bunting over the gate and the exhibits up on their stands */
+  function drawPark(c, r, p, now) {
+    const x = c * 16, y = r * 16;
+    ctx.fillStyle = '#7fc44f'; ctx.fillRect(x + 1, y + 8, 46, 39);
+    ctx.fillStyle = '#9ada66'; for (let i = 0; i < 26; i++) ctx.fillRect(x + 2 + (i * 7) % 44, y + 10 + (i * 13) % 34, 1, 1);
+    ctx.fillStyle = '#e8dcc0'; ctx.fillRect(x + 20, y + 8, 8, 39);
+    ctx.fillStyle = '#d0c4a8'; for (let i = 0; i < 10; i++) ctx.fillRect(x + 21 + (i % 3) * 3, y + 10 + i * 4, 1, 1);
+    const post = (px2, py2) => { ctx.fillStyle = '#fff8ec'; ctx.fillRect(px2, py2, 2, 6); ctx.fillStyle = '#c9c0a8'; ctx.fillRect(px2, py2 + 5, 2, 1); ctx.fillStyle = '#3a2a16'; ctx.fillRect(px2, py2 - 1, 2, 1); };
+    ctx.fillStyle = '#fff8ec'; ctx.fillRect(x, y + 9, 48, 1); ctx.fillRect(x, y + 12, 48, 1); ctx.fillRect(x, y + 43, 48, 1); ctx.fillRect(x, y + 46, 48, 1);
+    ctx.fillRect(x, y + 9, 1, 38); ctx.fillRect(x + 47, y + 9, 1, 38);
+    for (let i = 0; i < 48; i += 6) { post(x + i, y + 7); post(x + i, y + 41); }
+    for (let i = 14; i < 40; i += 6) { post(x, y + i); post(x + 46, y + i); }
+    /* the sign over the gate */
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 10, y - 2, 28, 9); ctx.fillStyle = '#e8542f'; ctx.fillRect(x + 11, y - 1, 26, 7);
+    ctx.fillStyle = '#ff8f6a'; ctx.fillRect(x + 11, y - 1, 26, 1);
+    SPR.drawTiny(ctx, 'PARK', x + 16, y + 0, '#fff8ec', 1);
+    ctx.fillStyle = '#5e3d18'; ctx.fillRect(x + 11, y + 7, 1, 3); ctx.fillRect(x + 36, y + 7, 1, 3);
+    /* bunting */
+    for (let i = 0; i < 8; i++) { ctx.fillStyle = ['#e8542f', '#ffd23f', '#3fa7d6', '#ff5f9e'][i % 4]; ctx.fillRect(x + 1 + i * 6, y + 10 + (i % 2), 3, 2); }
+    /* the ticket booth by the gate */
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 1, y + 33, 13, 15); ctx.fillStyle = '#ffd23f'; ctx.fillRect(x + 2, y + 34, 11, 13);
+    ctx.fillStyle = '#e8542f'; for (let i = 0; i < 6; i++) ctx.fillRect(x + 2 + i * 2, y + 34, 1, 13);
+    ctx.fillStyle = '#2e2216'; ctx.fillRect(x + 4, y + 38, 7, 5); ctx.fillStyle = '#fff8ec'; ctx.fillRect(x + 5, y + 39, 5, 3);
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x, y + 32, 15, 2); ctx.fillStyle = '#ff8f6a'; ctx.fillRect(x + 1, y + 32, 13, 1);
+    if (Math.floor(now / 700) % 2) { ctx.fillStyle = '#ffd23f'; ctx.fillRect(x + 6, y + 36, 3, 1); }
+    /* the exhibits on their little stands */
+    const slots = p.slots || [];
+    slots.forEach((ch, i) => {
+      if (!ch) return;
+      const ex = x + 8 + (i % 3) * 14, ey = y + 16 + Math.floor(i / 3) * 14;
+      ctx.fillStyle = '#c9c0a8'; ctx.fillRect(ex - 2, ey + 12, 12, 3); ctx.fillStyle = '#e8e2d0'; ctx.fillRect(ex - 2, ey + 12, 12, 1);
+      const spr = SPR.chickenSprite(SPECIES[ch.sp], 1, false);
+      const bob = Math.round(Math.sin(now / 500 + i * 2) * 0.8);
+      ctx.drawImage(spr, ex - 6, ey - 6 + bob);
+      const stars = GAME.rankOf(ch);
+      for (let s = 0; s < stars; s++) { ctx.fillStyle = '#ffd23f'; ctx.fillRect(ex - 2 + s * 3, ey - 8, 2, 1); }
+    });
+    if (!slots.filter(Boolean).length) SPR.drawTiny(ctx, 'DROP HENS', x + 7, y + 22, 'rgba(40,58,26,.75)', 1);
+  }
+
+  /* the Time Machine: a brass drum with a glass dome, a dial, a hatch for
+     the bones, and a great deal of blue light when it is running */
+  function drawTimeMachine(c, r, tm, now) {
+    const x = c * 16, y = r * 16;
+    const on = !!tm.on, spin = on ? Math.floor(now / 200) % 2 : 0;
+    ctx.fillStyle = 'rgba(40,58,26,.26)'; ctx.fillRect(x + 3, y + 30, 26, 3);
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 3, y + 12, 26, 19);
+    ctx.fillStyle = '#c98f3f'; ctx.fillRect(x + 4, y + 13, 24, 17);
+    ctx.fillStyle = '#e0bd82'; ctx.fillRect(x + 4, y + 13, 24, 2); ctx.fillRect(x + 4, y + 13, 3, 17);
+    ctx.fillStyle = '#8a5e2a'; ctx.fillRect(x + 4, y + 27, 24, 3); ctx.fillRect(x + 25, y + 13, 3, 17);
+    ctx.fillStyle = '#fff3c4'; for (let i = 0; i < 6; i++) { ctx.fillRect(x + 6 + i * 4, y + 15, 1, 1); ctx.fillRect(x + 6 + i * 4, y + 26, 1, 1); }
+    /* the dome */
+    ctx.fillStyle = '#2e2a3a'; ctx.fillRect(x + 7, y + 2, 18, 11); ctx.fillRect(x + 9, y, 14, 3);
+    ctx.fillStyle = on ? '#9fe8ff' : '#6a8aa0'; ctx.fillRect(x + 8, y + 3, 16, 9); ctx.fillRect(x + 10, y + 1, 12, 3);
+    if (on) {
+      const a = now / 200;
+      for (let i = 0; i < 8; i++) { const t = a + i * 0.8; ctx.fillStyle = i % 2 ? '#ffffff' : '#5fd0ff'; ctx.fillRect(Math.round(x + 16 + Math.cos(t) * (3 + i * 0.5)), Math.round(y + 7 + Math.sin(t) * (2 + i * 0.3)), 1, 1); }
+      if (Math.floor(now / 90) % 5 === 0) { ctx.fillStyle = '#fff8ec'; ctx.fillRect(x + 5 + Math.floor(now / 30) % 3, y - 2, 1, 5); ctx.fillRect(x + 26 - Math.floor(now / 50) % 3, y - 3, 1, 6); }
+    } else { ctx.fillStyle = '#ffffff'; ctx.fillRect(x + 10, y + 2, 3, 1); }
+    /* the dial and the bone hatch */
+    ctx.fillStyle = '#2e2216'; ctx.fillRect(x + 8, y + 17, 8, 8); ctx.fillStyle = '#e8d5a8'; ctx.fillRect(x + 9, y + 18, 6, 6);
+    const ang = on ? now / 300 : -1.2;
+    ctx.fillStyle = '#e8542f'; ctx.fillRect(x + 12 + Math.round(Math.cos(ang) * 2), y + 21 + Math.round(Math.sin(ang) * 2), 1, 1);
+    ctx.fillStyle = '#2e2216'; ctx.fillRect(x + 12, y + 21, 1, 1);
+    ctx.fillRect(x + 18, y + 17, 7, 8); ctx.fillStyle = '#5a4a3a'; ctx.fillRect(x + 19, y + 18, 5, 6);
+    if (S().fossilCount) ctx.drawImage(SPR.fossilSprite(1, 1), 0, 0, 9, 7, x + 18, y + 19, 7, 5);
+    if (on) { ctx.fillStyle = '#2e2216'; ctx.fillRect(x + 4, y + 28, 24, 3); ctx.fillStyle = '#5fd0ff'; ctx.fillRect(x + 5, y + 29, Math.round(22 * Math.min(1, tm.t / Math.max(1, tm.T))), 1); }
+    /* gears at the sides */
+    ctx.fillStyle = '#5e3d18'; ctx.fillRect(x, y + 18, 4, 4); ctx.fillRect(x + 28, y + 18, 4, 4);
+    ctx.fillStyle = '#c9924f'; ctx.fillRect(x + 1 + spin, y + 19, 2, 2); ctx.fillRect(x + 29 - spin, y + 19, 2, 2);
+  }
+
+  /* a bone half out of the dirt */
+  function drawFossil(f, now) {
+    const spr = SPR.fossilSprite(f.seed, 1);
+    ctx.fillStyle = 'rgba(40,58,26,.26)'; ctx.fillRect(Math.round(f.x - 4), Math.round(f.y + 1), 9, 2);
+    ctx.drawImage(spr, Math.round(f.x - 4), Math.round(f.y - 6 + f.z));
+    if (Math.floor(now / 400 + f.id) % 3 === 0) { ctx.fillStyle = '#fff8ec'; ctx.fillRect(Math.round(f.x + 4), Math.round(f.y - 8 + f.z), 1, 1); }
+  }
+
+  /* diners and tourists: people who are not on the payroll */
+  const visitorLooks = new Map();
+  function drawVisitor(v, now) {
+    if (v.x + 20 < cam().x || v.x > cam().x + W.view.w || v.y + 24 < cam().y || v.y > cam().y + W.view.h) return;
+    let look = visitorLooks.get(v.id);
+    if (!look) {
+      const rnd = SPR.mulberry(v.seed || v.id);
+      const pick = arr => arr[Math.floor(rnd() * arr.length)];
+      look = { skin: pick(SKINS), hair: pick(HAIRS), style: pick(HAIR_STYLES), shirt: pick(SHIRTS), pants: pick(PANTS), boot: pick(BOOTS), hat: pick(HATS) };
+      visitorLooks.set(v.id, look);
+      if (visitorLooks.size > 200) visitorLooks.delete(visitorLooks.keys().next().value);
+    }
+    const moving = v.state !== 'stay';
+    const spr = SPR.personSprite(look, moving ? v.frame : 0, 1);
+    ctx.fillStyle = 'rgba(40,58,26,.26)'; ctx.fillRect(Math.round(v.x + 1), Math.round(v.y + spr.height - 2), 10, 2);
+    ctx.save();
+    if (v.dir === 1) { ctx.translate(Math.round(v.x) + spr.width, Math.round(v.y)); ctx.scale(-1, 1); ctx.drawImage(spr, 0, 0); }
+    else ctx.drawImage(spr, Math.round(v.x), Math.round(v.y));
+    ctx.restore();
+    if (v.state === 'stay') {
+      if (v.kind === 'tourist') { if (Math.floor(now / 500 + v.id) % 3 === 0) { ctx.fillStyle = '#fff8ec'; ctx.fillRect(Math.round(v.x + 12), Math.round(v.y - 4), 2, 2); } }
+      else ctx.drawImage(SPR.dishSprite('omelette', 1), 0, 0, 10, 7, Math.round(v.x + 9), Math.round(v.y + 7), 7, 5);
+    } else if (v.kind === 'tourist' && v.state === 'in') {
+      ctx.fillStyle = '#ffd23f'; ctx.fillRect(Math.round(v.x + (v.dir === 1 ? 11 : -1)), Math.round(v.y + 11), 2, 1);
+    }
+  }
+
   /* a building site: stakes and rope round a dirt patch, timber waiting,
      and the frame going up as the movers work */
   function drawSite(k, st, now) {
@@ -1859,7 +2004,7 @@
 
   function drawMamaSign(now) {
     const s = W.stations.mamaSign, x = s.x - 5, y = s.y;
-    const maxed = S().mamaTier >= TIERS.length - 2;
+    const maxed = S().mamaTier >= TIER_DIVINE;
     const cost = GAME.mamaCost();
     const afford = !maxed && S().coins >= cost;
     ctx.drawImage(SPR.signSprite(26, 1, 0), x, y + 2);
@@ -2072,6 +2217,19 @@
       ctx.fillRect(Math.round(ch.x + 9), Math.round(yy - 5), 2, 2);
       ctx.fillRect(Math.round(ch.x + 9), Math.round(yy - 2), 2, 1);
     }
+    /* rank: a star for every rank earned, in a row over the head */
+    if (!chick) {
+      const stars = GAME.rankOf(ch);
+      if (stars > 0) {
+        const sx0 = Math.round(ch.x + 10 - stars * 2), sy0 = Math.round(yy - 3);
+        for (let i = 0; i < stars; i++) {
+          ctx.fillStyle = RANKS[stars].col; ctx.fillRect(sx0 + i * 4, sy0, 3, 3);
+          ctx.fillStyle = '#fff8ec'; ctx.fillRect(sx0 + i * 4 + 1, sy0, 1, 1);
+          ctx.fillStyle = '#2e2216'; ctx.fillRect(sx0 + i * 4 + 1, sy0 + 2, 1, 1);
+        }
+        if (stars >= RANKS.length - 1 && Math.floor(now / 300) % 2) { ctx.fillStyle = '#ffffff'; ctx.fillRect(sx0 - 2, sy0 - 1, 1, 1); ctx.fillRect(sx0 + stars * 4 + 1, sy0 + 1, 1, 1); }
+      }
+    }
     /* feed buff sparkle */
     if (ch.buffT > 0 && Math.floor(now / 250) % 2) {
       ctx.fillStyle = '#ffd23f';
@@ -2273,6 +2431,9 @@
     else if (buildSel === 'coop') drawCoop(c, r, {}, now);
     else if (buildSel === 'board') drawBoard(c, r, {}, now);
     else if (buildSel === 'hq') drawHQ(c, r, {}, now);
+    else if (buildSel === 'kitchen') drawKitchen(c, r, { pantry: [], counter: [], recipe: 'omelette', cook: null }, now);
+    else if (buildSel === 'park') drawPark(c, r, { slots: [] }, now);
+    else if (buildSel === 'timemachine') drawTimeMachine(c, r, { on: false, t: 0, T: 1 }, now);
     else drawIncubator(c, r, { queue: [], prog: 0 }, now);
     ctx.globalAlpha = 1;
     if (buildSel === 'well' || buildSel === 'sprinkler' || buildSel === 'coop') {
@@ -2397,6 +2558,9 @@
     for (const k of Object.keys(S().coops)) { const [c, r] = k.split(',').map(Number); drawCoop(c, r, S().coops[k], now); }
     for (const k of Object.keys(S().beehives)) { const [c, r] = k.split(',').map(Number); drawBeehive(c, r, S().beehives[k], now); }
     for (const k of Object.keys(S().genelabs)) { const [c, r] = k.split(',').map(Number); drawGeneLab(c, r, S().genelabs[k], now); }
+    for (const k of Object.keys(S().kitchens)) { const [c, r] = k.split(',').map(Number); drawKitchen(c, r, S().kitchens[k], now); }
+    for (const k of Object.keys(S().parks)) { const [c, r] = k.split(',').map(Number); drawPark(c, r, S().parks[k], now); }
+    for (const k of Object.keys(S().timemachines)) { const [c, r] = k.split(',').map(Number); drawTimeMachine(c, r, S().timemachines[k], now); }
     for (const k of Object.keys(S().storeys)) drawStorey(k, now);
     for (const k of Object.keys(S().sites)) drawSite(k, S().sites[k], now);
     drawBrand(now);
@@ -2432,11 +2596,13 @@
       ctx.fillRect(Math.round(f.x), Math.round(f.y), 1, 1);
       ctx.fillRect(Math.round(f.x + 3), Math.round(f.y + 1), 2, 2);
     });
+    S().fossils.forEach(f => drawFossil(f, now));
     S().eggs.forEach(e => drawEgg(e, now));
     S().plumes.forEach(pl => drawPlume(pl, now));
     drawMama(now);
     S().chickens.forEach(ch => drawChicken(ch, now));
     S().staff.forEach(w => drawStaff(w, now));
+    S().visitors.forEach(v => drawVisitor(v, now));
     drawTruck(now);
     drawTraffic(now);
     drawOrders(now);
@@ -2476,6 +2642,7 @@
     });
 
     drawWeather(now);
+    drawAge(now, dt);
 
     /* scoop ring */
     if (ptr.down && S().tool === 'basket' && ptr.inside) {
@@ -2557,6 +2724,58 @@
     }
   }
 
+  /* the age the company is in: a colour grade over the valley, a little
+     weather of its own, and a banner across the field when a new one begins */
+  let ageFx = null;
+  function drawAge(now, dt) {
+    const a = GAME.age();
+    const cx = cam().x, cy = cam().y, vw = W.view.w, vh = W.view.h;
+    if (a.tint) { ctx.fillStyle = a.tint; ctx.fillRect(cx, cy, vw, vh); }
+    if (a.id === 'steam') {
+      /* wisps of steam drifting up off the whole valley */
+      ctx.fillStyle = 'rgba(255,255,255,.16)';
+      const t0 = Math.floor(now / 80);
+      for (let i = 0; i < 14; i++) {
+        const x = ((i * 137 + t0) % (vw + 40)) + cx - 20;
+        const y = ((((i * 313 - t0 * 2) % (vh + 40)) + vh + 40) % (vh + 40)) + cy - 20;
+        ctx.fillRect(Math.round(x), Math.round(y), 3 + (i % 3), 2);
+      }
+    } else if (a.id === 'electric') {
+      /* fireflies */
+      for (let i = 0; i < 18; i++) {
+        if ((i + Math.floor(now / 300)) % 4 === 0) continue;
+        const x = cx + ((i * 97 + Math.floor(now / 90 + i * 30)) % vw), y = cy + ((i * 53 + Math.floor(Math.sin(now / 700 + i) * 6) + vh) % vh);
+        ctx.fillStyle = 'rgba(255,240,150,.9)'; ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
+      }
+    } else if (a.id === 'space') {
+      /* a satellite crossing high up, blinking */
+      const sx = cx + ((now / 40) % (vw + 60)) - 30, sy = cy + 14 + Math.sin(now / 2000) * 6;
+      ctx.fillStyle = '#c9ced6'; ctx.fillRect(Math.round(sx), Math.round(sy), 3, 1); ctx.fillRect(Math.round(sx) + 1, Math.round(sy) - 1, 1, 3);
+      if (Math.floor(now / 250) % 2) { ctx.fillStyle = '#ff5f5f'; ctx.fillRect(Math.round(sx) + 1, Math.round(sy), 1, 1); }
+    } else if (a.id === 'jurassic') {
+      /* pollen in a very old light */
+      ctx.fillStyle = 'rgba(220,255,160,.55)';
+      for (let i = 0; i < 16; i++) {
+        const x = ((i * 137 + Math.floor(now / 60)) % (vw + 40)) + cx - 20, y = ((i * 313 + Math.floor(now / 90)) % (vh + 40)) + cy - 20;
+        ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
+      }
+    }
+    /* the banner, when a new age begins */
+    if (ageFx && now - ageFx.t < 4200) {
+      const f = (now - ageFx.t) / 4200;
+      ctx.globalAlpha = f < 0.1 ? f / 0.1 : f > 0.8 ? (1 - f) / 0.2 : 1;
+      const txt = 'THE ' + ageFx.a.name.toUpperCase();
+      const k = 2, tw = SPR.textW(txt, k);
+      const bx = Math.round(cx + vw / 2 - tw / 2 - 10), by = Math.round(cy + 40);
+      ctx.fillStyle = 'rgba(24,18,12,.82)'; ctx.fillRect(bx, by - 6, tw + 20, 34);
+      ctx.fillStyle = ageFx.a.hue; ctx.fillRect(bx, by - 6, tw + 20, 2); ctx.fillRect(bx, by + 26, tw + 20, 2);
+      SPR.drawTitle(ctx, txt, bx + 10, by, ageFx.a.hue, '#1a120a', k);
+      const sub = ageFx.a.blurb.toUpperCase();
+      SPR.drawTiny(ctx, sub, Math.round(cx + vw / 2 - SPR.tinyW(sub, 1) / 2), by + 17, '#fff8ec', 1, '#1a120a');
+      ctx.globalAlpha = 1;
+    } else if (ageFx) ageFx = null;
+  }
+
   /* ================= MAGNET SCOOPING ================= */
   function magnet(dt) {
     if (!(ptr.down && S().tool === 'basket' && ptr.inside)) return;
@@ -2569,7 +2788,7 @@
       const d = Math.hypot(dx, dy);
       if (d < 7) {
         const r = GAME.scoopEgg(e);
-        if (r === true) { snd.scoop(); updateCursorChip(); }
+        if (r === true) { snd.scoop(); updateCursorChip(); if (e.golden) { sweepGold++; if (sweepGold >= 3) GAME.findSecret('goldrush'); } }
         else if (r === 'full' && Math.random() < 0.05) floatWorld('BASKET FULL', ptr.x, ptr.y - 14, 'pink');
         continue;
       }
@@ -2585,12 +2804,18 @@
         if (v) { snd.plume(); floatWorld('+' + v, pl.x, pl.y - 8, 'green', 'feather'); }
       }
     }
+    /* bones come up with the basket too */
+    for (let i = S().fossils.length - 1; i >= 0; i--) {
+      const f = S().fossils[i];
+      if (Math.hypot(ptr.x - f.x, ptr.y - f.y) < R * 0.8 && GAME.collectFossil(f)) { snd.sparkle(); floatWorld('FOSSIL', f.x, f.y - 8, 'gold', 'fossil'); }
+    }
   }
+  let sweepGold = 0;
 
   /* ================= HUD ================= */
   const el = {
     coins: $('#r-coins'), feathers: $('#r-feathers'), feed: $('#r-feed'), feedPill: $('#pill-feed'),
-    cap: $('#r-cap'), capPill: $('#pill-cap'),
+    cap: $('#r-cap'), capPill: $('#pill-cap'), agePill: $('#pill-age'),
     cursorChip: $('#cursor-chip'), bubble: $('#bubble'),
     toolbelt: $('#toolbelt'), deskbar: $('#deskbar'),
     palette: $('#build-palette'), farmPalette: $('#farm-palette'),
@@ -2639,7 +2864,7 @@
     { act: 'open-depot', icon: 'truck',  name: 'DEPOT',
       tip: 'Logistics - vehicles, routes and the wall map',
       open: () => GAME.depotOpen(), why: 'research Logistics' },
-    { act: 'open-world', icon: 'city',   name: 'WORLD',
+    { act: 'open-world', icon: 'globe',  name: 'WORLD',
       tip: 'The world - branches abroad, and the Moon',
       open: () => GAME.lvl('worldmap') > 0, why: 'research the World Map' },
     { act: 'open-genes', icon: 'dna',    name: 'GENES',
@@ -2727,7 +2952,7 @@
      by pointing `ctx` at an offscreen canvas for the duration of the call */
   function buildingThumb(type) {
     const small = ['belt', 'vacuum', 'blower', 'sorter', 'fence', 'splitter', 'trough', 'well', 'sprinkler', 'board', 'polisher'].includes(type);
-    const big = type === 'hatchery' || type === 'hq';
+    const big = type === 'hatchery' || type === 'hq' || type === 'park';
     const wpx = small ? 16 : big ? 50 : 34, hpx = small ? 16 : big ? 50 : 36;
     const k = small ? 2 : 1;
     const c = document.createElement('canvas');
@@ -2762,6 +2987,9 @@
       else if (type === 'coop') drawCoop(0, 0, {}, now);
       else if (type === 'board') drawBoard(0, 0, {}, now);
       else if (type === 'hq') drawHQ(0, 0, {}, now);
+      else if (type === 'kitchen') drawKitchen(0, 0, { pantry: [], counter: [], recipe: 'omelette', cook: null }, now);
+      else if (type === 'park') drawPark(0, 0, { slots: [] }, now);
+      else if (type === 'timemachine') drawTimeMachine(0, 0, { on: false, t: 0, T: 1 }, now);
       else drawIncubator(0, 0, { queue: [], prog: 0 }, now);
     } finally {
       ctx = saved;
@@ -3019,7 +3247,7 @@
     else if (GAME.lvl('court') && st.built.lovenest === 0 && stats.bred === 0) { anchor = null; text = 'build a love nest'; }
     else if (GAME.lvl('hiring') && !Object.keys(st.huts).length) { anchor = null; text = 'build a staff hut'; }
     else if (st.chickens.length > 6 && !st.inspected) { anchor = null; text = 'try the magnifier'; }
-    else if (st.mamaTier < TIERS.length - 2 && st.coins >= GAME.mamaCost() * 1.2) { anchor = [W.stations.mamaSign.x + 7, W.stations.mamaSign.y - 8]; text = 'upgrade mama'; }
+    else if (st.mamaTier < TIER_DIVINE && st.coins >= GAME.mamaCost() * 1.2) { anchor = [W.stations.mamaSign.x + 7, W.stations.mamaSign.y - 8]; text = 'upgrade mama'; }
     if (!text || !titleEl.hidden) { el.bubble.hidden = true; bubbleText = ''; return; }
     if (text !== bubbleText) { bubbleText = text; el.bubble.textContent = text; }
     el.bubble.hidden = false;
@@ -3039,6 +3267,7 @@
     paintCloud(el.bubble, tailAt, false);
   }
 
+  let ageShown = -1;
   function lightUpdate() {
     const set = (node, v) => { if (node.textContent !== v) node.textContent = v; };
     set(el.coins, GAME.fmt(S().coins));
@@ -3050,6 +3279,15 @@
     set(el.cap, n + '/' + capn);
     const full = n >= capn;
     if (el.capPill.classList.contains('full') !== full) el.capPill.classList.toggle('full', full);
+    if (el.agePill && ageShown !== GAME.ageIndex()) {
+      ageShown = GAME.ageIndex();
+      el.agePill.innerHTML = '';
+      el.agePill.appendChild(mkIcon(GAME.age().icon, 2));
+      const ab = document.createElement('b');
+      ab.textContent = GAME.age().name.toUpperCase();
+      el.agePill.appendChild(ab);
+      el.agePill.title = 'The ' + GAME.age().name + ' - tap to see what the next age needs';
+    }
     updateCursorChip();
     updateCrewBadge();
     hintLogic();
@@ -3823,11 +4061,35 @@
      and the Moon hangs top right. Pick a region, open it, and build
      branches on it; they earn on their own while you farm.
      ============================================================ */
+  /* ================= THE WORLD - A GLOBE ON THE DESK =================
+     One canvas: a pixel Earth turning under a fixed sun, the Moon on
+     its orbit round it, and every country as a marker standing on the
+     surface. Drag the globe to spin it; pick a country and the globe
+     turns to face it. The column on the right is the ledger for whatever
+     is picked, and the way to open it or build there.
+     ============================================================ */
   const WLW = 380, WLH = 220, WLK = 2;
-  let wlCv = null, wlCtx = null, wlHits = [], wlHover = null, wlMouse = { x: 0, y: 0, inside: false }, wlSel = null, wlLand = null, wlFx = null;
+  const GLOBE = { cx: 124, cy: 108, R: 74 };
+  const TILT = 0.38;                                     /* axial tilt, radians */
+  let wlCv = null, wlCtx = null, wlHits = [], wlHover = null, wlMouse = { x: 0, y: 0, inside: false }, wlSel = null, wlFx = null;
+  let wlYaw = 0.6, wlTarget = null, wlDrag = null, wlLast = 0, wlIdle = 9, wlOff = null, wlBuf = null, wlTex = null;
   function wlHitAt(x, y) {
     for (let i = wlHits.length - 1; i >= 0; i--) { const h = wlHits[i]; if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) return h; }
     return null;
+  }
+  const wrapAngle = a => { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; };
+  /* the yaw that puts a country dead centre, facing the room */
+  function faceYaw(r) { return wrapAngle(-r.lon * Math.PI / 180); }
+  function wlPick(id) {
+    wlSel = id;
+    const r = REGION_BY_ID[id];
+    if (r && !r.moon) wlTarget = faceYaw(r);
+    wlIdle = 0;
+  }
+  function wlStep(d) {
+    const i = Math.max(0, REGIONS.findIndex(r => r.id === wlSel));
+    const nx = REGIONS[(i + d + REGIONS.length) % REGIONS.length];
+    wlPick(nx.id);
   }
   function openWorld() {
     if (GAME.lvl('worldmap') < 1) { toast({ icon: 'lock', title: 'NO MAP', body: 'Research the World Map in the MARKET lane.' }); return; }
@@ -3839,141 +4101,322 @@
       body.appendChild(wlCv);
       wlCtx = wlCv.getContext('2d');
       const at = ev => { const r = wlCv.getBoundingClientRect(); return { x: (ev.clientX - r.left) / r.width * WLW, y: (ev.clientY - r.top) / r.height * WLH }; };
-      wlCv.addEventListener('pointermove', ev => { const p = at(ev); wlMouse = { x: p.x, y: p.y, inside: true }; const h = wlHitAt(p.x, p.y); wlHover = h ? h.key : null; });
-      wlCv.addEventListener('pointerleave', () => { wlMouse.inside = false; wlHover = null; });
+      const onGlobe = p => Math.hypot(p.x - GLOBE.cx, p.y - GLOBE.cy) <= GLOBE.R + 2;
+      wlCv.addEventListener('pointermove', ev => {
+        const p = at(ev); wlMouse = { x: p.x, y: p.y, inside: true };
+        if (wlDrag) { wlYaw = wlDrag.yaw + (p.x - wlDrag.x) / GLOBE.R * 1.3; wlTarget = null; wlIdle = 0; return; }
+        const h = wlHitAt(p.x, p.y); wlHover = h ? h.key : (onGlobe(p) ? 'globe' : null);
+      });
+      wlCv.addEventListener('pointerleave', () => { wlMouse.inside = false; wlHover = null; wlDrag = null; });
+      wlCv.addEventListener('pointerup', () => { wlDrag = null; });
       wlCv.addEventListener('pointerdown', ev => {
         ev.preventDefault();
+        wlCv.setPointerCapture(ev.pointerId);
         const p = at(ev); wlMouse = { x: p.x, y: p.y, inside: true };
         const h = wlHitAt(p.x, p.y);
-        if (!h) return;
-        if (h.kind === 'region') { wlSel = h.id; snd.plop(); return; }
+        if (!h) { if (onGlobe(p)) wlDrag = { x: p.x, yaw: wlYaw }; return; }
+        if (h.kind === 'region') { wlPick(h.id); snd.plop(); return; }
+        if (h.kind === 'prev') { wlStep(-1); snd.plop(); return; }
+        if (h.kind === 'next') { wlStep(1); snd.plop(); return; }
         if (h.kind === 'open') { if (GAME.openRegion(h.id)) { snd.grand(); wlFx = { t: performance.now(), id: h.id }; } else snd.error(); return; }
         if (h.kind === 'branch') { if (GAME.buildBranch(h.id)) { snd.build(); wlFx = { t: performance.now(), id: h.id }; } else snd.error(); return; }
         if (h.kind === 'close') { closeModals(); snd.plop(); }
       });
     }
-    if (!wlSel) wlSel = REGIONS.find(r => !r.home && GAME.regionReachable(r.id) && !GAME.regionOpen(r.id)) ? REGIONS.find(r => !r.home && GAME.regionReachable(r.id) && !GAME.regionOpen(r.id)).id : 'valley';
+    if (!wlSel) {
+      const first = REGIONS.find(r => !r.home && GAME.regionReachable(r.id) && !GAME.regionOpen(r.id));
+      wlPick(first ? first.id : 'valley');
+    }
+    wlLast = performance.now();
     openModal('#modal-world');
   }
-  /* the continents, baked once: blobs on a mask, shaded, with a pale coast */
-  function worldLand() {
-    if (wlLand) return wlLand;
-    const m = SPR.newMask(WLW, 200);
-    const blob = (x, y, r, sq) => SPR.mCircle(m, x, y, r, sq);
-    blob(84, 80, 40, 0.75); blob(60, 60, 22, 0.9); blob(112, 112, 24, 0.9); blob(118, 146, 20, 1); blob(100, 130, 14, 1);
-    blob(190, 62, 46, 0.62); blob(232, 92, 38, 0.72); blob(206, 112, 28, 0.9); blob(258, 78, 22, 0.9); blob(166, 46, 20, 0.7);
-    blob(132, 36, 22, 0.55); blob(150, 38, 12, 0.7);
-    blob(300, 144, 13, 0.8); blob(312, 150, 8, 1); blob(292, 150, 6, 1);
-    const c = SPR.newCanvas(WLW, 200);
-    SPR.renderMask(c.getContext('2d'), m, 1, 0, 0, { base: '#5fa84a', light: '#8fd14f', dark: '#3f7d32', out: '#e8dcb0' }, 77, { lightBand: 2, shadeBand: 3, speckle: 0.04, grain: 0.08 });
-    wlLand = c;
-    return c;
+  /* the planet's skin, baked once: a 256 x 128 map of what covers each
+     patch of ground. Every country is a continent grown round its heart,
+     its edge frayed by noise; the poles wear ice. */
+  const GLOBE_PAL = [[47, 111, 168], [106, 176, 76], [63, 138, 68], [224, 196, 122], [238, 243, 247], [138, 143, 122], [63, 143, 196], [120, 90, 50]];
+  function globeTex() {
+    if (wlTex) return wlTex;
+    const TW = 256, TH = 128;
+    const tex = new Uint8Array(TW * TH);
+    const hash = (x, y) => { const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return n - Math.floor(n); };
+    /* value noise on a lattice that wraps round the seam */
+    const noise = (u, v, cell) => {
+      const cu = u / cell, cv = v / cell;
+      const x0 = Math.floor(cu), y0 = Math.floor(cv), fx = cu - x0, fy = cv - y0;
+      const per = Math.round(TW / cell);
+      const at = (i, j) => hash(((i % per) + per) % per, j);
+      const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+      return (at(x0, y0) * (1 - sx) + at(x0 + 1, y0) * sx) * (1 - sy) + (at(x0, y0 + 1) * (1 - sx) + at(x0 + 1, y0 + 1) * sx) * sy;
+    };
+    for (let ty = 0; ty < TH; ty++) for (let tx = 0; tx < TW; tx++) {
+      const lat = (0.5 - ty / TH) * Math.PI, lon = (tx / TW - 0.5) * Math.PI * 2;
+      let land = 0, kind = 'green';
+      REGIONS.forEach(r => {
+        if (r.moon) return;
+        const rl = r.lat * Math.PI / 180, ro = r.lon * Math.PI / 180;
+        const d = Math.acos(Math.max(-1, Math.min(1, Math.sin(lat) * Math.sin(rl) + Math.cos(lat) * Math.cos(rl) * Math.cos(lon - ro))));
+        const rad = r.size * Math.PI / 180 * (0.62 + 0.76 * noise(tx + r.lon * 0.7, ty + r.lat * 0.4, 12));
+        if (d < rad) { const s = 1 - d / rad; if (s > land) { land = s; kind = r.land; } }
+      });
+      let t = 0;
+      if (land > 0.10) {
+        t = kind === 'sand' ? 3 : kind === 'cold' ? (land < 0.4 ? 1 : 4) : kind === 'high' ? (land > 0.55 ? 5 : 2) : kind === 'lush' ? 2 : 1;
+        if (kind === 'green' && noise(tx * 1.7, ty * 1.7, 6) > 0.72) t = 2;
+        if (kind === 'sand' && land > 0.7 && noise(tx, ty, 5) > 0.6) t = 7;
+      } else if (land > 0) t = 6;
+      if (Math.abs(lat) > 1.24 && t !== 6) t = 4;
+      if (Math.abs(lat) > 1.31) t = 4;
+      const grain = hash(tx, ty) < 0.16;
+      tex[ty * TW + tx] = t | (grain ? 8 : 0);
+    }
+    wlTex = tex;
+    return tex;
+  }
+  /* a country's place on the screen, and how far round the globe it is */
+  function regionView(r) {
+    const rl = r.lat * Math.PI / 180, ro = r.lon * Math.PI / 180;
+    const wx = Math.cos(rl) * Math.sin(ro), wy = Math.sin(rl), wz = Math.cos(rl) * Math.cos(ro);
+    const cy2 = Math.cos(wlYaw), sy2 = Math.sin(wlYaw);
+    const x1 = wx * cy2 + wz * sy2, z1 = -wx * sy2 + wz * cy2;
+    const ct = Math.cos(TILT), stt = Math.sin(TILT);
+    const ny = wy * ct - z1 * stt, nz = wy * stt + z1 * ct;
+    return { x: GLOBE.cx + x1 * GLOBE.R, y: GLOBE.cy - ny * GLOBE.R, z: nz };
+  }
+  function moonSpot(now) {
+    const a = now / 5200;
+    return { x: GLOBE.cx + Math.cos(a) * (GLOBE.R + 46), y: GLOBE.cy - 8 + Math.sin(a) * 28, front: Math.sin(a) > 0, a };
+  }
+  /* the planet itself, painted pixel by pixel into an offscreen buffer */
+  function paintGlobe(now) {
+    if (!wlOff) { wlOff = SPR.newCanvas(WLW, WLH); wlBuf = wlOff.getContext('2d').createImageData(WLW, WLH); }
+    const d = wlBuf.data; d.fill(0);
+    const tex = globeTex();
+    const { cx, cy, R } = GLOBE;
+    const ct = Math.cos(TILT), stt = Math.sin(TILT), cy2 = Math.cos(wlYaw), sy2 = Math.sin(wlYaw);
+    const Lx = -0.46, Ly = 0.44, Lz = 0.77;
+    for (let py = -R - 6; py <= R + 6; py++) {
+      const Y = cy + py; if (Y < 0 || Y >= WLH) continue;
+      for (let px = -R - 6; px <= R + 6; px++) {
+        const X = cx + px; if (X < 0 || X >= WLW) continue;
+        const nx = px / R, ny = -py / R, d2 = nx * nx + ny * ny;
+        const i = (Y * WLW + X) * 4;
+        if (d2 > 1) {
+          if (d2 < 1.17) { const a = (1.17 - d2) / 0.17; d[i] = 110; d[i + 1] = 180; d[i + 2] = 255; d[i + 3] = Math.round(110 * a * a); }
+          continue;
+        }
+        const nz = Math.sqrt(1 - d2);
+        /* view -> world: undo the tilt, then the spin */
+        const wy = ny * ct + nz * stt, wz1 = -ny * stt + nz * ct;
+        const wx = nx * cy2 - wz1 * sy2, wz = nx * sy2 + wz1 * cy2;
+        const lat = Math.asin(Math.max(-1, Math.min(1, wy))), lon = Math.atan2(wx, wz);
+        const tx = ((Math.floor((lon / (Math.PI * 2) + 0.5) * 256) % 256) + 256) % 256;
+        const ty = Math.max(0, Math.min(127, Math.floor((0.5 - lat / Math.PI) * 128)));
+        const v = tex[ty * 256 + tx];
+        const col = GLOBE_PAL[v & 7];
+        const light = nx * Lx + ny * Ly + nz * Lz;
+        let f = light < 0.02 ? 0.3 : light < 0.3 ? 0.6 : light < 0.66 ? 0.84 : 1.0;
+        if (((X + Y) & 1) && light > 0.02 && light < 0.3) f -= 0.1;
+        if (d2 > 0.88) f *= 0.82;
+        if (v & 8) f *= 0.9;
+        d[i] = col[0] * f; d[i + 1] = col[1] * f; d[i + 2] = col[2] * f; d[i + 3] = 255;
+      }
+    }
+    wlOff.getContext('2d').putImageData(wlBuf, 0, 0);
+    return wlOff;
+  }
+  function drawMoonBody(g, mx, my, open, now, big) {
+    const r = big ? 13 : 11;
+    const mm = SPR.newMask(r * 2 + 2, r * 2 + 2); SPR.mCircle(mm, r + 1, r + 1, r, 1);
+    SPR.renderMask(g, mm, 1, Math.round(mx - r - 1), Math.round(my - r - 1),
+      open ? { base: '#c9ced6', light: '#eef0f4', dark: '#8a9099', out: '#5e6570' } : { base: '#8a9099', light: '#b8c0cc', dark: '#5a626e', out: '#3a4048' },
+      5, { lightBand: 3, shadeBand: 4, grain: 0.1 });
+    g.fillStyle = open ? '#8a9099' : '#5a626e';
+    g.fillRect(Math.round(mx - 6), Math.round(my - 4), 4, 3); g.fillRect(Math.round(mx + 2), Math.round(my + 2), 5, 4); g.fillRect(Math.round(mx - 2), Math.round(my + 6), 3, 2);
+    if (open) {
+      /* the dome, and the branches as little lit windows */
+      g.fillStyle = '#9fe8ff'; g.fillRect(Math.round(mx - 4), Math.round(my - 11), 8, 4); g.fillRect(Math.round(mx - 2), Math.round(my - 13), 4, 2);
+      g.fillStyle = '#2e2216'; g.fillRect(Math.round(mx - 4), Math.round(my - 7), 8, 1);
+      for (let i = 0; i < Math.min(10, GAME.branchCount('moon')); i++) { g.fillStyle = Math.floor(now / 400 + i) % 3 ? '#ffd23f' : '#7a5a2a'; g.fillRect(Math.round(mx - 7 + (i % 5) * 3), Math.round(my + 9 + Math.floor(i / 5) * 2), 2, 1); }
+    }
   }
   function drawWorld(now) {
     if (!wlCv) return;
+    const dt = Math.min(0.1, Math.max(0, (now - wlLast) / 1000)); wlLast = now;
+    /* the globe turns to face the picked country, then drifts on its own once left alone */
+    if (wlTarget !== null) {
+      const dd = wrapAngle(wlTarget - wlYaw);
+      wlYaw += dd * Math.min(1, dt * 5);
+      if (Math.abs(dd) < 0.01) { wlYaw = wlTarget; wlTarget = null; }
+    } else if (!wlDrag) {
+      wlIdle += dt;
+      if (wlIdle > 5) wlYaw += dt * 0.18;
+    }
+    wlYaw = wrapAngle(wlYaw);
     const g = wlCtx;
     g.imageSmoothingEnabled = false;
     g.setTransform(WLK, 0, 0, WLK, 0, 0);
     wlHits = [];
     const st = S();
-    /* the sea, and the sky the Moon hangs in */
-    g.fillStyle = '#0f2f4a'; g.fillRect(0, 0, WLW, 200);
-    g.fillStyle = '#123858'; for (let y = 0; y < 200; y += 20) g.fillRect(0, y, WLW, 1); for (let x = 0; x < WLW; x += 20) g.fillRect(x, 0, 1, 200);
-    g.fillStyle = 'rgba(255,255,255,.22)';
-    for (let i = 0; i < 70; i++) { const x = (i * 97 + Math.floor(now / 70)) % WLW, y = (i * 53) % 200; if ((i + Math.floor(now / 500)) % 3) g.fillRect(x, y, 3, 1); }
-    g.drawImage(worldLand(), 0, 0);
-    /* shipping lanes home from every open region */
+    /* space: a slow sky of stars and the sun off to the upper left */
+    g.fillStyle = '#05080f'; g.fillRect(0, 0, WLW, WLH);
+    for (let i = 0; i < 90; i++) {
+      const x = (i * 97 + 13) % WLW, y = (i * 53 + 7) % WLH;
+      if ((i + Math.floor(now / 600)) % 9 === 0) continue;
+      g.fillStyle = i % 4 ? 'rgba(255,255,255,.55)' : 'rgba(180,220,255,.9)';
+      g.fillRect(x, y, 1, 1);
+    }
+    g.fillStyle = 'rgba(255,232,150,.10)'; g.fillRect(0, 0, 60, 46); g.fillStyle = 'rgba(255,232,150,.14)'; g.fillRect(0, 0, 34, 26);
+    const moon = moonSpot(now);
+    const moonOpen = GAME.regionOpen('moon');
+    /* the far side of the orbit passes behind the planet */
+    if (!moon.front) drawMoonBody(g, moon.x, moon.y, moonOpen, now, false);
+    /* the orbit itself, a ring of dots */
+    g.fillStyle = 'rgba(255,255,255,.12)';
+    for (let i = 0; i < 48; i++) { const a = i / 48 * Math.PI * 2; const ox = GLOBE.cx + Math.cos(a) * (GLOBE.R + 46), oy = GLOBE.cy - 8 + Math.sin(a) * 28; if (Math.sin(a) > 0 || Math.hypot(ox - GLOBE.cx, oy - GLOBE.cy) > GLOBE.R + 3) g.fillRect(Math.round(ox), Math.round(oy), 1, 1); }
+    g.drawImage(paintGlobe(now), 0, 0);
+    /* a glint where the sun catches the sea */
+    g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(GLOBE.cx - 30, GLOBE.cy - 36, 3, 1); g.fillRect(GLOBE.cx - 33, GLOBE.cy - 34, 2, 1);
+    /* the countries, standing on the surface */
     const home = REGION_BY_ID.valley;
     REGIONS.forEach(r => {
-      if (r.home || !GAME.regionOpen(r.id)) return;
-      const n = Math.max(1, Math.floor(Math.hypot(r.x - home.x, r.y - home.y) / 5));
-      const ph = Math.floor(now / 160) % 3;
-      for (let i = 0; i <= n; i++) {
-        if ((i + ph) % 3) continue;
-        const t = i / n;
-        g.fillStyle = r.moon ? '#ffd23f' : '#fff8ec';
-        g.fillRect(Math.round(home.x + (r.x - home.x) * t), Math.round(home.y + (r.y - home.y) * t - (r.moon ? Math.sin(t * Math.PI) * 30 : 0)), 2, 1);
+      if (r.moon) return;
+      const v = regionView(r);
+      if (v.z < 0.06) return;
+      const open = GAME.regionOpen(r.id), reach = GAME.regionReachable(r.id), sel = wlSel === r.id, hov = wlHover === 'r' + r.id;
+      const x = Math.round(v.x), y = Math.round(v.y);
+      g.globalAlpha = Math.min(1, 0.35 + v.z);
+      if (r.home) {
+        g.fillStyle = '#2e2216'; g.fillRect(x - 6, y - 13, 12, 12);
+        g.fillStyle = st.company.col1; g.fillRect(x - 5, y - 12, 10, 10);
+        g.drawImage(SPR.iconSprite(st.company.logo, 1), x - 5, y - 12);
+        g.fillStyle = '#2e2216'; g.fillRect(x, y - 2, 1, 3);
+      } else if (open) {
+        g.fillStyle = '#2e2216'; g.fillRect(x, y - 15, 1, 16);
+        g.fillStyle = r.flag[0]; g.fillRect(x + 1, y - 15, 8, 5);
+        g.fillStyle = r.flag[1]; g.fillRect(x + 1, y - 12, 8, 2);
+        for (let i = 0; i < GAME.branchCount(r.id); i++) {
+          const bx2 = x - 9 + (i % 5) * 4, by2 = y + 1 + Math.floor(i / 5) * 4;
+          g.fillStyle = '#2e2216'; g.fillRect(bx2, by2, 3, 3);
+          g.fillStyle = Math.floor(now / 500 + i) % 3 ? '#ffe9a0' : '#c9a35f'; g.fillRect(bx2 + 1, by2 + 1, 1, 2);
+        }
+      } else {
+        g.fillStyle = reach ? 'rgba(255,255,255,.8)' : 'rgba(255,255,255,.3)';
+        for (let i = 0; i < 6; i++) g.fillRect(x - 5 + (i % 3) * 4, y - 12 + Math.floor(i / 3) * 10, 2, 1);
+        g.fillRect(x - 5, y - 8, 1, 2); g.fillRect(x + 5, y - 8, 1, 2);
+        g.globalAlpha *= reach ? 1 : 0.45;
+        g.drawImage(SPR.iconSprite('lock', 1), x - 5, y - 13);
       }
+      g.globalAlpha = 1;
+      if (sel || hov) {
+        const pul = sel ? Math.floor(now / 300) % 2 : 0;
+        g.fillStyle = sel ? (pul ? '#ffd23f' : '#fff8ec') : 'rgba(255,255,255,.6)';
+        g.fillRect(x - 11, y - 18, 22, 1); g.fillRect(x - 11, y + 5, 22, 1); g.fillRect(x - 11, y - 18, 1, 24); g.fillRect(x + 10, y - 18, 1, 24);
+      }
+      if (wlFx && wlFx.id === r.id && now - wlFx.t < 700) { const f = (now - wlFx.t) / 700; g.fillStyle = 'rgba(255,255,255,' + (1 - f) + ')'; const rr = Math.round(f * 16); g.fillRect(x - rr, y - 7 - rr, rr * 2, 1); g.fillRect(x - rr, y - 7 + rr, rr * 2, 1); g.fillRect(x - rr, y - 7 - rr, 1, rr * 2); g.fillRect(x + rr, y - 7 - rr, 1, rr * 2); }
+      wlHits.push({ kind: 'region', key: 'r' + r.id, id: r.id, x: x - 11, y: y - 18, w: 22, h: 24 });
     });
-    /* the Moon */
-    const moon = REGION_BY_ID.moon;
-    const moonOpen = GAME.regionOpen('moon');
-    g.fillStyle = '#0b1a2a'; g.fillRect(moon.x - 24, moon.y - 22, 48, 44);
-    g.fillStyle = 'rgba(255,255,255,.7)'; for (let i = 0; i < 12; i++) g.fillRect(moon.x - 22 + (i * 37) % 44, moon.y - 20 + (i * 23) % 40, 1, 1);
-    const mm = SPR.newMask(40, 40); SPR.mCircle(mm, 20, 20, 15, 1);
-    SPR.renderMask(g, mm, 1, moon.x - 20, moon.y - 20, moonOpen ? { base: '#c9ced6', light: '#eef0f4', dark: '#8a9099', out: '#5e6570' } : { base: '#6a7078', light: '#8a9099', dark: '#4a5058', out: '#2e343c' }, 5, { lightBand: 3, shadeBand: 4, grain: 0.1 });
-    g.fillStyle = moonOpen ? '#8a9099' : '#4a5058'; g.fillRect(moon.x - 8, moon.y - 6, 5, 4); g.fillRect(moon.x + 4, moon.y + 2, 6, 5); g.fillRect(moon.x - 3, moon.y + 8, 4, 3);
-    if (moonOpen) { g.fillStyle = '#9fe8ff'; g.fillRect(moon.x - 4, moon.y - 12, 8, 5); g.fillRect(moon.x - 2, moon.y - 14, 4, 2); g.fillStyle = '#2e2216'; g.fillRect(moon.x - 4, moon.y - 7, 8, 1); }
-    /* the rocket, on its way */
+    /* the near side of the orbit passes in front */
+    if (moon.front) drawMoonBody(g, moon.x, moon.y, moonOpen, now, false);
+    {
+      const mx = Math.round(moon.x), my = Math.round(moon.y), sel = wlSel === 'moon', hov = wlHover === 'rmoon';
+      if (sel || hov) { g.fillStyle = sel ? (Math.floor(now / 300) % 2 ? '#ffd23f' : '#fff8ec') : 'rgba(255,255,255,.6)'; g.fillRect(mx - 15, my - 16, 30, 1); g.fillRect(mx - 15, my + 15, 30, 1); g.fillRect(mx - 15, my - 16, 1, 32); g.fillRect(mx + 14, my - 16, 1, 32); }
+      if (!moonOpen) { g.globalAlpha = GAME.regionReachable('moon') ? 1 : 0.5; g.drawImage(SPR.iconSprite('lock', 1), mx - 5, my - 5); g.globalAlpha = 1; }
+      if (wlFx && wlFx.id === 'moon' && now - wlFx.t < 700) { const f = (now - wlFx.t) / 700; g.fillStyle = 'rgba(255,255,255,' + (1 - f) + ')'; const rr = Math.round(f * 20); g.fillRect(mx - rr, my - rr, rr * 2, 1); g.fillRect(mx - rr, my + rr, rr * 2, 1); }
+      wlHits.push({ kind: 'region', key: 'rmoon', id: 'moon', x: mx - 15, y: my - 16, w: 30, h: 32 });
+    }
+    /* the rocket, on its way up */
     if (st.empire.rocket > 0) {
       const f = 1 - st.empire.rocket / 6;
-      const rx = home.x + (moon.x - home.x) * f, ry = home.y + (moon.y - home.y) * f - Math.sin(f * Math.PI) * 40;
+      const hv = regionView(home);
+      const sx = hv.z > 0 ? hv.x : GLOBE.cx, sy = hv.z > 0 ? hv.y : GLOBE.cy;
+      const rx = sx + (moon.x - sx) * f, ry = sy + (moon.y - sy) * f - Math.sin(f * Math.PI) * 30;
       g.fillStyle = '#fff8ec'; g.fillRect(Math.round(rx) - 1, Math.round(ry) - 3, 3, 6);
       g.fillStyle = '#e8542f'; g.fillRect(Math.round(rx) - 2, Math.round(ry) + 3, 5, 1);
       g.fillStyle = Math.floor(now / 60) % 2 ? '#ffd23f' : '#ff8f6a'; g.fillRect(Math.round(rx) - 1, Math.round(ry) + 4, 3, 3 + Math.floor(now / 90) % 2);
     }
-    /* the regions */
-    REGIONS.forEach(r => {
-      const open = GAME.regionOpen(r.id), reach = GAME.regionReachable(r.id), sel = wlSel === r.id, hov = wlHover === 'r' + r.id;
-      const x = r.x, y = r.y;
-      if (r.home) {
-        g.fillStyle = '#2e2216'; g.fillRect(x - 6, y - 12, 12, 12);
-        g.fillStyle = st.company.col1; g.fillRect(x - 5, y - 11, 10, 10);
-        g.drawImage(SPR.iconSprite(st.company.logo, 1), x - 5, y - 11);
-      } else if (open) {
-        g.fillStyle = '#3a2a16'; g.fillRect(x, y - 16, 1, 16);
-        g.fillStyle = r.flag[0]; g.fillRect(x + 1, y - 16, 9, 6);
-        g.fillStyle = r.flag[1]; g.fillRect(x + 1, y - 13, 9, 2);
-        /* the branches, little sheds in a row */
-        for (let i = 0; i < GAME.branchCount(r.id); i++) {
-          const bx2 = x - 10 + (i % 5) * 5, by2 = y + 2 + Math.floor(i / 5) * 5;
-          g.fillStyle = '#2e2216'; g.fillRect(bx2, by2, 4, 4);
-          g.fillStyle = i % 2 ? '#e0bd82' : '#c9a35f'; g.fillRect(bx2 + 1, by2 + 1, 2, 3);
-          g.fillStyle = '#e06a58'; g.fillRect(bx2, by2, 4, 1);
-        }
-      } else {
-        g.fillStyle = reach ? 'rgba(255,255,255,.7)' : 'rgba(255,255,255,.25)';
-        for (let i = 0; i < 8; i++) g.fillRect(x - 6 + (i % 4) * 4, y - 12 + Math.floor(i / 4) * 10, 2, 1);
-        g.fillRect(x - 6, y - 8, 1, 2); g.fillRect(x + 6, y - 8, 1, 2);
-        g.globalAlpha = reach ? 1 : 0.4; g.drawImage(SPR.iconSprite('lock', 1), x - 5, y - 13); g.globalAlpha = 1;
-      }
-      if (sel || hov) { g.fillStyle = sel ? '#ffd23f' : 'rgba(255,255,255,.6)'; g.fillRect(x - 12, y - 19, 24, 1); g.fillRect(x - 12, y + 4, 24, 1); g.fillRect(x - 12, y - 19, 1, 24); g.fillRect(x + 11, y - 19, 1, 24); }
-      if (wlFx && wlFx.id === r.id && now - wlFx.t < 700) { const f = (now - wlFx.t) / 700; g.fillStyle = 'rgba(255,255,255,' + (1 - f) + ')'; const rr = Math.round(f * 14); g.fillRect(x - rr, y - 8 - rr, rr * 2, 1); g.fillRect(x - rr, y - 8 + rr, rr * 2, 1); }
-      wlHits.push({ kind: 'region', key: 'r' + r.id, id: r.id, x: x - 12, y: y - 19, w: 24, h: 24 });
-    });
-    /* the way out, and what it all earns */
+    /* the way out, and what the empire earns */
     SPR.drawBox(g, 6, 6, 30, 12, wlHover === 'close' ? '#3a5060' : '#2a3f4c', '#5a7a88', '#0b1a24');
     SPR.drawTiny(g, 'EXIT', 12, 9, '#e8607a', 1);
     wlHits.push({ kind: 'close', key: 'close', x: 6, y: 6, w: 30, h: 12 });
     const inc = GAME.branchIncome();
-    const top = GAME.fmt(Math.round(inc)) + '/MIN ABROAD   ' + GAME.fmt(st.coins) + ' COINS';
-    g.fillStyle = 'rgba(11,26,36,.85)'; g.fillRect(42, 6, SPR.tinyW(top, 1) + 8, 12);
-    SPR.drawTiny(g, top, 46, 9, '#ffd23f', 1);
+    SPR.drawTiny(g, GAME.fmt(Math.round(inc)) + '/MIN ABROAD', 42, 9, '#ffd23f', 1);
+    SPR.drawTiny(g, GAME.fmt(st.coins) + ' COINS', 42, 17, '#7ef2a8', 1);
+    if (wlHover === 'globe' || wlDrag) SPR.drawTiny(g, wlDrag ? 'SPINNING' : 'DRAG TO SPIN', 6, WLH - 10, '#4fb072', 1);
 
-    /* the panel along the foot: the picked region and what you can do there */
-    g.fillStyle = '#0b1a24'; g.fillRect(0, 200, WLW, 20); g.fillStyle = '#2a4a5a'; g.fillRect(0, 200, WLW, 1);
+    /* ---- the column on the right: the picked country ---- */
     const r = REGION_BY_ID[wlSel] || REGION_BY_ID.valley;
+    const px0 = 226, pw = 148;
+    SPR.drawBox(g, px0, 6, pw, WLH - 12, '#0b1a24', '#2a4a5a', '#16232f');
     const open = GAME.regionOpen(r.id), reach = GAME.regionReachable(r.id);
-    g.fillStyle = r.flag[0]; g.fillRect(6, 205, 8, 6); g.fillStyle = r.flag[1]; g.fillRect(6, 208, 8, 2);
-    SPR.drawTiny(g, r.name.toUpperCase(), 18, 205, '#d8ffe8', 1);
-    SPR.drawTiny(g, r.blurb.toUpperCase(), 18, 213, '#4fb072', 1);
-    const px0 = 200;
+    /* flag, name, blurb */
+    g.fillStyle = '#2e2216'; g.fillRect(px0 + 7, 13, 18, 13);
+    g.fillStyle = r.flag[0]; g.fillRect(px0 + 8, 14, 16, 11);
+    g.fillStyle = r.flag[1]; g.fillRect(px0 + 8, 19, 16, 3);
+    if (r.moon) { g.fillStyle = '#c9ced6'; g.fillRect(px0 + 12, 16, 3, 3); g.fillRect(px0 + 18, 20, 2, 2); }
+    if (r.home) g.drawImage(SPR.iconSprite(st.company.logo, 1), px0 + 12, 15);
+    const nm = r.name.toUpperCase();
+    SPR.drawTiny(g, nm.length > 13 ? nm.slice(0, 13) : nm, px0 + 30, 12, '#d8ffe8', 1);
+    SPR.drawTiny(g, open ? (r.home ? 'HEAD OFFICE' : 'OPEN') : reach ? 'FOR SALE' : 'NOT YET', px0 + 30, 20, open ? '#7ef2a8' : reach ? '#ffd23f' : '#4fb072', 1);
+    const blurb = r.blurb.toUpperCase().split(' ');
+    let line = '', ly = 32;
+    blurb.forEach(w => { if (SPR.tinyW(line + ' ' + w, 1) > pw - 14) { SPR.drawTiny(g, line, px0 + 7, ly, '#4fb072', 1); ly += 7; line = w; } else line = line ? line + ' ' + w : w; });
+    if (line) { SPR.drawTiny(g, line, px0 + 7, ly, '#4fb072', 1); ly += 7; }
+    g.fillStyle = '#2a4a5a'; g.fillRect(px0 + 7, ly + 3, pw - 14, 1);
+    ly += 9;
+    /* the numbers */
+    const row = (a, b, col) => { SPR.drawTiny(g, a, px0 + 7, ly, '#7ef2a8', 1); SPR.drawTiny(g, b, px0 + pw - 7 - SPR.tinyW(b, 1), ly, col || '#d8ffe8', 1); ly += 8; };
     if (r.home) {
-      SPR.drawTiny(g, 'HQ  ' + GAME.fmt(Math.round(GAME.rates().coinsPerMin)) + '/MIN', px0, 205, '#7ef2a8', 1);
+      row('RANCH', GAME.fmt(Math.round(GAME.rates().coinsPerMin)) + '/MIN', '#ffd23f');
+      row('COUNTRIES', REGIONS.filter(x => !x.home && GAME.regionOpen(x.id)).length + '/' + (REGIONS.length - 1));
+      row('BRANCHES', String(st.stats.branches));
+      row('ABROAD', GAME.fmt(Math.round(inc)) + '/MIN', '#ffd23f');
+    } else if (!open) {
+      row('PRICE', GAME.fmt(r.cost), reach && st.coins >= r.cost ? '#ffd23f' : '#e8607a');
+      row('A BRANCH', GAME.fmt(r.yield) + '/MIN');
+      row('ROOM FOR', r.cap + ' BRANCHES');
+      if (r.moon && GAME.lvl('moonshot') < 1) row('NEEDS', 'MOONSHOT', '#e8607a');
+      else if (!reach) row('OPEN', 'THE ONE BEFORE', '#e8607a');
+    } else {
+      const n = GAME.branchCount(r.id);
+      row('BRANCHES', n + '/' + r.cap);
+      row('EARNING', GAME.fmt(Math.round(GAME.regionIncome(r.id))) + '/MIN', '#ffd23f');
+      row('NEXT ONE', n >= r.cap ? '-' : GAME.fmt(GAME.branchCost(r.id)), GAME.canBranch(r.id) ? '#ffd23f' : '#e8607a');
+      if (r.moon && GAME.lvl('moonegg')) row('MOON EGGS', n ? 'ON THEIR WAY' : 'NEED A BRANCH', '#5fd0ff');
+    }
+    /* the switch */
+    const by = 158;
+    if (r.home) {
+      SPR.drawBox(g, px0 + 7, by, pw - 14, 14, '#16232f', '#243440', '#0b1a24');
+      SPR.drawTiny(g, 'HOME SWEET HOME', px0 + 12, by + 4, '#4fb072', 1);
     } else if (!open) {
       const can = GAME.canOpenRegion(r.id);
-      const lab = reach ? 'OPEN  ' + GAME.fmt(r.cost) : r.moon && GAME.lvl('moonshot') < 1 ? 'NEEDS MOONSHOT' : 'OPEN THE ONE BEFORE';
-      SPR.drawBox(g, px0, 203, 100, 14, can ? SPR.darken('#ffc72f', 0.4) : '#16232f', can ? '#ffc72f' : '#243440', '#0b1a24');
-      SPR.drawTiny(g, lab, px0 + 4, 207, can ? '#fff8ec' : '#4fb072', 1);
-      if (reach) wlHits.push({ kind: 'open', key: 'open', id: r.id, x: px0, y: 203, w: 100, h: 14 });
-      SPR.drawTiny(g, GAME.fmt(r.yield) + '/MIN A BRANCH', px0 + 106, 207, '#7ef2a8', 1);
+      SPR.drawBox(g, px0 + 7, by, pw - 14, 14, can ? SPR.darken('#ffc72f', 0.4) : '#16232f', can ? '#ffc72f' : '#243440', '#0b1a24');
+      SPR.drawTiny(g, reach ? 'OPEN  ' + GAME.fmt(r.cost) : 'LOCKED', px0 + 12, by + 4, can ? '#fff8ec' : '#4fb072', 1);
+      if (reach) wlHits.push({ kind: 'open', key: 'open', id: r.id, x: px0 + 7, y: by, w: pw - 14, h: 14 });
     } else {
       const n = GAME.branchCount(r.id), can = GAME.canBranch(r.id), full = n >= r.cap;
-      SPR.drawBox(g, px0, 203, 100, 14, can ? SPR.darken('#7ef2a8', 0.55) : '#16232f', can ? '#7ef2a8' : '#243440', '#0b1a24');
-      SPR.drawTiny(g, full ? 'ALL BUILT' : 'BRANCH  ' + GAME.fmt(GAME.branchCost(r.id)), px0 + 4, 207, can ? '#fff8ec' : '#4fb072', 1);
-      if (!full) wlHits.push({ kind: 'branch', key: 'branch', id: r.id, x: px0, y: 203, w: 100, h: 14 });
-      SPR.drawTiny(g, n + '/' + r.cap + '  ' + GAME.fmt(Math.round(GAME.regionIncome(r.id))) + '/MIN', px0 + 106, 207, '#ffd23f', 1);
+      SPR.drawBox(g, px0 + 7, by, pw - 14, 14, can ? SPR.darken('#7ef2a8', 0.55) : '#16232f', can ? '#7ef2a8' : '#243440', '#0b1a24');
+      SPR.drawTiny(g, full ? 'ALL BUILT' : 'BRANCH  ' + GAME.fmt(GAME.branchCost(r.id)), px0 + 12, by + 4, can ? '#fff8ec' : '#4fb072', 1);
+      if (!full) wlHits.push({ kind: 'branch', key: 'branch', id: r.id, x: px0 + 7, y: by, w: pw - 14, h: 14 });
     }
+    /* previous and next, and where this one sits in the run */
+    const ay = 182;
+    [['<', 'prev', px0 + 7], ['>', 'next', px0 + pw - 23]].forEach(([lab, kind, bx]) => {
+      SPR.drawBox(g, bx, ay, 16, 14, wlHover === kind ? '#3a5060' : '#2a3f4c', '#5a7a88', '#0b1a24');
+      SPR.drawTiny(g, lab, bx + 6, ay + 4, '#d8ffe8', 1);
+      wlHits.push({ kind, key: kind, x: bx, y: ay, w: 16, h: 14 });
+    });
+    const idx = REGIONS.findIndex(x => x.id === r.id);
+    const pos = (idx + 1) + ' OF ' + REGIONS.length;
+    SPR.drawTiny(g, pos, px0 + pw / 2 - SPR.tinyW(pos, 1) / 2, ay + 4, '#4fb072', 1);
+    /* the run of flags along the foot, lit where they are open */
+    REGIONS.forEach((x, i) => {
+      const fx = px0 + 8 + i * 14, fy = 202;
+      const op = GAME.regionOpen(x.id);
+      g.fillStyle = op ? x.flag[0] : '#243440'; g.fillRect(fx, fy, 10, 7);
+      g.fillStyle = op ? x.flag[1] : '#16232f'; g.fillRect(fx, fy + 4, 10, 2);
+      if (x.id === r.id) { g.fillStyle = '#fff8ec'; g.fillRect(fx - 1, fy + 8, 12, 1); }
+    });
     /* the pointer */
     if (wlMouse.inside) {
       const hov = wlHitAt(wlMouse.x, wlMouse.y);
@@ -4014,17 +4457,20 @@
   let termMouse = { x: 0, y: 0, inside: false };
   let labOpenedAt = 0, installFx = null, termKeys = 0;
 
+  /* every package is on the board, always: the whole tree reads at a
+     glance. State says how far off it is: aged (its lane waits for an
+     age), locked (its parent is not in yet), short, ready, done. */
   function pkgState(sk) {
     const cur = GAME.lvl(sk.id);
     if (cur >= sk.max) return 'done';
+    if (!GAME.laneOpen(sk.br)) return 'aged';
+    const pre = skillPrereq(sk);
+    if (pre && GAME.lvl(pre.id) < 1) return 'locked';
     if (S().feathers >= skillCost(sk, cur)) return 'ready';
     return 'short';
   }
-  function pkgVisible(sk) {
-    if (sk.id === 'root') return true;
-    const pre = skillPrereq(sk);
-    return !pre || GAME.lvl(pre.id) > 0;
-  }
+  function pkgVisible(sk) { return true; }
+  const pkgDark = st => st === 'locked' || st === 'aged';
   /* quests show the chain up to one past the current goal */
   function questIndex(q) { return QUESTS.indexOf(q); }
   function questVisible(q) {
@@ -4046,7 +4492,7 @@
   }
   function clampPan() {
     const inner = mapInner();
-    const boardW = 13 * COLW + 8, boardH = GRID.rows * ROWH + 12;
+    const boardW = GRID.cols * COLW + 8, boardH = GRID.rows * ROWH + 12;
     mapPan.x = Math.min(0, Math.max(-(boardW - (inner.w - GUT)), mapPan.x));
     mapPan.y = Math.min(0, Math.max(-(boardH - inner.h), mapPan.y));
   }
@@ -4066,6 +4512,10 @@
     if (state === 'ready') {
       const b = SPR.darken(hue, 0.18);
       return { base: b, light: SPR.lighten(b, 0.30), dark: SPR.darken(b, 0.28), out: '#ffc72f' };
+    }
+    if (pkgDark(state)) {
+      const d = SPR.darken(hue, 0.76);
+      return { base: d, light: SPR.lighten(d, 0.10), dark: SPR.darken(d, 0.4), out: '#0f1f16' };
     }
     const d = SPR.darken(hue, 0.66);
     return { base: d, light: SPR.lighten(d, 0.14), dark: SPR.darken(d, 0.35), out: '#0f1f16' };
@@ -4161,7 +4611,7 @@
     /* ---------- the pointer ---------- */
     if (termMouse.inside) {
       const over = termHitAt(termMouse.x, termMouse.y);
-      const kind = over && (over.kind === 'node' || over.kind === 'quest' || over.kind === 'install' || over.kind === 'mod' || over.kind === 'home' || over.kind === 'close') ? 'hand' : 'arrow';
+      const kind = over && (over.kind === 'node' || over.kind === 'quest' || over.kind === 'age' || over.kind === 'install' || over.kind === 'mod' || over.kind === 'home' || over.kind === 'close') ? 'hand' : 'arrow';
       const cur = SPR.cursorSprite(kind, 1);
       g.drawImage(cur, Math.round(termMouse.x) - (kind === 'hand' ? 4 : 0), Math.round(termMouse.y) - (kind === 'hand' ? 2 : 0));
     }
@@ -4239,20 +4689,9 @@
       const a = nodePos(sk.pre), b = nodePos(sk.id);
       const st = pkgState(sk);
       const hue = MOD_BY_ID[sk.br].hue;
-      const col = onPath.has(sk.id) && st !== 'done' ? '#ffffff' : st === 'done' ? hue : st === 'ready' ? '#ffc72f' : '#2f6a48';
+      const col = onPath.has(sk.id) && st !== 'done' ? '#ffffff' : st === 'done' ? hue : st === 'ready' ? '#ffc72f' : pkgDark(st) ? '#173226' : '#2f6a48';
       if (sk.pre === 'root') seg(root.x + NODE / 2 + 1, b.y + NODE / 2, b.x - 1, b.y + NODE / 2, col, st !== 'done');
       else elbow(a, b, col, st !== 'done');
-    });
-    /* hidden children hint: short stubs with a ? */
-    visible.forEach(sk => {
-      SKILLS.filter(c2 => c2.pre === sk.id && !pkgVisible(c2)).forEach(c2 => {
-        const a = nodePos(sk.id), b = nodePos(c2.id);
-        const col = onPath.has(c2.id) ? 'rgba(255,255,255,.45)' : 'rgba(126,242,168,.22)';
-        for (let i = 2; i < 10; i += 3) g.fillRect(a.x + NODE + i, a.y + NODE / 2, 1, 1);
-        g.fillStyle = col;
-        for (let i = 2; i < 10; i += 3) g.fillRect(a.x + NODE + i, a.y + NODE / 2, 1, 1);
-        if (Math.floor(now / 700 + c2.d) % 2) SPR.drawTiny(g, '?', b.x + 4, b.y + 4, col, 1);
-      });
     });
     /* the quest chain zigzags along the top */
     QUESTS.forEach((q, i) => {
@@ -4274,10 +4713,17 @@
       const p = nodePos(id);
       if (p.x < inner.x + GUT - NODE || p.x > inner.x + inner.w + 4 || p.y < inner.y - NODE - 4 || p.y > inner.y + inner.h + 4) return;
       g.fillStyle = 'rgba(0,0,0,.4)'; g.fillRect(p.x + 1, p.y + 2, NODE + 1, NODE);
-      SPR.drawCube(g, p.x, p.y, NODE, nodePal(st, hue), { depth: st === 'short' || st === 'later' ? 1 : 2, bg: MAP_BG });
-      g.globalAlpha = st === 'short' || st === 'later' ? 0.5 : 1;
+      const dim = st === 'short' || st === 'later' ? 0.5 : pkgDark(st) ? 0.3 : 1;
+      SPR.drawCube(g, p.x, p.y, NODE, nodePal(st, hue), { depth: dim < 1 ? 1 : 2, bg: MAP_BG });
+      g.globalAlpha = dim;
       g.drawImage(SPR.iconSprite(icon, 1), p.x + 2, p.y + 2);
       g.globalAlpha = 1;
+      /* a little padlock on anything the tree has not reached yet */
+      if (pkgDark(st)) {
+        g.fillStyle = '#0f1f16'; g.fillRect(p.x + NODE - 6, p.y + NODE - 7, 6, 7);
+        g.fillStyle = st === 'aged' ? '#8a7a3a' : '#5a7a88';
+        g.fillRect(p.x + NODE - 5, p.y + NODE - 4, 4, 3); g.fillRect(p.x + NODE - 4, p.y + NODE - 6, 1, 2); g.fillRect(p.x + NODE - 3, p.y + NODE - 6, 1, 2);
+      }
       if (sel || hov) ring(p.x, p.y, sel ? '#ffffff' : 'rgba(255,255,255,.55)');
       if ((st === 'ready' || st === 'current') && Math.floor(now / 340) % 2) ring(p.x, p.y, st === 'ready' ? 'rgba(255,214,80,.85)' : 'rgba(255,255,255,.7)');
       if (installFx && installFx.id === id && now - installFx.t < 600) {
@@ -4288,7 +4734,8 @@
         g.fillRect(p.x - r2, p.y - r2, 1, NODE + r2 * 2); g.fillRect(p.x + NODE + r2 - 1, p.y - r2, 1, NODE + r2 * 2);
       }
       /* kind badges in the bottom-right corner */
-      if (kind === 'unlock' && st !== 'done') {
+      if (pkgDark(st)) { /* the padlock says it all */ }
+      else if (kind === 'unlock' && st !== 'done') {
         g.fillStyle = '#0f1f16'; g.fillRect(p.x + NODE - 5, p.y + NODE - 6, 5, 6);
         g.fillStyle = st === 'ready' ? '#ffd23f' : '#4fb072'; g.fillRect(p.x + NODE - 4, p.y + NODE - 3, 3, 2); g.fillRect(p.x + NODE - 3, p.y + NODE - 5, 1, 2);
       } else if (kind === 'unlock' || (kind === 'quest' && st === 'done')) {
@@ -4329,6 +4776,23 @@
       }
       termHits.push({ kind: 'quest', id: q.id, x: p.x - 1, y: p.y - 2, w: NODE + 3, h: NODE + 3 });
     });
+    /* the ages, in a row of their own: reached, next, and still to come */
+    AGES.forEach((a, i) => {
+      const cur = GAME.ageIndex();
+      const st = i <= cur ? 'done' : i === cur + 1 ? 'current' : 'later';
+      if (i) {
+        const p0 = nodePos(AGES[i - 1].id), p1 = nodePos(a.id);
+        seg(p0.x + NODE, p0.y + NODE / 2, p1.x - 1, p1.y + NODE / 2, i <= cur ? a.hue : '#3a3a2a', i > cur);
+      }
+      const p = drawNode(a.id, a.hue, st, a.icon, 'age', termSel === a.id, termHover === a.id);
+      if (!p) return;
+      if (st === 'current') {
+        const [c2, n2] = GAME.ageProgress(a);
+        g.fillStyle = '#0f1f16'; g.fillRect(p.x - 1, p.y + NODE + 2, NODE + 2, 3);
+        g.fillStyle = a.hue; g.fillRect(p.x, p.y + NODE + 3, Math.round(NODE * c2 / n2), 1);
+      }
+      termHits.push({ kind: 'age', id: a.id, x: p.x - 1, y: p.y - 2, w: NODE + 3, h: NODE + 3 });
+    });
     /* the way forward: a bouncing arrow over the current quest, and over
        the package it wants you to install */
     const bounce = Math.round(Math.abs(Math.sin(now / 260)) * 2);
@@ -4347,17 +4811,19 @@
       const y0 = Math.round(oy + L.top * ROWH - 3), h = L.rows * ROWH;
       if (i % 2) { g.fillStyle = 'rgba(255,255,255,.028)'; g.fillRect(inner.x, y0, GUT - 2, h); }
       const m = MOD_BY_ID[L.id];
-      const ready = L.id === 'quests' ? false : SKILLS_BY_MODULE[MOD_INDEX[L.id]].some(sk => pkgVisible(sk) && pkgState(sk) === 'ready');
-      g.fillStyle = m.hue; g.fillRect(inner.x, y0 + 1, 2, h - 1);
-      SPR.drawTiny(g, m.name, inner.x + 4, y0 + 4, m.hue, 1);
+      const ready = (L.id === 'quests' || L.id === 'ages') ? false : SKILLS_BY_MODULE[MOD_INDEX[L.id]].some(sk => pkgState(sk) === 'ready');
+      const shut = m.age && !GAME.laneOpen(m.id);
+      g.fillStyle = shut ? '#2a3a34' : m.hue; g.fillRect(inner.x, y0 + 1, 2, h - 1);
+      SPR.drawTiny(g, m.name, inner.x + 4, y0 + 4, shut ? '#3a5560' : m.hue, 1);
+      if (shut) SPR.drawTiny(g, AGES[AGE_INDEX[m.age]].name.split(' ')[0].toUpperCase(), inner.x + 4, y0 + 11, '#3a5560', 1);
       if (ready && Math.floor(now / 340) % 2) { g.fillStyle = '#ffd23f'; g.fillRect(inner.x + 4 + SPR.tinyW(m.name, 1) + 2, y0 + 5, 2, 2); }
     });
     g.fillStyle = 'rgba(126,242,168,.18)'; g.fillRect(inner.x + GUT - 2, inner.y, 1, inner.h);
     g.restore();
     /* window status line */
-    const vis = visible.length - 1, tot = SKILLS.length - 1;
+    const tot = SKILLS.length - 1, inst = SKILLS.filter(sk => sk.id !== 'root' && GAME.lvl(sk.id) >= sk.max).length;
     const doneQ = QUESTS.filter(GAME.questDone).length;
-    const status = vis + ' ON MAP  ' + (tot - vis) + ' DARK  QUESTS ' + doneQ + '/' + QUESTS.length;
+    const status = inst + '/' + tot + ' IN  QUESTS ' + doneQ + '/' + QUESTS.length + '  ' + GAME.age().name.toUpperCase();
     g.fillStyle = 'rgba(8,26,20,.85)'; g.fillRect(inner.x + 1, inner.y + inner.h - 9, SPR.tinyW(status, 1) + 4, 8);
     SPR.drawTiny(g, status, inner.x + 3, inner.y + inner.h - 7, '#4fb072', 1);
 
@@ -4400,7 +4866,8 @@
             g.fillStyle = '#7ef2a8'; g.fillRect(bx + 2, by + 2, Math.round((bw - 4) * f), bh - 4);
             SPR.drawTiny(g, 'INSTALLING', bx + 6, by + 4, '#03110a', 1);
           } else {
-            const lab2 = st === 'ready' ? '> INSTALL' : 'NEED MORE';
+            const lab2 = st === 'ready' ? '> INSTALL' : st === 'aged' ? AGES[AGE_INDEX[MOD_BY_ID[sk.br].age]].name.toUpperCase()
+                       : st === 'locked' ? 'NEEDS ' + skillPrereq(sk).name.toUpperCase().slice(0, 10) : 'NEED MORE';
             SPR.drawTiny(g, lab2, bx + Math.round(bw / 2 - SPR.tinyW(lab2, 1) / 2), by + 4, st === 'ready' ? '#fff8ec' : '#4fb072', 1);
           }
           if (st === 'ready') termHits.push({ kind: 'install', id: sk.id, x: bx, y: by, w: bw, h: bh });
@@ -4411,6 +4878,26 @@
         SPR.drawTiny(g, 'THE KERNEL.', rx, y2, '#d8ffe8', 1);
         SPR.drawTiny(g, 'EVERY LANE STARTS HERE.', rx, y2 + 7, '#7ef2a8', 1);
       }
+    } else if (termSel && AGE_INDEX[termSel] !== undefined) {
+      /* an age: what it takes to get there, ticked off */
+      const a = AGES[AGE_INDEX[termSel]], ai = AGE_INDEX[termSel], cur = GAME.ageIndex();
+      const st = ai <= cur ? 'done' : ai === cur + 1 ? 'current' : 'later';
+      SPR.drawCube(g, rx + 1, ry + 3, 16, nodePal(st, a.hue), { depth: 2, bg: '#0b1f18' });
+      g.drawImage(SPR.iconSprite(a.icon, 1), rx + 4, ry + 6);
+      a.name.toUpperCase().split(' ').slice(0, 2).forEach((w, i) => SPR.drawTiny(g, w, rx + 22, ry + 1 + i * 7, '#d8ffe8', 1));
+      SPR.drawTiny(g, ai <= cur ? (ai === cur ? 'NOW' : 'PAST') : 'AGE ' + (ai + 1), rx + 22, ry + 15, a.hue, 1);
+      let y2 = wrap(a.blurb, rx, ry + 25, '#7ef2a8') + 4;
+      const needs = GAME.ageNeeds(a);
+      if (!needs.length) { SPR.drawTiny(g, 'WHERE IT ALL STARTED', rx, y2, '#4fb072', 1); y2 += 7; }
+      needs.forEach(n => {
+        g.fillStyle = n.ok ? '#7ef2a8' : '#1d3628'; g.fillRect(rx, y2 + 1, 4, 4);
+        if (n.ok) { g.fillStyle = '#03110a'; g.fillRect(rx + 1, y2 + 2, 2, 2); }
+        const txt = (n.k === 'moon' ? '' : GAME.fmt(n.have) + '/' + GAME.fmt(n.want) + ' ') + n.name.toUpperCase();
+        SPR.drawTiny(g, txt.slice(0, 22), rx + 6, y2, n.ok ? '#d8ffe8' : '#4fb072', 1); y2 += 7;
+      });
+      const opens = MODULES.filter(m => m.age === a.id).map(m => m.name).join(', ');
+      if (opens) { SPR.drawTiny(g, 'OPENS ' + opens, rx, y2 + 2, '#ffd23f', 1); y2 += 9; }
+      SPR.drawTiny(g, '+' + Math.round(ECON.ageBonus * 100 * ai) + '% ON EVERY COIN', rx, RDW.y + RDW.h - 16, ai <= cur ? '#7ef2a8' : '#4fb072', 1);
     } else if (q) {
       const st = questState(q);
       SPR.drawCube(g, rx + 1, ry + 3, 16, nodePal(st, '#ffd23f'), { depth: 2, bg: '#0b1f18' });
@@ -4451,8 +4938,8 @@
     /* lane chips: click to pan there */
     MODULES.forEach((m, i) => {
       const cx = tb.x + 42 + i * 14;
-      const has = m.id === 'quests' || SKILLS_BY_MODULE[i].some(pkgVisible);
-      const ready = m.id === 'quests' ? false : SKILLS_BY_MODULE[i].some(sk => pkgVisible(sk) && pkgState(sk) === 'ready');
+      const has = m.id === 'quests' || m.id === 'ages' || GAME.laneOpen(m.id);
+      const ready = (m.id === 'quests' || m.id === 'ages') ? false : SKILLS_BY_MODULE[i].some(sk => pkgState(sk) === 'ready');
       SPR.drawBox(g, cx, tb.y + 2, 12, 10, has ? SPR.darken(m.hue, 0.5) : '#142a20', has ? m.hue : null, '#0f1f16');
       g.globalAlpha = has ? 1 : 0.4;
       g.drawImage(SPR.iconSprite(m.icon, 1), cx + 1, tb.y + 2);
@@ -4512,6 +4999,31 @@
     skillCardFeathers = S().feathers;
     const sk = termSel && SKILL_BY_ID[termSel] ? SKILL_BY_ID[termSel] : null;
     const q = termSel && QUEST_BY_ID[termSel] ? QUEST_BY_ID[termSel] : null;
+    const ag = termSel && AGE_INDEX[termSel] !== undefined ? AGES[AGE_INDEX[termSel]] : null;
+    if (ag) {
+      const ai = AGE_INDEX[ag.id], cur = GAME.ageIndex();
+      card.appendChild(mkIcon(ag.icon, 4));
+      const mid = document.createElement('div');
+      mid.className = 'skc-mid';
+      const b = document.createElement('b');
+      b.textContent = ag.name;
+      const small = document.createElement('small');
+      small.textContent = ai <= cur ? (ai === cur ? '  THE AGE WE ARE IN' : '  BEHIND US') : '  AGE ' + (ai + 1) + ' OF ' + AGES.length;
+      b.appendChild(small);
+      mid.appendChild(b);
+      const desc = document.createElement('span');
+      const needs = GAME.ageNeeds(ag);
+      desc.textContent = ag.blurb + (needs.length ? ' Needs ' + needs.map(n => (n.k === 'moon' ? '' : GAME.fmt(n.want) + ' ') + n.name).join(', ') + '.' : '');
+      mid.appendChild(desc);
+      card.appendChild(mid);
+      const btn = document.createElement('button');
+      btn.className = 'btn';
+      btn.disabled = true;
+      const [c2, n2] = GAME.ageProgress(ag);
+      btn.textContent = ai <= cur ? 'REACHED' : c2 + '/' + n2 + ' DONE';
+      card.appendChild(btn);
+      return;
+    }
     if (q) {
       const st = questState(q);
       card.appendChild(mkIcon(q.icon, 4));
@@ -4563,7 +5075,12 @@
     btn.className = 'btn';
     if (sk.id === 'root') { btn.disabled = true; btn.textContent = 'KERNEL'; }
     else if (maxed) { btn.disabled = true; btn.textContent = 'INSTALLED'; }
-    else {
+    else if (pkgDark(pkgState(sk))) {
+      btn.disabled = true;
+      btn.appendChild(mkIcon('lock', 2));
+      const st2 = pkgState(sk);
+      btn.appendChild(document.createTextNode(st2 === 'aged' ? AGES[AGE_INDEX[MOD_BY_ID[sk.br].age]].name.toUpperCase() : 'NEEDS ' + skillPrereq(sk).name.toUpperCase()));
+    } else {
       btn.dataset.act = 'buy-skill';
       btn.dataset.id = sk.id;
       if (S().feathers >= cost) btn.classList.add('btn-green');
@@ -4588,7 +5105,7 @@
           return;
         }
         const h = termHitAt(p.x, p.y);
-        termHover = h && (h.kind === 'node' || h.kind === 'quest') ? h.id : null;
+        termHover = h && (h.kind === 'node' || h.kind === 'quest' || h.kind === 'age') ? h.id : null;
       });
       termCv.addEventListener('pointerleave', () => { termMouse.inside = false; termHover = null; mapDrag = null; });
       termCv.addEventListener('pointerdown', ev => {
@@ -4598,11 +5115,11 @@
         termMouse = { x: p.x, y: p.y, inside: true };
         const h = termHitAt(p.x, p.y);
         if (!h) return;
-        if (h.kind === 'node' || h.kind === 'quest') { termSel = h.id; snd.plop(); renderSkillCard(); mapDrag = null; return; }
+        if (h.kind === 'node' || h.kind === 'quest' || h.kind === 'age') { termSel = h.id; snd.plop(); renderSkillCard(); mapDrag = null; return; }
         if (h.kind === 'install') { installPkg(h.id); return; }
         if (h.kind === 'mod') {
           const m = MODULES[h.i];
-          const first = m.id === 'quests' ? (GAME.currentQuest() || QUESTS[0]) : SKILLS_BY_MODULE[h.i][0];
+          const first = m.id === 'quests' ? (GAME.currentQuest() || QUESTS[0]) : m.id === 'ages' ? (GAME.nextAge() || GAME.age()) : SKILLS_BY_MODULE[h.i][0];
           if (first) { centerOn(first.id); snd.plop(); }
           return;
         }
@@ -4854,6 +5371,8 @@
       ipanel.appendChild(ipRow('lays every', GAME.fmtTime(GAME.chLayTime(ch) / (ch.buffT > 0 ? 2 : 1))));
       ipanel.appendChild(ipRow('egg value', GAME.fmt(GAME.eggValue(sp.tier, false))));
       ipanel.appendChild(ipRow('worth / min', () => GAME.fmt(Math.round(GAME.chScore(ch)))));
+      ipanel.appendChild(ipRow('rank', () => { const r2 = GAME.rankOf(ch); return RANKS[r2].n + (r2 ? ' ' + '*'.repeat(r2) : ''); }));
+      ipanel.appendChild(ipRow('eggs laid', () => { const nx = GAME.nextRankEggs(ch); return (ch.laid || 0) + (nx ? ' / ' + nx + ' for a star' : ' - top rank'); }));
       /* the five genes, as little pip rows */
       const gbox = document.createElement('div');
       gbox.className = 'gene-rows';
@@ -4995,12 +5514,12 @@
       ipanel.appendChild(ipRow('egg value', GAME.fmt(GAME.eggValue(st.mamaTier, false))));
       ipanel.appendChild(ipRow('pet cooldown', GAME.fmtTime(GAME.petCd(true))));
       ipanel.appendChild(ipRow('mutation', Math.round(GAME.mutationChance() * 100) + '%'));
-      const maxed = st.mamaTier >= TIERS.length - 2;
+      const maxed = st.mamaTier >= TIER_DIVINE;
       ipanel.appendChild(ipBtns([{
-        label: () => S().mamaTier >= TIERS.length - 2 ? 'MAX TIER' : 'UPGRADE ' + GAME.fmt(GAME.mamaCost()),
+        label: () => S().mamaTier >= TIER_DIVINE ? 'MAX TIER' : 'UPGRADE ' + GAME.fmt(GAME.mamaCost()),
         data: { act: 'upgrade-mama' },
-        disabled: () => S().mamaTier >= TIERS.length - 2 || S().coins < GAME.mamaCost(),
-        cls: () => S().mamaTier < TIERS.length - 2 && S().coins >= GAME.mamaCost() ? 'btn-green' : '',
+        disabled: () => S().mamaTier >= TIER_DIVINE || S().coins < GAME.mamaCost(),
+        cls: () => S().mamaTier < TIER_DIVINE && S().coins >= GAME.mamaCost() ? 'btn-green' : '',
       }]));
       return;
     }
@@ -5132,6 +5651,36 @@
         ipanel.appendChild(ipRow('staff', () => S().staff.length + ' / ' + GAME.staffSlots()));
         ipanel.appendChild(ipRow('wages', () => GAME.wagePerSec().toFixed(2) + '/s'));
         btns.push({ label: 'HIRE CREW', data: { act: 'open-hire' }, cls: 'btn-green' });
+      } else if (o.type === 'kitchen') {
+        const kt = st.kitchens[o.k];
+        if (!kt) { setInspect({ kind: 'farm' }); return; }
+        ipanel.appendChild(ipRow('larder', () => kt.pantry.length + ' / ' + ECON.kitchenPantry + ' eggs'));
+        ipanel.appendChild(ipRow('cooking', () => kt.cook ? RECIPE_BY_ID[kt.cook.recipe].name + ' ' + Math.round(Math.min(1, kt.cook.t / kt.cook.T) * 100) + '%' : 'nothing'));
+        ipanel.appendChild(ipRow('on the counter', () => kt.counter.length + ' / ' + ECON.kitchenCounter + (kt.counter.length ? ' worth ' + GAME.fmt(kt.counter.reduce((a, d) => a + d.value, 0)) : '')));
+        ipanel.appendChild(ipRow('sold', () => String(kt.sold)));
+        ipanel.appendChild(ipRow('recipe', () => { const r2 = RECIPE_BY_ID[kt.recipe] || RECIPES[0]; return r2.name + ': ' + r2.eggs + ' egg' + (r2.eggs > 1 ? 's' : '') + (r2.feed ? ' + ' + r2.feed + ' feed' : '') + ', x' + r2.mult; }));
+        RECIPES.filter(r2 => !r2.hen).forEach(r2 => {
+          btns.push({ label: () => r2.name.toUpperCase() + (GAME.recipeOpen(r2.id) ? '' : ' (LAB)'), data: { act: 'set-recipe', k: o.k, id: r2.id },
+                      disabled: () => !GAME.recipeOpen(r2.id) || kt.recipe === r2.id, cls: () => kt.recipe === r2.id ? 'btn-green' : '' });
+        });
+      } else if (o.type === 'park') {
+        const p = st.parks[o.k];
+        if (!p) { setInspect({ kind: 'farm' }); return; }
+        ipanel.appendChild(ipRow('exhibits', () => p.slots.filter(Boolean).length + ' / ' + GAME.parkSlots(o.k)));
+        ipanel.appendChild(ipRow('appeal', () => GAME.parkAppeal(o.k).toFixed(1)));
+        ipanel.appendChild(ipRow('a ticket', () => GAME.fmt(GAME.ticketPrice(o.k))));
+        ipanel.appendChild(ipRow('next bus', () => GAME.parkAppeal(o.k) > 0 ? GAME.fmtTime(Math.max(0, GAME.busEvery() - (p.t || 0))) : 'no show, no bus'));
+        ipanel.appendChild(ipRow('visitors', () => String(p.visitors || 0)));
+        p.slots.forEach((ch, i) => { if (ch) btns.push({ label: 'LET OUT ' + SPECIES[ch.sp].name.toUpperCase().slice(0, 10), data: { act: 'park-eject', k: o.k, i: String(i) } }); });
+      } else if (o.type === 'timemachine') {
+        const tm = st.timemachines[o.k];
+        if (!tm) { setInspect({ kind: 'farm' }); return; }
+        ipanel.appendChild(ipRow('fossils in the crate', () => String(S().fossilCount)));
+        ipanel.appendChild(ipRow('a dinosaur takes', ECON.dinoFossils + ' fossils'));
+        ipanel.appendChild(ipRow('countdown', () => tm.on ? GAME.fmtTime(Math.max(0, tm.T - tm.t)) : 'idle'));
+        ipanel.appendChild(ipRow('brought back', () => String(tm.made || 0)));
+        btns.push({ label: () => tm.on ? 'RUNNING' : 'LOAD ' + ECON.dinoFossils + ' FOSSILS', data: { act: 'tm-load', k: o.k },
+                    disabled: () => !GAME.canLoadTM(o.k), cls: () => GAME.canLoadTM(o.k) ? 'btn-green' : '' });
       } else if (o.type === 'fence') {
         ipanel.appendChild(ipRow('blocks', 'chickens'));
       }
@@ -6070,7 +6619,10 @@
     const row = document.createElement('div');
     row.className = 'tally';
     [['coin', GAME.fmt(now2) + '/min', 'Right now'], ['truck', GAME.fmt(L.sales), 'Truck sales'], ['doc', GAME.fmt(L.orders), 'Roadside orders'],
-     ['honey', GAME.fmt(L.honey), 'Honey'], ['star', GAME.fmt(L.quests), 'Quest rewards'], ['city', GAME.fmt(L.empire || 0), 'Branches abroad'], ['chart', GAME.fmt(GAME.companyValue()), 'Company value']].forEach(([ic, v, tip]) => {
+     ['honey', GAME.fmt(L.honey), 'Honey'], ['star', GAME.fmt(L.quests), 'Quest rewards'], ['globe', GAME.fmt(L.empire || 0), 'Branches abroad'],
+     ['pan', GAME.fmt(L.food || 0), 'Kitchen'], ['ticket', GAME.fmt(L.park || 0), 'Park tickets'], ['key', GAME.fmt(L.secrets || 0), 'Secrets'],
+     [GAME.age().icon, '+' + Math.round((GAME.ageMult() - 1) * 100) + '%', GAME.age().name + ' bonus'],
+     ['chart', GAME.fmt(GAME.companyValue()), 'Company value']].forEach(([ic, v, tip]) => {
       const cell = document.createElement('div');
       cell.title = tip;
       cell.appendChild(mkIcon(ic, 3));
@@ -6293,6 +6845,30 @@
       });
       box.appendChild(list);
 
+    } else if (indexTab === 'secrets') {
+      const found = SECRETS.filter(s => GAME.secretFound(s.id)).length;
+      $('#pedia-sub').textContent = found + ' / ' + SECRETS.length + ' SECRETS';
+      const intro = document.createElement('p');
+      intro.className = 'pedia-intro';
+      intro.textContent = 'Things the ranch never tells you to do. Each pays out once, the moment it happens.';
+      box.appendChild(intro);
+      const grid = document.createElement('div');
+      grid.className = 'egg-grid secrets';
+      SECRETS.forEach(s => {
+        const ok = GAME.secretFound(s.id);
+        const card = document.createElement('div');
+        card.className = 'egg-card' + (ok ? '' : ' unknown');
+        card.appendChild(mkIcon(ok ? s.icon : 'quest', 3));
+        const mid = document.createElement('div');
+        const b = document.createElement('b'); b.textContent = ok ? s.name : '???'; mid.appendChild(b);
+        const sp = document.createElement('span'); sp.textContent = ok ? s.desc : 'Not found yet.'; mid.appendChild(sp);
+        const rw = document.createElement('i');
+        rw.textContent = [s.rw.c ? s.rw.c + ' coins' : '', s.rw.f ? s.rw.f + ' feathers' : ''].filter(Boolean).join(', ');
+        mid.appendChild(rw);
+        card.appendChild(mid);
+        grid.appendChild(card);
+      });
+      box.appendChild(grid);
     } else if (indexTab === 'ledger') {
       renderLedger(box);
     } else if (indexTab === 'eggs') {
@@ -6306,7 +6882,7 @@
       TIERS.forEach((tier, t) => {
         const card = document.createElement('div');
         card.className = 'egg-card';
-        card.appendChild(cloneCanvas(SPR.eggSprite(t, 2, t === TIERS.length - 1)));
+        card.appendChild(cloneCanvas(SPR.eggSprite(t, 2, t === TIER_SECRET)));
         const mid = document.createElement('div');
         const b = document.createElement('b');
         b.textContent = tier.n;
@@ -6334,6 +6910,8 @@
         box.appendChild(p);
       }
       const icons = { species: null, first: null, land: 'house', mama: 'crown', hire: 'hands',
+                      secret: 'key', age: 'scroll', food: 'pan', park: 'ticket', fossil: 'fossil', rank: 'medal', moon: 'moon', world: 'globe',
+                      shape: 'hoe', quest: 'star', storey: 'rack', order: 'doc', genes: 'dna',
                       flyer: 'doc', applicants: 'hands', farm: 'sprout', grown: 'chick', wheels: 'truck', route: 'city' };
       list.forEach(en => {
         const row = document.createElement('div');
@@ -6404,6 +6982,13 @@
     if (st === 'stand') { renderPedia(); openModal('#modal-pedia'); snd.build(); return true; }
     if (st === 'depot') { renderDepot(); openModal('#modal-depot'); snd.build(); return true; }
     if (st === 'brand') { openCompany(); snd.build(); return true; }
+    const fos = GAME.fossilAt(x, y);
+    if (fos && GAME.collectFossil(fos)) { snd.sparkle(); floatWorld('FOSSIL', x, y - 14, 'gold', 'fossil'); return true; }
+    const mv = GAME.movers.van;
+    if (mv && x > mv.x - 4 && x < mv.x + 44 && y > mv.y - 8 && y < mv.y + 20) {
+      if (GAME.findSecret('vanmover')) snd.grand(); else { snd.engine(); floatWorld('HONK', x, y - 14, 'gold'); }
+      return true;
+    }
     const ord = GAME.orderAt(x, y);
     if (ord) { setInspect({ kind: 'order', ref: ord }); snd.plop(); return true; }
     if (st === 'mamaSign') {
@@ -6440,6 +7025,7 @@
       if (GAME.ejectNest(o.k)) { snd.plop(); return true; }
     }
     if (o && o.type === 'genelab' && S().tool !== 'build') { openGenes(); snd.build(); return true; }
+    if (o && (o.type === 'kitchen' || o.type === 'park' || o.type === 'timemachine') && S().tool !== 'build') { setInspect({ kind: 'build', ref: o }); snd.plop(); return true; }
     if (o && o.type === 'site' && S().tool !== 'build') { setInspect({ kind: 'build', ref: o }); return true; }
     return false;
   }
@@ -6478,7 +7064,7 @@
     if (tool === 'feed') { trySprinkle(p.x, p.y); ptr.mode = 'feed'; return; }
     if (tool === 'farm') { farmTile = null; lastPaint = null; dimPalettes(true); handleFarmAt(p.x, p.y); ptr.mode = 'farm'; return; }
     if (tool === 'inspect') { ptr.mode = 'inspect'; return; }
-    if (tool === 'basket') { ptr.mode = 'sweep'; return; }
+    if (tool === 'basket') { ptr.mode = 'sweep'; sweepGold = 0; return; }
     if (S().held) { ptr.mode = 'carry'; return; }
     cand = { ch: chickenAt(p.x, p.y), egg: eggAt(p.x, p.y), app: GAME.applicantAt(p.x, p.y),
              mama: overMama(p.x, p.y), plume: plumeAt(p.x, p.y) };
@@ -6556,6 +7142,11 @@
         if (v) { snd.plume(); floatWorld('+' + v, x, y - 8, 'green', 'feather'); }
         return;
       }
+      {
+        /* a butterfly, if you are quick */
+        const fly = flies.find(f => Math.abs(f.x - x) < 6 && Math.abs(f.y - y) < 6);
+        if (fly) { puff(fly.x, fly.y, fly.col, 6, 20, 16); if (GAME.findSecret('butterfly')) snd.grand(); else snd.plume(); return; }
+      }
       if (cand.egg) {
         if (GAME.grabEgg(cand.egg)) { snd.plop(); heldSince = performance.now(); }
         return;
@@ -6583,6 +7174,13 @@
           return;
         }
         const o = GAME.occAt(Math.floor(x / 16), Math.floor(y / 16));
+        if (o && o.type === 'kitchen') {
+          const n = GAME.basketToKitchen(o.k);
+          if (n) { snd.plop(); floatWorld('+' + n + ' TO THE LARDER', x, y - 12, 'green', 'pan'); }
+          else floatWorld('LARDER FULL', x, y - 12, 'pink');
+          updateCursorChip();
+          return;
+        }
         if (o && o.type === 'incubator') {
           const n = GAME.basketToInc(o.k);
           if (n) { snd.plop(); floatWorld('+' + n + ' IN', x, y - 12, 'green'); }
@@ -6628,6 +7226,14 @@
     else if (result === 'incubated') { snd.plop(); floatWorld('INCUBATING', x, y - 12, 'green'); }
     else if (result === 'ordered') { snd.clink(); floatWorld('HANDED OVER', x, y - 14, 'green'); }
     else if (result === 'loaded') snd.clink();
+    else if (result === 'exhibited') { snd.grand(); floatWorld('ON SHOW', x, y - 14, 'gold', 'ticket'); }
+    else if (result === 'roasting') { snd.build(); puff(x, y - 6, '#fff8ec', 8, 30, 26); floatWorld('INTO THE POT', x, y - 14, 'gold', 'pan'); }
+    else if (result === 'pantry') { snd.plop(); floatWorld('LARDER', x, y - 12, 'green', 'pan'); }
+    else if (result === 'park-full') { snd.error(); floatWorld('PARK FULL', x, y - 14, 'pink'); }
+    else if (result === 'park-nodino') { snd.error(); floatWorld('NEEDS A DINO PEN', x, y - 14, 'pink', 'lock'); }
+    else if (result === 'park-chick') { snd.error(); floatWorld('TOO YOUNG', x, y - 14, 'pink'); }
+    else if (result === 'kitchen-busy') { snd.error(); floatWorld('OVEN BUSY', x, y - 14, 'pink'); }
+    else if (result === 'kitchen-locked') { snd.error(); floatWorld('NEEDS A RECIPE', x, y - 14, 'pink', 'lock'); }
     else snd.plop();
   }
   /* while you are actually drawing, the palette gets out of the way */
@@ -6715,8 +7321,10 @@
     }
   }
 
+  let typed = '';
   window.addEventListener('keydown', ev => {
     keys[ev.key.toLowerCase()] = true;
+    if (ev.key.length === 1 && !(ev.target && ev.target.tagName === 'INPUT')) { typed = (typed + ev.key.toLowerCase()).slice(-3); if (typed === 'egg') GAME.findSecret('typist'); }
     if (ev.key === 'r' || ev.key === 'R') { placeDir = (placeDir + 1) % 4; GAME.mark('build'); }
     if (ev.key === 'Escape') { closeModals(); buildSel = null; GAME.mark('build'); }
     if (ev.key === '1') setTool('hand');
@@ -6901,6 +7509,10 @@
       }
       case 'open-genes': { openGenes(btn.dataset.id ? +btn.dataset.id : null); snd.build(); break; }
       case 'open-world': { openWorld(); snd.build(); break; }
+      case 'set-recipe': { if (GAME.setRecipe(btn.dataset.k, btn.dataset.id)) { snd.plop(); refreshInspect(); } else snd.error(); break; }
+      case 'park-eject': { if (GAME.parkEject(btn.dataset.k, +btn.dataset.i)) { snd.plop(); ipSig = ''; renderInspect(); } else snd.error(); break; }
+      case 'tm-load': { if (GAME.loadTM(btn.dataset.k)) { snd.grand(); refreshInspect(); } else snd.error(); break; }
+      case 'open-ages': { termSel = (GAME.nextAge() || GAME.age()).id; renderSkills(); centerOn(termSel); openModal('#modal-skills'); snd.build(); break; }
       case 'gene-pick': { genePick(+btn.dataset.id); break; }
       case 'gene-splice': { geneMode = geneMode === 'splice' ? null : 'splice'; snd.plop(); break; }
       case 'gene-clone': {
@@ -7033,6 +7645,19 @@
   GAME.on('rain', () => { snd.sprinkle(); });
   GAME.on('region', ({ r }) => { toast({ icon: r.moon ? 'atom' : 'city', title: r.name.toUpperCase(), body: r.moon ? 'The rocket is away.' : 'Open for business.' }); });
   GAME.on('branch', ({ r, n }) => { floatText('+1 BRANCH', innerWidth / 2 - 40, 120, 'gold', 'house'); });
+  GAME.on('secret', ({ s }) => { snd.grand(); toast({ icon: s.icon, title: 'SECRET: ' + s.name.toUpperCase(), body: s.desc, long: true }); });
+  GAME.on('age', ({ a }) => { snd.grand(); ageFx = { t: performance.now(), a }; toast({ icon: a.icon, title: 'THE ' + a.name.toUpperCase(), body: a.blurb, long: true }); renderToolbelt(); });
+  GAME.on('cooked', ({ recipe, x, y }) => { puff(x, y, '#fff8ec', 6, 24, 20); floatWorld(RECIPE_BY_ID[recipe].name.toUpperCase(), x, y - 10, 'green', 'pan'); snd.clink(); });
+  GAME.on('dine', ({ x, y, v }) => { floatWorld('+' + GAME.fmt(v), x, y - 12, 'gold', 'coin'); snd.coin(); });
+  GAME.on('ticket', ({ x, y, v }) => { floatWorld('+' + GAME.fmt(v), x, y - 12, 'gold', 'ticket'); snd.clink(); });
+  GAME.on('bus', ({ n }) => { snd.engine(); });
+  GAME.on('roast', ({ ch }) => { toast({ icon: 'pan', title: 'INTO THE POT', body: SPECIES[ch.sp].name + ' is the dish of the day.' }); });
+  GAME.on('exhibit', ({ ch }) => { snd.sparkle(); });
+  GAME.on('fossil', ({ x, y }) => { puff(x, y, '#e0cb98', 8, 30, 20); floatWorld('A FOSSIL', x, y - 14, 'gold', 'fossil'); snd.sparkle(); });
+  GAME.on('tmstart', () => { snd.engine(); });
+  GAME.on('tmdone', ({ x, y }) => { snd.grand(); puff(x, y, '#9fe8ff', 18, 60, 40); floatWorld('FROM THE PAST', x, y - 20, 'gold', 'dino'); });
+  GAME.on('rankup', ({ ch, rank }) => { floatWorld(RANKS[rank].n.toUpperCase(), ch.x + 10, ch.y - 12, 'gold', 'medal'); heart(ch.x + 10, ch.y - 6, 2); snd.sparkle(); });
+  GAME.on('moonegg', () => { snd.sparkle(); toast({ icon: 'moon', title: 'MOON EGG', body: 'Something came down by the Lab. Hatch it.' }); });
   GAME.on('rainend', () => { snd.sparkle(); });
   GAME.on('market', () => { if (!$('#modal-pedia').hidden && indexTab === 'ledger') GAME.mark('pedia'); });
   GAME.on('vehicle', ({ v }) => { snd.grand(); toast({ icon: 'truck', title: v.name.toUpperCase(), body: v.cap + ' eggs' }); });

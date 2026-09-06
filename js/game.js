@@ -53,15 +53,22 @@ const GAME = (() => {
       hatchers: {}, splitters: {}, loaders: {},
       polishers: {}, graders: {}, dynamos: {},
       barns: {}, troughs: {}, wells: {}, sprinklers: {}, mills: {}, coops: {}, boards: {}, hqs: {},
-      beehives: {}, genelabs: {},
+      beehives: {}, genelabs: {}, kitchens: {}, parks: {}, timemachines: {},
+      secrets: {},           /* secret id -> when it was found */
+      cooked: {},            /* recipe id -> dishes made */
+      fossils: [],           /* bones lying on the ground {id,x,y,z,vz,seed} */
+      fossilCount: 0,        /* bones in the crate, ready for the Time Machine */
+      visitors: [],          /* diners and tourists walking about */
+      age: 0,                /* index into AGES */
+      playT: 0,              /* seconds actually played */
       sites: {},             /* "c,r" -> {type, dir, t, T, kind:'build'|'storey'} the movers are on */
       storeys: {},           /* "c,r" -> 2 for a building with a second floor */
       orders: [],            /* customers at the lay-by, and their egg orders */
       orderT: 45,            /* seconds to the next customer */
       quests: {},            /* quest id -> true once it has paid out */
       company: Object.assign({}, COMPANY_DEFAULT),
-      ledger: { hist: [], acc: 0, t: 0, sales: 0, orders: 0, honey: 0, quests: 0, stocks: 0, empire: 0 },
-      empire: { open: { valley: true }, branches: {}, t: 0, rocket: 0 },   /* the rest of the world, and the Moon */
+      ledger: { hist: [], acc: 0, t: 0, sales: 0, orders: 0, honey: 0, quests: 0, stocks: 0, empire: 0, food: 0, park: 0, secrets: 0 },
+      empire: { open: { valley: true }, branches: {}, t: 0, rocket: 0, moonT: 0 },   /* the rest of the world, and the Moon */
       market: { t: 0, px: {}, hist: {}, held: {} },
       seenIntro: false,
       weather: { t: 150, rain: false, left: 0, after: 0 },   /* showers water every crop on the ranch */
@@ -96,7 +103,9 @@ const GAME = (() => {
                bred: 0, plumes: 0, culled: 0, wagesPaid: 0, staffEggs: 0, hired: 0, flyers: 0,
                planted: 0, harvested: 0, feedMade: 0, grown: 0, trips: 0, shaped: 0, planted2: 0,
                mamaFed: 0, watered: 0, builtN: 0, orders: 0, ordersMissed: 0, edits: 0, storeys: 0,
-               honey: 0, questsDone: 0, trades: 0, rains: 0, vips: 0, regions: 0, branches: 0 },
+               honey: 0, questsDone: 0, trades: 0, rains: 0, vips: 0, regions: 0, branches: 0,
+               cooked: 0, dishes: 0, roasts: 0, ranked: 0, champions: 0, secrets: 0, visitors: 0,
+               celestial: 0, fossils: 0, dinos: 0, dinoShown: 0, mamaPets: 0 },
       muted: false, last: Date.now(),
     };
   }
@@ -119,6 +128,7 @@ const GAME = (() => {
     let v = ECON.eggValue(tier);
     v *= 1 + 0.15 * lvl('value');
     v *= 1 + 0.01 * lvl('contracts') * disc();
+    if (tier === TIER_DINO && lvl('bigeggs')) v *= 2;
     if (golden) v *= ECON.goldenMult;
     if (polished) v *= ECON.polishMult;
     return Math.round(v * tycoon());
@@ -299,6 +309,9 @@ const GAME = (() => {
     two(S.dynamos, 'dynamo');
     Object.keys(S.beehives).forEach(k => occ[k] = { type: 'beehive', k });
     two(S.genelabs, 'genelab');
+    two(S.kitchens, 'kitchen');
+    box(S.parks, 'park', 3, 3);
+    two(S.timemachines, 'timemachine');
     /* a site holds its footprint until the movers are done */
     Object.keys(S.sites).forEach(k => {
       const s = S.sites[k];
@@ -359,7 +372,7 @@ const GAME = (() => {
   /* ---------- egg creation ---------- */
   function rollTier(base, extra) {
     let t = base, mutated = false;
-    const capT = TIERS.length - 2;   /* mutations never reach Secret */
+    const capT = TIER_DIVINE;   /* mutations never reach Secret */
     if (t < capT && Math.random() < mutationChance() + (extra || 0)) {
       let jump = 1;
       if (Math.random() < 0.15 * lvl('rainbow')) jump = 2;
@@ -383,10 +396,11 @@ const GAME = (() => {
   function layEgg(x, y, baseTier, fromPet, ch) {
     if (S.eggs.length >= ECON.groundEggCap) return null;
     const { tier, mutated } = rollTier(baseTier, ch ? ECON.geneSize * gene(ch, 'size') : 0);
-    const golden = Math.random() < goldenChance() + (ch ? ECON.geneLuck * gene(ch, 'luck') : 0);
+    const golden = Math.random() < goldenChance() + (ch ? ECON.geneLuck * gene(ch, 'luck') + rankLuck(ch) : 0);
     const egg = spawnEgg(x + (Math.random() * 22 - 11), y + (Math.random() * 14 - 4), tier, golden, false);
     if (!egg) return null;
     S.stats.laid++;
+    if (ch) countLay(ch);
     emit('lay', { egg, mutated, fromPet });
     return egg;
   }
@@ -448,12 +462,17 @@ const GAME = (() => {
   }
   function genesOf(ch) { if (!ch.genes) ch.genes = rollGenes(SPECIES[ch.sp].tier); return ch.genes; }
   function gene(ch, k) { return genesOf(ch)[k] || 0; }
-  function chLayTime(ch) { return layTime(SPECIES[ch.sp].tier) / (1 + ECON.geneLay * gene(ch, 'lay')); }
+  function chLayTime(ch) {
+    const sp = SPECIES[ch.sp];
+    let t = layTime(sp.tier) / (1 + ECON.geneLay * gene(ch, 'lay')) / (1 + rankSpeed(ch));
+    if (sp.tier === TIER_DINO) t /= 1 + 0.2 * lvl('dinofeed');
+    return t;
+  }
   /* coins a minute this bird is good for, every gene counted */
   function chScore(ch) {
     const sp = SPECIES[ch.sp];
     const perMin = 60 / chLayTime(ch);
-    const up = Math.min(TIERS.length - 2, sp.tier + 1);
+    const up = Math.min(TIER_DIVINE, sp.tier + 1);
     const pUp = Math.min(0.9, mutationChance() + ECON.geneSize * gene(ch, 'size'));
     const gold = Math.min(1, goldenChance() + ECON.geneLuck * gene(ch, 'luck'));
     const v = (eggValue(sp.tier, false) * (1 - pUp) + eggValue(up, false) * pUp) * (1 - gold + gold * ECON.goldenMult);
@@ -565,14 +584,16 @@ const GAME = (() => {
     const births = [];
     const once = t => {
       if (S.chickens.length >= chickenCap()) return;
-      let ht = rainbow ? TIERS.length - 1 : t;
-      if (!rainbow && ht < TIERS.length - 2 && Math.random() < 0.05 * lvl('miracle')) ht++;
+      let ht = rainbow ? TIER_SECRET : t;
+      if (!rainbow && ht < TIER_DIVINE && Math.random() < 0.05 * lvl('miracle')) ht++;
       const sp = pickSpecies(ht);
       const isNew = !S.disc.includes(sp.id);
       if (isNew) S.disc.push(sp.id);
       const f = featherFor(ht, isNew);
       dropPlumes(x, y + 6, f);
       S.stats.hatched++;
+      if (sp.tier === TIER_DINO) S.stats.dinos++;
+      else if (sp.tier === TIER_MOON) S.stats.celestial++;
       const born = spawnChicken(sp.id, x, y);
       born.age = 0;
       born.fed = 0;
@@ -586,6 +607,7 @@ const GAME = (() => {
     once(tier);
     if (!rainbow && Math.random() < 0.04 * lvl('twins')) once(tier);
     if (births.length) emit('hatch', { births, x, y, rainbow });
+    if (rainbow && births.length) findSecret('rainbow');
     return births;
   }
 
@@ -697,6 +719,7 @@ const GAME = (() => {
     S.mama.petCd = petCd(true);
     S.mama.belly = Math.max(0, mamaBelly() - 1 / ECON.mamaPellets);
     S.stats.pets++;
+    S.stats.mamaPets++;
     layEgg(WORLD.mama.x, WORLD.mama.y + 8, S.mamaTier, true);
     return true;
   }
@@ -710,7 +733,8 @@ const GAME = (() => {
       ch.age = growAge(ch);
       return true;
     }
-    layEgg(ch.x + 10, ch.y + 14, SPECIES[ch.sp].tier, true);
+    layEgg(ch.x + 10, ch.y + 14, SPECIES[ch.sp].tier, true, ch);
+    if (SPECIES[ch.sp].tier === TIER_DINO) findSecret('dinopet');
     return true;
   }
   function grabChicken(ch) {
@@ -736,6 +760,7 @@ const GAME = (() => {
       const ch = held.ch;
       /* love nest? */
       const o = occ[key(Math.floor(x / 16), Math.floor(y / 16))];
+      let why = null;
       if (o && o.type === 'lovenest') {
         const nest = S.nests[o.k];
         if (nest.slots.filter(Boolean).length < 2 && nest.cd <= 0) {
@@ -743,6 +768,17 @@ const GAME = (() => {
           if (nest.slots[0] && nest.slots[1]) nest.prog = 0.0001;
           return 'nested';
         }
+      }
+      /* the park: on show. the kitchen: in the pot. */
+      if (o && o.type === 'park') {
+        const res = parkAdd(o.k, ch);
+        if (res === true) return 'exhibited';
+        why = 'park-' + res;
+      }
+      if (o && o.type === 'kitchen') {
+        const res = kitchenRoast(o.k, ch);
+        if (res === 'roasting') return 'roasting';
+        why = 'kitchen-' + res;
       }
       /* the lab: graduate a chicken into feathers */
       if (inStation(x, y, 4) === 'lab') {
@@ -756,7 +792,7 @@ const GAME = (() => {
       ch.y = Math.max(20, Math.min(WORLD.roadY - 24, y - 10));
       if (!inOwned(ch.x + 10, ch.y + 10)) { ch.x = WORLD.mama.x + 20; ch.y = WORLD.mama.y; }
       S.chickens.push(ch);
-      return 'dropped';
+      return why || 'dropped';
     }
     /* egg */
     const e = held.egg;
@@ -764,6 +800,7 @@ const GAME = (() => {
     const ord = orderAt(x, y);
     if (ord && giveEgg(ord, e)) return 'ordered';
     const o = occ[key(c, r)];
+    if (o && o.type === 'kitchen' && kitchenAdd(o.k, e)) return 'pantry';
     if (o && o.type === 'incubator') {
       const inc = S.incs[o.k];
       if (inc.queue.length < incCapAt(o.k)) { inc.queue.push(e); return 'incubated'; }
@@ -914,11 +951,14 @@ const GAME = (() => {
       }
       if (S.paint[k] === kind) continue;
       if (!cellPaintable(cx, cy)) continue;
-      if (!S.paint[k]) {
+      const fresh = !S.paint[k];
+      if (fresh) {
         if (S.coins < terrainCost(kind) / 4) continue;
         S.coins -= terrainCost(kind) / 4;
       }
       S.paint[k] = kind;
+      /* now and then the spade turns up something that is not water */
+      if (kind === 'water' && fresh && Math.random() < fossilOdds()) dropFossil(px, py - 4);
       n++;
     }
     if (n) { S.stats.shaped += n; if (S.stats.shaped === n) note('shape', 'Started shaping the land.'); }
@@ -1083,6 +1123,7 @@ const GAME = (() => {
     const n = harvestYield(t.crop);
     addFeed(n, c * 16 + 8, r * 16 + 8);
     S.stats.harvested++;
+    if (lvl('amber') && Math.random() < 0.04) dropFossil(c * 16 + 8, r * 16 + 2);
     /* no seeds come back: the next packet is bought */
     if (d.regrow) t.growth = 0.3;
     else { t.crop = null; t.growth = 0; }
@@ -1133,6 +1174,12 @@ const GAME = (() => {
     tr.to = S.route;
     tr.pay = truckPayout();
     tr.n = tr.load.length;
+    /* with a food truck licence, whatever is on the counters rides along */
+    if (lvl('foodtruck')) {
+      let food = 0, n = 0;
+      Object.values(S.kitchens).forEach(kt => { kt.counter.forEach(d => { food += d.value; n++; }); kt.sold += kt.counter.length; kt.counter = []; });
+      if (n) { tr.pay += food; S.stats.dishes += n; tr.food = n; }
+    }
     S.stats.trips++;
     emit('depart', { n: tr.n, to: city() });
     return true;
@@ -1336,7 +1383,7 @@ const GAME = (() => {
         if (!it.graded) {
           it.graded = true;
           g.n++;
-          if (it.tier < TIERS.length - 2 && Math.random() < ECON.gradeChance * machineBoost(nx, ny)) {
+          if (it.tier < TIER_DIVINE && Math.random() < ECON.gradeChance * machineBoost(nx, ny)) {
             it.tier++;
             g.up++;
             S.stats.graded = (S.stats.graded || 0) + 1;
@@ -1370,6 +1417,10 @@ const GAME = (() => {
           inc.queue.push({ tier: it.tier, golden: it.golden, rainbow: it.rainbow, pol: it.pol });
           S.items.splice(i, 1);
         }
+        continue;
+      }
+      if (target && target.type === 'kitchen') {
+        if (kitchenAdd(target.k, { tier: it.tier, golden: it.golden, rainbow: it.rainbow, pol: it.pol })) S.items.splice(i, 1);
         continue;
       }
       if (target && target.type === 'silo') {
@@ -1510,11 +1561,11 @@ const GAME = (() => {
       else {
         let up = breedUp();
         if (a.tier === b.tier && a.id !== b.id) up += 0.10;
-        if (tier < TIERS.length - 2 && Math.random() < up) tier++;
+        if (tier < TIER_DIVINE && Math.random() < up) tier++;
       }
       const lay = n => {
         const egg = spawnEgg(x + (Math.random() * 20 - 10), y, rainbow ? 7 : tier, false, rainbow);
-        if (egg && rainbow) egg.tier = TIERS.length - 1;   /* rainbow eggs are Secret tier */
+        if (egg && rainbow) egg.tier = TIER_SECRET;   /* rainbow eggs are Secret tier */
         return egg;
       };
       lay();
@@ -1526,7 +1577,7 @@ const GAME = (() => {
       nest.slots = [null, null];
       nest.prog = 0;
       nest.cd = ECON.breedCd;
-      emit('breed', { x, y, rainbow, tier: rainbow ? TIERS.length - 1 : tier });
+      emit('breed', { x, y, rainbow, tier: rainbow ? TIER_SECRET : tier });
     }
   }
 
@@ -2105,7 +2156,7 @@ const GAME = (() => {
     if (walkTo(w, ch.x + 2, ch.y + 6, dt)) {
       if ((ch.petCd || 0) <= 0) {
         ch.petCd = petCd(false) / (1 + 0.06 * crewStat(w, 'care'));
-        layEgg(ch.x + 10, ch.y + 16, SPECIES[ch.sp].tier, true);
+        layEgg(ch.x + 10, ch.y + 16, SPECIES[ch.sp].tier, true, ch);
         S.stats.pets++;
         w.jobs++;
         emit('staffpet', { w, ch });
@@ -2199,6 +2250,7 @@ const GAME = (() => {
     else if (g.k === 'plots') cur = S.plots.filter(Boolean).length;
     else if (g.k === 'regions') cur = REGIONS.filter(r => !r.home && regionOpen(r.id)).length;
     else if (g.k === 'region') return [regionOpen(g.id) ? 1 : 0, 1];
+    else if (g.k === 'age') return [ageIndex() >= AGE_INDEX[g.id] ? 1 : 0, 1];
     else if (g.k === 'flock') cur = S.chickens.filter(ch => !isChick(ch)).length;
     return [Math.min(cur, g.n), g.n];
   }
@@ -2220,6 +2272,8 @@ const GAME = (() => {
 
   /* ---------- the ledger and the market ---------- */
   function earn(a, src) {
+    /* every age the company has lived through adds a little to every coin, share sales aside */
+    if (src !== 'stocks') a = a * ageMult();
     a = Math.round(a);
     S.coins += a;
     S.stats.coinsEarned += a;
@@ -2318,6 +2372,15 @@ const GAME = (() => {
       E.t -= 10;
       const v = branchIncome() / 6;
       if (v > 0) { earn(v, 'empire'); emit('empireincome', { v }); }
+    }
+    /* a Moon branch posts an egg home now and then; it falls out of the sky by the Lab */
+    if (lvl('moonegg') && branchCount('moon') > 0) {
+      E.moonT = (E.moonT || 0) + dt;
+      if (E.moonT >= ECON.moonEggEvery) {
+        E.moonT = 0;
+        const egg = spawnEgg(WORLD.stations.lab.x + 44 + Math.random() * 30, WORLD.stations.lab.y - 6 + Math.random() * 24, TIER_MOON, false, false);
+        if (egg) { egg.z = -90; egg.vz = 0; note('moon', 'An egg came down from the Moon.'); emit('moonegg', { egg }); }
+      }
     }
   }
   function setCompany(o) {
@@ -2455,7 +2518,7 @@ const GAME = (() => {
   ];
   function siteTime(type) { return ECON.siteBase + Math.sqrt(BUILDS[type].base) / 3; }
   function siteFor(k) { return S.sites[k] || null; }
-  const STOREY_OK = ['incubator', 'coop', 'barn', 'staffhut', 'silo', 'hq', 'mill', 'well', 'sprinkler', 'beehive', 'trough', 'hatchery', 'lovenest'];
+  const STOREY_OK = ['incubator', 'coop', 'barn', 'staffhut', 'silo', 'hq', 'mill', 'well', 'sprinkler', 'beehive', 'trough', 'hatchery', 'lovenest', 'kitchen', 'park', 'timemachine'];
   function storeyMult(k) { return S.storeys && S.storeys[k] ? ECON.storeyMult : 1; }
   function storeyCost(type) { return Math.round(BUILDS[type].base * ECON.storeyCost); }
   function canStorey(k) {
@@ -2580,6 +2643,9 @@ const GAME = (() => {
     else if (type === 'hq') S.hqs[k] = { built: Date.now() };
     else if (type === 'beehive') S.beehives[k] = { t: 0 };
     else if (type === 'genelab') S.genelabs[k] = { built: Date.now() };
+    else if (type === 'kitchen') S.kitchens[k] = { pantry: [], recipe: 'omelette', cook: null, counter: [], sold: 0 };
+    else if (type === 'park') S.parks[k] = { slots: [], t: 0, visitors: 0 };
+    else if (type === 'timemachine') S.timemachines[k] = { on: false, t: 0, T: 0, made: 0 };
   }
   function build(type, c, r, dir) {
     const cost = buildCost(type, S.built[type]);
@@ -2672,6 +2738,15 @@ const GAME = (() => {
       delete S.beehives[k]; S.built.beehive = Math.max(0, S.built.beehive - 1);
     } else if (o.type === 'genelab') {
       delete S.genelabs[k]; S.built.genelab = Math.max(0, S.built.genelab - 1);
+    } else if (o.type === 'kitchen') {
+      S.kitchens[k].pantry.forEach((e, i) => spawnEgg(kc * 16 + 6 + (i % 8) * 3, kr * 16 + 30, e.tier, e.golden, e.rainbow));
+      delete S.kitchens[k]; S.built.kitchen = Math.max(0, S.built.kitchen - 1);
+    } else if (o.type === 'park') {
+      S.parks[k].slots.forEach((ch, i) => { if (ch) parkEject(k, i); });
+      delete S.parks[k]; S.built.park = Math.max(0, S.built.park - 1);
+    } else if (o.type === 'timemachine') {
+      if (S.timemachines[k].on) S.fossilCount += ECON.dinoFossils;
+      delete S.timemachines[k]; S.built.timemachine = Math.max(0, S.built.timemachine - 1);
     }
     S.coins += BUILDS[o.type].refund;
     S.eggs.forEach(e => { if (e.suck === k) e.suck = null; });
@@ -2688,6 +2763,7 @@ const GAME = (() => {
     if (cur >= sk.max) return false;
     const pre = skillPrereq(sk);
     if (pre && lvl(pre.id) < 1) return false;
+    if (!laneOpen(sk.br)) return false;                /* the lane waits for its age */
     const cost = skillCost(sk, cur);
     if (S.feathers < cost) return false;
     S.feathers -= cost;
@@ -2696,7 +2772,7 @@ const GAME = (() => {
     return true;
   }
   function upgradeMama() {
-    if (S.mamaTier >= TIERS.length - 2) return false;    /* mama tops out at Divine */
+    if (S.mamaTier >= TIER_DIVINE) return false;    /* mama tops out at Divine */
     const cost = ECON.mamaCost(S.mamaTier);
     if (S.coins < cost) return false;
     S.coins -= cost;
@@ -2737,6 +2813,339 @@ const GAME = (() => {
     }
   }
 
+  /* ============================================================
+     RANKS - stars for the eggs a hen has laid
+     ============================================================ */
+  function rankOf(ch) {
+    const n = ch.laid || 0;
+    let r = 0;
+    for (let i = 0; i < RANKS.length; i++) if (n >= RANKS[i].eggs) r = i;
+    return r;
+  }
+  function rankName(ch) { return RANKS[rankOf(ch)].n; }
+  function rankSpeed(ch) { return lvl('ranks') ? rankOf(ch) * (ECON.rankLay + 0.04 * lvl('medals')) : 0; }
+  function rankLuck(ch) { return lvl('ranks') ? rankOf(ch) * 0.01 : 0; }
+  function nextRankEggs(ch) { const r = rankOf(ch); return r < RANKS.length - 1 ? RANKS[r + 1].eggs : null; }
+  function countLay(ch) {
+    const before = rankOf(ch);
+    ch.laid = (ch.laid || 0) + 1;
+    const after = rankOf(ch);
+    if (after > before) {
+      if (before === 0) S.stats.ranked++;
+      if (after === RANKS.length - 1) { S.stats.champions++; note('rank', SPECIES[ch.sp].name + ' made Champion.', ch.sp); findSecret('champion'); }
+      emit('rankup', { ch, rank: after });
+    }
+  }
+
+  /* ============================================================
+     AGES - six eras, each reached by milestones
+     ============================================================ */
+  function ageIndex() { return S.age || 0; }
+  function age() { return AGES[ageIndex()]; }
+  function ageValue(k) {
+    if (k === 'disc') return S.disc.length;
+    if (k === 'belts') return S.built.belt || 0;
+    if (k === 'moon') return regionOpen('moon') ? 1 : 0;
+    return S.stats[k] || 0;
+  }
+  function ageNeeds(a) {
+    return Object.keys(a.need).map(k => {
+      const want = a.need[k] === true ? 1 : a.need[k];
+      const have = ageValue(k);
+      return { k, want, have: Math.min(have, want), ok: have >= want, name: AGE_NEED_NAMES[k] || k };
+    });
+  }
+  function ageProgress(a) { const n = ageNeeds(a); return [n.filter(x => x.ok).length, Math.max(1, n.length)]; }
+  function nextAge() { return AGES[ageIndex() + 1] || null; }
+  function ageMult() { return 1 + ECON.ageBonus * ageIndex(); }
+  function laneOpen(modId) { const m = MOD_BY_ID[modId]; return !m || !m.age || ageIndex() >= AGE_INDEX[m.age]; }
+  function tickAges() {
+    const nx = nextAge();
+    if (!nx || !ageNeeds(nx).every(x => x.ok)) return;
+    S.age = ageIndex() + 1;
+    note('age', 'The ' + nx.name + ' began.');
+    mark('skills', 'build', 'pedia');
+    emit('age', { a: nx, i: S.age });
+  }
+
+  /* ============================================================
+     SECRETS - found, never told
+     ============================================================ */
+  function secretFound(id) { return !!(S.secrets && S.secrets[id]); }
+  function findSecret(id) {
+    const s = SECRET_BY_ID[id];
+    if (!s || secretFound(id)) return false;
+    S.secrets[id] = Date.now();
+    S.stats.secrets++;
+    if (s.rw.c) earn(s.rw.c, 'secrets');
+    if (s.rw.f) S.feathers += s.rw.f;
+    note('secret', 'Secret found: ' + s.name + '.');
+    mark('pedia');
+    emit('secret', { s });
+    return true;
+  }
+  let secretT = 0;
+  function tickSecrets(dt) {
+    S.playT = (S.playT || 0) + dt;
+    secretT += dt;
+    if (secretT < 1) return;
+    secretT = 0;
+    if (new Date().getHours() < 5) findSecret('nightowl');
+    if (S.eggs.length >= 100) findSecret('eggtower');
+    if (S.chickens.length >= chickenCap()) findSecret('fullhouse');
+    if (S.playT >= 3600) findSecret('longhaul');
+    if (S.stats.rains >= 5) findSecret('soaked');
+    if (regionOpen('moon')) findSecret('moonwalk');
+    if (S.stats.mamaPets >= 100) findSecret('petfan');
+    if (RECIPES.every(r => S.cooked[r.id])) findSecret('chef');
+  }
+
+  /* ============================================================
+     THE KITCHEN - eggs in the larder, a recipe on the board,
+     dishes on the counter, diners at the hatch
+     ============================================================ */
+  function recipeOpen(id) { const r = RECIPE_BY_ID[id]; return !!r && !r.hen && (!r.needs || lvl(r.needs) > 0); }
+  function recipesOpen() { return RECIPES.filter(r => !r.hen && recipeOpen(r.id)); }
+  function setRecipe(k, id) { const kt = S.kitchens[k]; if (!kt || !recipeOpen(id)) return false; kt.recipe = id; return true; }
+  function kitchenRoom(k) { const kt = S.kitchens[k]; return kt ? ECON.kitchenPantry - kt.pantry.length : 0; }
+  function kitchenAdd(k, e) {
+    const kt = S.kitchens[k];
+    if (!kt || kt.pantry.length >= ECON.kitchenPantry) return false;
+    kt.pantry.push({ tier: e.tier, golden: !!e.golden, rainbow: !!e.rainbow, pol: !!e.pol });
+    return true;
+  }
+  function basketToKitchen(k) {
+    let n = 0;
+    while (S.basket.length && kitchenAdd(k, S.basket[S.basket.length - 1])) { S.basket.pop(); n++; }
+    return n;
+  }
+  function dishMult() { return 1 + 0.2 * lvl('menu'); }
+  function cookTime(k, r) { return r.time * Math.pow(0.88, lvl('chef')) / storeyMult(k); }
+  /* a hen dropped on the kitchen goes in the oven; dinosaurs need the grill */
+  function kitchenRoast(k, ch) {
+    const kt = S.kitchens[k];
+    if (!kt) return 'none';
+    if (kt.cook) return 'busy';
+    const sp = SPECIES[ch.sp];
+    if (sp.tier === TIER_MOON) return 'locked';
+    const r = RECIPE_BY_ID[sp.tier === TIER_DINO ? 'dino' : 'roast'];
+    if (r.needs && !lvl(r.needs)) return 'locked';
+    const value = Math.round(eggValue(sp.tier, false) * r.mult * (1 + 0.1 * rankOf(ch)) * dishMult());
+    kt.cook = { recipe: r.id, t: 0, T: cookTime(k, r), value };
+    S.stats.roasts++;
+    note('food', 'A ' + sp.name + ' went into the pot.', ch.sp);
+    emit('roast', { k, ch, r });
+    return 'roasting';
+  }
+  function tickKitchens(dt) {
+    for (const k of Object.keys(S.kitchens)) {
+      const kt = S.kitchens[k];
+      const [c, r] = k.split(',').map(Number);
+      if (kt.cook) {
+        kt.cook.t += dt * machineBoost(c * 16 + 16, r * 16 + 16);
+        if (kt.cook.t >= kt.cook.T && kt.counter.length < ECON.kitchenCounter) {
+          kt.counter.push({ recipe: kt.cook.recipe, value: kt.cook.value });
+          S.cooked[kt.cook.recipe] = (S.cooked[kt.cook.recipe] || 0) + 1;
+          S.stats.cooked++;
+          emit('cooked', { k, recipe: kt.cook.recipe, x: c * 16 + 16, y: r * 16 });
+          kt.cook = null;
+        }
+        continue;
+      }
+      /* start the next dish once the larder can cover it */
+      const rc = RECIPE_BY_ID[kt.recipe] || RECIPES[0];
+      if (!recipeOpen(rc.id)) { kt.recipe = 'omelette'; continue; }
+      if (kt.counter.length >= ECON.kitchenCounter) continue;
+      if (kt.pantry.length < rc.eggs || S.feedStore < rc.feed) continue;
+      const used = kt.pantry.splice(0, rc.eggs);
+      S.feedStore -= rc.feed;
+      const base = used.reduce((a, e) => a + eggValue(e.tier, e.golden, e.pol), 0);
+      kt.cook = { recipe: rc.id, t: 0, T: cookTime(k, rc), value: Math.round(base * rc.mult * dishMult()) };
+    }
+  }
+  function kitchenCounterValue() { return Object.values(S.kitchens).reduce((a, kt) => a + kt.counter.reduce((b, d) => b + d.value, 0), 0); }
+  function sellDish(k) {
+    const kt = S.kitchens[k];
+    if (!kt || !kt.counter.length) return 0;
+    const d = kt.counter.shift();
+    earn(d.value, 'food');
+    kt.sold++;
+    S.stats.dishes++;
+    return d.value;
+  }
+
+  /* ============================================================
+     THE CHICKEN PARK - hens on show, visitors at the gate
+     ============================================================ */
+  function parkSlots(k) { return ECON.parkSlots + (S.storeys[k] ? 2 : 0); }
+  function parkAdd(k, ch) {
+    const p = S.parks[k];
+    if (!p) return 'none';
+    const sp = SPECIES[ch.sp];
+    if (isChick(ch)) return 'chick';
+    if (sp.tier === TIER_DINO && !lvl('dinopen')) return 'nodino';
+    if (p.slots.filter(Boolean).length >= parkSlots(k)) return 'full';
+    let i = p.slots.findIndex(s => !s);
+    if (i < 0) i = p.slots.length;
+    p.slots[i] = ch;
+    if (sp.tier === TIER_DINO) S.stats.dinoShown++;
+    note('park', sp.name + ' went on show at the park.', ch.sp);
+    emit('exhibit', { k, ch });
+    return true;
+  }
+  function parkEject(k, i) {
+    const p = S.parks[k];
+    if (!p || !p.slots[i]) return false;
+    const ch = p.slots[i];
+    p.slots[i] = null;
+    const [c, r] = k.split(',').map(Number);
+    ch.x = c * 16 + 6 + i * 7; ch.y = r * 16 + 50;
+    ch.state = 'idle'; ch.t = 0.5; ch.target = null;
+    S.chickens.push(ch);
+    return true;
+  }
+  function exhibitAppeal(ch) {
+    const sp = SPECIES[ch.sp];
+    let a = Math.pow(sp.tier + 1, 1.6) * (1 + 0.25 * rankOf(ch));
+    if (sp.tier === TIER_DINO) a *= 4;
+    if (sp.tier === TIER_MOON) a *= 3;
+    if (ch.mods && ch.mods.length) a *= 1 + 0.15 * ch.mods.length;
+    return a;
+  }
+  function parkAppeal(k) { const p = S.parks[k]; return p ? p.slots.filter(Boolean).reduce((a, ch) => a + exhibitAppeal(ch), 0) : 0; }
+  function ticketPrice(k) {
+    const v = ECON.ticketBase * parkAppeal(k) * (1 + 0.15 * lvl('tickets')) * (lvl('giftshop') ? 1.3 : 1) * (lvl('nightshow') ? 1.5 : 1) * tycoon();
+    return Math.round(v);
+  }
+  function busEvery() { return ECON.parkBusEvery / (lvl('busstop') ? 1.5 : 1); }
+  function tickParks(dt) {
+    for (const k of Object.keys(S.parks)) {
+      const p = S.parks[k];
+      const appeal = parkAppeal(k);
+      if (appeal <= 0) { p.t = Math.min(p.t || 0, 5); continue; }
+      p.t = (p.t || 0) + dt;
+      if (p.t < busEvery()) continue;
+      p.t = 0;
+      const n = Math.min(9, 2 + Math.floor(Math.sqrt(appeal) / 3) + lvl('crowds'));
+      /* the bus rolls by and lets them off at the gate */
+      cars.push({ id: nextId++, kind: 'bus', col: '#ffd23f', dir: 1, tour: true, x: -70, y: laneY(1), v: 60 });
+      const e = roadEntry();
+      for (let i = 0; i < n; i++) spawnVisitor('tourist', k, e.x - 40 - i * 9, e.y + (i % 2) * 5, ticketPrice(k));
+      emit('bus', { k, n });
+    }
+  }
+
+  /* ============================================================
+     VISITORS - diners at the kitchen hatch and tourists at the
+     park gate: little people who walk in, pay, gawp and leave
+     ============================================================ */
+  function spawnVisitor(kind, k, x, y, pay) {
+    if (S.visitors.length > 40) return null;
+    const v = { id: nextId++, kind, k, x, y, state: 'in', t: 0, pay: pay || 0, dir: 1, frame: 0, anim: 0, seed: Math.floor(Math.random() * 1e9) };
+    S.visitors.push(v);
+    return v;
+  }
+  function buildingFront(k, w, h) { const [c, r] = k.split(',').map(Number); return { x: c * 16 + w * 8 - 6, y: r * 16 + h * 16 + 2 }; }
+  function walkVisitor(v, tx, ty, dt) {
+    const dx = tx - v.x, dy = ty - v.y, d = Math.hypot(dx, dy);
+    if (d < 2) return true;
+    const sp = 30 * groundSpeed(v.x + 6, v.y + 12) * dt;
+    v.dir = dx > 0 ? 1 : -1;
+    let nx = v.x + dx / d * Math.min(d, sp), ny = v.y + dy / d * Math.min(d, sp);
+    if (inPond(nx + 6, ny + 8)) ny = v.y;
+    v.x = nx; v.y = ny;
+    v.anim = (v.anim || 0) + sp;
+    if (v.anim > 5) { v.anim = 0; v.frame ^= 1; }
+    return false;
+  }
+  let dinerT = 0;
+  function tickVisitors(dt) {
+    /* diners turn up while there is something on a counter */
+    const withFood = Object.keys(S.kitchens).filter(k => S.kitchens[k].counter.length);
+    if (withFood.length) {
+      dinerT += dt;
+      if (dinerT >= ECON.dinerEvery / (lvl('diner') ? 2 : 1)) {
+        dinerT = 0;
+        const e = roadEntry();
+        spawnVisitor('diner', withFood[Math.floor(Math.random() * withFood.length)], e.x, e.y, 0);
+      }
+    } else dinerT = Math.min(dinerT, 5);
+    for (let i = S.visitors.length - 1; i >= 0; i--) {
+      const v = S.visitors[i];
+      const b = BUILDS[v.kind === 'diner' ? 'kitchen' : 'park'];
+      const alive = v.kind === 'diner' ? S.kitchens[v.k] : S.parks[v.k];
+      if (!alive && v.state !== 'out') v.state = 'out';
+      if (v.state === 'in') {
+        const f = buildingFront(v.k, b.w, b.h);
+        if (walkVisitor(v, f.x + ((v.id % 5) - 2) * 5, f.y + (v.id % 3) * 2, dt)) {
+          v.state = 'stay'; v.t = v.kind === 'diner' ? 2.5 : ECON.parkWatch;
+          if (v.kind === 'diner') {
+            const got = sellDish(v.k);
+            if (got) emit('dine', { x: v.x + 6, y: v.y, v: got }); else v.state = 'out';
+          } else {
+            earn(v.pay, 'park');
+            alive.visitors = (alive.visitors || 0) + 1;
+            S.stats.visitors++;
+            emit('ticket', { x: v.x + 6, y: v.y, v: v.pay, k: v.k });
+          }
+        }
+      } else if (v.state === 'stay') {
+        v.t -= dt; v.frame = 0;
+        if (v.t <= 0) v.state = 'out';
+      } else {
+        const e = roadEntry();
+        if (walkVisitor(v, e.x + 12, e.y, dt) || v.x > WORLD.W - 8) S.visitors.splice(i, 1);
+      }
+    }
+  }
+
+  /* ============================================================
+     FOSSILS AND THE TIME MACHINE
+     ============================================================ */
+  function fossilOdds() { return ECON.fossilChance * (lvl('fossilhunt') ? 3 : 1); }
+  function dropFossil(x, y) {
+    if (S.fossils.length > 30) return null;
+    const f = { id: nextId++, x: Math.max(8, Math.min(WORLD.W - 8, x)), y: Math.max(20, Math.min(WORLD.roadY - 8, y)), z: -14, vz: 0, seed: Math.floor(Math.random() * 999) };
+    S.fossils.push(f);
+    note('fossil', 'Something very old turned up in the dirt.');
+    emit('fossil', { x: f.x, y: f.y });
+    return f;
+  }
+  function fossilAt(x, y) { return S.fossils.find(f => Math.abs(x - f.x) < 8 && Math.abs(y - f.y) < 8) || null; }
+  function collectFossil(f) {
+    const i = S.fossils.indexOf(f);
+    if (i < 0) return false;
+    S.fossils.splice(i, 1);
+    S.fossilCount++;
+    S.stats.fossils++;
+    findSecret('fossil');
+    emit('fossilgot', { x: f.x, y: f.y });
+    return true;
+  }
+  function tickFossils(dt) { for (const f of S.fossils) if (f.z < 0) { f.vz += 60 * dt; f.z = Math.min(0, f.z + f.vz * dt); } }
+  function tmTime(k) { return ECON.dinoTime * Math.pow(0.85, lvl('deextinct')) / storeyMult(k); }
+  function canLoadTM(k) { const tm = S.timemachines[k]; return !!tm && !tm.on && S.fossilCount >= ECON.dinoFossils && S.chickens.length < chickenCap(); }
+  function loadTM(k) {
+    if (!canLoadTM(k)) return false;
+    const tm = S.timemachines[k];
+    S.fossilCount -= ECON.dinoFossils;
+    tm.on = true; tm.t = 0; tm.T = tmTime(k);
+    emit('tmstart', { k });
+    return true;
+  }
+  function tickTimeMachines(dt) {
+    for (const k of Object.keys(S.timemachines)) {
+      const tm = S.timemachines[k];
+      if (!tm.on) continue;
+      const [c, r] = k.split(',').map(Number);
+      tm.t += dt * machineBoost(c * 16 + 16, r * 16 + 16);
+      if (tm.t < tm.T || S.chickens.length >= chickenCap()) continue;
+      tm.on = false; tm.t = 0; tm.made = (tm.made || 0) + 1;
+      hatchChicken(TIER_DINO, c * 16 + 16, r * 16 + 36, false);
+      emit('tmdone', { k, x: c * 16 + 16, y: r * 16 + 16 });
+    }
+  }
+
   /* ---------- master tick ---------- */
   function tick(dt) {
     tickMama(dt);
@@ -2762,6 +3171,13 @@ const GAME = (() => {
     tickMarket(dt);
     tickWeather(dt);
     tickEmpire(dt);
+    tickKitchens(dt);
+    tickParks(dt);
+    tickVisitors(dt);
+    tickFossils(dt);
+    tickTimeMachines(dt);
+    tickAges();
+    tickSecrets(dt);
   }
 
   /* ---------- offline ---------- */
@@ -2770,7 +3186,9 @@ const GAME = (() => {
     let dt = (now - (S.last || now)) / 1000;
     S.last = now;
     if (dt < 30) { tick(Math.min(2, Math.max(0, dt))); return null; }
+    if (dt >= 8 * 3600) findSecret('sleeper');
     dt = Math.min(dt, ECON.offlineCapHrs * 3600);
+    S.visitors = [];
     let laid = 0, hatched = 0, pay = 0, feathersGot = 0;
     /* Mama only lays for as long as the feed in her lasts */
     const mamaRan = Math.min(dt, mamaBelly() * ECON.mamaHunger);
@@ -2893,7 +3311,16 @@ const GAME = (() => {
       S.bots = Object.assign({ cull: 0, match: 0 }, S.bots);
       ['huts', 'silos', 'blowers', 'sorters', 'fences', 'hatchers', 'splitters', 'loaders',
        'barns', 'troughs', 'wells', 'sprinklers', 'mills', 'coops', 'boards', 'hqs', 'soil',
-       'paint', 'deco', 'polishers', 'graders', 'dynamos', 'beehives', 'genelabs', 'sites', 'storeys', 'quests'].forEach(m => { if (!S[m]) S[m] = {}; });
+       'paint', 'deco', 'polishers', 'graders', 'dynamos', 'beehives', 'genelabs', 'sites', 'storeys', 'quests',
+       'kitchens', 'parks', 'timemachines', 'secrets', 'cooked'].forEach(m => { if (!S[m]) S[m] = {}; });
+      if (!Array.isArray(S.fossils)) S.fossils = [];
+      if (!Array.isArray(S.visitors)) S.visitors = [];
+      S.visitors = S.visitors.filter(v => v && typeof v.x === 'number' && v.k);
+      if (typeof S.age !== 'number') S.age = 0;
+      if (typeof S.fossilCount !== 'number') S.fossilCount = 0;
+      if (typeof S.playT !== 'number') S.playT = 0;
+      Object.values(S.kitchens).forEach(kt => { if (!Array.isArray(kt.pantry)) kt.pantry = []; if (!Array.isArray(kt.counter)) kt.counter = []; if (!kt.recipe) kt.recipe = 'omelette'; if (typeof kt.sold !== 'number') kt.sold = 0; });
+      Object.values(S.parks).forEach(p => { if (!Array.isArray(p.slots)) p.slots = []; p.slots = p.slots.map(ch => ch && SPECIES[ch.sp] ? ch : null); });
       if (!Array.isArray(S.orders)) S.orders = [];
       S.orders = S.orders.filter(o => o && o.state && typeof o.x === 'number');
       if (typeof S.orderT !== 'number') S.orderT = 45;
@@ -2923,14 +3350,18 @@ const GAME = (() => {
         if (c.raised === undefined) c.raised = c.age >= 1 ? 1e9 : c.age * ECON.growTime;
         if (!c.genes) c.genes = rollGenes(SPECIES[c.sp] ? SPECIES[c.sp].tier : 0);
         if (!Array.isArray(c.mods)) c.mods = [];
+        if (typeof c.laid !== 'number') c.laid = 0;
       });
+      S.empire.moonT = S.empire.moonT || 0;
       if (!Array.isArray(S.routes) || !S.routes.length) S.routes = ['hamlet'];
       if (!CITY_BY_ID[S.route]) S.route = S.routes[0];
       if (!Array.isArray(S.diary)) S.diary = [];
       if (typeof S.day !== 'number') { S.day = 1; S.dayT = 0; }
       Object.values(S.silos).forEach(si => { if (!si.store) si.store = []; });
       ensureStarterInc();
-      nextId = 1 + Math.max(0, ...S.eggs.map(e => e.id || 0), ...S.chickens.map(c => c.id || 0), ...S.plumes.map(p => p.id || 0));
+      nextId = 1 + Math.max(0, ...S.eggs.map(e => e.id || 0), ...S.chickens.map(c => c.id || 0), ...S.plumes.map(p => p.id || 0),
+                            ...S.visitors.map(v => v.id || 0), ...S.fossils.map(f => f.id || 0),
+                            ...Object.values(S.parks).flatMap(p => p.slots.filter(Boolean).map(c => c.id || 0)));
       rebuildOcc();
       clampCam();
       return true;
@@ -3002,6 +3433,13 @@ const GAME = (() => {
     stockPrice, buyStock, sellStock, portfolio, companyValue, setCompany, earn,
     get weather() { return S.weather; },
     regionOpen, regionReachable, canOpenRegion, openRegion, branchCount, branchCost, canBranch, buildBranch, regionIncome, branchIncome,
+    rankOf, rankName, rankSpeed, rankLuck, nextRankEggs,
+    ageIndex, age, nextAge, ageNeeds, ageProgress, ageMult, laneOpen,
+    findSecret, secretFound,
+    recipeOpen, recipesOpen, setRecipe, kitchenAdd, kitchenRoom, basketToKitchen, kitchenRoast, sellDish, kitchenCounterValue, cookTime, dishMult,
+    parkSlots, parkAdd, parkEject, parkAppeal, exhibitAppeal, ticketPrice, busEvery,
+    fossilAt, collectFossil, canLoadTM, loadTM, tmTime, dropFossil,
+    get visitors() { return S.visitors; },
     tick, applyOffline, save, load, reset, fmt, fmtTime,
   };
 })();
