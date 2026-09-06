@@ -188,43 +188,15 @@ button:focus-visible{ outline:3px dashed var(--pink); outline-offset:2px; }
 .gene-rows.compact i{ width:5px; height:5px; border-width:1px; }
 
 /* ---------- the gene lab ---------- */
-.modal-panel.genes{ background:#eef6f4; }
-.gl-cols{ display:flex; gap:14px; align-items:flex-start; }
-.gl-list{ flex:0 0 340px; max-height:60vh; overflow-y:auto; display:flex; flex-direction:column; gap:6px; padding-right:4px; }
-.gl-listhead{ font-family:var(--font-px); font-size:10px; color:var(--ink-soft); padding:4px 2px; letter-spacing:1px; }
-.gl-listhead.warn{ color:var(--pink-dark); animation:startPulse 1s steps(2,end) infinite; }
-.gl-card{
-  display:flex; gap:8px; align-items:center; text-align:left; width:100%;
-  background:var(--panel); border:3px solid var(--ink); box-shadow:3px 3px 0 var(--shadow);
-  padding:6px 8px; font-family:var(--font-body); color:var(--ink);
-}
-.gl-card canvas{ image-rendering:pixelated; flex:none; }
-.gl-card > div{ flex:1; min-width:0; display:flex; flex-direction:column; }
-.gl-card b{ font-family:var(--font-px); font-size:10px; display:flex; align-items:center; gap:4px; }
-.gl-card small{ font-size:18px; color:var(--ink-soft); }
-.gl-card.active{ background:var(--gold); }
-.gl-card.donor{ border-style:dashed; border-color:var(--pink-dark); }
-.gl-card:hover{ filter:brightness(1.05); }
-.gl-bench{ flex:1; min-width:0; background:var(--panel); border:4px solid var(--ink); box-shadow:4px 4px 0 var(--shadow); padding:12px; }
-.gl-top{ display:flex; gap:14px; align-items:center; margin-bottom:10px; }
-.gl-top canvas{ image-rendering:pixelated; flex:none; }
-.gl-top b{ font-family:var(--font-px); font-size:16px; display:block; margin-bottom:4px; }
-.gl-top span{ display:block; font-size:22px; color:var(--ink-soft); line-height:1.1; }
-.gl-genes{ display:flex; flex-direction:column; gap:5px; margin-bottom:12px; }
-.gl-gene{ display:flex; align-items:center; gap:8px; font-size:21px; color:var(--ink-soft); }
-.gl-gene canvas{ image-rendering:pixelated; }
-.gl-gene b{ font-family:var(--font-px); font-size:10px; width:48px; }
-.gl-gene u{ display:flex; gap:3px; text-decoration:none; }
-.gl-gene u i{ width:12px; height:12px; border:2px solid var(--ink); background:#fff; display:block; }
-.gl-gene u i.on{ background:var(--gold); }
-.gl-ops{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-.gl-op{ border:3px dashed var(--ink-soft); padding:8px 10px; }
-.gl-op:last-child{ grid-column:1 / -1; }
-.gl-op b{ font-family:var(--font-px); font-size:12px; display:block; margin-bottom:3px; }
-.gl-op span{ display:block; font-size:21px; color:var(--ink-soft); line-height:1.1; margin-bottom:6px; }
-.gl-op.locked{ opacity:.6; }
-.gl-op .ip-btns .btn{ font-size:14px; padding:6px 8px; display:inline-flex; align-items:center; gap:5px; }
-@media (max-width:760px){ .gl-cols{ flex-direction:column; } .gl-list{ flex:none; max-height:34vh; width:100%; } .gl-ops{ grid-template-columns:1fr; } }
+/* the gene lab is a room drawn on one canvas; the panel is just its dark frame */
+.modal.genes-room{ background:rgba(4,8,12,.9); }
+.modal-panel.genes{ background:#0b1a24; border-color:#1f3040; padding:6px; width:min(960px, 100%); position:relative; box-shadow:0 0 0 3px #16232f, 8px 10px 0 rgba(0,0,0,.5); }
+.modal-panel.genes .genes-close{ position:absolute; right:-6px; top:-8px; z-index:2; background:#e8607a; color:#fff; border-color:#0b1a24; }
+#genes-body{ line-height:0; }
+#genes-canvas{ width:100%; height:auto; image-rendering:pixelated; image-rendering:crisp-edges; touch-action:none; cursor:none; display:block; }
+/* the HUD sits lighter on the field: glass pills, no hard shadow */
+#res-float .pill{ background:rgba(255,249,236,.72); box-shadow:none; border-width:3px; }
+#res-float .pill.full{ background:rgba(255,214,214,.85); }
 
 /* ---------- the intro and the company form ---------- */
 #intro-ui{ position:absolute; bottom:5%; right:4%; display:flex; gap:8px; }

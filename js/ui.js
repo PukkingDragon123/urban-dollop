@@ -3609,130 +3609,208 @@
   }
   function genePick(id) {
     if (geneMode === 'splice' && geneTarget && id !== geneTarget) {
-      if (GAME.splice(geneTarget, id)) { geneMode = null; renderGenes(); refreshInspect(); }
+      if (GAME.splice(geneTarget, id)) { geneMode = null; glFx = { t: performance.now(), kind: 'splice' }; refreshInspect(); }
       else { snd.error(); }
       return;
     }
-    geneTarget = id; snd.plop(); renderGenes();
+    geneTarget = id; snd.plop();
   }
-  function genePips(ch) {
-    const box = document.createElement('div');
-    box.className = 'gene-rows compact';
-    GENE_KEYS.forEach(k => {
-      const g = GENES[k], v = GAME.gene(ch, k);
-      const row = document.createElement('div');
-      row.className = 'gene-row';
-      row.title = g.name + ' - ' + g.desc;
-      row.appendChild(mkIcon(g.icon, 2));
-      for (let i = 0; i < ECON.geneMax; i++) { const pip = document.createElement('i'); if (i < v) { pip.className = 'on'; pip.style.background = g.col; } row.appendChild(pip); }
-      box.appendChild(row);
-    });
-    return box;
+  /* ============================================================
+     THE GENE LAB - a room, not a form. Steel walls, pipes, a helix
+     on the back screen, and the flock floating in glass tubes along
+     the bench. Tap a tube to lift that hen onto the big specimen tube
+     on the right; the machines beside it splice, clone and cross. All
+     of it is drawn on one canvas and hit-tested like the Lab's screen.
+     ============================================================ */
+  const GLW = 380, GLH = 220, GK = 2;
+  let glCv = null, glCtx = null, glHits = [], glHover = null, glMouse = { x: 0, y: 0, inside: false }, glScroll = 0, glFx = null;
+  function glAdults() { return S().chickens.filter(c => !GAME.isChick(c)).slice().sort((a, b) => GAME.chScore(b) - GAME.chScore(a)); }
+  function glHitAt(x, y) {
+    for (let i = glHits.length - 1; i >= 0; i--) { const h = glHits[i]; if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) return h; }
+    return null;
   }
   function renderGenes() {
     const body = $('#genes-body');
-    body.innerHTML = '';
-    const st = S();
-    const adults = st.chickens.filter(c => !GAME.isChick(c)).slice().sort((a, b) => GAME.chScore(b) - GAME.chScore(a));
-    $('#genes-sub').textContent = adults.length + ' HENS - ' + st.stats.edits + ' EDITS - ' + GAME.fmt(st.feathers) + ' FEATHERS';
-    const cols = document.createElement('div');
-    cols.className = 'gl-cols';
-    /* the flock, best first */
-    const list = document.createElement('div');
-    list.className = 'gl-list';
-    const lh = document.createElement('div');
-    lh.className = 'gl-listhead';
-    lh.textContent = geneMode === 'splice' ? 'PICK THE DONOR - IT WILL BE GONE' : 'THE FLOCK, BEST EARNER FIRST';
-    if (geneMode === 'splice') lh.classList.add('warn');
-    list.appendChild(lh);
-    if (!adults.length) { const none = document.createElement('p'); none.className = 'pedia-intro'; none.textContent = 'No grown hens yet. Chicks have to grow up before their genes can be read.'; list.appendChild(none); }
-    adults.forEach((ch, i) => {
-      const sp = SPECIES[ch.sp];
-      const card = document.createElement('button');
-      card.type = 'button';
-      card.className = 'gl-card' + (ch.id === geneTarget ? ' active' : '') + (geneMode === 'splice' && ch.id !== geneTarget ? ' donor' : '');
-      card.dataset.act = 'gene-pick'; card.dataset.id = String(ch.id);
-      card.appendChild(chickEl(sp, 2, false));
-      const mid = document.createElement('div');
-      const nm = document.createElement('b');
-      if (i === 0) nm.appendChild(mkIcon('crown', 2));
-      nm.appendChild(document.createTextNode(sp.name));
-      mid.appendChild(nm);
-      const sub = document.createElement('small');
-      sub.textContent = TIERS[sp.tier].n + ' - ' + GAME.fmt(Math.round(GAME.chScore(ch))) + '/min' + (ch.mods && ch.mods.length ? ' - ' + ch.mods.length + ' cross' : '');
-      mid.appendChild(sub);
-      card.appendChild(mid);
-      card.appendChild(genePips(ch));
-      list.appendChild(card);
-    });
-    cols.appendChild(list);
-    /* the bench: the picked hen and what can be done to it */
-    const bench = document.createElement('div');
-    bench.className = 'gl-bench';
-    const ch = st.chickens.find(c => c.id === geneTarget);
-    if (!ch) {
-      const p = document.createElement('p'); p.className = 'pedia-intro'; p.textContent = 'Pick a hen from the list to put it on the bench.'; bench.appendChild(p);
-    } else {
-      const sp = SPECIES[ch.sp];
-      const top = document.createElement('div');
-      top.className = 'gl-top';
-      top.appendChild(chickEl(sp, 4, false));
-      const t2 = document.createElement('div');
-      const b2 = document.createElement('b'); b2.textContent = sp.name.toUpperCase(); t2.appendChild(b2);
-      const s2 = document.createElement('span'); s2.textContent = TIERS[sp.tier].n + ' - lays every ' + GAME.fmtTime(GAME.chLayTime(ch)) + ' - worth ' + GAME.fmt(Math.round(GAME.chScore(ch))) + ' a minute'; t2.appendChild(s2);
-      if (ch.mods && ch.mods.length) { const m2 = document.createElement('span'); m2.textContent = 'crossed with: ' + ch.mods.map(m => (ANIMALS.find(a => a.mark === m) || { name: m }).name.toLowerCase()).join(', '); t2.appendChild(m2); }
-      top.appendChild(t2);
-      bench.appendChild(top);
-      const gl = document.createElement('div');
-      gl.className = 'gl-genes';
-      GENE_KEYS.forEach(k => {
-        const g = GENES[k], v = GAME.gene(ch, k);
-        const row = document.createElement('div');
-        row.className = 'gl-gene';
-        row.appendChild(mkIcon(g.icon, 2));
-        const nm = document.createElement('b'); nm.textContent = g.name; nm.style.color = g.col; row.appendChild(nm);
-        const pips = document.createElement('u');
-        for (let i = 0; i < ECON.geneMax; i++) { const pip = document.createElement('i'); if (i < v) { pip.className = 'on'; pip.style.background = g.col; } pips.appendChild(pip); }
-        row.appendChild(pips);
-        const d2 = document.createElement('span'); d2.textContent = g.desc + (v ? ' (+' + Math.round(v * ({ lay: ECON.geneLay, size: ECON.geneSize, luck: ECON.geneLuck, plume: ECON.genePlume, hardy: ECON.geneHardy }[k]) * 100) + '%)' : ''); row.appendChild(d2);
-        gl.appendChild(row);
+    if (!glCv) {
+      body.innerHTML = '';
+      glCv = document.createElement('canvas');
+      glCv.id = 'genes-canvas'; glCv.width = GLW * GK; glCv.height = GLH * GK;
+      body.appendChild(glCv);
+      glCtx = glCv.getContext('2d');
+      const at = ev => { const r = glCv.getBoundingClientRect(); return { x: (ev.clientX - r.left) / r.width * GLW, y: (ev.clientY - r.top) / r.height * GLH }; };
+      glCv.addEventListener('pointermove', ev => { const p = at(ev); glMouse = { x: p.x, y: p.y, inside: true }; const h = glHitAt(p.x, p.y); glHover = h ? h.key : null; });
+      glCv.addEventListener('pointerleave', () => { glMouse.inside = false; glHover = null; });
+      glCv.addEventListener('pointerdown', ev => {
+        ev.preventDefault();
+        const p = at(ev); glMouse = { x: p.x, y: p.y, inside: true };
+        const h = glHitAt(p.x, p.y);
+        if (!h) return;
+        if (h.kind === 'tube') { genePick(h.id); return; }
+        if (h.kind === 'splice') { if (h.on) { geneMode = geneMode === 'splice' ? null : 'splice'; snd.plop(); } else snd.error(); return; }
+        if (h.kind === 'clone') { if (GAME.cloneChicken(h.id)) { snd.grand(); glFx = { t: performance.now(), kind: 'clone' }; } else snd.error(); return; }
+        if (h.kind === 'cross') { if (GAME.crossAnimal(h.id, h.animal)) { snd.grand(); glFx = { t: performance.now(), kind: 'cross' }; } else snd.error(); return; }
+        if (h.kind === 'scroll') { glScroll = Math.max(0, glScroll + h.d); snd.plop(); return; }
+        if (h.kind === 'close') { closeModals(); snd.plop(); }
       });
-      bench.appendChild(gl);
-      const ops = document.createElement('div');
-      ops.className = 'gl-ops';
-      const op = (title, desc, btnDefs, locked) => {
-        const box = document.createElement('div');
-        box.className = 'gl-op' + (locked ? ' locked' : '');
-        const h3 = document.createElement('b'); h3.textContent = title; box.appendChild(h3);
-        const p3 = document.createElement('span'); p3.textContent = desc; box.appendChild(p3);
-        const row = document.createElement('div'); row.className = 'ip-btns';
-        btnDefs.forEach(def => {
-          const b = document.createElement('button');
-          b.type = 'button';
-          b.className = 'btn' + (def.green ? ' btn-green' : '');
-          Object.keys(def.data).forEach(k2 => b.dataset[k2] = def.data[k2]);
-          b.disabled = !!def.disabled;
-          if (def.icon) b.appendChild(mkIcon(def.icon, 2));
-          b.appendChild(document.createTextNode(def.label));
-          row.appendChild(b);
-        });
-        box.appendChild(row);
-        ops.appendChild(box);
-      };
-      const spliceOk = GAME.lvl('splice') > 0;
-      op('SPLICE', spliceOk ? 'Pick a donor from the list. Every gene keeps the better of the two; the donor is gone. ' + GAME.spliceCost() + ' feathers.' : 'Research Splicing in the HENS lane.',
-         [{ label: geneMode === 'splice' ? 'CANCEL' : 'SPLICE INTO THIS HEN', data: { act: 'gene-splice' }, green: spliceOk && geneMode !== 'splice', disabled: !spliceOk || st.feathers < GAME.spliceCost() || adults.length < 2, icon: 'flask' }], !spliceOk);
-      const cloneOk = GAME.lvl('clone') > 0;
-      const cc = GAME.cloneCost(ch);
-      op('CLONE', cloneOk ? 'A second bird, genes and marks and all. ' + GAME.fmt(cc.c) + ' coins and ' + cc.f + ' feathers.' : 'Research Cloning in the HENS lane.',
-         [{ label: 'CLONE ' + GAME.fmt(cc.c), data: { act: 'gene-clone', id: String(ch.id) }, green: GAME.canClone(ch), disabled: !GAME.canClone(ch), icon: 'twins' }], !cloneOk);
-      const crossOk = GAME.lvl('crossbreed') > 0;
-      op('CROSS', crossOk ? 'One animal, one gene up, one mark on the plumage. ' + GAME.crossCost() + ' feathers each.' : 'Research Crossbreeding in the HENS lane.',
-         ANIMALS.map(a => ({ label: a.name.toUpperCase() + ' +' + GENES[a.gene].name, data: { act: 'gene-cross', id: String(ch.id), animal: a.id }, green: GAME.canCross(ch, a.id), disabled: !GAME.canCross(ch, a.id), icon: GENES[a.gene].icon })), !crossOk);
-      bench.appendChild(ops);
     }
-    cols.appendChild(bench);
-    body.appendChild(cols);
+    glScroll = 0;
+  }
+  /* a glass tube with liquid, bubbles and something floating in it */
+  function glTube(g, x, y, w, h, now, liquid, seed, spr, sprScale, glow) {
+    const lt = y + 8, lh = h - 16;
+    g.fillStyle = '#0b1a24'; g.fillRect(x - 3, y + h - 6, w + 6, 8);          /* pedestal */
+    g.fillStyle = '#2a4a5a'; g.fillRect(x - 2, y + h - 5, w + 4, 5);
+    g.fillStyle = glow ? '#7ef2a8' : '#1f6a5a'; for (let i = 0; i < 3; i++) g.fillRect(x + 2 + i * Math.floor((w - 4) / 3), y + h - 3, 3, 1);
+    g.fillStyle = '#2a4a5a'; g.fillRect(x - 2, y, w + 4, 5);                    /* cap */
+    g.fillStyle = '#4a7a8a'; g.fillRect(x - 2, y, w + 4, 1);
+    g.fillStyle = 'rgba(190,240,255,.16)'; g.fillRect(x, y + 5, w, h - 11);     /* glass */
+    g.fillStyle = liquid; g.fillRect(x + 1, lt, w - 2, lh);                       /* liquid */
+    g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(x + 1, lt, w - 2, 1);
+    if (spr) {
+      const bob = Math.round(Math.sin(now / 600 + seed) * 2);
+      const sx = Math.round(x + w / 2 - spr.width / 2), sy = Math.round(lt + lh / 2 - spr.height / 2 + bob);
+      g.drawImage(spr, sx, sy);
+      g.fillStyle = 'rgba(80,220,200,.28)'; g.fillRect(sx, Math.max(lt, sy), spr.width, Math.min(spr.height, lt + lh - sy));
+    }
+    /* bubbles rising */
+    g.fillStyle = 'rgba(255,255,255,.55)';
+    for (let i = 0; i < 5; i++) {
+      const bx = x + 3 + ((i * 7 + seed * 3) % Math.max(1, w - 6));
+      const by = lt + lh - 2 - Math.floor(((now / 28) + i * 19 + seed * 7) % (lh - 3));
+      g.fillRect(bx, by, 1, 1); if (i % 2) g.fillRect(bx + 1, by, 1, 1);
+    }
+    g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(x + 2, y + 6, 1, h - 13);  /* highlight */
+    g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(x + w - 3, y + 6, 2, h - 13);
+    if (glow) { g.fillStyle = glow; g.fillRect(x - 3, y - 1, w + 6, 1); g.fillRect(x - 3, y + h + 1, w + 6, 1); g.fillRect(x - 4, y - 1, 1, h + 3); g.fillRect(x + w + 3, y - 1, 1, h + 3); }
+  }
+  function drawGenes(now) {
+    if (!glCv) return;
+    const g = glCtx;
+    g.imageSmoothingEnabled = false;
+    g.setTransform(GK, 0, 0, GK, 0, 0);
+    glHits = [];
+    const st = S();
+    const adults = glAdults();
+    const target = st.chickens.find(c => c.id === geneTarget);
+
+    /* ---- the room ---- */
+    g.fillStyle = '#0e1620'; g.fillRect(0, 0, GLW, GLH);
+    g.fillStyle = '#16232f';
+    for (let x = 0; x < GLW; x += 38) for (let y = 0; y < 150; y += 30) g.fillRect(x + 1, y + 1, 36, 28);
+    g.fillStyle = '#1f3040'; for (let x = 0; x < GLW; x += 38) g.fillRect(x + 1, 1, 36, 1);
+    /* pipes along the ceiling */
+    g.fillStyle = '#34505e'; g.fillRect(0, 6, GLW, 5); g.fillStyle = '#5a7a88'; g.fillRect(0, 6, GLW, 1);
+    g.fillStyle = '#2a3f4c'; g.fillRect(0, 14, GLW, 3);
+    for (let x = 20; x < GLW; x += 60) { g.fillStyle = '#5a7a88'; g.fillRect(x, 4, 6, 9); g.fillStyle = Math.floor(now / 700 + x) % 3 ? '#7ef2a8' : '#245a3a'; g.fillRect(x + 2, 12, 2, 2); }
+    /* the floor */
+    g.fillStyle = '#101c24'; g.fillRect(0, 150, GLW, GLH - 150);
+    g.fillStyle = '#1a2b36'; for (let x = 0; x < GLW; x += 20) g.fillRect(x, 150, 1, GLH - 150); for (let y = 150; y < GLH; y += 14) g.fillRect(0, y, GLW, 1);
+    g.fillStyle = 'rgba(126,242,168,.06)'; g.fillRect(0, 150, GLW, 3);
+    /* the helix screen on the back wall */
+    SPR.drawBox(g, 262, 20, 108, 44, '#03110a', '#2f6a48', '#0f1f16');
+    for (let i = 0; i < 26; i++) {
+      const px2 = 268 + i * 4, ph = Math.sin(now / 500 + i * 0.55);
+      g.fillStyle = '#ff5f9e'; g.fillRect(px2, Math.round(42 + ph * 12), 2, 2);
+      g.fillStyle = '#3fa7d6'; g.fillRect(px2, Math.round(42 - ph * 12), 2, 2);
+      if (i % 3 === 0) { g.fillStyle = 'rgba(126,242,168,.5)'; g.fillRect(px2, Math.min(42 + ph * 12, 42 - ph * 12) | 0, 1, Math.abs(ph * 24) | 0); }
+    }
+    SPR.drawTiny(g, 'GENE LAB', 266, 23, '#7ef2a8', 1);
+    const fx = GAME.fmt(st.feathers) + ' FEATHERS';
+    SPR.drawTiny(g, fx, 368 - SPR.tinyW(fx, 1), 23, '#ffd23f', 1);
+    SPR.drawScanlines(g, 263, 21, 106, 42, now);
+    /* the way out */
+    SPR.drawBox(g, 14, 22, 30, 12, glHover === 'close' ? '#3a5060' : '#2a3f4c', '#5a7a88', '#0b1a24');
+    SPR.drawTiny(g, 'EXIT', 20, 25, '#e8607a', 1);
+    glHits.push({ kind: 'close', key: 'close', x: 14, y: 22, w: 30, h: 12, label: 'BACK TO THE RANCH' });
+
+    /* ---- the flock in their tubes ---- */
+    const TW = 30, TH = 84, GAP = 8, x0 = 14, ty = 46;
+    const perPage = 6;
+    if (glScroll > Math.max(0, adults.length - perPage)) glScroll = Math.max(0, adults.length - perPage);
+    const shown = adults.slice(glScroll, glScroll + perPage);
+    if (!adults.length) SPR.drawTiny(g, 'NO GROWN HENS YET', x0, ty + 40, '#7ef2a8', 1);
+    shown.forEach((ch, i) => {
+      const x = x0 + i * (TW + GAP);
+      const sp = SPECIES[ch.sp];
+      const sel = ch.id === geneTarget, donor = geneMode === 'splice' && !sel;
+      const glow = sel ? '#ffd23f' : donor ? (Math.floor(now / 300) % 2 ? '#ff5f9e' : null) : (glHover === 'tube' + ch.id ? 'rgba(255,255,255,.5)' : null);
+      glTube(g, x, ty, TW, TH, now, sel ? 'rgba(80,220,255,.55)' : 'rgba(60,200,170,.45)', ch.id, SPR.chickenSprite(sp, 1, false), 1, glow);
+      if (adults[0] === ch) g.drawImage(SPR.iconSprite('crown', 1), x + TW / 2 - 5, ty - 12 + Math.round(Math.sin(now / 400) * 1));
+      /* what it earns, on the pedestal */
+      const lab = GAME.fmt(Math.round(GAME.chScore(ch)));
+      SPR.drawTiny(g, lab, Math.round(x + TW / 2 - SPR.tinyW(lab, 1) / 2), ty + TH + 5, sel ? '#ffd23f' : '#7ef2a8', 1);
+      /* its genes as five little lights */
+      GENE_KEYS.forEach((k, gi) => { const v = GAME.gene(ch, k); g.fillStyle = v ? GENES[k].col : '#1f3040'; g.fillRect(x + 1 + gi * 6, ty + TH + 12, 4, 2); });
+      glHits.push({ kind: 'tube', key: 'tube' + ch.id, id: ch.id, x: x - 3, y: ty - 2, w: TW + 6, h: TH + 20, label: (donor ? 'DONOR: ' : '') + sp.name.toUpperCase() + '  ' + TIERS[sp.tier].n.toUpperCase() });
+    });
+    if (adults.length > perPage) {
+      [['<', -1, x0 - 12], ['>', 1, x0 + perPage * (TW + GAP) - 2]].forEach(([lab, d, bx]) => {
+        const can = d < 0 ? glScroll > 0 : glScroll + perPage < adults.length;
+        SPR.drawBox(g, bx, ty + 34, 9, 14, can ? '#2a4a5a' : '#16232f', can ? '#5a7a88' : null, '#0b1a24');
+        SPR.drawTiny(g, lab, bx + 3, ty + 38, can ? '#d8ffe8' : '#3a5560', 1);
+        if (can) glHits.push({ kind: 'scroll', key: 'scroll' + d, d, x: bx, y: ty + 34, w: 9, h: 14, label: 'MORE HENS' });
+      });
+    }
+
+    /* ---- the specimen tube and its readout ---- */
+    const bx = 256, by = 72, BW = 46, BH = 100;
+    const flash = glFx && now - glFx.t < 700 ? (1 - (now - glFx.t) / 700) : 0;
+    glTube(g, bx, by, BW, BH, now, flash ? 'rgba(255,255,220,' + (0.35 + flash * 0.5) + ')' : 'rgba(80,220,255,.5)', 99, target ? SPR.chickenSprite(SPECIES[target.sp], 2, false) : null, 2, geneMode === 'splice' ? '#ff5f9e' : '#5fe8ff');
+    if (!target) SPR.drawTiny(g, 'PICK A HEN', bx + 4, by + 44, '#7ef2a8', 1);
+    /* the readout */
+    const rx = bx + BW + 8, ry = by;
+    SPR.drawBox(g, rx, ry, 372 - rx, 74, '#03110a', '#2f6a48', '#0f1f16');
+    if (target) {
+      const sp = SPECIES[target.sp];
+      SPR.drawTiny(g, sp.name.toUpperCase().slice(0, 14), rx + 3, ry + 3, '#d8ffe8', 1);
+      GENE_KEYS.forEach((k, gi) => {
+        const v = GAME.gene(target, k);
+        g.drawImage(SPR.iconSprite(GENES[k].icon, 1), rx + 3, ry + 11 + gi * 10);
+        for (let p = 0; p < ECON.geneMax; p++) { g.fillStyle = p < v ? GENES[k].col : '#1d3628'; g.fillRect(rx + 15 + p * 7, ry + 13 + gi * 10, 5, 4); }
+      });
+      const sc = GAME.fmt(Math.round(GAME.chScore(target))) + '/MIN' + (target.mods && target.mods.length ? '  ' + target.mods.length + 'X' : '');
+      SPR.drawTiny(g, sc, rx + 3, ry + 64, '#ffd23f', 1);
+    } else SPR.drawTiny(g, 'NO SPECIMEN', rx + 3, ry + 3, '#4fb072', 1);
+    SPR.drawScanlines(g, rx + 1, ry + 1, 372 - rx - 2, 72, now + 300);
+
+    /* ---- the machines: splice, clone, cross ---- */
+    const machine = (kind, x, y, w, icon, label, cost, on, hot, extra) => {
+      const hov = glHover === kind + (extra || '');
+      SPR.drawBox(g, x, y, w, 20, on ? (hot ? SPR.darken('#ffc72f', 0.4) : '#1d3628') : '#16232f', on ? (hot ? '#ffc72f' : '#4fb072') : '#243440', '#0b1a24');
+      g.globalAlpha = on ? 1 : 0.4; g.drawImage(SPR.iconSprite(icon, 1), x + 3, y + 3); g.globalAlpha = 1;
+      SPR.drawTiny(g, label, x + 15, y + 4, on ? '#d8ffe8' : '#3a5560', 1);
+      if (cost) SPR.drawTiny(g, cost, x + 15, y + 12, on ? (hot ? '#ffd23f' : '#4fb072') : '#3a5560', 1);
+      if (!on) g.drawImage(SPR.iconSprite('lock', 1), x + w - 12, y + 5);
+      if (hov && on) { g.fillStyle = 'rgba(255,255,255,.6)'; g.fillRect(x, y, w, 1); g.fillRect(x, y + 19, w, 1); }
+    };
+    const my = 152, my2 = 178;
+    const spliceOk = GAME.lvl('splice') > 0, cloneOk = GAME.lvl('clone') > 0, crossOk = GAME.lvl('crossbreed') > 0;
+    machine('splice', 14, my, 70, 'flask', geneMode === 'splice' ? 'CANCEL' : 'SPLICE', spliceOk ? GAME.spliceCost() + ' F' : 'RESEARCH', spliceOk, geneMode === 'splice' || (target && st.feathers >= GAME.spliceCost() && adults.length > 1));
+    glHits.push({ kind: 'splice', key: 'splice', on: spliceOk && target && adults.length > 1, x: 14, y: my, w: 70, h: 20, label: spliceOk ? (geneMode === 'splice' ? 'PICK THE DONOR - IT WILL BE GONE' : 'SPLICE: THE BEST OF TWO HENS, ONE BIRD') : 'RESEARCH SPLICING IN THE HENS LANE' });
+    const cc = target ? GAME.cloneCost(target) : null;
+    machine('clone', 92, my, 70, 'twins', 'CLONE', cloneOk ? (cc ? GAME.fmt(cc.c) + ' + ' + cc.f + ' F' : '-') : 'RESEARCH', cloneOk, target && GAME.canClone(target));
+    glHits.push({ kind: 'clone', key: 'clone', id: target ? target.id : 0, x: 92, y: my, w: 70, h: 20, label: cloneOk ? 'CLONE: A SECOND BIRD, GENES AND ALL' : 'RESEARCH CLONING IN THE HENS LANE' });
+    SPR.drawTiny(g, crossOk ? 'CROSS' : 'CROSS', 218, my2 + 4, crossOk ? '#7ef2a8' : '#3a5560', 1);
+    SPR.drawTiny(g, crossOk ? GAME.crossCost() + ' F' : 'LOCKED', 218, my2 + 12, crossOk ? '#4fb072' : '#3a5560', 1);
+    ANIMALS.forEach((a, i) => {
+      const ax = 14 + i * 40;
+      const can = target && GAME.canCross(target, a.id);
+      machine('cross', ax, my2, 36, GENES[a.gene].icon, a.name.toUpperCase().slice(0, 4), '+' + GENES[a.gene].name, crossOk, can, a.id);
+      glHits.push({ kind: 'cross', key: 'cross' + a.id, id: target ? target.id : 0, animal: a.id, x: ax, y: my2, w: 36, h: 20, label: crossOk ? a.name.toUpperCase() + ': ' + a.desc.toUpperCase() : 'RESEARCH CROSSBREEDING IN THE HENS LANE' });
+    });
+    /* the status strip */
+    const hov = glHits.find(h => h.key === glHover);
+    g.fillStyle = '#0b1a24'; g.fillRect(0, GLH - 14, GLW, 14);
+    g.fillStyle = '#2a4a5a'; g.fillRect(0, GLH - 14, GLW, 1);
+    const line = hov ? hov.label : (geneMode === 'splice' ? 'TAP THE HEN TO SPLICE IN' : adults.length + ' HENS  ' + st.stats.edits + ' EDITS');
+    SPR.drawTiny(g, line, 6, GLH - 9, hov ? '#d8ffe8' : '#4fb072', 1);
+    /* the pointer */
+    if (glMouse.inside) {
+      const kind = hov ? 'hand' : 'arrow';
+      const cur = SPR.cursorSprite(kind, 1);
+      g.drawImage(cur, Math.round(glMouse.x) - (kind === 'hand' ? 4 : 0), Math.round(glMouse.y) - (kind === 'hand' ? 2 : 0));
+    }
+    g.setTransform(1, 0, 0, 1, 0, 0);
   }
 
   /* ================= MODAL PLUMBING ================= */
@@ -6652,13 +6730,13 @@
       }
       case 'open-genes': { openGenes(btn.dataset.id ? +btn.dataset.id : null); snd.build(); break; }
       case 'gene-pick': { genePick(+btn.dataset.id); break; }
-      case 'gene-splice': { geneMode = geneMode === 'splice' ? null : 'splice'; renderGenes(); snd.plop(); break; }
+      case 'gene-splice': { geneMode = geneMode === 'splice' ? null : 'splice'; snd.plop(); break; }
       case 'gene-clone': {
-        if (GAME.cloneChicken(+btn.dataset.id)) { snd.grand(); renderGenes(); } else snd.error();
+        if (GAME.cloneChicken(+btn.dataset.id)) snd.grand(); else snd.error();
         break;
       }
       case 'gene-cross': {
-        if (GAME.crossAnimal(+btn.dataset.id, btn.dataset.animal)) { snd.grand(); renderGenes(); } else snd.error();
+        if (GAME.crossAnimal(+btn.dataset.id, btn.dataset.animal)) snd.grand(); else snd.error();
         break;
       }
       case 'open-company': { openCompany(); $('#menu-pop').hidden = true; break; }
@@ -6862,6 +6940,7 @@
       if (!titleEl.hidden) { if (introMode) drawIntro(dt); else drawTitleScreen(dt); }
       render(now, dt);
       if (!$('#modal-skills').hidden) drawTerm(now);
+      if (!$('#modal-genes').hidden) drawGenes(now);
       if (!$('#modal-depot').hidden && mapCv) drawValleyMap(now);
       drawTrip(now);
       hudAcc += dt;
