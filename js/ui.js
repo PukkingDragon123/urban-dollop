@@ -2639,6 +2639,9 @@
     { act: 'open-depot', icon: 'truck',  name: 'DEPOT',
       tip: 'Logistics - vehicles, routes and the wall map',
       open: () => GAME.depotOpen(), why: 'research Logistics' },
+    { act: 'open-world', icon: 'city',   name: 'WORLD',
+      tip: 'The world - branches abroad, and the Moon',
+      open: () => GAME.lvl('worldmap') > 0, why: 'research the World Map' },
     { act: 'open-genes', icon: 'dna',    name: 'GENES',
       tip: 'The Gene Lab - read, splice, clone and cross your hens',
       open: () => GAME.hasGeneLab(), why: GAME.lvl('genelab') ? 'build a Gene Lab' : 'research the Gene Lab' },
@@ -3809,6 +3812,174 @@
       const kind = hov ? 'hand' : 'arrow';
       const cur = SPR.cursorSprite(kind, 1);
       g.drawImage(cur, Math.round(glMouse.x) - (kind === 'hand' ? 4 : 0), Math.round(glMouse.y) - (kind === 'hand' ? 2 : 0));
+    }
+    g.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
+  /* ============================================================
+     THE WORLD - a map of the whole egg-eating world, drawn on one
+     canvas. Continents rise out of a moving sea, every region has a
+     flag on a pole, shipping lanes run home from the ones you own,
+     and the Moon hangs top right. Pick a region, open it, and build
+     branches on it; they earn on their own while you farm.
+     ============================================================ */
+  const WLW = 380, WLH = 220, WLK = 2;
+  let wlCv = null, wlCtx = null, wlHits = [], wlHover = null, wlMouse = { x: 0, y: 0, inside: false }, wlSel = null, wlLand = null, wlFx = null;
+  function wlHitAt(x, y) {
+    for (let i = wlHits.length - 1; i >= 0; i--) { const h = wlHits[i]; if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) return h; }
+    return null;
+  }
+  function openWorld() {
+    if (GAME.lvl('worldmap') < 1) { toast({ icon: 'lock', title: 'NO MAP', body: 'Research the World Map in the MARKET lane.' }); return; }
+    if (!wlCv) {
+      const body = $('#world-body');
+      body.innerHTML = '';
+      wlCv = document.createElement('canvas');
+      wlCv.id = 'world-canvas'; wlCv.width = WLW * WLK; wlCv.height = WLH * WLK;
+      body.appendChild(wlCv);
+      wlCtx = wlCv.getContext('2d');
+      const at = ev => { const r = wlCv.getBoundingClientRect(); return { x: (ev.clientX - r.left) / r.width * WLW, y: (ev.clientY - r.top) / r.height * WLH }; };
+      wlCv.addEventListener('pointermove', ev => { const p = at(ev); wlMouse = { x: p.x, y: p.y, inside: true }; const h = wlHitAt(p.x, p.y); wlHover = h ? h.key : null; });
+      wlCv.addEventListener('pointerleave', () => { wlMouse.inside = false; wlHover = null; });
+      wlCv.addEventListener('pointerdown', ev => {
+        ev.preventDefault();
+        const p = at(ev); wlMouse = { x: p.x, y: p.y, inside: true };
+        const h = wlHitAt(p.x, p.y);
+        if (!h) return;
+        if (h.kind === 'region') { wlSel = h.id; snd.plop(); return; }
+        if (h.kind === 'open') { if (GAME.openRegion(h.id)) { snd.grand(); wlFx = { t: performance.now(), id: h.id }; } else snd.error(); return; }
+        if (h.kind === 'branch') { if (GAME.buildBranch(h.id)) { snd.build(); wlFx = { t: performance.now(), id: h.id }; } else snd.error(); return; }
+        if (h.kind === 'close') { closeModals(); snd.plop(); }
+      });
+    }
+    if (!wlSel) wlSel = REGIONS.find(r => !r.home && GAME.regionReachable(r.id) && !GAME.regionOpen(r.id)) ? REGIONS.find(r => !r.home && GAME.regionReachable(r.id) && !GAME.regionOpen(r.id)).id : 'valley';
+    openModal('#modal-world');
+  }
+  /* the continents, baked once: blobs on a mask, shaded, with a pale coast */
+  function worldLand() {
+    if (wlLand) return wlLand;
+    const m = SPR.newMask(WLW, 200);
+    const blob = (x, y, r, sq) => SPR.mCircle(m, x, y, r, sq);
+    blob(84, 80, 40, 0.75); blob(60, 60, 22, 0.9); blob(112, 112, 24, 0.9); blob(118, 146, 20, 1); blob(100, 130, 14, 1);
+    blob(190, 62, 46, 0.62); blob(232, 92, 38, 0.72); blob(206, 112, 28, 0.9); blob(258, 78, 22, 0.9); blob(166, 46, 20, 0.7);
+    blob(132, 36, 22, 0.55); blob(150, 38, 12, 0.7);
+    blob(300, 144, 13, 0.8); blob(312, 150, 8, 1); blob(292, 150, 6, 1);
+    const c = SPR.newCanvas(WLW, 200);
+    SPR.renderMask(c.getContext('2d'), m, 1, 0, 0, { base: '#5fa84a', light: '#8fd14f', dark: '#3f7d32', out: '#e8dcb0' }, 77, { lightBand: 2, shadeBand: 3, speckle: 0.04, grain: 0.08 });
+    wlLand = c;
+    return c;
+  }
+  function drawWorld(now) {
+    if (!wlCv) return;
+    const g = wlCtx;
+    g.imageSmoothingEnabled = false;
+    g.setTransform(WLK, 0, 0, WLK, 0, 0);
+    wlHits = [];
+    const st = S();
+    /* the sea, and the sky the Moon hangs in */
+    g.fillStyle = '#0f2f4a'; g.fillRect(0, 0, WLW, 200);
+    g.fillStyle = '#123858'; for (let y = 0; y < 200; y += 20) g.fillRect(0, y, WLW, 1); for (let x = 0; x < WLW; x += 20) g.fillRect(x, 0, 1, 200);
+    g.fillStyle = 'rgba(255,255,255,.22)';
+    for (let i = 0; i < 70; i++) { const x = (i * 97 + Math.floor(now / 70)) % WLW, y = (i * 53) % 200; if ((i + Math.floor(now / 500)) % 3) g.fillRect(x, y, 3, 1); }
+    g.drawImage(worldLand(), 0, 0);
+    /* shipping lanes home from every open region */
+    const home = REGION_BY_ID.valley;
+    REGIONS.forEach(r => {
+      if (r.home || !GAME.regionOpen(r.id)) return;
+      const n = Math.max(1, Math.floor(Math.hypot(r.x - home.x, r.y - home.y) / 5));
+      const ph = Math.floor(now / 160) % 3;
+      for (let i = 0; i <= n; i++) {
+        if ((i + ph) % 3) continue;
+        const t = i / n;
+        g.fillStyle = r.moon ? '#ffd23f' : '#fff8ec';
+        g.fillRect(Math.round(home.x + (r.x - home.x) * t), Math.round(home.y + (r.y - home.y) * t - (r.moon ? Math.sin(t * Math.PI) * 30 : 0)), 2, 1);
+      }
+    });
+    /* the Moon */
+    const moon = REGION_BY_ID.moon;
+    const moonOpen = GAME.regionOpen('moon');
+    g.fillStyle = '#0b1a2a'; g.fillRect(moon.x - 24, moon.y - 22, 48, 44);
+    g.fillStyle = 'rgba(255,255,255,.7)'; for (let i = 0; i < 12; i++) g.fillRect(moon.x - 22 + (i * 37) % 44, moon.y - 20 + (i * 23) % 40, 1, 1);
+    const mm = SPR.newMask(40, 40); SPR.mCircle(mm, 20, 20, 15, 1);
+    SPR.renderMask(g, mm, 1, moon.x - 20, moon.y - 20, moonOpen ? { base: '#c9ced6', light: '#eef0f4', dark: '#8a9099', out: '#5e6570' } : { base: '#6a7078', light: '#8a9099', dark: '#4a5058', out: '#2e343c' }, 5, { lightBand: 3, shadeBand: 4, grain: 0.1 });
+    g.fillStyle = moonOpen ? '#8a9099' : '#4a5058'; g.fillRect(moon.x - 8, moon.y - 6, 5, 4); g.fillRect(moon.x + 4, moon.y + 2, 6, 5); g.fillRect(moon.x - 3, moon.y + 8, 4, 3);
+    if (moonOpen) { g.fillStyle = '#9fe8ff'; g.fillRect(moon.x - 4, moon.y - 12, 8, 5); g.fillRect(moon.x - 2, moon.y - 14, 4, 2); g.fillStyle = '#2e2216'; g.fillRect(moon.x - 4, moon.y - 7, 8, 1); }
+    /* the rocket, on its way */
+    if (st.empire.rocket > 0) {
+      const f = 1 - st.empire.rocket / 6;
+      const rx = home.x + (moon.x - home.x) * f, ry = home.y + (moon.y - home.y) * f - Math.sin(f * Math.PI) * 40;
+      g.fillStyle = '#fff8ec'; g.fillRect(Math.round(rx) - 1, Math.round(ry) - 3, 3, 6);
+      g.fillStyle = '#e8542f'; g.fillRect(Math.round(rx) - 2, Math.round(ry) + 3, 5, 1);
+      g.fillStyle = Math.floor(now / 60) % 2 ? '#ffd23f' : '#ff8f6a'; g.fillRect(Math.round(rx) - 1, Math.round(ry) + 4, 3, 3 + Math.floor(now / 90) % 2);
+    }
+    /* the regions */
+    REGIONS.forEach(r => {
+      const open = GAME.regionOpen(r.id), reach = GAME.regionReachable(r.id), sel = wlSel === r.id, hov = wlHover === 'r' + r.id;
+      const x = r.x, y = r.y;
+      if (r.home) {
+        g.fillStyle = '#2e2216'; g.fillRect(x - 6, y - 12, 12, 12);
+        g.fillStyle = st.company.col1; g.fillRect(x - 5, y - 11, 10, 10);
+        g.drawImage(SPR.iconSprite(st.company.logo, 1), x - 5, y - 11);
+      } else if (open) {
+        g.fillStyle = '#3a2a16'; g.fillRect(x, y - 16, 1, 16);
+        g.fillStyle = r.flag[0]; g.fillRect(x + 1, y - 16, 9, 6);
+        g.fillStyle = r.flag[1]; g.fillRect(x + 1, y - 13, 9, 2);
+        /* the branches, little sheds in a row */
+        for (let i = 0; i < GAME.branchCount(r.id); i++) {
+          const bx2 = x - 10 + (i % 5) * 5, by2 = y + 2 + Math.floor(i / 5) * 5;
+          g.fillStyle = '#2e2216'; g.fillRect(bx2, by2, 4, 4);
+          g.fillStyle = i % 2 ? '#e0bd82' : '#c9a35f'; g.fillRect(bx2 + 1, by2 + 1, 2, 3);
+          g.fillStyle = '#e06a58'; g.fillRect(bx2, by2, 4, 1);
+        }
+      } else {
+        g.fillStyle = reach ? 'rgba(255,255,255,.7)' : 'rgba(255,255,255,.25)';
+        for (let i = 0; i < 8; i++) g.fillRect(x - 6 + (i % 4) * 4, y - 12 + Math.floor(i / 4) * 10, 2, 1);
+        g.fillRect(x - 6, y - 8, 1, 2); g.fillRect(x + 6, y - 8, 1, 2);
+        g.globalAlpha = reach ? 1 : 0.4; g.drawImage(SPR.iconSprite('lock', 1), x - 5, y - 13); g.globalAlpha = 1;
+      }
+      if (sel || hov) { g.fillStyle = sel ? '#ffd23f' : 'rgba(255,255,255,.6)'; g.fillRect(x - 12, y - 19, 24, 1); g.fillRect(x - 12, y + 4, 24, 1); g.fillRect(x - 12, y - 19, 1, 24); g.fillRect(x + 11, y - 19, 1, 24); }
+      if (wlFx && wlFx.id === r.id && now - wlFx.t < 700) { const f = (now - wlFx.t) / 700; g.fillStyle = 'rgba(255,255,255,' + (1 - f) + ')'; const rr = Math.round(f * 14); g.fillRect(x - rr, y - 8 - rr, rr * 2, 1); g.fillRect(x - rr, y - 8 + rr, rr * 2, 1); }
+      wlHits.push({ kind: 'region', key: 'r' + r.id, id: r.id, x: x - 12, y: y - 19, w: 24, h: 24 });
+    });
+    /* the way out, and what it all earns */
+    SPR.drawBox(g, 6, 6, 30, 12, wlHover === 'close' ? '#3a5060' : '#2a3f4c', '#5a7a88', '#0b1a24');
+    SPR.drawTiny(g, 'EXIT', 12, 9, '#e8607a', 1);
+    wlHits.push({ kind: 'close', key: 'close', x: 6, y: 6, w: 30, h: 12 });
+    const inc = GAME.branchIncome();
+    const top = GAME.fmt(Math.round(inc)) + '/MIN ABROAD   ' + GAME.fmt(st.coins) + ' COINS';
+    g.fillStyle = 'rgba(11,26,36,.85)'; g.fillRect(42, 6, SPR.tinyW(top, 1) + 8, 12);
+    SPR.drawTiny(g, top, 46, 9, '#ffd23f', 1);
+
+    /* the panel along the foot: the picked region and what you can do there */
+    g.fillStyle = '#0b1a24'; g.fillRect(0, 200, WLW, 20); g.fillStyle = '#2a4a5a'; g.fillRect(0, 200, WLW, 1);
+    const r = REGION_BY_ID[wlSel] || REGION_BY_ID.valley;
+    const open = GAME.regionOpen(r.id), reach = GAME.regionReachable(r.id);
+    g.fillStyle = r.flag[0]; g.fillRect(6, 205, 8, 6); g.fillStyle = r.flag[1]; g.fillRect(6, 208, 8, 2);
+    SPR.drawTiny(g, r.name.toUpperCase(), 18, 205, '#d8ffe8', 1);
+    SPR.drawTiny(g, r.blurb.toUpperCase(), 18, 213, '#4fb072', 1);
+    const px0 = 200;
+    if (r.home) {
+      SPR.drawTiny(g, 'HQ  ' + GAME.fmt(Math.round(GAME.rates().coinsPerMin)) + '/MIN', px0, 205, '#7ef2a8', 1);
+    } else if (!open) {
+      const can = GAME.canOpenRegion(r.id);
+      const lab = reach ? 'OPEN  ' + GAME.fmt(r.cost) : r.moon && GAME.lvl('moonshot') < 1 ? 'NEEDS MOONSHOT' : 'OPEN THE ONE BEFORE';
+      SPR.drawBox(g, px0, 203, 100, 14, can ? SPR.darken('#ffc72f', 0.4) : '#16232f', can ? '#ffc72f' : '#243440', '#0b1a24');
+      SPR.drawTiny(g, lab, px0 + 4, 207, can ? '#fff8ec' : '#4fb072', 1);
+      if (reach) wlHits.push({ kind: 'open', key: 'open', id: r.id, x: px0, y: 203, w: 100, h: 14 });
+      SPR.drawTiny(g, GAME.fmt(r.yield) + '/MIN A BRANCH', px0 + 106, 207, '#7ef2a8', 1);
+    } else {
+      const n = GAME.branchCount(r.id), can = GAME.canBranch(r.id), full = n >= r.cap;
+      SPR.drawBox(g, px0, 203, 100, 14, can ? SPR.darken('#7ef2a8', 0.55) : '#16232f', can ? '#7ef2a8' : '#243440', '#0b1a24');
+      SPR.drawTiny(g, full ? 'ALL BUILT' : 'BRANCH  ' + GAME.fmt(GAME.branchCost(r.id)), px0 + 4, 207, can ? '#fff8ec' : '#4fb072', 1);
+      if (!full) wlHits.push({ kind: 'branch', key: 'branch', id: r.id, x: px0, y: 203, w: 100, h: 14 });
+      SPR.drawTiny(g, n + '/' + r.cap + '  ' + GAME.fmt(Math.round(GAME.regionIncome(r.id))) + '/MIN', px0 + 106, 207, '#ffd23f', 1);
+    }
+    /* the pointer */
+    if (wlMouse.inside) {
+      const hov = wlHitAt(wlMouse.x, wlMouse.y);
+      const kind = hov ? 'hand' : 'arrow';
+      const cur = SPR.cursorSprite(kind, 1);
+      g.drawImage(cur, Math.round(wlMouse.x) - (kind === 'hand' ? 4 : 0), Math.round(wlMouse.y) - (kind === 'hand' ? 2 : 0));
     }
     g.setTransform(1, 0, 0, 1, 0, 0);
   }
@@ -5899,7 +6070,7 @@
     const row = document.createElement('div');
     row.className = 'tally';
     [['coin', GAME.fmt(now2) + '/min', 'Right now'], ['truck', GAME.fmt(L.sales), 'Truck sales'], ['doc', GAME.fmt(L.orders), 'Roadside orders'],
-     ['honey', GAME.fmt(L.honey), 'Honey'], ['star', GAME.fmt(L.quests), 'Quest rewards'], ['chart', GAME.fmt(GAME.companyValue()), 'Company value']].forEach(([ic, v, tip]) => {
+     ['honey', GAME.fmt(L.honey), 'Honey'], ['star', GAME.fmt(L.quests), 'Quest rewards'], ['city', GAME.fmt(L.empire || 0), 'Branches abroad'], ['chart', GAME.fmt(GAME.companyValue()), 'Company value']].forEach(([ic, v, tip]) => {
       const cell = document.createElement('div');
       cell.title = tip;
       cell.appendChild(mkIcon(ic, 3));
@@ -6729,6 +6900,7 @@
         break;
       }
       case 'open-genes': { openGenes(btn.dataset.id ? +btn.dataset.id : null); snd.build(); break; }
+      case 'open-world': { openWorld(); snd.build(); break; }
       case 'gene-pick': { genePick(+btn.dataset.id); break; }
       case 'gene-splice': { geneMode = geneMode === 'splice' ? null : 'splice'; snd.plop(); break; }
       case 'gene-clone': {
@@ -6859,6 +7031,8 @@
   GAME.on('cross', ({ ch, animal, x, y }) => { snd.grand(); puff(x, y, '#ffd23f', 12, 34, 28); toast({ icon: 'atom', title: 'CROSSED WITH A ' + animal.name.toUpperCase(), body: animal.desc }); });
   GAME.on('company', ({ c }) => { toast({ icon: c.logo, title: c.name, body: 'Filed and signed.' }); });
   GAME.on('rain', () => { snd.sprinkle(); });
+  GAME.on('region', ({ r }) => { toast({ icon: r.moon ? 'atom' : 'city', title: r.name.toUpperCase(), body: r.moon ? 'The rocket is away.' : 'Open for business.' }); });
+  GAME.on('branch', ({ r, n }) => { floatText('+1 BRANCH', innerWidth / 2 - 40, 120, 'gold', 'house'); });
   GAME.on('rainend', () => { snd.sparkle(); });
   GAME.on('market', () => { if (!$('#modal-pedia').hidden && indexTab === 'ledger') GAME.mark('pedia'); });
   GAME.on('vehicle', ({ v }) => { snd.grand(); toast({ icon: 'truck', title: v.name.toUpperCase(), body: v.cap + ' eggs' }); });
@@ -6941,6 +7115,7 @@
       render(now, dt);
       if (!$('#modal-skills').hidden) drawTerm(now);
       if (!$('#modal-genes').hidden) drawGenes(now);
+      if (!$('#modal-world').hidden) drawWorld(now);
       if (!$('#modal-depot').hidden && mapCv) drawValleyMap(now);
       drawTrip(now);
       hudAcc += dt;

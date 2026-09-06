@@ -329,6 +329,27 @@ const STOCKS = [
 const STOCK_BY_ID = Object.fromEntries(STOCKS.map(s => [s.id, s]));
 
 /* ------------------------------------------------------------
+   THE WORLD - once the valley is yours, the rest of it. Regions
+   open in order down this list for coins; each takes a number
+   of branches that earn coins a minute on their own. The Moon
+   needs a rocket (the Moonshot cube) on top of its price.
+   x, y sit on the 380 x 200 world map.
+   ------------------------------------------------------------ */
+const REGIONS = [
+  { id:'valley',       name:'Cluckton Valley', flag:['#6ab04c', '#ffd23f'], x:96,  y:96,  cost:0,     branchBase:0,      cap:0,  yield:0,    home:true, blurb:'Home. The ranch itself.' },
+  { id:'featherland',  name:'Featherland',     flag:['#3fa7d6', '#fff8ec'], x:64,  y:62,  cost:8000,  branchBase:3000,   cap:4,  yield:24,   blurb:'Cold, tidy, mad for eggs.' },
+  { id:'yolkshire',    name:'Yolkshire',       flag:['#e8542f', '#fff8ec'], x:190, y:66,  cost:20000, branchBase:6000,   cap:5,  yield:40,   blurb:'Tea, rain and a boiled egg.' },
+  { id:'shellvador',   name:'Shellvador',      flag:['#ffd23f', '#6ab04c'], x:116, y:146, cost:45000, branchBase:12000,  cap:5,  yield:70,   blurb:'Sun all year. Hens lay double.' },
+  { id:'eggypt',       name:'Eggypt',          flag:['#f0a422', '#2e2216'], x:208, y:112, cost:90000, branchBase:22000,  cap:6,  yield:120,  blurb:'Pyramids of eggs, literally.' },
+  { id:'cluckistan',   name:'Cluckistan',      flag:['#b06ee0', '#ffd23f'], x:252, y:84,  cost:180000,branchBase:40000,  cap:6,  yield:200,  blurb:'High plains. Very large hens.' },
+  { id:'peckoslovakia',name:'Peckoslovakia',   flag:['#ff5f9e', '#fff8ec'], x:166, y:44,  cost:320000,branchBase:70000,  cap:6,  yield:320,  blurb:'The egg opera capital.' },
+  { id:'coopisland',   name:'Coop Island',     flag:['#4fb8a8', '#fff8ec'], x:302, y:146, cost:650000,branchBase:130000, cap:8,  yield:520,  blurb:'An island shaped like a hen.' },
+  { id:'henmark',      name:'Henmark',         flag:['#e8324a', '#fff8ec'], x:130, y:34,  cost:1.2e6, branchBase:250000, cap:8,  yield:850,  blurb:'Designer eggs. Very dear.' },
+  { id:'moon',         name:'The Moon',        flag:['#c9ced6', '#2e2216'], x:338, y:36,  cost:8e6,   branchBase:2e6,    cap:10, yield:6000, moon:true, blurb:'No air. No foxes. Eggs float.' },
+];
+const REGION_BY_ID = Object.fromEntries(REGIONS.map(r => [r.id, r]));
+
+/* ------------------------------------------------------------
    CREW - five stats, and roles that each lean on different ones.
    People answer flyers; robots get assembled at the hut.
    ------------------------------------------------------------ */
@@ -755,6 +776,9 @@ const SKILLS = [
   K('contracts',  'market', 4, 'fullbonus', 'Premium Contracts','doc',   4,  400, 5.0, '+1% value per species discovered'),
   K('fleet',      'market', 5, 'autosend',  'Second Lorry',     'truck', 3,  1400,3.0, '-25% truck round trip'),
   U('tycoon',     'market', 6, 'fleet',     'Egg Empire',       'crown', 5000,'ALL coin gains x2'),
+  U('worldmap',   'market', 6, 'fleet',     'World Map',        'city',  2500,'Unlock the WORLD: open branches in other countries'),
+  K('airfreight', 'market', 7, 'worldmap',  'Air Freight',      'wind',  4, 4000, 2.2, '+50% income from every branch abroad'),
+  U('moonshot',   'market', 8, 'airfreight','Moonshot',         'atom',  20000,'Unlock the Moon: the last place left to sell eggs'),
 
   /* ---- CREW: flyers, wages, robots, roles ---- */
   U('hiring',     'crew', 1, 'root',      'Recruiting',     'doc',    12,  'Unlock the Staff Hut, flyers and hiring'),
@@ -839,6 +863,9 @@ const QUESTS = [
   { id:'q_fingers', name:'Green Fingers',   icon:'sprout', goal:{ k:'stat', s:'harvested', n:25 },  rw:{ f:60 },         hint:'Harvest 25 crops', where:'field' },
   { id:'q_tenk',    name:'Ten Thousand',    icon:'chart',  goal:{ k:'stat', s:'coinsEarned', n:10000 }, rw:{ f:120 },    hint:'Earn 10,000 coins', where:'truck' },
   { id:'q_public',  name:'Go Public',       icon:'star',   goal:{ k:'skill', id:'stocks' },          rw:{ c:2000 },       hint:'Go public', where:'lab' },
+  { id:'q_abroad',  name:'Go Abroad',       icon:'city',   goal:{ k:'regions', n:1 },                rw:{ f:200 },        hint:'Open a country', where:'lab' },
+  { id:'q_branches',name:'Ten Branches',    icon:'house',  goal:{ k:'stat', s:'branches', n:10 },   rw:{ c:50000 },      hint:'Build 10 branches', where:'lab' },
+  { id:'q_moon',    name:'The Moon',        icon:'atom',   goal:{ k:'region', id:'moon' },           rw:{ f:2000 },       hint:'Reach the Moon', where:'lab' },
 ];
 const QUEST_BY_ID = Object.fromEntries(QUESTS.map(q => [q.id, q]));
 

@@ -193,7 +193,8 @@ button:focus-visible{ outline:3px dashed var(--pink); outline-offset:2px; }
 .modal-panel.genes{ background:#0b1a24; border-color:#1f3040; padding:6px; width:min(960px, 100%); position:relative; box-shadow:0 0 0 3px #16232f, 8px 10px 0 rgba(0,0,0,.5); }
 .modal-panel.genes .genes-close{ position:absolute; right:-6px; top:-8px; z-index:2; background:#e8607a; color:#fff; border-color:#0b1a24; }
 #genes-body{ line-height:0; }
-#genes-canvas{ width:100%; height:auto; image-rendering:pixelated; image-rendering:crisp-edges; touch-action:none; cursor:none; display:block; }
+#genes-canvas, #world-canvas{ width:100%; height:auto; image-rendering:pixelated; image-rendering:crisp-edges; touch-action:none; cursor:none; display:block; }
+#world-body{ line-height:0; }
 /* the HUD sits lighter on the field: glass pills, no hard shadow */
 #res-float .pill{ background:rgba(255,249,236,.72); box-shadow:none; border-width:3px; }
 #res-float .pill.full{ background:rgba(255,214,214,.85); }

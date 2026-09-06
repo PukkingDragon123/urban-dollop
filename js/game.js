@@ -60,7 +60,8 @@ const GAME = (() => {
       orderT: 45,            /* seconds to the next customer */
       quests: {},            /* quest id -> true once it has paid out */
       company: Object.assign({}, COMPANY_DEFAULT),
-      ledger: { hist: [], acc: 0, t: 0, sales: 0, orders: 0, honey: 0, quests: 0, stocks: 0 },
+      ledger: { hist: [], acc: 0, t: 0, sales: 0, orders: 0, honey: 0, quests: 0, stocks: 0, empire: 0 },
+      empire: { open: { valley: true }, branches: {}, t: 0, rocket: 0 },   /* the rest of the world, and the Moon */
       market: { t: 0, px: {}, hist: {}, held: {} },
       seenIntro: false,
       weather: { t: 150, rain: false, left: 0, after: 0 },   /* showers water every crop on the ranch */
@@ -95,7 +96,7 @@ const GAME = (() => {
                bred: 0, plumes: 0, culled: 0, wagesPaid: 0, staffEggs: 0, hired: 0, flyers: 0,
                planted: 0, harvested: 0, feedMade: 0, grown: 0, trips: 0, shaped: 0, planted2: 0,
                mamaFed: 0, watered: 0, builtN: 0, orders: 0, ordersMissed: 0, edits: 0, storeys: 0,
-               honey: 0, questsDone: 0, trades: 0, rains: 0, vips: 0 },
+               honey: 0, questsDone: 0, trades: 0, rains: 0, vips: 0, regions: 0, branches: 0 },
       muted: false, last: Date.now(),
     };
   }
@@ -2196,6 +2197,8 @@ const GAME = (() => {
     else if (g.k === 'disc') cur = S.disc.length;
     else if (g.k === 'built') cur = S.built[g.t] || 0;
     else if (g.k === 'plots') cur = S.plots.filter(Boolean).length;
+    else if (g.k === 'regions') cur = REGIONS.filter(r => !r.home && regionOpen(r.id)).length;
+    else if (g.k === 'region') return [regionOpen(g.id) ? 1 : 0, 1];
     else if (g.k === 'flock') cur = S.chickens.filter(ch => !isChick(ch)).length;
     return [Math.min(cur, g.n), g.n];
   }
@@ -2267,7 +2270,56 @@ const GAME = (() => {
   }
   function portfolio() { return STOCKS.reduce((a, st) => a + (S.market.held[st.id] || 0) * stockPrice(st.id), 0); }
   /* what the company itself is worth: its earnings, capitalised */
-  function companyValue() { return Math.round(rates().coinsPerMin * 20 + S.coins + portfolio()); }
+  function companyValue() { return Math.round((rates().coinsPerMin + branchIncome()) * 20 + S.coins + portfolio()); }
+
+  /* ---------- the world: regions open in order, branches earn on their own ---------- */
+  function regionOpen(id) { return !!(S.empire && S.empire.open[id]); }
+  function regionReachable(id) {
+    const r = REGION_BY_ID[id];
+    if (!r || lvl('worldmap') < 1) return false;
+    if (r.moon && lvl('moonshot') < 1) return false;
+    const idx = REGIONS.indexOf(r);
+    return idx <= 1 || regionOpen(REGIONS[idx - 1].id);
+  }
+  function canOpenRegion(id) { return regionReachable(id) && !regionOpen(id) && S.coins >= REGION_BY_ID[id].cost; }
+  function openRegion(id) {
+    if (!canOpenRegion(id)) return false;
+    const r = REGION_BY_ID[id];
+    S.coins -= r.cost;
+    S.empire.open[id] = true;
+    S.stats.regions++;
+    if (r.moon) S.empire.rocket = 6;
+    note('world', 'Opened ' + r.name + '.');
+    emit('region', { r });
+    return true;
+  }
+  function branchCount(id) { return (S.empire.branches[id] || 0); }
+  function branchCost(id) { const r = REGION_BY_ID[id]; return Math.round(r.branchBase * Math.pow(1.6, branchCount(id))); }
+  function canBranch(id) {
+    const r = REGION_BY_ID[id];
+    return !!r && !r.home && regionOpen(id) && branchCount(id) < r.cap && S.coins >= branchCost(id);
+  }
+  function buildBranch(id) {
+    if (!canBranch(id)) return false;
+    S.coins -= branchCost(id);
+    S.empire.branches[id] = branchCount(id) + 1;
+    S.stats.branches++;
+    emit('branch', { r: REGION_BY_ID[id], n: S.empire.branches[id] });
+    return true;
+  }
+  /* coins a minute from every branch, air freight and the empire bonus counted */
+  function regionIncome(id) { return branchCount(id) * REGION_BY_ID[id].yield * (1 + 0.5 * lvl('airfreight')) * tycoon(); }
+  function branchIncome() { return REGIONS.reduce((a, r) => a + regionIncome(r.id), 0); }
+  function tickEmpire(dt) {
+    const E = S.empire;
+    if (E.rocket > 0) E.rocket -= dt;
+    E.t += dt;
+    if (E.t >= 10) {
+      E.t -= 10;
+      const v = branchIncome() / 6;
+      if (v > 0) { earn(v, 'empire'); emit('empireincome', { v }); }
+    }
+  }
   function setCompany(o) {
     const c = S.company;
     if (typeof o.name === 'string') {
@@ -2709,6 +2761,7 @@ const GAME = (() => {
     tickLedger(dt);
     tickMarket(dt);
     tickWeather(dt);
+    tickEmpire(dt);
   }
 
   /* ---------- offline ---------- */
@@ -2847,6 +2900,9 @@ const GAME = (() => {
       S.company = Object.assign({}, COMPANY_DEFAULT, S.company || {});
       if (!Array.isArray(S.company.sig)) S.company.sig = null;
       S.weather = Object.assign({ t: 150, rain: false, left: 0, after: 0 }, S.weather || {});
+      S.empire = Object.assign({ open: { valley: true }, branches: {}, t: 0, rocket: 0 }, S.empire || {});
+      if (!S.empire.open) S.empire.open = { valley: true };
+      if (!S.empire.branches) S.empire.branches = {};
       S.ledger = Object.assign({ hist: [], acc: 0, t: 0, sales: 0, orders: 0, honey: 0, quests: 0, stocks: 0 }, S.ledger || {});
       if (!Array.isArray(S.ledger.hist)) S.ledger.hist = [];
       S.market = Object.assign({ t: 0, px: {}, hist: {}, held: {} }, S.market || {});
@@ -2945,6 +3001,7 @@ const GAME = (() => {
     canSplice, splice, spliceCost, canClone, cloneChicken, cloneCost, canCross, crossAnimal, crossCost,
     stockPrice, buyStock, sellStock, portfolio, companyValue, setCompany, earn,
     get weather() { return S.weather; },
+    regionOpen, regionReachable, canOpenRegion, openRegion, branchCount, branchCost, canBranch, buildBranch, regionIncome, branchIncome,
     tick, applyOffline, save, load, reset, fmt, fmtTime,
   };
 })();
