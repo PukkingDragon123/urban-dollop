@@ -174,6 +174,7 @@
     el.style.left = Math.round(sx) + 'px';
     el.style.top = Math.round(sy) + 'px';
     fxLayer.appendChild(el);
+    paintCloud(el, el.offsetWidth / 2, false);
     setTimeout(() => el.remove(), 1150);
   }
   function floatWorld(txt, wx, wy, cls, icon) {
@@ -192,6 +193,7 @@
     if (opts.body) txt.appendChild(document.createTextNode(opts.body));
     el.appendChild(txt);
     toastBox.appendChild(el);
+    paintCloud(el, el.offsetWidth - 26, false);
     setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 320); }, opts.long ? 6000 : 3600);
   }
 
@@ -3052,6 +3054,7 @@
     hint.textContent = q.hint;
     mid.appendChild(hint);
     card.appendChild(mid);
+    paintCloud(card, 22, false);
   }
 
   /* ================= TITLE SCREEN ================= */

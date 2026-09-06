@@ -573,6 +573,251 @@ const SPR = (() => {
     return c;
   }
 
+  function daisySprite(seed, k) {
+    const key = 'daisy_' + seed + '_' + k;
+    if (cache.has(key)) return cache.get(key);
+    const rnd = mulberry(seed * 37 + 5);
+    const W = 12, H = 11;
+    const c = newCanvas(W * k, H * k);
+    const ctx = c.getContext('2d');
+    const n = 2 + Math.floor(rnd() * 2);
+    for (let i = 0; i < n; i++) {
+      const fx = 2 + Math.floor(rnd() * 8), fy = 2 + Math.floor(rnd() * 4);
+      ctx.fillStyle = '#4f9b3f';
+      ctx.fillRect(fx * k, (fy + 1) * k, k, (H - fy - 2) * k);
+      const petal = '#fff8ee';
+      px(ctx, fx, fy - 1, k, petal); px(ctx, fx - 1, fy, k, petal);
+      px(ctx, fx + 1, fy, k, petal); px(ctx, fx, fy + 1, k, petal);
+      px(ctx, fx - 1, fy - 1, k, petal); px(ctx, fx + 1, fy - 1, k, petal);
+      px(ctx, fx - 1, fy + 1, k, petal); px(ctx, fx + 1, fy + 1, k, petal);
+      px(ctx, fx, fy, k, '#ffd23f');
+    }
+    cache.set(key, c);
+    return c;
+  }
+
+  function poppySprite(seed, k) {
+    const key = 'poppy_' + seed + '_' + k;
+    if (cache.has(key)) return cache.get(key);
+    const rnd = mulberry(seed * 41 + 9);
+    const W = 12, H = 13;
+    const c = newCanvas(W * k, H * k);
+    const ctx = c.getContext('2d');
+    const n = 2 + Math.floor(rnd() * 2);
+    for (let i = 0; i < n; i++) {
+      const fx = 2 + Math.floor(rnd() * 8), fy = 2 + Math.floor(rnd() * 5);
+      ctx.fillStyle = '#4f9b3f';
+      ctx.fillRect(fx * k, (fy + 2) * k, k, (H - fy - 3) * k);
+      const col = '#e8402f';
+      px(ctx, fx, fy - 1, k, col); px(ctx, fx - 1, fy, k, col);
+      px(ctx, fx + 1, fy, k, col); px(ctx, fx, fy + 1, k, col);
+      px(ctx, fx - 1, fy - 1, k, lighten(col, 0.25)); px(ctx, fx + 1, fy - 1, k, darken(col, 0.15));
+      px(ctx, fx, fy, k, '#2e2216');
+    }
+    cache.set(key, c);
+    return c;
+  }
+
+  function dandelionSprite(seed, k) {
+    const key = 'dande_' + seed + '_' + k;
+    if (cache.has(key)) return cache.get(key);
+    const rnd = mulberry(seed * 43 + 13);
+    const W = 11, H = 13;
+    const c = newCanvas(W * k, H * k);
+    const ctx = c.getContext('2d');
+    const n = 2 + Math.floor(rnd() * 2);
+    for (let i = 0; i < n; i++) {
+      const fx = 2 + Math.floor(rnd() * 7), fy = 2 + Math.floor(rnd() * 5);
+      ctx.fillStyle = '#5da33a';
+      ctx.fillRect(fx * k, (fy + 2) * k, k, (H - fy - 3) * k);
+      const puff = rnd() < 0.5;
+      const m = newMask(W, H);
+      mCircle(m, fx, fy, 2, 0.9);
+      const pal = puff
+        ? { base: '#fff8ee', light: '#ffffff', dark: '#e8dcc0', out: null }
+        : { base: '#ffd23f', light: '#ffe98a', dark: '#e0a416', out: null };
+      renderMask(ctx, m, k, 0, 0, pal, seed, { lightBand: 1, shadeBand: 1 });
+    }
+    cache.set(key, c);
+    return c;
+  }
+
+  function tulipSprite(seed, k) {
+    const key = 'tulip_' + seed + '_' + k;
+    if (cache.has(key)) return cache.get(key);
+    const rnd = mulberry(seed * 47 + 17);
+    const W = 12, H = 16;
+    const c = newCanvas(W * k, H * k);
+    const ctx = c.getContext('2d');
+    const cols = ['#e8547a', '#ffd23f', '#ff9f6b', '#c9a8f0', '#fff5e8'];
+    const n = 2 + Math.floor(rnd() * 2);
+    for (let i = 0; i < n; i++) {
+      const fx = 2 + Math.floor(rnd() * 8), fy = 2 + Math.floor(rnd() * 4);
+      const stemH = H - fy - 4;
+      ctx.fillStyle = '#3f7d32';
+      ctx.fillRect(fx * k, (fy + 4) * k, k, stemH * k);
+      ctx.fillStyle = '#4f9b3f';
+      ctx.fillRect((fx - 1) * k, (fy + Math.floor(stemH / 2)) * k, k, k);
+      const col = cols[Math.floor(rnd() * cols.length)];
+      /* the closed cup, a little wider at the base */
+      ctx.fillStyle = darken(col, 0.15); ctx.fillRect((fx - 1) * k, (fy + 3) * k, 3 * k, k);
+      ctx.fillStyle = col; ctx.fillRect((fx - 1) * k, (fy + 1) * k, 3 * k, 2 * k);
+      ctx.fillStyle = lighten(col, 0.3); ctx.fillRect(fx * k, fy * k, k, k);
+    }
+    cache.set(key, c);
+    return c;
+  }
+
+  function rosebushSprite(seed, k) {
+    const key = 'rosebush_' + seed + '_' + k;
+    if (cache.has(key)) return cache.get(key);
+    const rnd = mulberry(seed * 53 + 21);
+    const W = 18, H = 14;
+    const c = newCanvas(W * k, H * k);
+    const ctx = c.getContext('2d');
+    const m = newMask(W, H);
+    mCircle(m, 9, 9, 6, 0.7);
+    for (let i = 0; i < 4; i++) mCircle(m, 3 + rnd() * 12, 6 + rnd() * 5, 2.5 + rnd() * 2, 0.8);
+    const pal = leafPal(rnd() < 0.5 ? 'dark' : 0);
+    renderMask(ctx, m, k, 0, 0, pal, seed + 2, { lightBand: 2, shadeBand: 2, speckle: 0.1, grain: 0.08 });
+    /* roses: a bloom of three shaded pixels, not a single berry dot */
+    const n = 4 + Math.floor(rnd() * 3);
+    for (let i = 0; i < n; i++) {
+      const bx = 3 + Math.floor(rnd() * 12), by = 4 + Math.floor(rnd() * 6);
+      if (!mGet(m, bx, by)) continue;
+      px(ctx, bx, by, k, '#e8324a'); px(ctx, bx + 1, by, k, '#c41f38');
+      px(ctx, bx, by - 1, k, lighten('#e8324a', 0.35));
+    }
+    cache.set(key, c);
+    return c;
+  }
+
+  function fernSprite(seed, k) {
+    const key = 'fern_' + seed + '_' + k;
+    if (cache.has(key)) return cache.get(key);
+    const rnd = mulberry(seed * 59 + 25);
+    const W = 14, H = 15;
+    const c = newCanvas(W * k, H * k);
+    const ctx = c.getContext('2d');
+    const n = 2 + Math.floor(rnd() * 2);
+    for (let i = 0; i < n; i++) {
+      const bx = 2 + Math.floor(rnd() * 9), frondH = 6 + Math.floor(rnd() * 5);
+      const col = rnd() < 0.5 ? '#5da33a' : '#4f9b3f';
+      for (let y = 0; y < frondH; y++) {
+        const yy = H - 1 - y;
+        px(ctx, bx, yy, k, y === frondH - 1 ? darken(col, 0.15) : col);
+        const leafletW = Math.max(1, Math.round((frondH - y) / 3));
+        if (y % 2 === 0 && y < frondH - 1) {
+          for (let s = 1; s <= leafletW; s++) { px(ctx, bx - s, yy, k, col); px(ctx, bx + s, yy, k, col); }
+        }
+      }
+    }
+    cache.set(key, c);
+    return c;
+  }
+
+  function ivySprite(seed, k) {
+    const key = 'ivy_' + seed + '_' + k;
+    if (cache.has(key)) return cache.get(key);
+    const rnd = mulberry(seed * 61 + 29);
+    const W = 16, H = 8;
+    const c = newCanvas(W * k, H * k);
+    const ctx = c.getContext('2d');
+    const m = newMask(W, H);
+    mCircle(m, 8, 6, 7, 0.45);
+    mCircle(m, 3, 6, 3, 0.5);
+    mCircle(m, 13, 6, 3, 0.5);
+    const pal = leafPal('dark');
+    renderMask(ctx, m, k, 0, 0, pal, seed + 4, { lightBand: 1, shadeBand: 1, speckle: 0.14, grain: 0.1 });
+    /* tiny white flowers scattered through it */
+    const nf = 2 + Math.floor(rnd() * 3);
+    for (let i = 0; i < nf; i++) {
+      const fx = 2 + Math.floor(rnd() * 12), fy = 3 + Math.floor(rnd() * 4);
+      if (mGet(m, fx, fy)) px(ctx, fx, fy, k, '#fff8ee');
+    }
+    cache.set(key, c);
+    return c;
+  }
+
+  function cactusSprite(seed, k) {
+    const key = 'cactus_' + seed + '_' + k;
+    if (cache.has(key)) return cache.get(key);
+    const rnd = mulberry(seed * 67 + 33);
+    const W = 14, H = 20;
+    const c = newCanvas(W * k, H * k);
+    const ctx = c.getContext('2d');
+    const bodyH = 13 + Math.floor(rnd() * 4);
+    const m = newMask(W, H);
+    mRect(m, 5, H - bodyH, 4, bodyH);
+    mCircle(m, 7, H - bodyH, 2.2, 0.7);
+    const arm = rnd() < 0.7;
+    if (arm) {
+      const ay = H - bodyH + 4 + Math.floor(rnd() * 3);
+      mRect(m, 9, ay, 3, 6);
+      mRect(m, 9, ay - 4, 2, 5);
+    }
+    const base = '#4f9b5a';
+    renderMask(ctx, m, k, 0, 0,
+      { base, light: lighten(base, 0.28), dark: darken(base, 0.28), out: darken(base, 0.55) },
+      seed, { lightBand: 1, shadeBand: 2, grain: 0.08 });
+    /* spine flecks */
+    ctx.fillStyle = '#dff0d8';
+    for (let y = H - bodyH + 2; y < H - 1; y += 2) { px(ctx, 5, y, k, '#dff0d8'); px(ctx, 8, y + 1, k, '#dff0d8'); }
+    /* a little flower on top, half the time */
+    if (rnd() < 0.5) { px(ctx, 6, H - bodyH - 1, k, '#ff8ab5'); px(ctx, 7, H - bodyH - 1, k, '#ffd23f'); }
+    /* a pot beneath it, since this one is not planted loose in the ground */
+    ctx.fillStyle = '#2e2216'; ctx.fillRect(3 * k, (H - 3) * k, 8 * k, 3 * k);
+    ctx.fillStyle = '#c9924f'; ctx.fillRect(4 * k, (H - 3) * k, 6 * k, 2 * k);
+    ctx.fillStyle = '#e0bd82'; ctx.fillRect(4 * k, (H - 3) * k, 6 * k, 1 * k);
+    cache.set(key, c);
+    return c;
+  }
+
+  function bambooSprite(seed, k) {
+    const key = 'bamboo_' + seed + '_' + k;
+    if (cache.has(key)) return cache.get(key);
+    const rnd = mulberry(seed * 71 + 37);
+    const W = 14, H = 26;
+    const c = newCanvas(W * k, H * k);
+    const ctx = c.getContext('2d');
+    const n = 2 + Math.floor(rnd() * 2);
+    for (let i = 0; i < n; i++) {
+      const bx = 1 + Math.floor(rnd() * (W - 3)), bh = 16 + Math.floor(rnd() * 8);
+      const top = H - bh;
+      ctx.fillStyle = '#7cc44a'; ctx.fillRect(bx * k, top * k, 2 * k, bh * k);
+      ctx.fillStyle = '#5da33a'; ctx.fillRect((bx + 1) * k, top * k, k, bh * k);
+      /* dark rings between segments */
+      ctx.fillStyle = '#3f7d32';
+      for (let y = top + 3; y < H; y += 4) ctx.fillRect(bx * k, y * k, 2 * k, k);
+      /* a tuft of leaves at the top */
+      ctx.fillStyle = '#5da33a';
+      ctx.fillRect((bx - 2) * k, (top - 1) * k, 2 * k, k);
+      ctx.fillRect((bx + 2) * k, top * k, 2 * k, k);
+      ctx.fillRect((bx - 1) * k, (top - 2) * k, 2 * k, k);
+    }
+    cache.set(key, c);
+    return c;
+  }
+
+  function mossSprite(seed, k) {
+    const key = 'moss_' + seed + '_' + k;
+    if (cache.has(key)) return cache.get(key);
+    const rnd = mulberry(seed * 73 + 41);
+    const W = 14, H = 8;
+    const c = newCanvas(W * k, H * k);
+    const ctx = c.getContext('2d');
+    const m = newMask(W, H);
+    mCircle(m, 7, 5, 6, 0.42);
+    const base = '#5a9b40';
+    renderMask(ctx, m, k, 0, 0,
+      { base, light: lighten(base, 0.22), dark: darken(base, 0.25), out: null },
+      seed, { lightBand: 1, shadeBand: 1, speckle: 0.16, grain: 0.14 });
+    /* a couple of little lichen flecks */
+    if (rnd() < 0.6) { px(ctx, 4, 4, k, '#c9d68a'); px(ctx, 10, 5, k, '#c9d68a'); }
+    cache.set(key, c);
+    return c;
+  }
+
   /* dispatcher used by the world builder */
   function decoSprite(kind, k, seed) {
     seed = seed || 1;
@@ -590,6 +835,16 @@ const SPR = (() => {
       case 'sunflower': return sunflowerSprite(seed, k);
       case 'lavender': return lavenderSprite(seed, k);
       case 'clover': return cloverSprite(seed, k);
+      case 'daisy': return daisySprite(seed, k);
+      case 'poppy': return poppySprite(seed, k);
+      case 'dandelion': return dandelionSprite(seed, k);
+      case 'tulip': return tulipSprite(seed, k);
+      case 'rosebush': return rosebushSprite(seed, k);
+      case 'fern': return fernSprite(seed, k);
+      case 'ivy': return ivySprite(seed, k);
+      case 'cactus': return cactusSprite(seed, k);
+      case 'bamboo': return bambooSprite(seed, k);
+      case 'moss': return mossSprite(seed, k);
       case 'bench': case 'lamp': case 'barrel': case 'birdbath': case 'scarecrow':
       case 'mailbox': case 'hay': case 'planter':
         return furnitureSprite(kind, seed, k);
