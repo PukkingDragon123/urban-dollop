@@ -2950,20 +2950,20 @@
     const incK = Object.keys(st.incs)[0];
     const incPos = incK ? incK.split(',').map(Number) : null;
     let anchor = null, text = null;
-    if (GAME.mamaHungry()) { anchor = [W.mama.x, W.mama.y - 34]; text = 'grandma is hungry - scatter feed by her nest'; }
-    else if (stats.pets === 0) { anchor = [W.mama.x, W.mama.y - 34]; text = 'pet me!'; }
+    if (GAME.mamaHungry()) { anchor = [W.mama.x, W.mama.y - 34]; text = 'feed grandma'; }
+    else if (stats.pets === 0) { anchor = [W.mama.x, W.mama.y - 34]; text = 'pet me'; }
     else if (S().orders.some(o => o.state === 'wait' && o.t < 25)) { const o = S().orders.find(o2 => o2.state === 'wait' && o2.t < 25); anchor = [o.x + 14, o.y - 22]; text = o.who.toLowerCase() + ' is about to drive off - hand over ' + (o.n - o.got) + ' more eggs'; }
-    else if (Object.keys(st.sites).length && !GAME.movers.van) { anchor = null; text = 'the movers are on their way'; }
-    else if (stats.collected === 0 && st.eggs.length > 1) { anchor = [W.mama.x + 34, W.mama.y - 6]; text = 'take the basket tool and sweep up eggs'; }
-    else if (stats.hatched === 0 && (st.basket.length > 0 || st.held)) { anchor = incPos ? [incPos[0] * 16 + 16, incPos[1] * 16 - 8] : null; text = 'drop eggs in the incubator to hatch them'; }
+    else if (Object.keys(st.sites).length && !GAME.movers.van) { anchor = null; text = 'movers coming'; }
+    else if (stats.collected === 0 && st.eggs.length > 1) { anchor = [W.mama.x + 34, W.mama.y - 6]; text = 'sweep eggs'; }
+    else if (stats.hatched === 0 && (st.basket.length > 0 || st.held)) { anchor = incPos ? [incPos[0] * 16 + 16, incPos[1] * 16 - 8] : null; text = 'hatch eggs'; }
     else if (stats.sold === 0 && (st.basket.length > 2 || st.truck.load.length)) { anchor = [W.truckHome.x + 26, W.truckHome.y - 24]; text = st.truck.load.length ? 'tap the truck to sell' : 'drop eggs on the truck'; }
-    else if (st.truck.state === 'parked' && st.truck.load.length >= GAME.truckCap() && !GAME.lvl('autosend')) { anchor = [W.truckHome.x + 26, W.truckHome.y - 24]; text = 'truck is full - tap to send it'; }
-    else if (st.feathers >= 4 && Object.keys(st.sk).length <= 1) { anchor = [W.stations.lab.x + 15, W.stations.lab.y - 10]; text = 'spend feathers in the lab'; }
-    else if (st.unpaid) { anchor = null; text = 'payroll is empty - your staff have stopped working'; }
-    else if (GAME.lvl('court') && st.built.lovenest === 0 && stats.bred === 0) { anchor = null; text = 'build a love nest to breed chickens'; }
-    else if (GAME.lvl('hiring') && !Object.keys(st.huts).length) { anchor = null; text = 'build a staff hut, then tap it to hire crew'; }
-    else if (st.chickens.length > 6 && !st.inspected) { anchor = null; text = 'use the magnifier tool to inspect any hen, worker or machine'; }
-    else if (st.mamaTier < TIERS.length - 2 && st.coins >= GAME.mamaCost() * 1.2) { anchor = [W.stations.mamaSign.x + 7, W.stations.mamaSign.y - 8]; text = 'upgrade mama at her sign'; }
+    else if (st.truck.state === 'parked' && st.truck.load.length >= GAME.truckCap() && !GAME.lvl('autosend')) { anchor = [W.truckHome.x + 26, W.truckHome.y - 24]; text = 'send truck'; }
+    else if (st.feathers >= 4 && Object.keys(st.sk).length <= 1) { anchor = [W.stations.lab.x + 15, W.stations.lab.y - 10]; text = 'visit the lab'; }
+    else if (st.unpaid) { anchor = null; text = 'pay your crew'; }
+    else if (GAME.lvl('court') && st.built.lovenest === 0 && stats.bred === 0) { anchor = null; text = 'build a love nest'; }
+    else if (GAME.lvl('hiring') && !Object.keys(st.huts).length) { anchor = null; text = 'build a staff hut'; }
+    else if (st.chickens.length > 6 && !st.inspected) { anchor = null; text = 'try the magnifier'; }
+    else if (st.mamaTier < TIERS.length - 2 && st.coins >= GAME.mamaCost() * 1.2) { anchor = [W.stations.mamaSign.x + 7, W.stations.mamaSign.y - 8]; text = 'upgrade mama'; }
     if (!text || !titleEl.hidden) { el.bubble.hidden = true; bubbleText = ''; return; }
     if (text !== bubbleText) { bubbleText = text; el.bubble.textContent = text; }
     el.bubble.hidden = false;
@@ -3355,7 +3355,7 @@
     head.appendChild(cloneCanvas(SPR.raccoonSprite('boss', 1), 3));
     const ttl = document.createElement('div');
     const h = document.createElement('b'); h.textContent = companyInIntro ? 'FOUND YOUR COMPANY' : 'THE COMPANY'; ttl.appendChild(h);
-    const p = document.createElement('span'); p.textContent = companyInIntro ? 'Name it, pick its mark and paint its colours. The sign by the road, the paperwork and the receipts will wear them.' : 'Repaint the sign whenever you like. The customers will not mind.'; ttl.appendChild(p);
+    const p = document.createElement('span'); p.textContent = companyInIntro ? 'Name it and pick its colours.' : 'Repaint it any time.'; ttl.appendChild(p);
     head.appendChild(ttl);
     host.appendChild(head);
     host.appendChild(brandPreview(d));
@@ -3699,9 +3699,9 @@
       g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(x, y, 26, 2);
       lines.forEach((l, i) => SPR.drawTiny(g, l, x + 2 + tilt, y + 4 + i * 6, '#3a2a16', 1));
     };
-    note(8, 190, '#ffe27a', ['FEED THE', 'CHICKS', 'FIRST'], 0);
-    note(38, 196, '#ffb0d0', ['PLANT', 'BEFORE', 'NOON'], 1);
-    note(346, 194, '#b8f0c8', ['PET MAMA', 'SHE IS', 'SLOW NOW'], 0);
+    note(8, 190, '#ffe27a', ['FEED', 'CHICKS'], 0);
+    note(38, 196, '#ffb0d0', ['WATER', 'CROPS'], 1);
+    note(346, 194, '#b8f0c8', ['PET', 'MAMA'], 0);
 
     /* ---------- keyboard ---------- */
     g.fillStyle = '#1a1410'; g.fillRect(70, 196, 200, 20);
@@ -4012,9 +4012,8 @@
       if (st === 'current') SPR.drawTiny(g, 'PAYS OUT BY ITSELF', rx, RDW.y + RDW.h - 16, '#4fb072', 1);
     } else {
       const cq2 = GAME.currentQuest();
-      SPR.drawTiny(g, 'CLICK A CUBE', rx, ry, '#d8ffe8', 1);
-      SPR.drawTiny(g, 'TO READ IT.', rx, ry + 7, '#d8ffe8', 1);
-      let y2 = wrap('gold rims install now. padlocks open a tool or a building. the top lane is your quest chain.', rx, ry + 18, '#7ef2a8') + 6;
+      SPR.drawTiny(g, 'TAP A CUBE', rx, ry, '#d8ffe8', 1);
+      let y2 = ry + 12;
       if (cq2) {
         SPR.drawTiny(g, 'NEXT STEP', rx, y2, '#ffd23f', 1); y2 += 8;
         y2 = wrap(cq2.name, rx, y2, '#fff8ec');
@@ -4122,8 +4121,7 @@
       const hint = document.createElement('span');
       hint.className = 'sk-hint';
       const cq = GAME.currentQuest();
-      hint.textContent = cq ? 'next step: ' + cq.name.toLowerCase() + ' - ' + cq.hint.toLowerCase() + '.'
-                            : 'click a cube on the screen. gold rims install right now; padlocks open tools and buildings.';
+      hint.textContent = cq ? cq.hint : 'tap a cube.';
       card.appendChild(hint);
       return;
     }
@@ -6593,7 +6591,7 @@
   GAME.on('quest', ({ q }) => {
     snd.grand();
     const rw = [q.rw.c ? '+' + q.rw.c + ' coins' : '', q.rw.f ? '+' + q.rw.f + ' feathers' : ''].filter(Boolean).join(', ');
-    toast({ icon: q.icon, title: 'QUEST DONE: ' + q.name.toUpperCase(), body: rw + '. ' + (GAME.currentQuest() ? 'Next: ' + GAME.currentQuest().name.toLowerCase() + '.' : 'That was the last one.'), long: true });
+    toast({ icon: q.icon, title: 'QUEST DONE', body: rw, long: true });
     questSig = '';
   });
   GAME.on('customer', ({ o }) => { snd.plop(); floatWorld(o.who + ': ' + o.n + ' EGGS', o.x + 14, o.y - 28, 'gold', 'doc'); });
