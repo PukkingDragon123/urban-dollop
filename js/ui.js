@@ -1385,6 +1385,13 @@
       ctx.fillStyle = f < 0.2 && Math.floor(now / 250) % 2 ? '#e8542f' : f < 0.4 ? '#f0a422' : '#7ac74f'; ctx.fillRect(bx + 3, by + bh - 4, Math.round((bw - 6) * f), 2);
       /* what it pays */
       SPR.drawTiny(ctx, GAME.fmt(o.pay), bx + bw - 3 - SPR.tinyW(GAME.fmt(o.pay), 1), by + 9 - 6, '#8a5e2a', 1);
+      if (o.vip) {
+        /* a gold rim and a star: this one pays double and will not wait long */
+        ctx.fillStyle = '#ffd23f';
+        ctx.fillRect(bx - 1, by - 1, bw + 2, 1); ctx.fillRect(bx - 1, by + bh, bw + 2, 1);
+        ctx.fillRect(bx - 1, by - 1, 1, bh + 2); ctx.fillRect(bx + bw, by - 1, 1, bh + 2);
+        ctx.drawImage(SPR.iconSprite('star', 1), bx + bw / 2 - 5, by - 12 + (Math.floor(now / 300) % 2));
+      }
     });
   }
   function drawMovers(now) {
@@ -2468,6 +2475,8 @@
       }
     });
 
+    drawWeather(now);
+
     /* scoop ring */
     if (ptr.down && S().tool === 'basket' && ptr.inside) {
       const R = GAME.scoopR();
@@ -2504,6 +2513,48 @@
     vg.addColorStop(1, 'rgba(48,36,18,.20)');
     ctx.fillStyle = vg;
     ctx.fillRect(0, 0, cv.width, cv.height);
+  }
+
+  /* rain: a cool wash over everything, streaks slanting down, splashes on
+     the ground; then a rainbow for a few seconds once it stops */
+  function drawWeather(now) {
+    const w = GAME.weather;
+    const cx = cam().x, cy = cam().y, vw = W.view.w, vh = W.view.h;
+    if (w.rain) {
+      const f = Math.min(1, w.left / 6, (ECON.rainLength * 1.5 - w.left) / 4);   /* eases in and out */
+      ctx.fillStyle = 'rgba(40,60,90,' + (0.16 * f).toFixed(3) + ')';
+      ctx.fillRect(cx, cy, vw, vh);
+      ctx.fillStyle = 'rgba(190,220,255,' + (0.55 * f).toFixed(3) + ')';
+      const t = now / 4;
+      for (let i = 0; i < 110; i++) {
+        const x = ((i * 137 + t * 1.2) % (vw + 60)) + cx - 30;
+        const y = ((i * 313 + t * 3) % (vh + 40)) + cy - 20;
+        ctx.fillRect(Math.round(x), Math.round(y), 1, 5);
+        ctx.fillRect(Math.round(x) - 1, Math.round(y) + 5, 1, 2);
+      }
+      /* splashes where the drops land */
+      ctx.fillStyle = 'rgba(220,240,255,' + (0.5 * f).toFixed(3) + ')';
+      const s2 = Math.floor(now / 90);
+      for (let i = 0; i < 30; i++) {
+        const x = ((i * 211 + s2 * 17) % vw) + cx, y = ((i * 97 + s2 * 5) % vh) + cy;
+        if ((i + s2) % 3) continue;
+        ctx.fillRect(Math.round(x) - 1, Math.round(y), 3, 1);
+      }
+    } else if (w.after > 0) {
+      /* the rainbow, up in the top right, fading */
+      const a = Math.min(1, w.after / 14) * 0.8;
+      const cols = ['#e8542f', '#f0a422', '#ffd23f', '#6ab04c', '#3fa7d6', '#b06ee0'];
+      const ox = cx + vw - 40, oy = cy + vh * 0.55, R0 = 92;
+      cols.forEach((col, i) => {
+        ctx.fillStyle = col;
+        ctx.globalAlpha = a;
+        const R = R0 - i * 3;
+        for (let ang = Math.PI * 1.02; ang < Math.PI * 1.98; ang += 0.012) {
+          ctx.fillRect(Math.round(ox + Math.cos(ang) * R), Math.round(oy + Math.sin(ang) * R * 0.85), 2, 2);
+        }
+      });
+      ctx.globalAlpha = 1;
+    }
   }
 
   /* ================= MAGNET SCOOPING ================= */
@@ -3348,31 +3399,116 @@
     const og = out.getContext('2d'); og.imageSmoothingEnabled = false; og.drawImage(c, 0, 0, 360, 120);
     return out;
   }
+  /* the signature: a run of pen points on a 120 x 40 grid, [-1,-1] where the pen lifted */
+  let sigPts = [], sigDown = false, sigLast = null;
+  const SIGW = 120, SIGH = 40;
+  function sigEnough(pts) { return (pts || []).filter(p => p[0] >= 0).length >= 14; }
+  function drawSignature(g, pts, k, col) {
+    g.fillStyle = col || '#1f2a6e';
+    let prev = null;
+    (pts || []).forEach(p => {
+      if (p[0] < 0) { prev = null; return; }
+      if (prev) {
+        const n = Math.max(Math.abs(p[0] - prev[0]), Math.abs(p[1] - prev[1]));
+        for (let i = 1; i <= n; i++) {
+          const x = Math.round(prev[0] + (p[0] - prev[0]) * i / n), y = Math.round(prev[1] + (p[1] - prev[1]) * i / n);
+          g.fillRect(x * k, y * k, k, k); g.fillRect(x * k, (y + 1) * k, k, k);
+        }
+      } else { g.fillRect(p[0] * k, p[1] * k, k, k); g.fillRect(p[0] * k, (p[1] + 1) * k, k, k); }
+      prev = p;
+    });
+  }
+  function signatureCanvas(pts, k, col) {
+    const c = document.createElement('canvas');
+    c.width = SIGW * k; c.height = SIGH * k; c.className = 'cf-signature';
+    drawSignature(c.getContext('2d'), pts, k, col);
+    return c;
+  }
+  function redrawPad() {
+    const pad = $('#sig-pad');
+    if (!pad) return;
+    const g = pad.getContext('2d');
+    g.clearRect(0, 0, pad.width, pad.height);
+    drawSignature(g, sigPts, 2);
+    const ok = sigEnough(sigPts);
+    const wrap = pad.parentElement;
+    if (wrap) wrap.classList.toggle('signed', ok);
+    const btn = companyHost && companyHost.querySelector('[data-act="company-save"]');
+    if (btn) { btn.disabled = !ok; btn.classList.toggle('btn-green', ok); }
+    const st = companyHost && companyHost.querySelector('.stamp');
+    if (st) { st.textContent = ok ? 'SIGNED' : 'UNSIGNED'; st.className = 'stamp ' + (ok ? 'green' : 'amber'); }
+    const note = companyHost && companyHost.querySelector('.cf-foot small');
+    if (note) note.textContent = ok ? '' : 'SIGN ON THE LINE';
+  }
+  function padPoint(ev) {
+    const pad = $('#sig-pad');
+    const r = pad.getBoundingClientRect();
+    return [Math.max(0, Math.min(SIGW - 1, Math.floor((ev.clientX - r.left) / r.width * SIGW))),
+            Math.max(0, Math.min(SIGH - 2, Math.floor((ev.clientY - r.top) / r.height * SIGH)))];
+  }
+  document.addEventListener('pointerdown', ev => {
+    if (!ev.target || ev.target.id !== 'sig-pad') return;
+    ev.preventDefault();
+    ev.target.setPointerCapture(ev.pointerId);
+    sigDown = true;
+    const p = padPoint(ev);
+    if (sigPts.length && sigPts[sigPts.length - 1][0] >= 0) sigPts.push([-1, -1]);
+    sigPts.push(p); sigLast = p;
+    redrawPad();
+  });
+  document.addEventListener('pointermove', ev => {
+    if (!sigDown || !ev.target || ev.target.id !== 'sig-pad') return;
+    const p = padPoint(ev);
+    if (sigLast && p[0] === sigLast[0] && p[1] === sigLast[1]) return;
+    if (sigPts.length > 880) return;
+    sigPts.push(p); sigLast = p;
+    redrawPad();
+  });
+  document.addEventListener('pointerup', () => { if (sigDown) { sigDown = false; sigLast = null; snd.plop(); } });
+
+  /* The form is a certificate of incorporation on ruled paper: the founder's
+     photo, the particulars on dotted lines, the mark and the colours, a
+     specimen of the sign, and a line at the foot that has to be signed
+     before the company exists. */
   function renderCompanyForm() {
     const host = companyHost;
     if (!host) return;
     const d = companyDraft;
     host.innerHTML = '';
-    const head = document.createElement('div');
-    head.className = 'cf-head';
-    head.appendChild(cloneCanvas(SPR.raccoonSprite('boss', 1), 3));
-    const ttl = document.createElement('div');
-    const h = document.createElement('b'); h.textContent = companyInIntro ? 'FOUND YOUR COMPANY' : 'THE COMPANY'; ttl.appendChild(h);
-    const p = document.createElement('span'); p.textContent = companyInIntro ? 'Name it and pick its colours.' : 'Repaint it any time.'; ttl.appendChild(p);
-    head.appendChild(ttl);
-    host.appendChild(head);
-    host.appendChild(brandPreview(d));
-    const nameRow = document.createElement('label');
-    nameRow.className = 'cf-row';
-    const nl = document.createElement('i'); nl.textContent = 'NAME'; nameRow.appendChild(nl);
+    const paper = document.createElement('div');
+    paper.className = 'cf-paper';
+    const lh = document.createElement('div');
+    lh.className = 'cf-letterhead';
+    const l1 = document.createElement('small'); l1.textContent = 'CLUCKTON VALLEY - REGISTRY OF COMPANIES'; lh.appendChild(l1);
+    const l2 = document.createElement('b'); l2.textContent = companyInIntro ? 'CERTIFICATE OF INCORPORATION' : 'AMENDED PARTICULARS'; lh.appendChild(l2);
+    const l3 = document.createElement('i'); l3.textContent = 'FORM 7B - ONE EGG COMPANY'; lh.appendChild(l3);
+    paper.appendChild(lh);
+    const stamp = document.createElement('div');
+    stamp.className = 'stamp amber'; stamp.textContent = 'UNSIGNED';
+    paper.appendChild(stamp);
+
+    const body = document.createElement('div');
+    body.className = 'cf-body';
+    const photo = document.createElement('div');
+    photo.className = 'cf-photo';
+    photo.appendChild(cloneCanvas(SPR.raccoonSprite('boss', 1), 3));
+    body.appendChild(photo);
+    const fields = document.createElement('div');
+    fields.className = 'cf-fields';
+    const line = (label, node) => {
+      const row = document.createElement('label');
+      row.className = 'cf-line' + (node.classList && node.classList.contains('cf-grid') ? ' pick' : '');
+      const i = document.createElement('i'); i.textContent = label; row.appendChild(i);
+      row.appendChild(node);
+      return row;
+    };
+    const txt = t => { const sp = document.createElement('span'); sp.textContent = t; return sp; };
+    fields.appendChild(line('FOUNDER', txt('A RACCOON')));
+    fields.appendChild(line('FILED', txt('DAY ' + S().day + ', AT THE FARM GATE')));
     const inp = document.createElement('input');
     inp.type = 'text'; inp.maxLength = 16; inp.id = 'company-name'; inp.value = d.name; inp.autocomplete = 'off'; inp.spellcheck = false;
     inp.placeholder = 'INF EGG CO.';
-    nameRow.appendChild(inp);
-    host.appendChild(nameRow);
-    const logoRow = document.createElement('div');
-    logoRow.className = 'cf-row';
-    const ll = document.createElement('i'); ll.textContent = 'MARK'; logoRow.appendChild(ll);
+    fields.appendChild(line('NAME', inp));
     const grid = document.createElement('div'); grid.className = 'cf-grid';
     LOGOS.forEach(lg => {
       const b = document.createElement('button');
@@ -3381,12 +3517,8 @@
       b.appendChild(mkIcon(lg, 3));
       grid.appendChild(b);
     });
-    logoRow.appendChild(grid);
-    host.appendChild(logoRow);
+    fields.appendChild(line('MARK', grid));
     [['col1', 'PAINT'], ['col2', 'TRIM']].forEach(([k, label]) => {
-      const row = document.createElement('div');
-      row.className = 'cf-row';
-      const l2 = document.createElement('i'); l2.textContent = label; row.appendChild(l2);
       const g2 = document.createElement('div'); g2.className = 'cf-grid';
       BRAND_COLS.forEach(col => {
         const b = document.createElement('button');
@@ -3395,16 +3527,48 @@
         b.style.background = col;
         g2.appendChild(b);
       });
-      row.appendChild(g2);
-      host.appendChild(row);
+      fields.appendChild(line(label, g2));
     });
+    body.appendChild(fields);
+    paper.appendChild(body);
+
+    const spec = document.createElement('div');
+    spec.className = 'cf-specimen';
+    const specCol = document.createElement('div');
+    specCol.style.display = 'flex'; specCol.style.flexDirection = 'column'; specCol.style.alignItems = 'center'; specCol.style.gap = '4px';
+    const sl = document.createElement('small'); sl.textContent = 'SPECIMEN OF THE SIGN'; specCol.appendChild(sl);
+    specCol.appendChild(brandPreview(d));
+    spec.appendChild(specCol);
+    paper.appendChild(spec);
+
+    /* the line to sign */
+    const sign = document.createElement('div');
+    sign.className = 'cf-sign';
+    const si = document.createElement('i'); si.textContent = 'SIGNED'; sign.appendChild(si);
+    const padWrap = document.createElement('div');
+    padWrap.className = 'cf-pad';
+    const pad = document.createElement('canvas');
+    pad.id = 'sig-pad'; pad.width = SIGW * 2; pad.height = SIGH * 2;
+    padWrap.appendChild(pad);
+    const baseline = document.createElement('u'); padWrap.appendChild(baseline);
+    sign.appendChild(padWrap);
+    const clear = document.createElement('button');
+    clear.className = 'btn btn-tiny'; clear.type = 'button'; clear.dataset.act = 'company-sigclear'; clear.textContent = 'CLEAR';
+    sign.appendChild(clear);
+    paper.appendChild(sign);
+
     const foot = document.createElement('div');
     foot.className = 'cf-foot';
+    const note = document.createElement('small'); foot.appendChild(note);
     const save = document.createElement('button');
-    save.className = 'btn btn-green'; save.dataset.act = 'company-save'; save.type = 'button';
-    save.textContent = companyInIntro ? 'FOUND THE COMPANY' : 'REPAINT THE SIGN';
+    save.className = 'btn'; save.dataset.act = 'company-save'; save.type = 'button';
+    save.textContent = companyInIntro ? 'FILE IT' : 'RE-FILE';
     foot.appendChild(save);
-    host.appendChild(foot);
+    paper.appendChild(foot);
+    host.appendChild(paper);
+    /* an existing signature comes back onto the line; a new company starts blank */
+    sigPts = Array.isArray(d.sig) ? d.sig.map(p => [p[0], p[1]]) : [];
+    redrawPad();
   }
   document.addEventListener('input', ev => {
     if (ev.target && ev.target.id === 'company-name' && companyDraft) {
@@ -3415,6 +3579,8 @@
   });
   function saveCompany() {
     if (!companyDraft) return;
+    if (!sigEnough(sigPts)) { snd.error(); redrawPad(); return; }
+    companyDraft.sig = sigPts.slice();
     GAME.setCompany(companyDraft);
     snd.grand();
     if (companyInIntro) {
@@ -6500,6 +6666,7 @@
       case 'company-col1': { companyDraft.col1 = btn.dataset.col; renderCompanyForm(); snd.plop(); break; }
       case 'company-col2': { companyDraft.col2 = btn.dataset.col; renderCompanyForm(); snd.plop(); break; }
       case 'company-save': { saveCompany(); break; }
+      case 'company-sigclear': { sigPts = []; redrawPad(); snd.plop(); break; }
       case 'intro-next': { introNext(); break; }
       case 'intro-skip': { introSkip(); break; }
       case 'quest-card': {
@@ -6612,7 +6779,9 @@
   GAME.on('splice', ({ ch, x, y }) => { snd.grand(); puff(x, y, '#ff5f9e', 12, 34, 28); toast({ icon: 'dna', title: 'SPLICED', body: SPECIES[ch.sp].name + ' carries the best of both birds now.' }); });
   GAME.on('clone', ({ ch, x, y }) => { snd.grand(); puff(x, y, '#9fe8ff', 12, 34, 28); bornFx.set(ch.id, performance.now()); toast({ icon: 'twins', title: 'CLONED', body: 'A second ' + SPECIES[ch.sp].name + ', genes and all.' }); });
   GAME.on('cross', ({ ch, animal, x, y }) => { snd.grand(); puff(x, y, '#ffd23f', 12, 34, 28); toast({ icon: 'atom', title: 'CROSSED WITH A ' + animal.name.toUpperCase(), body: animal.desc }); });
-  GAME.on('company', ({ c }) => { toast({ icon: c.logo, title: c.name, body: 'The sign by the road is painted.' }); });
+  GAME.on('company', ({ c }) => { toast({ icon: c.logo, title: c.name, body: 'Filed and signed.' }); });
+  GAME.on('rain', () => { snd.sprinkle(); });
+  GAME.on('rainend', () => { snd.sparkle(); });
   GAME.on('market', () => { if (!$('#modal-pedia').hidden && indexTab === 'ledger') GAME.mark('pedia'); });
   GAME.on('vehicle', ({ v }) => { snd.grand(); toast({ icon: 'truck', title: v.name.toUpperCase(), body: v.cap + ' eggs' }); });
   GAME.on('route', ({ city }) => { snd.grand(); toast({ icon: 'city', title: city.name.toUpperCase(), body: 'pays x' + city.mult.toFixed(2) }); });

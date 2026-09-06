@@ -68,6 +68,11 @@ const ECON = {
   cloneCoins: 40,          // coins per point of egg value to clone a hen
   stockTick: 6,            // seconds between market moves
   stockVol: 0.035,         // how jumpy the market is
+  rainEvery: 240,          // seconds between showers, give or take
+  rainLength: 45,          // seconds a shower lasts; every crop drinks while it does
+  vipChance: 0.18,         // odds a customer is a VIP with a bigger, better-paying order
+  vipPay: 2.0,             // what a VIP pays on top of the going rate
+  vipTime: 110,            // seconds a VIP is prepared to wait
   polishMult: 1.5,         // what a polished egg is worth
   gradeChance: 0.12,       // chance a grader bumps an egg a tier
   dynamoR: 74,             // px a dynamo drives machines
@@ -125,6 +130,12 @@ const CROPS = {
             desc:'Sunny seeds the flock adores.' },
   berry:  { name:'Berry Bush',grow:240, yield:12, seed:70, col:'#c94a6a', stages:4, needs:'berries', regrow:true,
             desc:'Regrows after every picking.' },
+  strawberry: { name:'Strawberry', grow:200, yield:14, seed:24, col:'#e8324a', stages:4, needs:'strawberries', regrow:true,
+            desc:'Sweet, and it fruits again.' },
+  chili:  { name:'Chili',     grow:260, yield:22, seed:30, col:'#e8402f', stages:4, needs:'chilis',
+            desc:'Hot stuff. A heavy, fiery harvest.' },
+  pumpkin:{ name:'Pumpkin',   grow:600, yield:60, seed:80, col:'#f0a422', stages:4, needs:'pumpkins',
+            desc:'Slow as anything, and worth the wait.' },
 };
 const CROP_KEYS = Object.keys(CROPS);
 
@@ -303,7 +314,7 @@ const ANIMAL_BY_ID = Object.fromEntries(ANIMALS.map(a => [a.id, a]));
    rich. Name it, pick a logo and two colours; the truck, the
    sign and the paperwork wear them.
    ------------------------------------------------------------ */
-const COMPANY_DEFAULT = { name:'INF EGG CO.', logo:'egg', col1:'#e8542f', col2:'#ffd23f', done:false };
+const COMPANY_DEFAULT = { name:'INF EGG CO.', logo:'egg', col1:'#e8542f', col2:'#ffd23f', done:false, sig:null };
 const LOGOS = ['egg', 'chick', 'star', 'crown', 'sparkle', 'heart', 'bolt', 'clover', 'gear', 'truck', 'flame', 'atom'];
 const BRAND_COLS = ['#e8542f', '#f0a422', '#ffd23f', '#6ab04c', '#3fa7d6', '#2f5f9e', '#b06ee0', '#ff5f9e',
                     '#fff8ec', '#2e2216', '#8a5e2a', '#4fb8a8'];
@@ -685,15 +696,18 @@ const SKILLS = [
   K('bumper',     'farm', 2, 'farming',    'Bumper Crop',    'bowl',    6, 8,   2.1, '+20% feed per harvest'),
   U('trough',     'farm', 2, 'farming',    'Feed Trough',    'bowl',    15,  'Unlock the Trough: the flock feeds itself'),
   U('corn',       'farm', 3, 'wheat',      'Corn Seed',      'seed',    12,  'Unlock corn: slow, tall, generous'),
+  U('strawberries','farm', 3, 'wheat',     'Strawberry Seed','heart',   14,  'Unlock strawberries: sweet, and they fruit again'),
   U('sprinkler',  'farm', 3, 'bumper',     'Sprinklers',     'spiral',  30,  'Unlock the Sprinkler: keeps a circle watered'),
   U('coopbuild',  'farm', 3, 'trough',     'The Coop',       'house',   40,  'Unlock the Coop: chicks near it grow twice as fast'),
   U('sunflowers', 'farm', 4, 'corn',       'Sunflower Seed', 'sparkle', 45,  'Unlock sunflowers: the richest feed'),
+  U('chilis',     'farm', 4, 'corn',       'Chili Seed',     'flame',   40,  'Unlock chilis: a hot, heavy harvest'),
   U('well',       'farm', 4, 'sprinkler',  'The Well',       'spiral',  90,  'Unlock the Well: a wide watered circle'),
   K('hearty',     'farm', 4, 'coopbuild',  'Hearty Feed',    'flame',   5, 60,  2.3, 'chicks need two feeds fewer and 12% less time'),
   U('berries',    'farm', 5, 'sunflowers', 'Berry Bushes',   'heart',   120, 'Unlock berry bushes: they regrow after picking'),
   U('mill',       'farm', 5, 'well',       'The Mill',       'gear',    260, 'Unlock the Mill: +25% feed from every harvest'),
   K('slowbelly',  'farm', 5, 'hearty',     'Slow Bellies',   'heart',   5, 110, 2.3, 'the flock stays full 25% longer'),
   U('harvestbot', 'farm', 6, 'mill',       'Auto Harvest',   'robot',   900, 'ripe crops harvest themselves'),
+  U('pumpkins',   'farm', 6, 'berries',    'Pumpkin Seed',   'sparkle', 220, 'Unlock pumpkins: slow as anything, worth the wait'),
 
   /* ---- HENS ---- */
   K('happy',      'hens', 1, 'root',   'Happy Hens',     'heart',   12, 4,  1.9, '+10% lay speed'),
@@ -819,6 +833,10 @@ const QUESTS = [
   { id:'q_belts',   name:'Belt Line',       icon:'crate',  goal:{ k:'built', t:'belt', n:4 },        rw:{ c:250 },        hint:'Build 4 belts', where:'field' },
   { id:'q_genes',   name:'Gene Editor',     icon:'dna',    goal:{ k:'stat', s:'edits', n:1 },       rw:{ f:60 },         hint:'Edit a gene', where:'field' },
   { id:'q_storey',  name:'Second Storey',   icon:'rack',   goal:{ k:'stat', s:'storeys', n:1 },     rw:{ c:400 },        hint:'Add a floor', where:'field' },
+  { id:'q_regulars',name:'Regulars',        icon:'doc',    goal:{ k:'stat', s:'orders', n:5 },      rw:{ c:300 },        hint:'Fill 5 orders', where:'road' },
+  { id:'q_land',    name:'More Land',       icon:'house',  goal:{ k:'plots', n:3 },                  rw:{ f:80 },         hint:'Own 3 plots', where:'field' },
+  { id:'q_flock',   name:'A Real Flock',    icon:'chick',  goal:{ k:'flock', n:20 },                 rw:{ c:600 },        hint:'Keep 20 hens', where:'mama' },
+  { id:'q_fingers', name:'Green Fingers',   icon:'sprout', goal:{ k:'stat', s:'harvested', n:25 },  rw:{ f:60 },         hint:'Harvest 25 crops', where:'field' },
   { id:'q_tenk',    name:'Ten Thousand',    icon:'chart',  goal:{ k:'stat', s:'coinsEarned', n:10000 }, rw:{ f:120 },    hint:'Earn 10,000 coins', where:'truck' },
   { id:'q_public',  name:'Go Public',       icon:'star',   goal:{ k:'skill', id:'stocks' },          rw:{ c:2000 },       hint:'Go public', where:'lab' },
 ];

@@ -2357,6 +2357,37 @@ const SPR = (() => {
         const bx = x0 + 1 + Math.floor(rnd() * (w - 2)), by = 16 - h + 1 + Math.floor(rnd() * (h - 2));
         R(bx, by, 1, 1, def.col); R(bx, by, 1, 1, i % 2 ? def.col : '#ff7a9a');
       }
+    } else if (kind === 'strawberry') {
+      /* a low leafy mound with the fruit hanging off its edges */
+      const w = stage === 1 ? 6 : 10, h = stage === 1 ? 4 : 6;
+      const x0 = 8 - w / 2;
+      R(x0, 16 - h, w, h, gd); R(x0 + 1, 16 - h, w - 2, 2, green); R(x0 + 2, 16 - h, 2, 1, gl);
+      if (stage === 2) { R(x0 + 2, 15 - h, 1, 1, '#fff8ec'); R(x0 + w - 3, 16 - h, 1, 1, '#fff8ec'); }
+      if (ripe) for (let i = 0; i < 4; i++) {
+        const bx = x0 + 1 + Math.floor(rnd() * (w - 3)), by = 12 + Math.floor(rnd() * 3);
+        R(bx, by, 2, 2, def.col); R(bx, by, 1, 1, '#ff7a9a'); R(bx, by - 1, 1, 1, green);
+      }
+    } else if (kind === 'chili') {
+      const h = stage === 1 ? 6 : stage === 2 ? 9 : 11;
+      [4, 9, 12].forEach((x, i) => {
+        R(x, 16 - h, 1, h, gd);
+        R(x - 1, 16 - h + 2, 3, 1, green); R(x - 1, 16 - h + 5, 1, 1, gl); R(x + 1, 16 - h + 5, 1, 1, green);
+        if (ripe) { R(x + 1, 16 - h + 3, 1, 4, def.col); R(x + 1, 16 - h + 2, 1, 1, gd); R(x - 2, 16 - h + 6, 1, 3, '#c9301f'); }
+        else if (stage === 2) R(x + 1, 16 - h + 3, 1, 3, '#7fbf4f');
+      });
+    } else if (kind === 'pumpkin') {
+      /* a vine along the ground, then the fruit swelling on it */
+      R(2, 14, 12, 1, gd); R(3, 13, 2, 1, green); R(8, 13, 2, 1, green); R(12, 13, 2, 1, gl);
+      if (stage >= 2) {
+        const pw = ripe ? 9 : 5, ph = ripe ? 7 : 4, px0 = 8 - Math.floor(pw / 2), py0 = 15 - ph;
+        const skin = ripe ? def.col : '#8fbf4f';
+        R(px0, py0, pw, ph, skin);
+        R(px0 + 1, py0 - 1, pw - 2, 1, skin);
+        R(px0, py0 + ph - 1, pw, 1, ripe ? '#c9741a' : '#5aa845');
+        for (let sx = px0 + 2; sx < px0 + pw - 1; sx += 3) R(sx, py0, 1, ph, ripe ? '#e08a1a' : '#6fae4a');
+        R(px0 + Math.floor(pw / 2), py0 - 2, 1, 2, gd);
+        R(px0 + 1, py0, 2, 1, ripe ? '#ffd28a' : '#b8e28a');
+      }
     } else {
       /* clover */
       const n = stage === 1 ? 3 : 6;
@@ -2651,7 +2682,7 @@ const SPR = (() => {
     const key = 'car_' + kind + '_' + col + '_' + frame + '_' + scale;
     if (cache.has(key)) return cache.get(key);
     const k = scale || 1;
-    const dims = { sedan: [26, 13], hatch: [22, 13], pickup: [28, 13], van: [28, 15], bus: [42, 17], mover: [40, 19] }[kind] || [26, 13];
+    const dims = { sedan: [26, 13], hatch: [22, 13], pickup: [28, 13], van: [28, 15], bus: [42, 17], limo: [40, 13], mover: [40, 19] }[kind] || [26, 13];
     const c = newCanvas(dims[0] * k, dims[1] * k);
     const ctx = c.getContext('2d');
     const R = (x, y, w, h, col2) => { ctx.fillStyle = col2; ctx.fillRect(x * k, y * k, w * k, h * k); };
@@ -2695,6 +2726,16 @@ const SPR = (() => {
       R(2, 9, 38, 1, '#fff8ec');
       R(40, 10, 1, 2, '#ffd23f'); R(1, 10, 1, 2, '#e8542f');
       wheel(8, H - 3); wheel(19, H - 3); wheel(32, H - 3);
+    } else if (kind === 'limo') {
+      /* long, low and black, with a gold line down the side */
+      R(1, 5, 38, 6, OUT); R(2, 6, 36, 4, body); R(2, 6, 36, 1, light); R(2, 9, 36, 1, dark);
+      R(9, 1, 24, 5, OUT); R(10, 2, 22, 4, body); R(10, 2, 22, 1, light);
+      win(11, 2, 5, 4); win(17, 2, 5, 4); win(23, 2, 5, 4); win(28, 2, 4, 4);
+      R(2, 8, 36, 1, '#ffd23f');
+      R(38, 7, 1, 2, '#ffd23f'); R(1, 7, 1, 2, '#e8542f');
+      R(5, 1, 1, 4, '#c9ced6');                     /* the little flag mast */
+      R(6, 1, 3, 2, '#e8542f');
+      wheel(7, H - 3); wheel(32, H - 3);
     } else {
       /* the movers' box van: white box, blue stripe, the name on the side */
       R(1, 1, 30, 16, OUT); R(2, 2, 28, 14, '#f2ece0'); R(2, 2, 28, 1, '#ffffff'); R(2, 15, 28, 1, '#b8b0a0');

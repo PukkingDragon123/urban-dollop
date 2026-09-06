@@ -63,6 +63,7 @@ const GAME = (() => {
       ledger: { hist: [], acc: 0, t: 0, sales: 0, orders: 0, honey: 0, quests: 0, stocks: 0 },
       market: { t: 0, px: {}, hist: {}, held: {} },
       seenIntro: false,
+      weather: { t: 150, rain: false, left: 0, after: 0 },   /* showers water every crop on the ranch */
       soil: {},              /* "c,r" -> {crop, growth, water, seed} tilled ground */
       paint: {},             /* "cx,cy" at 8px -> 'path'|'stone'|'high'|'water', painted ground */
       brush: 2,              /* brush radius, in 8px cells */
@@ -94,7 +95,7 @@ const GAME = (() => {
                bred: 0, plumes: 0, culled: 0, wagesPaid: 0, staffEggs: 0, hired: 0, flyers: 0,
                planted: 0, harvested: 0, feedMade: 0, grown: 0, trips: 0, shaped: 0, planted2: 0,
                mamaFed: 0, watered: 0, builtN: 0, orders: 0, ordersMissed: 0, edits: 0, storeys: 0,
-               honey: 0, questsDone: 0, trades: 0 },
+               honey: 0, questsDone: 0, trades: 0, rains: 0, vips: 0 },
       muted: false, last: Date.now(),
     };
   }
@@ -1091,7 +1092,7 @@ const GAME = (() => {
     for (const k of Object.keys(S.soil)) {
       const t = S.soil[k];
       const [c, r] = k.split(',').map(Number);
-      const auto = wateredBy(c, r);
+      const auto = wateredBy(c, r) || S.weather.rain;
       if (auto) t.water = 1;
       else t.water = Math.max(0, (t.water || 0) - dt / ECON.waterLast);
       if (!t.crop) continue;
@@ -1106,6 +1107,19 @@ const GAME = (() => {
         t.auto = (t.auto || 0) + dt;
         if (t.auto > 4) { t.auto = 0; harvest(c, r, true); }
       }
+    }
+  }
+
+  /* ---------- weather: a shower now and then, and a rainbow after ---------- */
+  function tickWeather(dt) {
+    const w = S.weather;
+    if (w.rain) {
+      w.left -= dt;
+      if (w.left <= 0) { w.rain = false; w.after = 14; w.t = ECON.rainEvery * (0.6 + Math.random() * 0.8); emit('rainend', {}); }
+    } else {
+      if (w.after > 0) w.after -= dt;
+      w.t -= dt;
+      if (w.t <= 0) { w.rain = true; w.left = ECON.rainLength * (0.7 + Math.random() * 0.8); S.stats.rains++; emit('rain', {}); }
     }
   }
 
@@ -2181,6 +2195,8 @@ const GAME = (() => {
     else if (g.k === 'soil') cur = Object.keys(S.soil).length;
     else if (g.k === 'disc') cur = S.disc.length;
     else if (g.k === 'built') cur = S.built[g.t] || 0;
+    else if (g.k === 'plots') cur = S.plots.filter(Boolean).length;
+    else if (g.k === 'flock') cur = S.chickens.filter(ch => !isChick(ch)).length;
     return [Math.min(cur, g.n), g.n];
   }
   function questDone(q) { return !!S.quests[q.id]; }
@@ -2261,6 +2277,10 @@ const GAME = (() => {
     if (LOGOS.includes(o.logo)) c.logo = o.logo;
     if (BRAND_COLS.includes(o.col1)) c.col1 = o.col1;
     if (BRAND_COLS.includes(o.col2)) c.col2 = o.col2;
+    /* the signature is a run of pen points on a 120 x 40 grid; -1 marks a lifted pen */
+    if (Array.isArray(o.sig) && o.sig.length) {
+      c.sig = o.sig.slice(0, 900).map(p => [Math.max(-1, Math.min(119, p[0] | 0)), Math.max(-1, Math.min(39, p[1] | 0))]);
+    }
     c.done = true;
     mark('build');
     emit('company', { c });
@@ -2304,12 +2324,19 @@ const GAME = (() => {
     S.chickens.forEach(ch => { if (!isChick(ch)) pool.push(SPECIES[ch.sp].tier); });
     return pool;
   }
+  const VIP_NAMES = ['THE COUNTESS', 'A FILM STAR', 'MR MONEYBAGS', 'A TYCOON', 'LADY YOLKINGTON', 'THE BANKER', 'A DUCHESS'];
   function newOrder(spot) {
     const tier = pickOne(orderTierPool());
-    const n = 2 + Math.floor(Math.random() * Math.min(7, 2 + Math.floor(S.day / 2) + Math.floor(S.chickens.length / 4)));
-    const unit = Math.round(eggValue(tier, false) * ECON.orderPay);
-    return { id: nextId++, tier, n, got: 0, unit, pay: unit * n, t: ECON.orderTime, T: ECON.orderTime,
-             who: pickOne(CUSTOMER_NAMES), kind: pickOne(CUSTOMER_CARS), col: pickOne(CAR_COLS),
+    /* once you have filled a couple, the odd VIP turns up: a longer car, a
+       bigger order, twice the money, and less patience */
+    const vip = S.stats.orders >= 2 && Math.random() < ECON.vipChance;
+    let n = 2 + Math.floor(Math.random() * Math.min(7, 2 + Math.floor(S.day / 2) + Math.floor(S.chickens.length / 4)));
+    if (vip) n += 3;
+    const unit = Math.round(eggValue(tier, false) * ECON.orderPay * (vip ? ECON.vipPay : 1));
+    const wait = vip ? ECON.vipTime : ECON.orderTime;
+    return { id: nextId++, tier, n, got: 0, unit, pay: unit * n, t: wait, T: wait, vip,
+             who: vip ? pickOne(VIP_NAMES) : pickOne(CUSTOMER_NAMES),
+             kind: vip ? 'limo' : pickOne(CUSTOMER_CARS), col: vip ? '#2e2216' : pickOne(CAR_COLS),
              state: 'arrive', x: WORLD.W + 60, y: laneY(-1), spot };
   }
   function tickOrders(dt) {
@@ -2346,8 +2373,9 @@ const GAME = (() => {
   function completeOrder(o) {
     o.state = 'leave'; o.done = true;
     earn(o.pay, 'orders');
-    S.feathers += ECON.orderTip;
+    S.feathers += ECON.orderTip * (o.vip ? 3 : 1);
     S.stats.orders++;
+    if (o.vip) S.stats.vips++;
     note('order', o.who + ' drove off with ' + o.n + ' eggs and paid ' + o.pay + '.');
     emit('orderdone', { o });
   }
@@ -2680,6 +2708,7 @@ const GAME = (() => {
     tickQuests();
     tickLedger(dt);
     tickMarket(dt);
+    tickWeather(dt);
   }
 
   /* ---------- offline ---------- */
@@ -2816,6 +2845,8 @@ const GAME = (() => {
       S.orders = S.orders.filter(o => o && o.state && typeof o.x === 'number');
       if (typeof S.orderT !== 'number') S.orderT = 45;
       S.company = Object.assign({}, COMPANY_DEFAULT, S.company || {});
+      if (!Array.isArray(S.company.sig)) S.company.sig = null;
+      S.weather = Object.assign({ t: 150, rain: false, left: 0, after: 0 }, S.weather || {});
       S.ledger = Object.assign({ hist: [], acc: 0, t: 0, sales: 0, orders: 0, honey: 0, quests: 0, stocks: 0 }, S.ledger || {});
       if (!Array.isArray(S.ledger.hist)) S.ledger.hist = [];
       S.market = Object.assign({ t: 0, px: {}, hist: {}, held: {} }, S.market || {});
@@ -2913,6 +2944,7 @@ const GAME = (() => {
     genesOf, gene, chScore, bestChickens, hasGeneLab, chLayTime,
     canSplice, splice, spliceCost, canClone, cloneChicken, cloneCost, canCross, crossAnimal, crossCost,
     stockPrice, buyStock, sellStock, portfolio, companyValue, setCompany, earn,
+    get weather() { return S.weather; },
     tick, applyOffline, save, load, reset, fmt, fmtTime,
   };
 })();

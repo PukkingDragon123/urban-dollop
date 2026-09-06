@@ -230,31 +230,91 @@ button:focus-visible{ outline:3px dashed var(--pink); outline-offset:2px; }
 #intro-ui{ position:absolute; bottom:5%; right:4%; display:flex; gap:8px; }
 #intro-ui .btn{ font-size:18px; padding:9px 18px; }
 #company-form{
-  position:absolute; inset:6% 8%; overflow:auto;
-  background:rgba(253,243,218,.97); border:4px solid var(--ink); box-shadow:6px 6px 0 rgba(0,0,0,.35);
-  padding:12px 14px;
+  position:absolute; inset:2% 5%; overflow:auto;
+  display:flex; align-items:flex-start; justify-content:center;
+  padding:4px 4px 14px;
 }
-.cf-head{ display:flex; gap:12px; align-items:center; margin-bottom:8px; }
-.cf-head canvas{ image-rendering:pixelated; flex:none; }
-.cf-head b{ font-family:var(--font-px); font-size:15px; display:block; margin-bottom:4px; }
-.cf-head span{ display:block; font-size:21px; color:var(--ink-soft); line-height:1.1; }
-.brand-preview{ display:block; width:min(360px, 100%); height:auto; image-rendering:pixelated; margin:4px auto 8px; border:4px solid var(--ink); background:#8ed254; }
-.cf-row{ display:flex; gap:10px; align-items:flex-start; margin:6px 0; }
-.cf-row > i{ font-style:normal; font-family:var(--font-px); font-size:10px; width:52px; padding-top:8px; color:var(--ink-soft); flex:none; }
-.cf-row input{
-  flex:1; font-family:var(--font-px); font-size:14px; letter-spacing:1px; text-transform:uppercase;
-  padding:8px 10px; border:4px solid var(--ink); background:#fff; color:var(--ink); min-width:0;
+/* ---- the certificate: ruled paper, a red margin, a stamp, a line to sign ---- */
+.cf-paper{
+  position:relative; width:min(680px, 100%);
+  background:
+    repeating-linear-gradient(0deg, rgba(90,120,160,.10) 0 1px, transparent 1px 28px),
+    linear-gradient(180deg,#fffdf6,#fbf1dc);
+  border:4px solid var(--ink);
+  box-shadow:6px 8px 0 rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.6);
+  padding:10px 16px 12px 44px;
+  transform:rotate(-.6deg);
+  color:var(--ink);
 }
+.cf-paper::before{
+  content:''; position:absolute; left:30px; top:0; bottom:0; width:2px;
+  background:rgba(220,90,90,.32);
+}
+/* the two punched holes down the margin */
+.cf-paper::after{
+  content:''; position:absolute; left:10px; top:60px; width:10px; height:10px; border-radius:50%;
+  background:#0d1a12; box-shadow:0 160px 0 #0d1a12, inset 1px 1px 0 rgba(255,255,255,.25);
+}
+.cf-letterhead{ text-align:center; border-bottom:3px double var(--ink); padding:2px 90px 8px 0; margin-bottom:10px; line-height:1; }
+.cf-letterhead small{ display:block; font-family:var(--font-px); font-size:7px; letter-spacing:2px; color:var(--ink-soft); line-height:1.6; }
+.cf-letterhead b{ display:block; font-family:var(--font-px); font-size:13px; letter-spacing:1px; line-height:1.5; margin:4px 0; }
+.cf-letterhead i{ display:block; font-style:normal; font-family:var(--font-px); font-size:7px; color:var(--pink-dark); letter-spacing:1px; line-height:1.6; }
+.cf-body{ display:flex; gap:14px; align-items:flex-start; }
+.cf-photo{
+  flex:none; width:66px; height:72px; border:4px solid var(--ink); background:#fff;
+  box-shadow:3px 3px 0 var(--shadow); display:flex; align-items:center; justify-content:center; overflow:hidden;
+}
+.cf-photo canvas{ image-rendering:pixelated; }
+.cf-fields{ flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; }
+.cf-line{ display:flex; align-items:baseline; gap:8px; }
+.cf-line > i{ font-style:normal; font-family:var(--font-px); font-size:9px; color:var(--ink-soft); width:66px; flex:none; }
+.cf-line > span, .cf-line > input{
+  flex:1; min-width:0; font-family:var(--font-body); font-size:25px; line-height:1.05; color:var(--ink);
+  border:none; border-bottom:3px dotted var(--ink-soft); background:transparent; padding:0 2px 2px;
+}
+.cf-line > input{ font-family:var(--font-px); font-size:14px; letter-spacing:1px; text-transform:uppercase; outline:none; }
+.cf-line > input:focus{ border-bottom-color:var(--pink-dark); background:rgba(255,214,63,.12); }
+.cf-line.pick{ align-items:flex-start; }
+.cf-line.pick > i{ padding-top:10px; }
 .cf-grid{ display:flex; flex-wrap:wrap; gap:6px; }
-.cf-pick{ width:40px; height:40px; border:3px solid var(--ink); background:var(--panel); display:flex; align-items:center; justify-content:center; padding:0; box-shadow:2px 2px 0 var(--shadow); }
+.cf-pick{ width:34px; height:34px; border:3px solid var(--ink); background:#fff; display:flex; align-items:center; justify-content:center; padding:0; box-shadow:2px 2px 0 var(--shadow); }
 .cf-pick canvas{ image-rendering:pixelated; }
 .cf-pick.active{ outline:4px solid var(--pink-dark); outline-offset:-1px; transform:translate(1px,1px); box-shadow:none; }
-.cf-pick.swatch{ width:32px; height:32px; }
-.cf-foot{ display:flex; justify-content:flex-end; margin-top:8px; }
-.cf-foot .btn{ font-size:20px; padding:10px 20px; }
-.modal-panel.company{ width:min(720px, 100%); }
-@media (max-width:700px){ #company-form{ inset:2% 3%; padding:8px; } .cf-pick{ width:34px; height:34px; } .cf-pick.swatch{ width:26px; height:26px; } .cf-row > i{ width:40px; } }
-
+.cf-pick.swatch{ width:26px; height:26px; }
+.brand-preview{ display:block; width:min(240px, 100%); height:auto; image-rendering:pixelated; border:4px solid var(--ink); background:#8ed254; }
+.cf-specimen{ display:flex; flex-direction:row; align-items:center; gap:14px; margin:8px 0 2px; }
+.cf-specimen small{ font-family:var(--font-px); font-size:8px; letter-spacing:2px; color:var(--ink-soft); }
+/* the signature box: dotted, with an X where the pen goes */
+.cf-sign{ display:flex; gap:12px; align-items:flex-end; margin-top:6px; flex-wrap:wrap; }
+.cf-sign > i{ font-style:normal; font-family:var(--font-px); font-size:9px; color:var(--ink-soft); width:66px; flex:none; align-self:flex-start; padding-top:8px; }
+.cf-pad{ position:relative; flex:1; min-width:220px; max-width:300px; }
+#sig-pad{
+  display:block; width:100%; max-width:300px; height:auto; aspect-ratio:3 / 1;
+  border:3px dotted var(--ink-soft); background:rgba(255,255,255,.55);
+  cursor:crosshair; touch-action:none; image-rendering:pixelated;
+}
+.cf-pad::after{
+  content:'X'; position:absolute; left:8px; bottom:12px; font-family:var(--font-px); font-size:14px; color:var(--pink-dark); pointer-events:none;
+}
+.cf-pad u{ position:absolute; left:26px; right:14px; bottom:18px; height:0; border-bottom:2px solid var(--ink-soft); pointer-events:none; }
+.cf-pad.signed u{ border-bottom-color:var(--ink); }
+.cf-sign .btn.btn-tiny{ font-size:11px; padding:6px 8px; align-self:center; }
+.cf-foot{ display:flex; justify-content:flex-end; align-items:center; gap:10px; margin-top:6px; }
+.cf-foot .btn{ font-size:16px; padding:8px 16px; }
+.cf-foot small{ font-family:var(--font-px); font-size:9px; color:var(--pink-dark); margin-right:auto; }
+.cf-paper .stamp{ right:14px; top:14px; font-size:12px; letter-spacing:2px; transform:rotate(9deg); opacity:.6; }
+.cf-signature{ image-rendering:pixelated; display:block; }
+.modal-panel.company{ width:min(760px, 100%); background:#c99a62; border-color:#5e3d18; }
+.modal-panel.company .modal-head h2{ color:#3a2a16; }
+.modal-panel.company #company-body{ display:flex; justify-content:center; padding:6px 2px 14px; }
+@media (max-width:700px){
+  #company-form{ inset:1% 2%; padding:4px 2px 12px; }
+  .cf-paper{ padding:10px 10px 12px 34px; transform:none; }
+  .cf-paper::after{ display:none; }
+  .cf-pick{ width:32px; height:32px; } .cf-pick.swatch{ width:26px; height:26px; }
+  .cf-line > i, .cf-sign > i{ width:48px; }
+  .cf-body{ flex-direction:column; }
+}
 /* ---------- the ledger ---------- */
 .ledger-sec{ border:4px solid var(--ink); background:var(--panel); box-shadow:4px 4px 0 var(--shadow); padding:10px 12px; margin-bottom:12px; }
 .ledger-sec > b{ font-family:var(--font-px); font-size:13px; display:block; margin-bottom:8px; }
