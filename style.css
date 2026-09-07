@@ -1324,38 +1324,51 @@ button:focus-visible{ outline:3px dashed var(--pink); outline-offset:2px; }
 /* ---------- the founder's dialogue ---------- */
 #quest-dialogue{
   position:absolute; left:10px; top:62px; z-index:12;
-  width:min(324px, 54%);
-  display:flex; gap:0; align-items:stretch;
-  background:linear-gradient(180deg,#fffaef 0 42%, #f6ead2 42%);
+  width:min(318px, 54%);
+  display:grid; grid-template-columns:auto 1fr;
+  grid-template-areas:"face body" "foot foot";
+  background:var(--panel);
   border:4px solid var(--ink);
   box-shadow:4px 5px 0 var(--shadow);
   cursor:pointer; text-align:left; line-height:1.1;
   transition:transform .1s var(--pop), filter .1s ease;
 }
 #quest-dialogue:hover{ transform:translateY(-2px); filter:brightness(1.04); }
-#quest-dialogue.done{ background:linear-gradient(180deg,#f0ffe0 0 42%, #dcf3c0 42%); }
+#quest-dialogue.done{ background:#f4ffe6; }
+#quest-dialogue.done .qd-foot{ background:#dcf3c0; }
+/* his photograph, pinned in the corner like a staff board */
 .qd-face{
-  flex:none; width:62px; display:flex; align-items:flex-end; justify-content:center;
-  background:linear-gradient(180deg,#c9dcf0 0 62%, #8fbf5f 62%);
-  border-right:4px solid var(--ink);
+  grid-area:face; align-self:start;
+  width:66px; height:72px;
+  display:flex; align-items:flex-end; justify-content:center;
+  background:linear-gradient(180deg,#c9dcf0 0 64%, #8fbf5f 64%);
+  border-right:4px solid var(--ink); border-bottom:4px solid var(--ink);
   overflow:hidden; line-height:0;
 }
-.qd-face canvas{ image-rendering:pixelated; margin-bottom:-2px; }
-.qd-body{ flex:1; min-width:0; padding:7px 9px 8px; display:flex; flex-direction:column; gap:4px; }
+.qd-face canvas{ image-rendering:pixelated; margin-bottom:-3px; }
+.qd-body{ grid-area:body; min-width:0; padding:7px 9px 8px; display:flex; flex-direction:column; gap:3px; }
 .qd-top{ display:flex; align-items:baseline; gap:6px; }
 .qd-top b{ font-family:var(--font-px); font-size:11px; color:var(--ink); }
 .qd-top small{ font-family:var(--font-px); font-size:8px; color:var(--pink-dark); margin-left:auto; letter-spacing:1px; }
-.qd-say{ font-size:25px; color:var(--ink); }
-.qd-job{ display:flex; align-items:center; gap:6px; }
+.qd-say{ font-size:22px; color:var(--ink); }
+/* the job strip runs the whole width, under everything he says */
+.qd-foot{
+  grid-area:foot; background:var(--cream2); border-top:3px solid var(--ink);
+  padding:6px 9px 7px; display:flex; flex-direction:column; gap:5px;
+}
+.qd-job{ display:flex; align-items:center; gap:7px; }
 .qd-job canvas{ image-rendering:pixelated; flex:none; }
-.qd-job i{ font-style:normal; font-family:var(--font-px); font-size:9px; color:var(--ink-soft); }
-.qd-rail{ position:relative; height:11px; border:3px solid var(--ink); background:#fff; }
+.qd-job i{ display:block; font-style:normal; font-family:var(--font-px); font-size:9px; color:var(--ink); }
+.qd-job em{ display:block; font-style:normal; font-family:var(--font-px); font-size:8px; color:#8a5e2a; margin-top:4px; }
+.qd-bar{ display:flex; align-items:center; gap:7px; }
+.qd-rail{ flex:1; min-width:0; height:10px; border:3px solid var(--ink); background:#fff; }
 .qd-rail s{ display:block; height:100%; background:var(--gold); text-decoration:none; }
-.qd-rail i{ position:absolute; right:3px; top:-4px; font-style:normal; font-family:var(--font-px); font-size:8px; color:var(--ink); }
+.qd-bar i{ flex:none; font-style:normal; font-family:var(--font-px); font-size:8px; color:var(--ink); }
 @media (max-width:700px){
   #quest-dialogue{ width:min(300px, 74%); top:52px; }
-  .qd-say{ font-size:22px; }
-  .qd-face{ width:48px; }
+  .qd-say{ font-size:20px; }
+  .qd-face{ width:52px; height:57px; }
+  .qd-face canvas{ transform:scale(.72); transform-origin:bottom center; }
   .hud-bar .pill{ padding:5px 7px; font-size:17px; gap:4px; }
   .hud-bar .pill canvas{ transform:scale(1); }
 }

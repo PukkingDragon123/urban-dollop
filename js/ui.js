@@ -165,6 +165,17 @@
   /* ================= FLOAT TEXT & TOASTS ================= */
   const fxLayer = $('#fx-layer'), toastBox = $('#toasts');
   function floatText(txt, sx, sy, cls, icon) {
+    /* two things arriving at once would print on top of each other, so
+       stack them, and never let more than a handful be up at a time */
+    while (fxLayer.children.length >= 5) fxLayer.firstChild.remove();
+    let top = Math.round(sy);
+    for (let i = 0; i < 8; i++) {
+      const clash = Array.from(fxLayer.children).some(o =>
+        Math.abs(parseInt(o.style.top, 10) - top) < 15 &&
+        Math.abs(parseInt(o.style.left, 10) - Math.round(sx)) < 130);
+      if (!clash) break;
+      top -= 17;
+    }
     const el = document.createElement('div');
     el.className = 'float-txt' + (cls ? ' ' + cls : '');
     if (icon) el.appendChild(mkIcon(icon, 2));
@@ -172,7 +183,7 @@
     span.textContent = txt;
     el.appendChild(span);
     el.style.left = Math.round(sx) + 'px';
-    el.style.top = Math.round(sy) + 'px';
+    el.style.top = top + 'px';
     fxLayer.appendChild(el);
     paintCloud(el, el.offsetWidth / 2, false);
     setTimeout(() => el.remove(), 1150);
@@ -628,7 +639,11 @@
   }
 
   function lockedPlot(g, p) {
-    const x0 = p.tc * 16, y0 = p.tr * 16, w = PLOT_W * 16, h = PLOT_H * 16;
+    const x0 = p.tc * 16, y0 = p.tr * 16, w = PLOT_W * 16;
+    /* the bottom row of plots runs past the kerb; nobody's fence and
+       nobody's weeds belong on the tarmac, so stop the plot there */
+    const h = Math.min(p.tr * 16 + PLOT_H * 16, W.roadY) - y0;
+    if (h <= 16) return;
     /* overgrown, hazy */
     g.fillStyle = 'rgba(28,44,20,.34)';
     g.fillRect(x0, y0, w, h);
@@ -1664,25 +1679,31 @@
       if (o.x + 40 < cam().x || o.x - 10 > cam().x + W.view.w) return;
       const spr = drawCar(o.kind, o.col, o.x, o.y, -1, o.state === 'wait' ? 0 : Math.floor(now / 80) % 2);
       if (o.state !== 'wait') return;
-      /* the order, in a bubble over the car */
+      /* the order, on a docket over the car: the eggs wanted, the price,
+         then the clock. six to a row so a big order stays narrow enough
+         to sit beside the next car in the lay-by. */
       const n = o.n, got = o.got;
-      const bw = Math.max(30, 8 + n * 5), bh = 15;
+      const PER = 6;
+      const rows = Math.ceil(n / PER), cols = Math.min(n, PER);
+      const payTxt = GAME.fmt(o.pay), payW = SPR.tinyW(payTxt, 1);
+      const bw = Math.max(30, 8 + cols * 5, 8 + payW), bh = 14 + rows * 7;
       const bx = Math.round(o.x + spr.width / 2 - bw / 2), by = Math.round(o.y - bh - 8);
       ctx.fillStyle = '#2e2216'; ctx.fillRect(bx - 1, by, bw + 2, bh); ctx.fillRect(bx, by - 1, bw, bh + 2);
       ctx.fillStyle = '#fff8ec'; ctx.fillRect(bx, by, bw, bh);
       ctx.fillStyle = '#2e2216'; ctx.fillRect(bx + bw / 2 - 2, by + bh, 4, 1); ctx.fillRect(bx + bw / 2 - 1, by + bh + 1, 2, 1); ctx.fillRect(bx + bw / 2, by + bh + 2, 1, 1);
       ctx.fillStyle = '#fff8ec'; ctx.fillRect(bx + bw / 2 - 1, by + bh, 2, 1);
       for (let i = 0; i < n; i++) {
-        const ex = bx + 4 + i * 5, ey = by + 3;
+        const row = Math.floor(i / PER), inRow = Math.min(n - row * PER, PER);
+        const ex = Math.round(bx + bw / 2 - inRow * 5 / 2 + 1 + (i % PER) * 5), ey = by + 3 + row * 7;
         ctx.fillStyle = i < got ? TIERS[o.tier].c : '#2e2216'; ctx.fillRect(ex, ey, 3, 4); ctx.fillRect(ex + 1, ey - 1, 1, 1); ctx.fillRect(ex + 1, ey + 4, 1, 1);
         if (i >= got) { ctx.fillStyle = EGG_SHELL[o.tier]; ctx.fillRect(ex + 1, ey + 1, 1, 2); }
       }
+      /* what it pays, on its own line under the eggs */
+      SPR.drawTiny(ctx, payTxt, Math.round(bx + bw / 2 - payW / 2), by + 4 + rows * 7, '#8a5e2a', 1);
       /* the clock */
       const f = Math.max(0, o.t / o.T);
       ctx.fillStyle = '#e0c9a0'; ctx.fillRect(bx + 3, by + bh - 4, bw - 6, 2);
       ctx.fillStyle = f < 0.2 && Math.floor(now / 250) % 2 ? '#e8542f' : f < 0.4 ? '#f0a422' : '#7ac74f'; ctx.fillRect(bx + 3, by + bh - 4, Math.round((bw - 6) * f), 2);
-      /* what it pays */
-      SPR.drawTiny(ctx, GAME.fmt(o.pay), bx + bw - 3 - SPR.tinyW(GAME.fmt(o.pay), 1), by + 9 - 6, '#8a5e2a', 1);
       if (o.vip) {
         /* a gold rim and a star: this one pays double and will not wait long */
         ctx.fillStyle = '#ffd23f';
@@ -2090,7 +2111,7 @@
     if (sayCache.has(key)) return sayCache.get(key);
     const lines = wrapTiny(text, 23);
     const tw = Math.max(...lines.map(l => SPR.tinyW(l, 1)));
-    const w = tw + 18, h = lines.length * 7 + 13;
+    const w = tw + 18, h = lines.length * 7 + 18;
     const cloud = SPR.cloudBubble(w, h, Math.round(w * 0.32), below, { px: 1, fill: '#fff9ec', ink: '#2e2216' });
     const c = SPR.newCanvas(cloud.width, cloud.height);
     const g = c.getContext('2d');
@@ -2283,15 +2304,16 @@
       ctx.save();
       ctx.translate(Math.round(cx), Math.round(cy + wig));
       const BW = 58;
-      ctx.drawImage(SPR.signSprite(BW, 1, 1), -BW / 2, -16);
+      /* a two-line board: the words, then the coin and the asking price */
+      ctx.drawImage(SPR.signSprite(BW, 1, 1, 21), -BW / 2, -25);
       const t1 = 'FOR SALE';
-      SPR.drawText(ctx, t1, -Math.floor(SPR.textW(t1, 1) / 2), -14, '#4a3018', 1);
+      SPR.drawText(ctx, t1, -Math.floor(SPR.textW(t1, 1) / 2), -23, '#4a3018', 1);
       const priceTxt = GAME.fmt(p.price);
       const pw = SPR.textW(priceTxt, 1) + 6;
-      SPR.drawText(ctx, priceTxt, -Math.floor(pw / 2) + 6, -6, afford ? '#2e6e2e' : '#a83a2a', 1);
+      SPR.drawText(ctx, priceTxt, -Math.floor(pw / 2) + 6, -13, afford ? '#2e6e2e' : '#a83a2a', 1);
       ctx.fillStyle = afford ? '#ffd23f' : '#b5a06a';
-      ctx.fillRect(-Math.floor(pw / 2) - 1, -5, 4, 4);
-      ctx.fillStyle = '#e0a416'; ctx.fillRect(-Math.floor(pw / 2), -4, 2, 2);
+      ctx.fillRect(-Math.floor(pw / 2) - 1, -12, 4, 4);
+      ctx.fillStyle = '#e0a416'; ctx.fillRect(-Math.floor(pw / 2), -11, 2, 2);
       ctx.restore();
     });
   }
@@ -2354,15 +2376,18 @@
     ctx.fillStyle = 'rgba(40,58,26,.25)'; ctx.fillRect(x + 2, y + 24, 12, 2);
     ctx.fillStyle = '#5e3d18'; ctx.fillRect(x + 7, y + 8, 3, 18);
     ctx.fillStyle = '#a8783f'; ctx.fillRect(x + 7, y + 8, 1, 18);
-    /* two arrow boards pointing down the road */
-    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x, y, 17, 8); ctx.fillRect(x + 17, y + 2, 2, 4);
-    ctx.fillStyle = '#3f6fd6'; ctx.fillRect(x + 1, y + 1, 15, 6); ctx.fillRect(x + 16, y + 3, 2, 2);
-    ctx.fillStyle = '#6f9af0'; ctx.fillRect(x + 1, y + 1, 15, 1);
-    SPR.drawTiny(ctx, GAME.city().name.slice(0, 5).toUpperCase(), x + 2, y + 2, '#ffffff', 1);
-    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x - 2, y + 9, 17, 8); ctx.fillRect(x - 4, y + 11, 2, 4);
-    ctx.fillStyle = '#e8542f'; ctx.fillRect(x - 1, y + 10, 15, 6); ctx.fillRect(x - 3, y + 12, 2, 2);
-    ctx.fillStyle = '#ff8f6a'; ctx.fillRect(x - 1, y + 10, 15, 1);
-    SPR.drawTiny(ctx, GAME.depotOpen() ? 'DEPOT' : 'SHUT', x + 1, y + 11, '#ffffff', 1);
+    /* two arrow boards pointing down the road, each cut to fit its word */
+    const cityTxt = GAME.city().name.slice(0, 5).toUpperCase();
+    const openTxt = GAME.depotOpen() ? 'DEPOT' : 'SHUT';
+    const w1 = SPR.tinyW(cityTxt, 1) + 4, w2 = SPR.tinyW(openTxt, 1) + 4;
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x, y, w1, 8); ctx.fillRect(x + w1, y + 2, 2, 4);
+    ctx.fillStyle = '#3f6fd6'; ctx.fillRect(x + 1, y + 1, w1 - 2, 6); ctx.fillRect(x + w1 - 1, y + 3, 2, 2);
+    ctx.fillStyle = '#6f9af0'; ctx.fillRect(x + 1, y + 1, w1 - 2, 1);
+    SPR.drawTiny(ctx, cityTxt, x + 2, y + 2, '#ffffff', 1);
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x - 2, y + 9, w2, 8); ctx.fillRect(x - 4, y + 11, 2, 4);
+    ctx.fillStyle = '#e8542f'; ctx.fillRect(x - 1, y + 10, w2 - 2, 6); ctx.fillRect(x - 3, y + 12, 2, 2);
+    ctx.fillStyle = '#ff8f6a'; ctx.fillRect(x - 1, y + 10, w2 - 2, 1);
+    SPR.drawTiny(ctx, openTxt, x, y + 11, '#ffffff', 1);
     /* a lamp that blinks when you can afford the next vehicle or route */
     const nextV = VEHICLES[S().vehicle + 1];
     const nextC = CITIES.find(c => !S().routes.includes(c.id));
@@ -3588,7 +3613,7 @@
     /* his portrait, framed like a staff photo */
     const face = document.createElement('div');
     face.className = 'qd-face';
-    face.appendChild(cloneCanvas(SPR.raccoonSprite(cheering ? 'cheer' : 'boss', 1), 2));
+    face.appendChild(cloneCanvas(SPR.raccoonSprite(cheering ? 'cheer' : 'boss', 1), 3));
     box.appendChild(face);
     const body = document.createElement('div');
     body.className = 'qd-body';
@@ -3605,24 +3630,34 @@
     say.className = 'qd-say';
     say.textContent = '"' + said + '"';
     body.appendChild(say);
+    box.appendChild(body);
+    /* the job itself, on its own strip under what he says */
+    const foot = document.createElement('div');
+    foot.className = 'qd-foot';
     const job = document.createElement('div');
     job.className = 'qd-job';
     job.appendChild(mkIcon(q.icon, 2));
+    const jt = document.createElement('div');
     const jn = document.createElement('i');
+    jn.textContent = q.name.toUpperCase();
+    jt.appendChild(jn);
     const rw = [q.rw.c ? GAME.fmt(q.rw.c) + ' COINS' : '', q.rw.f ? q.rw.f + ' FEATHERS' : ''].filter(Boolean).join(' + ');
-    jn.textContent = q.name.toUpperCase() + (rw ? '  -  ' + rw : '');
-    job.appendChild(jn);
-    body.appendChild(job);
+    if (rw) { const rl = document.createElement('em'); rl.textContent = rw; jt.appendChild(rl); }
+    job.appendChild(jt);
+    foot.appendChild(job);
+    const bar = document.createElement('div');
+    bar.className = 'qd-bar';
     const rail = document.createElement('div');
     rail.className = 'qd-rail';
     const fill = document.createElement('s');
     fill.style.width = Math.round(cur / n * 100) + '%';
     rail.appendChild(fill);
+    bar.appendChild(rail);
     const num = document.createElement('i');
-    num.textContent = cur + ' / ' + n;
-    rail.appendChild(num);
-    body.appendChild(rail);
-    box.appendChild(body);
+    num.textContent = cur + '/' + n;
+    bar.appendChild(num);
+    foot.appendChild(bar);
+    box.appendChild(foot);
   }
 
   /* ================= TITLE SCREEN ================= */

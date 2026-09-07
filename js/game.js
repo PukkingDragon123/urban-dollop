@@ -24,7 +24,7 @@ const WORLD = {
     lab:      { x: 18,  y: 638, w: 30, h: 32 },   /* the Lab, home of EGGOS */
     stand:    { x: 56,  y: 644, w: 16, h: 24 },   /* the Index bookstand */
     mamaSign: { x: 88,  y: 666, w: 14, h: 20 },   /* upgrade-mama signpost */
-    depot:    { x: 216, y: 770, w: 16, h: 26 },   /* the road sign: vehicles and routes */
+    depot:    { x: 214, y: 770, w: 26, h: 26 },   /* the road sign: vehicles and routes */
     brand:    { x: 72,  y: 766, w: 72, h: 30 },   /* the company sign, in your colours */
   },
   starterInc: [3, 44],                      /* prebuilt incubator anchor tile */

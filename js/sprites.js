@@ -1805,9 +1805,9 @@ const SPR = (() => {
         else if (x < 5 && y < 7) P.set(x, y, 1);
       }
       P.set(4, 4, 1); P.set(3, 5, 1);
-      P.txt('EGGS', 14, 2, 5);
-      P.txt('NOW!', 14, 8, 2);
-      P.rect(13, 7, 15, 1, 4);
+      P.txt('EGGS', 13, 2, 5);
+      P.txt('NOW!', 13, 8, 2);
+      P.rect(13, 7, 14, 1, 4);
       return P.out();
     }
     if (id === 'sale') {
@@ -1827,7 +1827,7 @@ const SPR = (() => {
     if (id === 'hen') {
       P.rect(0, 0, BILL_W, BILL_H, 9);
       P.txt('OUR', 2, 2, 2);
-      P.txt('HENS', 2, 8, 2);
+      P.txt('HENS', 2, 7, 2);
       /* a hen, side on, drawn straight into the cells */
       const rows = ['.....ww.', '....wwww', '.oooowwo', 'oooooowk', 'oooooowo',
                     '.ooooooo', '..oooo..', '..o..o..'];
@@ -1839,13 +1839,15 @@ const SPR = (() => {
       P.rect(0, BILL_H - 2, BILL_W, 2, 7);
       return P.out();
     }
-    /* the company's own board */
-    P.rect(0, 0, BILL_W, 2, 2); P.rect(0, BILL_H - 2, BILL_W, 2, 2);
+    /* the company's own board: a rule top and bottom, up to two words
+       of five between them, and the mark stamped in the corner */
+    P.rect(0, 0, BILL_W, 1, 2); P.rect(0, BILL_H - 1, BILL_W, 1, 2);
     const name = ((co && co.name) || 'INF EGG CO.').replace(/[^A-Z0-9 ]/gi, '').trim().toUpperCase();
     const words = name.split(' ').filter(Boolean).slice(0, 2);
-    words.forEach((w, i) => P.txt(w.slice(0, 6), 2, 4 + i * 6, 2));
-    P.disc(23, 7, 4, 4, 1);
-    P.disc(23, 7, 2.4, 1, 1);
+    const top = words.length > 1 ? 2 : 5;
+    words.forEach((w, i) => P.txt(w.slice(0, 5), 2, top + i * 6, 2));
+    P.disc(24, 7, 3, 4, 1);
+    P.disc(24, 7, 1.7, 1, 1);
     return P.out();
   }
   /* the hoarding itself: two legs, a braced frame, the poster, a hood of lamps */
@@ -2519,28 +2521,31 @@ const SPR = (() => {
   }
 
   /* wooden sign board — text drawn by the caller */
-  function signSprite(w, scale, style) {
-    const key = 'sign_' + w + '_' + scale + '_' + (style || 0);
+  /* board is `bh` tall (12 by default: one line of the big font) with
+     posts under it, so a two-line sign asks for a taller board */
+  function signSprite(w, scale, style, bh) {
+    const bd = bh || 12;
+    const key = 'sign_' + w + '_' + scale + '_' + (style || 0) + '_' + bd;
     if (cache.has(key)) return cache.get(key);
     const k = scale || 1;
-    const h = 20;
+    const h = bd + 8;
     const c = newCanvas(w * k, h * k);
     const ctx = c.getContext('2d');
     /* posts */
     ctx.fillStyle = '#6e4a20';
-    ctx.fillRect(Math.floor(w * 0.28) * k, 10 * k, 2 * k, 10 * k);
-    ctx.fillRect(Math.floor(w * 0.68) * k, 10 * k, 2 * k, 10 * k);
+    ctx.fillRect(Math.floor(w * 0.28) * k, (bd - 2) * k, 2 * k, 10 * k);
+    ctx.fillRect(Math.floor(w * 0.68) * k, (bd - 2) * k, 2 * k, 10 * k);
     /* board */
     const m = newMask(w, h);
-    mRect(m, 0, 0, w, 12);
+    mRect(m, 0, 0, w, bd);
     renderMask(ctx, m, k, 0, 0,
       { base: '#c9a35f', light: '#e8c48f', dark: '#a8783f', out: '#5e3d18' }, 11, { grain: 0.14 });
     /* plank seam + nails */
     ctx.fillStyle = '#a8783f';
-    ctx.fillRect(k, 6 * k, (w - 2) * k, k);
+    ctx.fillRect(k, Math.floor(bd / 2) * k, (w - 2) * k, k);
     ctx.fillStyle = '#5e3d18';
     ctx.fillRect(2 * k, 2 * k, k, k); ctx.fillRect((w - 3) * k, 2 * k, k, k);
-    ctx.fillRect(2 * k, 9 * k, k, k); ctx.fillRect((w - 3) * k, 9 * k, k, k);
+    ctx.fillRect(2 * k, (bd - 3) * k, k, k); ctx.fillRect((w - 3) * k, (bd - 3) * k, k, k);
     cache.set(key, c);
     return c;
   }
