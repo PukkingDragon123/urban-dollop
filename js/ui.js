@@ -2084,28 +2084,44 @@
     if (line) out.push(line);
     return out;
   }
-  /* the cloud, cached by what it says */
-  function sayCloud(text) {
-    if (sayCache.has(text)) return sayCache.get(text);
+  /* the cloud, cached by what it says and which way the tail points */
+  function sayCloud(text, below) {
+    const key = (below ? 'v' : '^') + text;
+    if (sayCache.has(key)) return sayCache.get(key);
     const lines = wrapTiny(text, 23);
     const tw = Math.max(...lines.map(l => SPR.tinyW(l, 1)));
     const w = tw + 18, h = lines.length * 7 + 13;
-    const cloud = SPR.cloudBubble(w, h, Math.round(w * 0.32), false, { px: 1, fill: '#fff9ec', ink: '#2e2216' });
+    const cloud = SPR.cloudBubble(w, h, Math.round(w * 0.32), below, { px: 1, fill: '#fff9ec', ink: '#2e2216' });
     const c = SPR.newCanvas(cloud.width, cloud.height);
     const g = c.getContext('2d');
     g.imageSmoothingEnabled = false;
     g.drawImage(cloud, 0, 0);
-    lines.forEach((l, i) => SPR.drawTiny(g, l, 9, 7 + i * 7, '#2e2216', 1));
-    if (sayCache.size > 60) sayCache.clear();
-    sayCache.set(text, c);
+    lines.forEach((l, i) => SPR.drawTiny(g, l, 9, (below ? 12 : 7) + i * 7, '#2e2216', 1));
+    if (sayCache.size > 80) sayCache.clear();
+    sayCache.set(key, c);
     return c;
   }
-  /* draw it above a speaker, kept inside the view */
-  function drawSay(text, wx, wy) {
-    const c = sayCloud(text);
+  /* the dialogue panel owns the top-left of the view; in world pixels
+     it covers about this much, and a speech cloud keeps out of it */
+  const PANEL_W = 126, PANEL_H = 52;
+  /* draw it over a speaker: above if there is room, below if not, and
+     never behind the founder's own dialogue box */
+  function drawSay(text, wx, wy, h) {
+    const height = h === undefined ? 30 : h;
+    const above = sayCloud(text, false);
+    const below = wy - above.height < cam().y + 2;
+    const c = below ? sayCloud(text, true) : above;
     let x = Math.round(wx - c.width * 0.32);
+    let y = Math.round(below ? wy + height : wy - c.height);
+    /* if it would land under the dialogue panel, slide it clear */
+    const panelX = cam().x + PANEL_W, panelY = cam().y + PANEL_H;
+    if (x < panelX && y < panelY && !$('#quest-dialogue').hidden) {
+      if (panelX + c.width + 2 < cam().x + W.view.w) x = panelX;
+      else y = panelY;
+    }
     x = Math.max(cam().x + 2, Math.min(cam().x + W.view.w - c.width - 2, x));
-    ctx.drawImage(c, x, Math.round(wy - c.height));
+    y = Math.max(cam().y + 2, Math.min(cam().y + W.view.h - c.height - 2, y));
+    ctx.drawImage(c, x, y);
   }
 
   /* ============================================================
@@ -2143,7 +2159,7 @@
       ctx.fillStyle = S().company.col1;
       ctx.fillRect(Math.round(b.x + (b.dir === 1 ? 7 : 8)), Math.round(b.y - 3 + bob - hop), 5, 1);
     }
-    if (b.line) drawSay(b.line, b.x + 10, b.y - 8 - hop);
+    if (b.line) drawSay(b.line, b.x + 10, b.y - 8 - hop, 34);
     else if (pose === 'read') {
       /* leafing through the ledger */
       if (Math.floor(now / 500) % 2) { ctx.fillStyle = '#fff8ec'; ctx.fillRect(Math.round(b.x + 6), Math.round(b.y + 6), 2, 1); }
