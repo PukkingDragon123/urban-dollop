@@ -211,8 +211,42 @@
   /* ================= CANVAS & CAMERA ================= */
   const cv = $('#world');
   let ctx = cv.getContext('2d');   /* swapped temporarily when painting thumbnails */
-  const SC = 3;
-  cv.width = W.view.w * SC; cv.height = W.view.h * SC;
+  /* how many screen pixels one world pixel gets. Measured from the window
+     rather than fixed, so the stage fills whatever room there is and the
+     page never has anything below the fold. */
+  let SC = 3;
+  /* fit the stage to the window: take the room the rail leaves, pick a
+     whole-number zoom so pixels stay square, and set the camera's view
+     from that. Called on load and whenever the window changes. */
+  function sizeStage() {
+    const row = $('#stage-row');
+    if (!row) return false;
+    const rs = row.getBoundingClientRect();
+    if (rs.width < 40 || rs.height < 40) return false;
+    const stacked = getComputedStyle(row).flexDirection === 'column';
+    const rail = $('#siderail');
+    const rr = rail && rail.offsetParent !== null ? rail.getBoundingClientRect() : null;
+    const GAP = 10, BORD = 8;                    /* the stage's own border */
+    const aw = Math.max(160, rs.width  - BORD - (!stacked && rr ? rr.width  + GAP : 0));
+    const ah = Math.max(120, rs.height - BORD - ( stacked && rr ? rr.height + GAP : 0));
+    /* the art is drawn for three screen pixels to a world pixel; drop to
+       two only when the window is too narrow to show a field at three */
+    const z = aw < 640 ? 2 : aw < 1560 ? 3 : 4;
+    const vw = Math.max(120, Math.min(W.W, Math.floor(aw / z)));
+    const vh = Math.max(100, Math.min(W.H, Math.floor(ah / z)));
+    if (z === SC && vw === W.view.w && vh === W.view.h) return false;
+    SC = z; W.view.w = vw; W.view.h = vh;
+    cv.width = vw * z; cv.height = vh * z;
+    cv.style.width = (vw * z) + 'px';
+    cv.style.height = (vh * z) + 'px';
+    ctx.imageSmoothingEnabled = false;
+    GAME.clampCam();
+    if (onStageResize) onStageResize();
+    return true;
+  }
+  /* set once the title screen's own canvas exists */
+  let onStageResize = null;
+  sizeStage();
 
   function cam() { return S().cam; }
   function worldToScreen(wx, wy) {
@@ -3288,8 +3322,7 @@
        strap - the camera may scroll that much further so the road, the
        truck and the customers are never stuck behind it */
     const dock = !el.palette.hidden ? el.palette : !el.farmPalette.hidden ? el.farmPalette : null;
-    let top = Math.min(el.toolbelt.getBoundingClientRect().top, el.deskbar.getBoundingClientRect().top);
-    if (dock) top = Math.min(top, dock.getBoundingClientRect().top);
+    const top = dock ? dock.getBoundingClientRect().top : r.bottom;
     GAME.setCamPad(Math.max(0, (r.bottom - top) / (r.width / W.view.w)));
     /* a new ranch opens looking at the road, where the bike and the sign are */
     if (!S().camSet) { S().camSet = true; S().cam.y += 200; GAME.clampCam(); }
@@ -3664,13 +3697,27 @@
   const titleEl = $('#title-screen');
   const titleCv = $('#title-canvas');
   const tctx = titleCv.getContext('2d');
-  const TW = 384, TH = 208;
+  let TW = 384, TH = 208;
   let titleT = 0;
-  const titleEggs = Array.from({ length: 20 }, () => ({
+  let titleEggs = Array.from({ length: 20 }, () => ({
     x: 16 + Math.random() * (TW - 32), y: 52 + Math.random() * (TH + 40),
     tier: Math.floor(Math.random() * 8), sp: 8 + Math.random() * 14, sw: Math.random() * 6,
   }));
-  const titleClouds = [0, 1, 2, 3].map(i => ({ x: Math.random() * TW, y: 58 + i * 13, w: 34 + i * 12, v: 4 + i * 2 }));
+  let titleClouds = [0, 1, 2, 3].map(i => ({ x: Math.random() * TW, y: 58 + i * 13, w: 34 + i * 12, v: 4 + i * 2 }));
+  /* the hills, the drifting eggs and the logo are all laid out from TW and
+     TH, so handing them the stage's real size composes the card to fit
+     whatever shape the window is instead of cropping or stretching it */
+  onStageResize = () => {
+    TW = W.view.w; TH = W.view.h;
+    titleCv.width = TW; titleCv.height = TH;
+    tctx.imageSmoothingEnabled = false;
+    titleEggs = Array.from({ length: Math.round(TW * TH / 4000) + 8 }, () => ({
+      x: 16 + Math.random() * (TW - 32), y: 52 + Math.random() * (TH + 40),
+      tier: Math.floor(Math.random() * 8), sp: 8 + Math.random() * 14, sw: Math.random() * 6,
+    }));
+    titleClouds = [0, 1, 2, 3].map(i => ({ x: Math.random() * TW, y: 58 + i * 13, w: 34 + i * 12, v: 4 + i * 2 }));
+  };
+  onStageResize();
   const silCache = new Map();
 
   function drawTitleScreen(dt) {
@@ -3790,13 +3837,13 @@
     });
     /* logo */
     const title = 'INF EGG CO.';
-    const k = 3;
+    const k = SPR.textW(title, 3) < TW - 16 ? 3 : SPR.textW(title, 2) < TW - 12 ? 2 : 1;
     SPR.drawTitle(tctx, title, Math.round(TW / 2 - SPR.textW(title, k) / 2), 18, '#ffd23f', '#3a2410', k);
     const sub = 'A COZY CHICKEN RANCH';
     SPR.drawText(tctx, sub, Math.round(TW / 2 - SPR.textW(sub, 1) / 2), 46, '#ffe9b0', 1, '#3a2410');
     /* progress plate above the START button */
     const line = GAME.disc() + ' OF ' + SPECIES_TOTAL + ' CHICKENS FOUND';
-    const lw = SPR.textW(line, 1), px0 = Math.round(TW / 2 - lw / 2) - 7, py0 = TH - 40;
+    const lw = SPR.textW(line, 1), px0 = Math.round(TW / 2 - lw / 2) - 7, py0 = TH - 58;
     tctx.fillStyle = 'rgba(24,18,12,.62)';
     tctx.fillRect(px0, py0 - 4, lw + 14, 14);
     tctx.fillStyle = 'rgba(255,232,180,.28)';
@@ -3805,8 +3852,12 @@
     const blink = Math.floor(now / 480) % 2;
     SPR.drawText(tctx, line, px0 + 7, py0, blink ? '#fff8ec' : '#e8d5a8', 1, '#1a120a');
   }
-  function showTitle() { titleEl.hidden = false; setInspect(null); introMode = null; $('#intro-ui').hidden = true; $('#company-form').hidden = true; $('#title-buttons').hidden = false; }
-  function hideTitle() { titleEl.hidden = true; S().seenTitle = true; introMode = null; }
+  /* the rail stands outside the stage, so the title screen no longer
+     covers it. Blank the strap instead of removing it: taking it out of
+     the row would widen the stage and snap it back again. */
+  function railUp(up) { const a = $('#app'); if (a) a.classList.toggle('title-up', !up); }
+  function showTitle() { titleEl.hidden = false; railUp(false); setInspect(null); introMode = null; $('#intro-ui').hidden = true; $('#company-form').hidden = true; $('#title-buttons').hidden = false; }
+  function hideTitle() { titleEl.hidden = true; railUp(true); S().seenTitle = true; introMode = null; }
 
   /* ================= THE INTRO =================
      A raccoon gets a letter: Grandmama's farm is theirs. One old
@@ -3839,6 +3890,22 @@
     const sc = INTRO[Math.min(introScene, INTRO.length - 1)];
     const now = titleT * 1000; titleT += dt;
     tctx.imageSmoothingEnabled = false;
+    /* the caption wraps to whatever width the window gave us; the plate
+       grows to hold it and the horizon rises to stand clear of it, so on
+       a tall narrow card the cast is not standing behind the words */
+    const capW = TW - 40;
+    const caps = [];
+    sc.lines.forEach((src, si) => {
+      let line = '';
+      src.split(' ').forEach(word => {
+        const t = line ? line + ' ' + word : word;
+        if (line && SPR.textW(t, 1) > capW) { caps.push({ t: line, lead: si === 0 }); line = word; }
+        else line = t;
+      });
+      if (line) caps.push({ t: line, lead: si === 0 });
+    });
+    const plateH = caps.length * 12 + 10;
+    const plateY = TH - plateH - 40;   /* clear of the NEXT and SKIP keys */
     /* sky */
     const bands = sc.bg === 'night' ? ['#0b1020', '#111a34', '#16203c', '#1d2b4a', '#26375c', '#2f4470']
                 : sc.bg === 'day' ? ['#7fb8e8', '#8fc4ec', '#a2d0f0', '#b8dcf4', '#cfe8f8', '#e4f2fb']
@@ -3847,9 +3914,15 @@
     bands.forEach((b, i) => { tctx.fillStyle = b; tctx.fillRect(0, i * per, TW, per); });
     if (sc.bg !== 'day') for (let i = 0; i < 40; i++) { if (Math.floor(now / 500 + i) % 7 === 0) continue; tctx.fillStyle = 'rgba(255,255,255,.7)'; tctx.fillRect((i * 97) % TW, (i * 43) % 120, 1, 1); }
     /* ground */
-    const gy = TH - 62;
+    const gy = Math.min(TH - 62, plateY - 12);
     tctx.fillStyle = sc.bg === 'night' ? '#22301e' : sc.bg === 'day' ? '#6fae4a' : '#3a2a4a'; tctx.fillRect(0, gy, TW, TH - gy);
     tctx.fillStyle = sc.bg === 'night' ? '#2c3d26' : sc.bg === 'day' ? '#7fbf58' : '#4a3a5a'; tctx.fillRect(0, gy, TW, 2);
+    /* every scene is composed for a card 384 across. The sky and the
+       ground stretch to whatever card we got; the cast is centred in it,
+       so a narrow window keeps the middle of the picture instead of
+       squashing the raccoon. */
+    tctx.save();
+    tctx.translate(Math.round((TW - 384) / 2), 0);
     if (sc.bg === 'night') {
       /* the town: dark house fronts and a lamp post */
       for (let i = 0; i < 6; i++) { const hx = i * 66 + 10, hh = 30 + (i * 13) % 20; tctx.fillStyle = '#141a2c'; tctx.fillRect(hx, gy - hh, 48, hh); tctx.fillStyle = (i + Math.floor(now / 1700)) % 3 ? '#ffe9a0' : '#3a3a5a'; tctx.fillRect(hx + 10, gy - hh + 8, 6, 6); tctx.fillRect(hx + 30, gy - hh + 8, 6, 6); }
@@ -3900,15 +3973,15 @@
       tctx.drawImage(tr, bx + 6 + Math.round((introT * 30) % 120), by + 8);
       SPR.drawTiny(tctx, 'SUPER RICH', bx + 8, by + 6, '#8a5e2a', 1);
     }
+    tctx.restore();
     /* the caption plate, typed out */
-    const plateY = TH - 52;
-    tctx.fillStyle = 'rgba(24,18,12,.82)'; tctx.fillRect(12, plateY, TW - 24, 44);
-    tctx.fillStyle = 'rgba(255,232,180,.35)'; tctx.fillRect(12, plateY, TW - 24, 1); tctx.fillRect(12, plateY + 43, TW - 24, 1);
+    tctx.fillStyle = 'rgba(24,18,12,.82)'; tctx.fillRect(12, plateY, TW - 24, plateH);
+    tctx.fillStyle = 'rgba(255,232,180,.35)'; tctx.fillRect(12, plateY, TW - 24, 1); tctx.fillRect(12, plateY + plateH - 1, TW - 24, 1);
     let budget = Math.floor(introT * 28);
-    sc.lines.forEach((ln, i) => {
-      const shown = ln.slice(0, Math.max(0, budget));
-      budget -= ln.length + 4;
-      SPR.drawText(tctx, shown, 20, plateY + 7 + i * 12, i === 0 ? '#ffd23f' : '#fff8ec', 1, '#1a120a');
+    caps.forEach((ln, i) => {
+      const shown = ln.t.slice(0, Math.max(0, budget));
+      budget -= ln.t.length + 3;
+      SPR.drawText(tctx, shown, 20, plateY + 7 + i * 12, ln.lead ? '#ffd23f' : '#fff8ec', 1, '#1a120a');
     });
     SPR.drawTiny(tctx, (introScene + 1) + ' / ' + INTRO.length, TW - 30, plateY - 8, '#e8d5a8', 1);
   }
@@ -4061,7 +4134,7 @@
     inp.type = 'text'; inp.maxLength = 16; inp.id = 'company-name'; inp.value = d.name; inp.autocomplete = 'off'; inp.spellcheck = false;
     inp.placeholder = 'INF EGG CO.';
     fields.appendChild(line('NAME', inp));
-    const grid = document.createElement('div'); grid.className = 'cf-grid';
+    const grid = document.createElement('div'); grid.className = 'cf-grid marks';
     LOGOS.forEach(lg => {
       const b = document.createElement('button');
       b.className = 'cf-pick' + (d.logo === lg ? ' active' : '');
@@ -4071,7 +4144,7 @@
     });
     fields.appendChild(line('MARK', grid));
     [['col1', 'PAINT'], ['col2', 'TRIM']].forEach(([k, label]) => {
-      const g2 = document.createElement('div'); g2.className = 'cf-grid';
+      const g2 = document.createElement('div'); g2.className = 'cf-grid swatches';
       BRAND_COLS.forEach(col => {
         const b = document.createElement('button');
         b.className = 'cf-pick swatch' + (d[k] === col ? ' active' : '');
@@ -4082,32 +4155,46 @@
       fields.appendChild(line(label, g2));
     });
     body.appendChild(fields);
-    paper.appendChild(body);
+
+    /* the sheet runs in two columns so nothing has to wrap and the whole
+       form is on screen at once: particulars down the left, the specimen
+       and the pen down the right */
+    const cols = document.createElement('div');
+    cols.className = 'cf-cols';
+    const left = document.createElement('div');
+    left.className = 'cf-left';
+    left.appendChild(body);
+    cols.appendChild(left);
+    const right = document.createElement('div');
+    right.className = 'cf-right';
 
     const spec = document.createElement('div');
     spec.className = 'cf-specimen';
-    const specCol = document.createElement('div');
-    specCol.style.display = 'flex'; specCol.style.flexDirection = 'column'; specCol.style.alignItems = 'center'; specCol.style.gap = '4px';
-    const sl = document.createElement('small'); sl.textContent = 'SPECIMEN OF THE SIGN'; specCol.appendChild(sl);
-    specCol.appendChild(brandPreview(d));
-    spec.appendChild(specCol);
-    paper.appendChild(spec);
+    const sl = document.createElement('small'); sl.textContent = 'SPECIMEN OF THE SIGN'; spec.appendChild(sl);
+    spec.appendChild(brandPreview(d));
+    right.appendChild(spec);
 
     /* the line to sign */
     const sign = document.createElement('div');
     sign.className = 'cf-sign';
-    const si = document.createElement('i'); si.textContent = 'SIGNED'; sign.appendChild(si);
+    const shead = document.createElement('div');
+    shead.className = 'cf-shead';
+    const sh = document.createElement('small'); sh.textContent = 'SIGNED BY THE FOUNDER'; shead.appendChild(sh);
+    const clear = document.createElement('button');
+    clear.className = 'btn btn-tiny'; clear.type = 'button'; clear.dataset.act = 'company-sigclear'; clear.textContent = 'CLEAR';
+    shead.appendChild(clear);
+    sign.appendChild(shead);
     const padWrap = document.createElement('div');
     padWrap.className = 'cf-pad';
     const pad = document.createElement('canvas');
     pad.id = 'sig-pad'; pad.width = SIGW * 2; pad.height = SIGH * 2;
     padWrap.appendChild(pad);
     const baseline = document.createElement('u'); padWrap.appendChild(baseline);
+    const ghost = document.createElement('em'); ghost.textContent = 'SIGN HERE'; padWrap.appendChild(ghost);
     sign.appendChild(padWrap);
-    const clear = document.createElement('button');
-    clear.className = 'btn btn-tiny'; clear.type = 'button'; clear.dataset.act = 'company-sigclear'; clear.textContent = 'CLEAR';
-    sign.appendChild(clear);
-    paper.appendChild(sign);
+    right.appendChild(sign);
+    cols.appendChild(right);
+    paper.appendChild(cols);
 
     const foot = document.createElement('div');
     foot.className = 'cf-foot';
@@ -7648,7 +7735,11 @@
   cv.addEventListener('pointerleave', () => { ptr.inside = false; });
   cv.addEventListener('pointerenter', () => { ptr.inside = true; });
   cv.addEventListener('contextmenu', ev => ev.preventDefault());
-  window.addEventListener('resize', () => requestAnimationFrame(syncCamPad));
+  window.addEventListener('resize', () => requestAnimationFrame(() => { sizeStage(); syncCamPad(); }));
+  if (window.ResizeObserver) {
+    const ro = new ResizeObserver(() => requestAnimationFrame(() => { sizeStage(); syncCamPad(); }));
+    const row = $('#stage-row'); if (row) ro.observe(row);
+  }
   /* the dock shelf runs sideways, so let a plain wheel roll it along */
   [el.palette, el.farmPalette].forEach(dock => {
     dock.addEventListener('wheel', ev => {
@@ -8160,6 +8251,7 @@
     updateCursorChip();
     requestAnimationFrame(syncCamPad);
     if (S().seenTitle) titleEl.hidden = true;
+    railUp(titleEl.hidden);
     const mb = $('#btn-mute');
     if (mb) mb.textContent = S().muted ? 'SOUND OFF' : 'SOUND ON';
     if (off && (off.laid > 0 || off.hatched > 0 || off.pay > 0)) {

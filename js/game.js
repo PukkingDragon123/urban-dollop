@@ -264,6 +264,7 @@ const GAME = (() => {
      down and no strip of your land is ever stuck behind the buttons. */
   let camPad = 0;
   function setCamPad(px) { camPad = Math.max(0, Math.round(px) || 0); clampCam(); }
+  function getCamPad() { return camPad; }
   function clampCam() {
     const b = ownedBounds();
     const vw = WORLD.view.w, vh = WORLD.view.h;
@@ -3570,7 +3571,7 @@ const GAME = (() => {
     tileBuildable, canPlace, occAt: (c, r) => occ[key(c, r)],
     buyPlot, petMama, petChicken, grabChicken, grabEgg, dropHeld, hitTruck,
     scoopEgg, collectPlume, basketToTruck, basketToInc, basketToGround, sprinkleFeed,
-    sendTruck, build, demolish, setBeltDir, ejectNest, buySkill, upgradeMama, setCamPad,
+    sendTruck, build, demolish, setBeltDir, ejectNest, buySkill, upgradeMama, setCamPad, camPad: getCamPad,
     staffSlots, wagePerSec, canHire, fireStaff, setRole, roleOpen,
     sendFlyers, canFlyer, flyerPrice, hireApplicant, assembleBot, botPrice,
     crewStat, crewSpeed, crewCarry, trait, machineBoost, careBoost, auraR, restCap,

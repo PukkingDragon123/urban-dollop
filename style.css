@@ -41,18 +41,30 @@ canvas{ image-rendering:pixelated; image-rendering:crisp-edges; display:block; }
 button{ font-family:inherit; cursor:pointer; }
 button:focus-visible{ outline:3px dashed var(--pink); outline-offset:2px; }
 
-#app{ max-width:1180px; margin:0 auto; padding:10px 12px; }
+#app{
+  max-width:1440px; margin:0 auto; padding:8px 10px;
+  height:100vh; height:100dvh;
+  display:flex; flex-direction:column; overflow:hidden;
+}
 
-/* ---------- stage ---------- */
+/* ---------- stage ----------
+   The stage and the rail stand side by side and share the window between
+   them, so the whole game is on screen and there is nothing to scroll to. */
+#stage-row{
+  position:relative; flex:1 1 auto; min-height:0;
+  display:flex; flex-direction:row; gap:8px;
+  align-items:center; justify-content:center;
+}
 #stage-wrap{
-  position:relative;
+  position:relative; flex:0 0 auto;
   border:4px solid var(--ink);
   box-shadow:6px 6px 0 var(--shadow);
   background:#8ed254;
   line-height:0;
   overflow:hidden;
 }
-#world{ width:100%; height:auto; cursor:none; touch-action:none; }
+/* the canvas is measured and sized in script; it is never stretched */
+#world{ display:block; cursor:none; touch-action:none; }
 
 /* floating resources — tiny and quiet */
 #res-float{
@@ -200,7 +212,7 @@ button:focus-visible{ outline:3px dashed var(--pink); outline-offset:2px; }
 #res-float .pill.full{ background:rgba(255,214,214,.85); }
 
 /* ---------- the intro and the company form ---------- */
-#intro-ui{ position:absolute; bottom:5%; right:4%; display:flex; gap:8px; }
+#intro-ui{ position:absolute; bottom:14px; right:14px; display:flex; gap:8px; }
 #intro-ui .btn{ font-size:18px; padding:9px 18px; }
 #company-form{
   position:absolute; inset:2% 5%; overflow:auto;
@@ -462,7 +474,7 @@ button:focus-visible{ outline:3px dashed var(--pink); outline-offset:2px; }
   image-rendering:pixelated; image-rendering:crisp-edges;
 }
 #title-buttons{
-  position:absolute; bottom:5%; left:50%; transform:translateX(-50%);
+  position:absolute; bottom:14px; left:50%; transform:translateX(-50%);
   display:flex; gap:10px;
 }
 #title-buttons .btn{ font-size:22px; padding:12px 26px; animation:startPulse 1s steps(2, end) infinite; }
@@ -1391,3 +1403,232 @@ button:focus-visible{ outline:3px dashed var(--pink); outline-offset:2px; }
 .pt-col.active{ outline:4px solid #fff8ec; outline-offset:-1px; transform:translate(1px,1px); box-shadow:none; }
 .pt-size{ display:flex; gap:4px; }
 #poster-tools .btn{ font-size:13px; padding:8px 10px; }
+
+/* ============================================================
+   THE RAIL
+   Every button used to stand on the field: the tool rack across
+   the bottom right, the desk keys across the bottom left, and the
+   dock over both. Now they stand in one rail beside the stage, so
+   the field is only ever field, and the whole game fits the window
+   with nothing to scroll to.
+   ============================================================ */
+#siderail{
+  position:relative;
+  flex:0 0 auto; align-self:stretch;
+  display:flex; flex-direction:column; gap:10px;
+  align-items:center; justify-content:space-evenly;
+  padding:8px 7px;
+  /* a leather strap: lit down its left edge, worn down its right */
+  background:linear-gradient(90deg,#9a6a30 0 3px,#8a5e2a 3px 40%,#7a5024 40%,#63411c);
+  border:4px solid var(--ink);
+  box-shadow:5px 6px 0 var(--shadow), 0 2px 0 rgba(255,255,255,.18) inset;
+  overflow:hidden;
+}
+/* stitched down both long edges, so the strap reads as a strap even
+   where no button stands on it */
+#siderail::before, #siderail::after{
+  content:''; position:absolute; top:6px; bottom:6px; width:2px;
+  background:repeating-linear-gradient(180deg, rgba(255,240,200,.42) 0 5px, transparent 5px 12px);
+  pointer-events:none;
+}
+#siderail::before{ left:4px; }
+#siderail::after{ right:4px; }
+/* the two groups keep their own identity, split by a stitched seam */
+#siderail #deskbar, #siderail #toolbelt{
+  position:static; left:auto; right:auto; bottom:auto;
+  display:grid; grid-template-columns:repeat(2, 54px); gap:5px;
+  align-items:stretch; justify-items:stretch;
+  background:none; border:none; box-shadow:none; padding:0;
+}
+#siderail #toolbelt{
+  padding-top:10px;
+  border-top:3px dashed rgba(255,240,200,.35);
+}
+/* an odd one out sits in the middle of its own row rather than
+   hanging off the left */
+#siderail #deskbar > :last-child:nth-child(odd),
+#siderail #toolbelt > :last-child:nth-child(odd){
+  grid-column:1 / -1; justify-self:center;
+}
+/* rail keys: square, a picture and its name, no room wasted */
+#siderail .desk-btn, #siderail .tool-btn{
+  width:54px; height:56px; padding:2px 0 3px;
+  border-width:4px; box-shadow:0 4px 0 var(--shadow);
+  gap:1px;
+}
+#siderail .desk-btn canvas, #siderail .tool-btn canvas{ transform:scale(.95); }
+#siderail .desk-btn small{ display:block; font-size:7px; letter-spacing:0; }
+#siderail .desk-btn:hover:not(:disabled){ transform:translateY(-3px) scale(1.03); }
+#siderail .desk-btn:active:not(:disabled){ transform:translateY(2px) scale(.96); box-shadow:0 2px 0 var(--shadow); }
+#siderail .tool-btn.active{ transform:translateY(3px); box-shadow:0 1px 0 var(--shadow); }
+#siderail .tool-btn.tool-menu, #siderail .tool-btn.tool-crew{
+  width:54px; height:56px; align-self:auto;
+}
+#siderail .tool-key{ left:-5px; top:-5px; width:17px; height:17px; line-height:17px; font-size:9px; }
+#siderail .lock-badge{ right:-5px; top:-6px; width:19px; height:19px; }
+#siderail .tb-badge{ top:-6px; right:-6px; min-width:20px; height:20px; line-height:20px; font-size:11px; }
+/* the dock is the one thing still allowed over the field, and only
+   while you are holding a brush or a building */
+#build-palette, #farm-palette{ bottom:8px; }
+/* a narrow window lays the rail out under the stage instead */
+@media (max-width:820px), (orientation:portrait){
+  #stage-row{ flex-direction:column; gap:6px; }
+  #siderail{
+    align-self:stretch; flex-direction:row; flex-wrap:wrap;
+    gap:6px; padding:6px; justify-content:center;
+    background:linear-gradient(180deg,#9a6a30 0 3px,#8a5e2a 3px 40%,#7a5024 40%,#63411c);
+  }
+  #siderail::before, #siderail::after{
+    top:auto; bottom:auto; left:6px; right:6px; width:auto; height:2px;
+    background:repeating-linear-gradient(90deg, rgba(255,240,200,.42) 0 5px, transparent 5px 12px);
+  }
+  #siderail::before{ top:4px; }
+  #siderail::after{ bottom:4px; }
+  #siderail #deskbar, #siderail #toolbelt{
+    grid-template-columns:repeat(7, 44px); gap:4px;
+  }
+  #siderail #toolbelt{ padding-top:0; border-top:none; border-left:3px dashed rgba(255,240,200,.35); padding-left:6px; }
+  #siderail .desk-btn, #siderail .tool-btn,
+  #siderail .tool-btn.tool-menu, #siderail .tool-btn.tool-crew{ width:44px; height:44px; box-shadow:0 3px 0 var(--shadow); padding:0; }
+  #siderail .desk-btn canvas, #siderail .tool-btn canvas{ transform:scale(.9); }
+  #siderail .desk-btn small{ display:none; }
+}
+@media (max-width:520px){
+  #siderail #deskbar, #siderail #toolbelt{ grid-template-columns:repeat(4, 44px); }
+}
+/* the title card is composed at the stage's own size in script, so it
+   scales by a whole number and needs no cropping or squashing */
+/* an empty strap while the title screen is up: no keys to press yet, and
+   no jump in the stage's width when they arrive */
+#app.title-up #siderail > *{ visibility:hidden; }
+#app.title-up #siderail{ pointer-events:none; }
+
+/* ============================================================
+   NOTHING BELOW THE FOLD
+   A panel is never taller than the window. The head and the tabs
+   stay put and the long list inside scrolls under them, so the
+   close button and the page tabs are always where you left them.
+   ============================================================ */
+.modal{ align-items:center; padding:10px; overflow:hidden; }
+.modal-panel{
+  max-height:calc(100vh - 20px); max-height:calc(100dvh - 20px);
+  display:flex; flex-direction:column; overflow:hidden auto;
+}
+.modal-panel > *{ flex:0 0 auto; }
+.modal-panel > .modal-head{ margin-bottom:8px; }
+/* the pages that run long do their own scrolling */
+#pedia, #depot-body, #hire-list{ flex:1 1 auto; min-height:0; overflow-y:auto; }
+#pedia{ padding-bottom:6px; }
+/* the book's tabs hang off its right edge and the office wears rings of
+   card, so those two panels must not clip what sticks out of them - the
+   page inside each does its own scrolling instead */
+.modal-panel.book, .modal-panel.office{ overflow:visible; }
+.modal-panel.book{ padding:12px 20px 16px 28px; }
+.modal-panel.book #index-tabs{ top:50px; gap:5px; max-height:calc(100% - 58px); }
+.modal-panel.book .tab-btn{ padding:10px 7px; letter-spacing:0; }
+/* eight tabs of upright lettering need a short window to give a little:
+   they stay in one column rather than wrapping behind the book */
+@media (max-height:840px){ .modal-panel.book .tab-btn{ padding:7px 6px; font-size:10px; } }
+@media (max-height:740px){ .modal-panel.book .tab-btn{ padding:5px 6px; font-size:9px; } }
+@media (max-height:640px){ .modal-panel.book .tab-btn{ padding:4px 5px; font-size:8px; } }
+@media (max-width:700px){
+  .modal{ padding:6px; }
+  .modal-panel{ max-height:calc(100vh - 12px); max-height:calc(100dvh - 12px); padding:12px; }
+  .modal-head h2{ font-size:16px; }
+}
+
+/* ============================================================
+   THE CERTIFICATE
+   Ruled paper, a red margin, two punched holes and a stamp. It
+   runs in two columns - the particulars down the left, the
+   specimen of the sign and the line to sign down the right - so
+   nothing wraps onto its own orphan row and the whole sheet is on
+   screen with FILE IT in reach.
+   ============================================================ */
+#company-form{
+  inset:0; padding:10px;
+  align-items:center; justify-content:center;
+  background:rgba(10,16,12,.74);
+}
+.cf-paper{
+  width:min(740px, 100%);
+  max-height:100%; overflow:auto;
+  padding:10px 18px 12px 42px;
+  transform:rotate(-.4deg);
+  /* the stage kills line-height to close the gap under the canvas; paper
+     is prose, so it gets its leading back or wrapped lines pile up */
+  line-height:1.3;
+}
+.cf-cols{
+  display:grid; grid-template-columns:minmax(0,1fr) auto;
+  gap:8px 16px; align-items:start;
+  margin-top:2px;
+}
+.cf-left{ min-width:0; }
+.cf-right{
+  width:250px; align-self:stretch;
+  display:flex; flex-direction:column; gap:11px;
+  border-left:3px dotted rgba(122,90,58,.4); padding-left:14px;
+}
+.cf-body{ gap:11px; }
+.cf-fields{ gap:5px; }
+/* the twelve marks make a tidy six by two, never eleven and a stray */
+.cf-grid.marks{ display:grid; grid-template-columns:repeat(6, 34px); gap:5px; }
+.cf-grid.swatches{ display:grid; grid-template-columns:repeat(6, 27px); gap:4px; }
+.cf-pick.swatch{ width:27px; height:27px; }
+.cf-pick.active{ outline:3px solid var(--ink); outline-offset:2px; box-shadow:2px 2px 0 var(--shadow); transform:none; }
+.cf-pick.active::after{
+  content:''; position:absolute; inset:-8px -3px auto auto;
+  width:9px; height:9px; background:var(--pink-dark);
+  box-shadow:0 0 0 2px var(--ink);
+}
+.cf-pick{ position:relative; }
+/* the specimen: its caption sits above the board, clear of it */
+.cf-specimen{
+  display:flex; flex-direction:column; align-items:flex-start; gap:5px;
+  margin:0;
+}
+.cf-specimen small{ letter-spacing:1px; }
+.brand-preview{ width:100%; max-width:230px; }
+/* the pen: a ruled block with an X where the name goes */
+.cf-sign{ display:flex; flex-direction:column; align-items:stretch; gap:5px; margin:0; }
+.cf-sign small{ font-family:var(--font-px); font-size:8px; letter-spacing:1px; color:var(--ink-soft); }
+.cf-shead{ display:flex; align-items:center; gap:8px; }
+.cf-shead small{ flex:1; min-width:0; }
+.cf-sign .btn.btn-tiny{ flex:none; font-size:9px; padding:4px 6px; box-shadow:2px 2px 0 var(--shadow); }
+.cf-pad{
+  position:relative; flex:none; width:100%; max-width:230px; min-width:0;
+  background:
+    repeating-linear-gradient(0deg, rgba(96,126,166,.26) 0 1px, transparent 1px 13px),
+    linear-gradient(180deg, rgba(255,255,255,.78), rgba(255,252,240,.6));
+  border:3px dashed var(--ink-soft);
+  box-shadow:inset 2px 2px 0 rgba(122,90,58,.14);
+}
+#sig-pad{ max-width:100%; border:none; background:transparent; position:relative; z-index:2; }
+.cf-pad::after{ left:6px; bottom:11px; font-size:13px; z-index:3; }
+.cf-pad u{ left:20px; right:10px; bottom:17px; border-bottom:2px dotted var(--ink-soft); z-index:1; }
+.cf-pad.signed u{ border-bottom-style:solid; border-bottom-color:var(--ink); }
+/* a ghost of the instruction, which the first stroke covers over */
+.cf-pad em{
+  position:absolute; left:24px; bottom:28px; z-index:1;
+  font-style:normal; font-family:var(--font-px); font-size:9px; letter-spacing:2px;
+  color:rgba(122,90,58,.3); pointer-events:none; line-height:1;
+}
+.cf-pad.signed em{ display:none; }
+.cf-foot{
+  border-top:3px double var(--ink); margin-top:8px; padding-top:7px;
+  gap:12px; align-items:center;
+}
+.cf-foot small{ font-family:var(--font-px); font-size:9px; letter-spacing:1px; }
+.cf-letterhead{ padding:2px 96px 6px 0; margin-bottom:6px; }
+@media (max-width:760px){
+  .cf-paper{ padding:10px 12px 12px 30px; }
+  .cf-cols{ grid-template-columns:minmax(0,1fr); }
+  .cf-right{
+    width:auto; border-left:none; padding-left:0;
+    border-top:3px dotted rgba(122,90,58,.4); padding-top:9px;
+    flex-direction:row; flex-wrap:wrap; gap:12px;
+  }
+  .cf-specimen, .cf-sign{ flex:1 1 210px; }
+  .cf-grid.marks{ grid-template-columns:repeat(6, 30px); }
+}

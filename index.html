@@ -13,6 +13,7 @@
 <body>
 <div id="app">
 
+ <div id="stage-row">
   <div id="stage-wrap">
     <canvas id="world" width="1152" height="624"></canvas>
 
@@ -26,8 +27,6 @@
       </div>
     </div>
 
-    <div id="deskbar"></div>
-    <div id="toolbelt"></div>
     <div id="build-palette" hidden></div>
     <div id="farm-palette" hidden></div>
     <div id="trip-view" hidden>
@@ -58,6 +57,13 @@
     <div id="quest-dialogue" hidden></div>
     <div id="cursor-chip" hidden></div>
   </div>
+
+  <!-- THE RAIL: every button that used to stand on the field -->
+  <div id="siderail">
+    <div id="deskbar"></div>
+    <div id="toolbelt"></div>
+  </div>
+ </div>
 
   <!-- RESEARCH: the computer on the Lab desk -->
   <div class="modal lab" id="modal-skills" hidden>
