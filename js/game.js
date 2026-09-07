@@ -12,12 +12,14 @@ const SAVE_KEY = 'infEggCoSave_v7';
    the home plot is bottom-left, and the road runs along its foot. */
 const WORLD = {
   T: 16, COLS: 80, ROWS: 52,
-  W: 1280, H: 832,
-  roadY: 800,                                /* road rows 50-51, bottom plots only */
+  W: 1280, H: 928,                           /* the last 96px are the road and the town over it */
+  roadY: 800,                                /* the kerb on your side; the road runs 48px deep */
+  roadH: 48,                                 /* three tile rows of tarmac, two lanes and a line */
+  farY: 848,                                 /* the far kerb: footpath, then the town frontage */
   view: { w: 384, h: 208 },                  /* camera viewport */
   mama: { x: 118, y: 688 },
   truckHome: { x: 150, y: 796, w: 56, h: 32 },
-  layby: { x: 236, y: 784, w: 96, h: 16 },      /* gravel shoulder where customers pull up */
+  layby: { x: 236, y: 784, w: 160, h: 16 },     /* gravel shoulder where customers pull up */
   stations: {
     lab:      { x: 18,  y: 638, w: 30, h: 32 },   /* the Lab, home of EGGOS */
     stand:    { x: 56,  y: 644, w: 16, h: 24 },   /* the Index bookstand */
@@ -53,7 +55,7 @@ const GAME = (() => {
       hatchers: {}, splitters: {}, loaders: {},
       polishers: {}, graders: {}, dynamos: {},
       barns: {}, troughs: {}, wells: {}, sprinklers: {}, mills: {}, coops: {}, boards: {}, hqs: {},
-      beehives: {}, genelabs: {}, kitchens: {}, parks: {}, timemachines: {},
+      beehives: {}, genelabs: {}, billboards: {}, kitchens: {}, parks: {}, timemachines: {},
       secrets: {},           /* secret id -> when it was found */
       cooked: {},            /* recipe id -> dishes made */
       fossils: [],           /* bones lying on the ground {id,x,y,z,vz,seed} */
@@ -70,6 +72,8 @@ const GAME = (() => {
       ledger: { hist: [], acc: 0, t: 0, sales: 0, orders: 0, honey: 0, quests: 0, stocks: 0, empire: 0, food: 0, park: 0, secrets: 0 },
       empire: { open: { valley: true }, branches: {}, t: 0, rocket: 0, moonT: 0 },   /* the rest of the world, and the Moon */
       market: { t: 0, px: {}, hist: {}, held: {} },
+      boss: { x: WORLD.mama.x + 34, y: WORLD.mama.y + 4, dir: -1, frame: 0, anim: 0,
+              state: 'idle', t: 2, tx: 0, ty: 0, at: null, line: null, lineT: 0, pose: 'stand', said: null },
       seenIntro: false,
       weather: { t: 150, rain: false, left: 0, after: 0 },   /* showers water every crop on the ranch */
       soil: {},              /* "c,r" -> {crop, growth, water, seed} tilled ground */
@@ -103,7 +107,7 @@ const GAME = (() => {
                bred: 0, plumes: 0, culled: 0, wagesPaid: 0, staffEggs: 0, hired: 0, flyers: 0,
                planted: 0, harvested: 0, feedMade: 0, grown: 0, trips: 0, shaped: 0, planted2: 0,
                mamaFed: 0, watered: 0, builtN: 0, orders: 0, ordersMissed: 0, edits: 0, storeys: 0,
-               honey: 0, questsDone: 0, trades: 0, rains: 0, vips: 0, regions: 0, branches: 0,
+               honey: 0, questsDone: 0, trades: 0, rains: 0, vips: 0, regions: 0, branches: 0, posters: 0, bossPets: 0,
                cooked: 0, dishes: 0, roasts: 0, ranked: 0, champions: 0, secrets: 0, visitors: 0,
                celestial: 0, fossils: 0, dinos: 0, dinoShown: 0, mamaPets: 0 },
       muted: false, last: Date.now(),
@@ -251,6 +255,8 @@ const GAME = (() => {
       x0 = Math.min(x0, p.tc * 16); y0 = Math.min(y0, p.tr * 16);
       x1 = Math.max(x1, (p.tc + PLOT_W) * 16); y1 = Math.max(y1, (p.tr + PLOT_H) * 16);
     });
+    /* own anything on the road row and you may look over the road at the town */
+    if (y1 >= PLOT_ROWS * PLOT_H * 16) y1 = WORLD.H;
     return { x0, y0, x1, y1 };
   }
   /* the tool dock floats over the foot of the screen. camPad is how many
@@ -308,6 +314,7 @@ const GAME = (() => {
     box(S.graders, 'grader', 2, 1);
     two(S.dynamos, 'dynamo');
     Object.keys(S.beehives).forEach(k => occ[k] = { type: 'beehive', k });
+    two(S.billboards, 'billboard');
     two(S.genelabs, 'genelab');
     two(S.kitchens, 'kitchen');
     box(S.parks, 'park', 3, 3);
@@ -2268,6 +2275,9 @@ const GAME = (() => {
     note('quest', 'Quest done: ' + q.name + '.');
     mark('skills');
     emit('quest', { q });
+    /* the founder takes the credit, then points at the next thing */
+    bossSay(BOSS_DONE[S.stats.questsDone % BOSS_DONE.length], 6, 'cheer');
+    bossOnQuest(currentQuest());
   }
 
   /* ---------- the ledger and the market ---------- */
@@ -2409,7 +2419,8 @@ const GAME = (() => {
   const cars = [];
   let carT = 3;
   const pickOne = a => a[Math.floor(Math.random() * a.length)];
-  function laneY(dir) { return dir === 1 ? WORLD.roadY + 15 : WORLD.roadY + 2; }
+  /* the near lane runs east, the far lane west, with the dashes between them */
+  function laneY(dir) { return dir === 1 ? WORLD.roadY + 28 : WORLD.roadY + 6; }
   function tickTraffic(dt) {
     carT -= dt;
     if (carT <= 0 && cars.length < 4) {
@@ -2432,8 +2443,26 @@ const GAME = (() => {
                           'DEL THE DRIVER', 'TWO KIDS', 'THE MAYOR', 'A PAINTER', 'NURSE KAY', 'THE TWINS', 'A BUSKER'];
   function orderSpots() {
     const L = WORLD.layby;
-    return [{ x: L.x + 6, y: L.y - 8 }, { x: L.x + 54, y: L.y - 8 }];
+    return [{ x: L.x + 6, y: L.y - 8 }, { x: L.x + 58, y: L.y - 8 }, { x: L.x + 110, y: L.y - 8 }];
   }
+  /* ---------- billboards: paint a poster, pull the road in ---------- */
+  function billboardPull() {
+    return Object.keys(S.billboards).reduce((a, k) =>
+      a + 1 + (S.billboards[k].custom ? ECON.billboardArt : 0), 0);
+  }
+  function billboardArt(k) { const b = S.billboards[k]; return b ? b.art : null; }
+  function setBillboardArt(k, art, custom) {
+    const b = S.billboards[k];
+    if (!b || typeof art !== 'string') return false;
+    b.art = art;
+    b.custom = !!custom;
+    if (custom) S.stats.posters++;
+    mark('build');
+    emit('poster', { k, custom: !!custom });
+    return true;
+  }
+  function maxOrders() { return ECON.maxOrders + Math.min(1, Math.floor(billboardPull() / 2)); }
+  function orderWait() { return ECON.orderEvery / (1 + ECON.billboardPull * billboardPull()); }
   function orderTierPool() {
     const pool = [S.mamaTier];
     S.chickens.forEach(ch => { if (!isChick(ch)) pool.push(SPECIES[ch.sp].tier); });
@@ -2447,7 +2476,8 @@ const GAME = (() => {
     const vip = S.stats.orders >= 2 && Math.random() < ECON.vipChance;
     let n = 2 + Math.floor(Math.random() * Math.min(7, 2 + Math.floor(S.day / 2) + Math.floor(S.chickens.length / 4)));
     if (vip) n += 3;
-    const unit = Math.round(eggValue(tier, false) * ECON.orderPay * (vip ? ECON.vipPay : 1));
+    const unit = Math.round(eggValue(tier, false) * ECON.orderPay * (vip ? ECON.vipPay : 1)
+                            * (1 + ECON.billboardPay * billboardPull()));
     const wait = vip ? ECON.vipTime : ECON.orderTime;
     return { id: nextId++, tier, n, got: 0, unit, pay: unit * n, t: wait, T: wait, vip,
              who: vip ? pickOne(VIP_NAMES) : pickOne(CUSTOMER_NAMES),
@@ -2458,9 +2488,9 @@ const GAME = (() => {
     if (lvl('orders')) {
       S.orderT -= dt;
       if (S.orderT <= 0) {
-        S.orderT = ECON.orderEvery * (0.6 + Math.random() * 0.8);
-        const spot = [0, 1].find(i => !S.orders.some(q => q.spot === i && q.state !== 'leave'));
-        if (spot !== undefined && S.orders.filter(o => o.state !== 'leave').length < ECON.maxOrders) S.orders.push(newOrder(spot));
+        S.orderT = orderWait() * (0.6 + Math.random() * 0.8);
+        const spot = orderSpots().map((_, i) => i).find(i => !S.orders.some(q => q.spot === i && q.state !== 'leave'));
+        if (spot !== undefined && S.orders.filter(o => o.state !== 'leave').length < maxOrders()) S.orders.push(newOrder(spot));
       }
     }
     for (let i = S.orders.length - 1; i >= 0; i--) {
@@ -2566,7 +2596,7 @@ const GAME = (() => {
     const pending = Object.keys(S.sites);
     if (!movers.van) {
       if (!pending.length) return;
-      movers.van = { x: -90, y: WORLD.roadY + 15, tx: 0, state: 'arrive', anim: 0 };
+      movers.van = { x: -90, y: WORLD.roadY + 26, tx: 0, state: 'arrive', anim: 0 };
       movers.crew = MOVER_LOOKS.map((look, i) => ({ id: 9000 + i, x: -90, y: WORLD.roadY, dir: 1, frame: 0, anim: 0, state: 'van', look, job: null, hammer: 0 }));
       emit('movers', { state: 'coming' });
     }
@@ -2643,6 +2673,7 @@ const GAME = (() => {
     else if (type === 'hq') S.hqs[k] = { built: Date.now() };
     else if (type === 'beehive') S.beehives[k] = { t: 0 };
     else if (type === 'genelab') S.genelabs[k] = { built: Date.now() };
+    else if (type === 'billboard') S.billboards[k] = { art: null, custom: false, seed: Math.floor(Math.random() * 9999) };
     else if (type === 'kitchen') S.kitchens[k] = { pantry: [], recipe: 'omelette', cook: null, counter: [], sold: 0 };
     else if (type === 'park') S.parks[k] = { slots: [], t: 0, visitors: 0 };
     else if (type === 'timemachine') S.timemachines[k] = { on: false, t: 0, T: 0, made: 0 };
@@ -2738,6 +2769,8 @@ const GAME = (() => {
       delete S.beehives[k]; S.built.beehive = Math.max(0, S.built.beehive - 1);
     } else if (o.type === 'genelab') {
       delete S.genelabs[k]; S.built.genelab = Math.max(0, S.built.genelab - 1);
+    } else if (o.type === 'billboard') {
+      delete S.billboards[k]; S.built.billboard = Math.max(0, S.built.billboard - 1);
     } else if (o.type === 'kitchen') {
       S.kitchens[k].pantry.forEach((e, i) => spawnEgg(kc * 16 + 6 + (i % 8) * 3, kr * 16 + 30, e.tier, e.golden, e.rainbow));
       delete S.kitchens[k]; S.built.kitchen = Math.max(0, S.built.kitchen - 1);
@@ -3017,7 +3050,7 @@ const GAME = (() => {
     const v = ECON.ticketBase * parkAppeal(k) * (1 + 0.15 * lvl('tickets')) * (lvl('giftshop') ? 1.3 : 1) * (lvl('nightshow') ? 1.5 : 1) * tycoon();
     return Math.round(v);
   }
-  function busEvery() { return ECON.parkBusEvery / (lvl('busstop') ? 1.5 : 1); }
+  function busEvery() { return ECON.parkBusEvery / (lvl('busstop') ? 1.5 : 1) / (1 + 0.12 * billboardPull()); }
   function tickParks(dt) {
     for (const k of Object.keys(S.parks)) {
       const p = S.parks[k];
@@ -3146,6 +3179,128 @@ const GAME = (() => {
     }
   }
 
+  /* ============================================================
+     THE FOUNDER
+     A raccoon with a plan, walking his own farm. He heads for
+     whatever the current job is about, says his piece over the
+     fence, and takes the credit the moment it lands.
+     ============================================================ */
+  function boss() { return S.boss; }
+  function bossSay(line, secs, pose) {
+    const b = S.boss;
+    if (!b || !line) return false;
+    b.line = line;
+    b.lineT = secs || 6;
+    b.pose = pose || 'stand';
+    emit('boss', { line, pose: b.pose });
+    return true;
+  }
+  /* where on the farm a job actually happens */
+  function bossSpot(where) {
+    const W2 = WORLD;
+    if (where === 'mama') return { x: W2.mama.x + 30, y: W2.mama.y + 2, at: 'mama' };
+    if (where === 'lab') return { x: W2.stations.lab.x + 38, y: W2.stations.lab.y + 18, at: 'lab' };
+    if (where === 'truck') return { x: W2.truckHome.x + 62, y: W2.truckHome.y - 34, at: 'truck' };
+    if (where === 'road') { const e = roadEntry(); return { x: Math.max(20, e.x - 70), y: W2.roadY - 34, at: 'road' }; }
+    if (where === 'inc') {
+      const k = Object.keys(S.incs)[0] || W2.starterInc.join(',');
+      const [c, r] = k.split(',').map(Number);
+      return { x: c * 16 + 36, y: r * 16 + 22, at: 'inc' };
+    }
+    /* the field: a crop if there is one, else anywhere he owns */
+    const soil = Object.keys(S.soil);
+    if (soil.length) {
+      const [c, r] = soil[Math.floor(Math.random() * soil.length)].split(',').map(Number);
+      return { x: c * 16 + 18, y: r * 16 + 4, at: 'field' };
+    }
+    const owned = PLOTS.filter(p => S.plots[p.id]);
+    const p = owned[Math.floor(Math.random() * owned.length)] || PLOTS[PLOT_START];
+    return { x: p.tc * 16 + 30 + Math.random() * (PLOT_W * 16 - 60),
+             y: p.tr * 16 + 30 + Math.random() * (PLOT_H * 16 - 60), at: 'field' };
+  }
+  function bossGo(where) {
+    const sp = bossSpot(where);
+    const b = S.boss;
+    b.tx = Math.max(12, Math.min(WORLD.W - 26, sp.x));
+    b.ty = Math.max(24, Math.min(WORLD.roadY - 30, sp.y));
+    b.at = sp.at;
+    b.state = 'walk';
+    b.t = 26;                                  /* give up and stand about after this long */
+  }
+  function bossWalk(dt) {
+    const b = S.boss;
+    const dx = b.tx - b.x, dy = b.ty - b.y, d = Math.hypot(dx, dy);
+    if (d < 3) return true;
+    const sp = 26 * groundSpeed(b.x + 10, b.y + 20) * dt;
+    b.dir = dx > 0 ? 1 : -1;
+    let nx = b.x + dx / d * Math.min(d, sp), ny = b.y + dy / d * Math.min(d, sp);
+    if (inPond(nx + 10, ny + 22) || !inOwned(nx + 10, ny + 22)) { nx = b.x; ny = b.y; b.t = Math.min(b.t, 0.2); }
+    b.x = nx; b.y = ny;
+    b.anim += sp;
+    if (b.anim > 5) { b.anim = 0; b.frame ^= 1; }
+    return false;
+  }
+  const pickLine = arr => arr[Math.floor(Math.random() * arr.length)];
+  /* what he has to say where he is standing: the job first, then the place */
+  function bossLineHere() {
+    const q = currentQuest();
+    if (q && q.where === S.boss.at && S.boss.said !== q.id) { S.boss.said = q.id; return q.say; }
+    const at = BOSS_AT[S.boss.at];
+    if (at && Math.random() < 0.6) return pickLine(at);
+    return pickLine(BOSS_IDLE);
+  }
+  function tickBoss(dt) {
+    const b = S.boss;
+    if (!b || !S.company.done) return;
+    if (b.lineT > 0) { b.lineT -= dt; if (b.lineT <= 0) { b.line = null; if (b.pose === 'cheer' || b.pose === 'read') b.pose = 'stand'; } }
+    b.t -= dt;
+    if (b.state === 'walk') {
+      if (bossWalk(dt) || b.t <= 0) {
+        b.state = 'talk';
+        b.t = 3 + Math.random() * 3;
+        bossSay(bossLineHere(), 6, 'stand');
+      }
+      return;
+    }
+    if (b.t > 0) return;
+    if (b.state === 'talk') {
+      /* a breather: he reads the ledger, or just stands and admires it */
+      b.state = 'idle';
+      b.t = 4 + Math.random() * 6;
+      b.pose = Math.random() < 0.35 ? 'read' : 'stand';
+      return;
+    }
+    /* off to the next thing - wherever the current job is, most of the time */
+    const q = currentQuest();
+    b.pose = 'stand';
+    bossGo(q && Math.random() < 0.7 ? q.where : 'field');
+  }
+  /* a fresh job: he goes and stands where it happens, and says so */
+  function bossOnQuest(q) {
+    const b = S.boss;
+    if (!b || !q) return;
+    b.said = null;
+    if (b.at !== q.where) { bossGo(q.where); return; }
+    /* already standing in the right place: he says it as soon as he stops cheering */
+    b.said = q.id;
+    b.state = 'talk';
+    b.t = Math.max(b.t, b.lineT + 1);
+    setTimeout(() => { if (S.boss === b && b.said === q.id && !b.line) bossSay(q.say, 8, 'stand'); }, 0);
+  }
+  function bossTap() {
+    const b = S.boss;
+    if (!b) return null;
+    S.stats.bossPets++;
+    const q = currentQuest();
+    bossSay(q ? q.say : pickLine(BOSS_IDLE), 7, S.stats.bossPets % 4 === 0 ? 'cheer' : 'stand');
+    return q;
+  }
+  function bossAt(x, y) {
+    const b = S.boss;
+    if (!b || !S.company.done) return null;
+    return (x > b.x - 2 && x < b.x + 22 && y > b.y - 8 && y < b.y + 26) ? b : null;
+  }
+
   /* ---------- master tick ---------- */
   function tick(dt) {
     tickMama(dt);
@@ -3167,6 +3322,7 @@ const GAME = (() => {
     tickOrders(dt);
     moversTick(dt);
     tickQuests();
+    tickBoss(dt);
     tickLedger(dt);
     tickMarket(dt);
     tickWeather(dt);
@@ -3311,7 +3467,7 @@ const GAME = (() => {
       S.bots = Object.assign({ cull: 0, match: 0 }, S.bots);
       ['huts', 'silos', 'blowers', 'sorters', 'fences', 'hatchers', 'splitters', 'loaders',
        'barns', 'troughs', 'wells', 'sprinklers', 'mills', 'coops', 'boards', 'hqs', 'soil',
-       'paint', 'deco', 'polishers', 'graders', 'dynamos', 'beehives', 'genelabs', 'sites', 'storeys', 'quests',
+       'paint', 'deco', 'polishers', 'graders', 'dynamos', 'beehives', 'genelabs', 'sites', 'storeys', 'quests', 'billboards',
        'kitchens', 'parks', 'timemachines', 'secrets', 'cooked'].forEach(m => { if (!S[m]) S[m] = {}; });
       if (!Array.isArray(S.fossils)) S.fossils = [];
       if (!Array.isArray(S.visitors)) S.visitors = [];
@@ -3333,6 +3489,10 @@ const GAME = (() => {
       S.ledger = Object.assign({ hist: [], acc: 0, t: 0, sales: 0, orders: 0, honey: 0, quests: 0, stocks: 0 }, S.ledger || {});
       if (!Array.isArray(S.ledger.hist)) S.ledger.hist = [];
       S.market = Object.assign({ t: 0, px: {}, hist: {}, held: {} }, S.market || {});
+      S.boss = Object.assign(freshState().boss, S.boss || {});
+      S.boss.line = null; S.boss.lineT = 0; S.boss.state = 'idle'; S.boss.t = 2; S.boss.said = null;
+      if (!inOwned(S.boss.x + 10, S.boss.y + 22)) { S.boss.x = WORLD.mama.x + 34; S.boss.y = WORLD.mama.y + 4; }
+      Object.values(S.billboards).forEach(b => { if (typeof b.art !== 'string') b.art = null; });
       S.stats = Object.assign(freshState().stats, S.stats || {});
       Object.values(S.sites).forEach(st => { if (typeof st.t !== 'number') st.t = 0; });
       if (!toolOpen(S.tool)) S.tool = 'hand';
@@ -3425,7 +3585,9 @@ const GAME = (() => {
     toolOpen, depotOpen, incCapAt,
     questProgress, questDone, currentQuest,
     get cars() { return cars; }, get movers() { return movers; },
-    orderAt, orderSpots, giveEgg, basketToOrder,
+    orderAt, orderSpots, giveEgg, basketToOrder, maxOrders, orderWait,
+    billboardPull, billboardArt, setBillboardArt,
+    boss, bossSay, bossTap, bossAt, bossGo,
     siteFor, storeyMult, canStorey, addStorey, storeyCost, finishSites: () => Object.keys(S.sites).forEach(finishSite),
     cropSpeed, cropTimeLeft, beeBoost,
     genesOf, gene, chScore, bestChickens, hasGeneLab, chLayTime,

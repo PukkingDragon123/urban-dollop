@@ -17,11 +17,13 @@
     <canvas id="world" width="1152" height="624"></canvas>
 
     <div id="res-float">
-      <span class="pill" id="pill-coins"><b id="r-coins">0</b></span>
-      <span class="pill" id="pill-feathers"><b id="r-feathers">0</b></span>
-      <span class="pill" id="pill-feed" title="Feed pellets in the barn"><b id="r-feed">0/40</b></span>
-      <span class="pill" id="pill-cap" title="Chickens on the ranch"><b id="r-cap">0/10</b></span>
-      <button class="pill" id="pill-age" data-act="open-ages" title="The age the company is in"><b id="r-age">STRAW AGE</b></button>
+      <div class="hud-bar">
+        <span class="pill" id="pill-coins" title="Coins in the company account"><b id="r-coins">0</b></span>
+        <span class="pill" id="pill-feathers" title="Feathers, for research at the Lab"><b id="r-feathers">0</b></span>
+        <span class="pill" id="pill-feed" title="Feed pellets in the barn"><b id="r-feed">0/40</b></span>
+        <span class="pill" id="pill-cap" title="Chickens on the ranch"><b id="r-cap">0/10</b></span>
+        <button class="pill" id="pill-age" data-act="open-ages" title="The age the company is in - tap for what the next one needs"><b id="r-age">STRAW AGE</b></button>
+      </div>
     </div>
 
     <div id="deskbar"></div>
@@ -53,8 +55,7 @@
       </div>
       <div id="company-form" hidden></div>
     </div>
-    <div id="quest-card" hidden></div>
-    <div id="bubble" hidden></div>
+    <div id="quest-dialogue" hidden></div>
     <div id="cursor-chip" hidden></div>
   </div>
 
@@ -138,6 +139,21 @@
     <div class="modal-panel genes">
       <button class="btn btn-tiny genes-close" data-act="close-modal">X</button>
       <div id="world-body"></div>
+    </div>
+  </div>
+
+  <!-- THE BILLBOARD: paint the poster that pulls the road in -->
+  <div class="modal" id="modal-poster" hidden>
+    <div class="modal-panel poster">
+      <div class="modal-head">
+        <h2>THE BILLBOARD</h2>
+        <span class="panel-sub" id="poster-sub"></span>
+        <button class="btn btn-tiny" data-act="close-modal">CLOSE</button>
+      </div>
+      <div id="poster-wrap">
+        <canvas id="poster-canvas" width="700" height="350"></canvas>
+      </div>
+      <div id="poster-tools"></div>
     </div>
   </div>
 

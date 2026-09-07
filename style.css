@@ -1295,3 +1295,86 @@ button:focus-visible{ outline:3px dashed var(--pink); outline-offset:2px; }
   transition:opacity .12s ease;
 }
 #build-palette, #farm-palette{ transition:opacity .18s ease; }
+
+/* ============================================================
+   v20 - ONE HUD BAR, THE FOUNDER'S DIALOGUE, THE POSTER DESK
+   The five floating pills were five boxes fighting for the same
+   corner. They are one bar now. The quest card became the
+   raccoon talking, so it wears a portrait and sits under the bar
+   where nothing else wants to be.
+   ============================================================ */
+#res-float{ left:10px; top:10px; gap:0; }
+.hud-bar{
+  display:flex; align-items:stretch;
+  background:rgba(255,249,236,.94);
+  border:4px solid var(--ink);
+  box-shadow:3px 4px 0 var(--shadow);
+}
+.hud-bar .pill{
+  background:none; border:none; box-shadow:none;
+  padding:8px 11px; gap:6px;
+}
+.hud-bar .pill + .pill{ border-left:3px dotted rgba(122,90,58,.45); }
+.hud-bar .pill.full{ background:rgba(255,206,206,.95); }
+.hud-bar .pill.full b{ color:#a8321c; }
+#res-float .pill{ background:none; box-shadow:none; border-width:0; }
+#pill-age{ pointer-events:auto; cursor:pointer; font-family:var(--font-px); }
+#pill-age:hover{ background:rgba(255,232,150,.55); }
+
+/* ---------- the founder's dialogue ---------- */
+#quest-dialogue{
+  position:absolute; left:10px; top:62px; z-index:12;
+  width:min(348px, 58%);
+  display:flex; gap:0; align-items:stretch;
+  background:linear-gradient(180deg,#fffaef 0 42%, #f6ead2 42%);
+  border:4px solid var(--ink);
+  box-shadow:4px 5px 0 var(--shadow);
+  cursor:pointer; text-align:left; line-height:1.1;
+  transition:transform .1s var(--pop), filter .1s ease;
+}
+#quest-dialogue:hover{ transform:translateY(-2px); filter:brightness(1.04); }
+#quest-dialogue.done{ background:linear-gradient(180deg,#f0ffe0 0 42%, #dcf3c0 42%); }
+.qd-face{
+  flex:none; width:62px; display:flex; align-items:flex-end; justify-content:center;
+  background:linear-gradient(180deg,#c9dcf0 0 62%, #8fbf5f 62%);
+  border-right:4px solid var(--ink);
+  overflow:hidden; line-height:0;
+}
+.qd-face canvas{ image-rendering:pixelated; margin-bottom:-2px; }
+.qd-body{ flex:1; min-width:0; padding:7px 9px 8px; display:flex; flex-direction:column; gap:4px; }
+.qd-top{ display:flex; align-items:baseline; gap:6px; }
+.qd-top b{ font-family:var(--font-px); font-size:11px; color:var(--ink); }
+.qd-top small{ font-family:var(--font-px); font-size:8px; color:var(--pink-dark); margin-left:auto; letter-spacing:1px; }
+.qd-say{ font-size:25px; color:var(--ink); }
+.qd-job{ display:flex; align-items:center; gap:6px; }
+.qd-job canvas{ image-rendering:pixelated; flex:none; }
+.qd-job i{ font-style:normal; font-family:var(--font-px); font-size:9px; color:var(--ink-soft); }
+.qd-rail{ position:relative; height:11px; border:3px solid var(--ink); background:#fff; }
+.qd-rail s{ display:block; height:100%; background:var(--gold); text-decoration:none; }
+.qd-rail i{ position:absolute; right:3px; top:-4px; font-style:normal; font-family:var(--font-px); font-size:8px; color:var(--ink); }
+@media (max-width:700px){
+  #quest-dialogue{ width:min(300px, 74%); top:52px; }
+  .qd-say{ font-size:22px; }
+  .qd-face{ width:48px; }
+  .hud-bar .pill{ padding:5px 7px; font-size:17px; gap:4px; }
+  .hud-bar .pill canvas{ transform:scale(1); }
+}
+
+/* ---------- the poster desk ---------- */
+.modal-panel.poster{ width:min(760px, 100%); background:#c9a35f; border-color:#5e3d18; }
+.modal-panel.poster .modal-head h2, .modal-panel.poster .panel-sub{ color:#2e2216; }
+#poster-wrap{
+  border:5px solid #3a2a16; background:#7a5230; padding:6px;
+  box-shadow:inset 0 0 0 2px rgba(0,0,0,.3), 5px 5px 0 rgba(0,0,0,.3);
+  line-height:0;
+}
+#poster-canvas{ width:100%; height:auto; image-rendering:pixelated; touch-action:none; cursor:crosshair; display:block; }
+#poster-tools{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:10px; }
+.pt-cols{ display:flex; flex-wrap:wrap; gap:4px; }
+.pt-col{
+  width:32px; height:32px; padding:0; border:3px solid var(--ink);
+  box-shadow:2px 2px 0 var(--shadow);
+}
+.pt-col.active{ outline:4px solid #fff8ec; outline-offset:-1px; transform:translate(1px,1px); box-shadow:none; }
+.pt-size{ display:flex; gap:4px; }
+#poster-tools .btn{ font-size:13px; padding:8px 10px; }

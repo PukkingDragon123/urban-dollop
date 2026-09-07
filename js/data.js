@@ -71,6 +71,9 @@ const ECON = {
   beehiveBoost: 0.30,      // crop growth inside that circle
   honeyEvery: 75,          // seconds between honey jars
   honeyValue: 14,          // coins a jar of honey fetches
+  billboardPull: 0.40,     // how much one billboard cuts the wait between customers
+  billboardPay: 0.07,      // and what it adds to what they pay
+  billboardArt: 0.5,       // a poster you painted yourself counts half again
   orderEvery: 70,          // seconds between customers pulling up
   orderTime: 150,          // seconds a customer waits
   orderPay: 2.4,           // what an order pays per egg, against the sell value
@@ -320,11 +323,27 @@ const BUILDS = {
                desc:'Three fossils in, one dinosaur out, sixty-five million years later.', needs:'timemachine' },
   board:     { name:'Noticeboard', sec:'crew', w:1, h:1, base:40, growth:1.4, refund:15,
                desc:'Where flyers get pinned. Applicants walk up to it and wait.', needs:'hiring' },
+  billboard: { name:'Billboard', sec:'empire', w:2, h:2, base:300, growth:1.7, refund:120,
+               desc:'A hoarding by the road. Paint your own poster; more customers pull in.', needs:'billboard' },
   belt:      { name:'Conveyor',  sec:'factory', w:1, h:1, base:15, growth:1, refund:7,
                desc:'Carries eggs to the truck, a silo or an incubator.', needs:'belts' },
   fence:     { name:'Fence',     sec:'ranch', w:1, h:1, base:10, growth:1, refund:5,
                desc:'Chickens will not cross it. Pen them where you want them.', needs:'belts' },
 };
+
+/* ------------------------------------------------------------
+   BILLBOARDS - a poster is a grid of fat pixels, each cell an
+   index into this palette. 0 is the bare board.
+   ------------------------------------------------------------ */
+const BILL_COLS = ['#e8dcc0', '#fff8ec', '#2e2216', '#ffd23f', '#f0a422', '#e8542f',
+                   '#ff5f9e', '#6ab04c', '#3fa7d6', '#7fe8d0', '#b06ee0', '#8a5e2a'];
+const BILL_PRESETS = [
+  { id:'eggs',  name:'FRESH EGGS' },
+  { id:'sale',  name:'BIG SALE' },
+  { id:'hen',   name:'OUR HENS' },
+  { id:'brand', name:'THE COMPANY' },
+  { id:'blank', name:'BLANK BOARD' },
+];
 
 /* ------------------------------------------------------------
    GENES - every hen carries five, nought to three points each.
@@ -898,6 +917,7 @@ const SKILLS = [
   K('truckcap',   'market', 2, 'logistics', 'Bigger Bed',       'truck', 8,  15,  2.2, '+5 truck capacity'),
   K('route',      'market', 2, 'logistics', 'Express Route',    'road',  6,  25,  2.3, 'truck trips 15% faster'),
   U('ledger',     'market', 3, 'orders',    'The Ledger',       'chart', 60,  'Unlock the LEDGER in the Index: a graph of what the company earns'),
+  U('billboard',  'market', 3, 'orders',    'Billboards',       'sign',  40,  'Unlock the Billboard: paint your own poster and pull more cars off the road'),
   U('silo',       'market', 3, 'truckcap',  'Egg Silo',         'silo',  180, 'Unlock the Silo and the Packer role'),
   K('fullbonus',  'market', 3, 'route',     'Full Load Deal',   'chart', 6,  30,  2.3, '+6% payout for a full truck'),
   U('stocks',     'market', 4, 'ledger',    'Stock Market',     'coin',  400, 'Unlock the market: buy and sell shares in rival egg companies'),
@@ -1045,6 +1065,93 @@ const QUESTS = [
   { id:'q_keeper',  name:'Secret Keeper',   icon:'key',    goal:{ k:'stat', s:'secrets', n:12 },    rw:{ f:10000 },      hint:'Find 12 secrets', where:'field' },
 ];
 const QUEST_BY_ID = Object.fromEntries(QUESTS.map(q => [q.id, q]));
+
+/* ------------------------------------------------------------
+   THE FOUNDER'S VOICE
+   Every quest is a raccoon leaning on a fence telling you what
+   he wants next. He walks the farm; these are his lines.
+   ------------------------------------------------------------ */
+const QUEST_SAY = {
+  q_sweep:    'Eggs on the grass are money on the floor. Sweep them up.',
+  q_sale:     'Load the bike and pedal into town. Our first coin is out there.',
+  q_feedbag:  'Buy me the feed bag at the Lab. A hungry hen is a sad hen.',
+  q_grandma:  'Grandmama\'s hen wants her supper before she gives us anything.',
+  q_hatch:    'One hen is a hobby. Put an egg in the incubator and we are a business.',
+  q_hoe:      'The field is bare. Fetch the hoe from the Lab and we will fix that.',
+  q_till:     'Turn six tiles of that dirt over. I would help, but these are my good paws.',
+  q_water:    'Seeds in, water on. Nothing on this farm grows out of hope.',
+  q_harvest:  'Cut it while it is ripe. Every crop is a bag of feed we did not buy.',
+  q_grown:    'Feed that chick until it is a hen. Then it works for us.',
+  q_toolbox:  'Get the toolbox. I have plans, and plans need buildings.',
+  q_build:    'Put something up. A farm with no sheds looks like a hobby.',
+  q_depot:    'Install Logistics. A bicycle is not a supply chain.',
+  q_order:    'Someone has pulled up on the road wanting eggs. Do not keep them waiting.',
+  q_hire:     'Hire a hand. I did not inherit a farm to carry baskets myself.',
+  q_iron:     'Hatch, earn, build. Get us to the Iron Age and the tools improve.',
+  q_cook:     'An egg sells for one coin. An omelette sells for five. Cook something.',
+  q_eight:    'Eight kinds of chicken. The book is looking thin, partner.',
+  q_belts:    'Four belts. Let the machines carry eggs and we will carry money.',
+  q_rank:     'Keep a hen laying and she earns her stars. Stars mean speed.',
+  q_genes:    'Splice something in the Gene Lab. Nobody has to know.',
+  q_storey:   'Build up, not out. Land is dear and air is free.',
+  q_dishes:   'Ten dishes out of that kitchen. The diners are hungry and rich.',
+  q_regulars: 'Five orders filled and we have regulars. Regulars come back.',
+  q_secret:   'This valley is hiding things. Go and poke at something odd.',
+  q_land:     'Three plots. Buy the neighbours out before they get ideas.',
+  q_steam:    'Boilers, belts and a proper kitchen. Take us to the Steam Age.',
+  q_park:     'People pay to look at chickens. Build the park. I checked. They do.',
+  q_flock:    'Twenty hens on the ground. Now it sounds like a farm from the road.',
+  q_visitors: 'A hundred visitors through that gate, and a ticket off every one.',
+  q_fingers:  'Twenty-five harvests. You are frighteningly good at this.',
+  q_roast:    'One hen, one pot, forty times the money. Do not tell the others.',
+  q_tenk:     'Ten thousand coins. I would very much like to see it written down.',
+  q_public:   'Take the company public. Then buy into the rivals. Quietly.',
+  q_champion: 'Four hundred eggs from one hen. I want her name on a plaque.',
+  q_electric: 'Lamps in the windows, crowds at the gate. The Electric Age, please.',
+  q_abroad:   'Open a country. Eggs taste the same everywhere and pay more abroad.',
+  q_secrets5: 'Five secrets. Somebody in this valley is keeping notes.',
+  q_branches: 'Ten branches. I want our sign on ten roads I have never driven.',
+  q_space:    'A rocket on the pad. The Space Age will not open itself.',
+  q_moon:     'The Moon. No foxes, no rain, and nobody has claimed the eggs.',
+  q_moonegg:  'Something came down from the Moon. Hatch it and see what we bought.',
+  q_fossil:   'There are bones under this dirt. Water the soil and dig one up.',
+  q_jurassic: 'Seventy species and sixty million coins. Then we buy a time machine.',
+  q_dino:     'Three fossils in the machine. Stand back. Possibly quite far back.',
+  q_dinopark: 'Put the dinosaur in the park. Tickets will pay for the fence. Probably.',
+  q_keeper:   'Twelve secrets. At this point the valley works for you, not me.',
+};
+QUESTS.forEach(q => { q.say = QUEST_SAY[q.id] || q.hint + '.'; });
+
+/* what he says when one is paid out, and what he mutters between jobs */
+const BOSS_DONE = [
+  'That is the one. Next.',
+  'Paid out. Now do it again, bigger.',
+  'Look at us. Practically respectable.',
+  'Banked. I am writing this one down.',
+  'See? I said it would work.',
+  'Good. Now something harder.',
+  'The ledger likes you today.',
+  'That went better than my last idea.',
+];
+const BOSS_IDLE = [
+  'Fine farm. Needs more of everything.',
+  'Do you smell money? I smell money.',
+  'Grandmama would have hated the paperwork.',
+  'Every egg is a coin with a shell on it.',
+  'I am supervising. This is supervising.',
+  'If a fox turns up, that one is yours.',
+  'One day all of this is a chain.',
+  'Mind the hen. She is particular.',
+  'I have read the ledger twice. It is still good.',
+];
+const BOSS_AT = {
+  mama:  ['She was Grandmama\'s. Be nice to her.', 'That hen has outlasted three of my schemes.'],
+  lab:   ['Feathers in, science out. My favourite trade.', 'Everything on this board is a plan I cannot afford yet.'],
+  truck: ['Every load that leaves is a coin that comes back.', 'One day this is a fleet. Watch.'],
+  road:  ['Cars all day and not one of them stops. Yet.', 'A big enough sign and they all pull in.'],
+  field: ['Dirt today, dinner tomorrow.', 'I like a field that owes me something.'],
+  inc:   ['Rock, crack, cluck. Best sound on the farm.', 'Every one of those is a new employee.'],
+};
 
 /* ------------------------------------------------------------
    GRID LAYOUT - the map is a board of square nodes. Each module

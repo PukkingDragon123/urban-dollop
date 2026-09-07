@@ -183,7 +183,7 @@
     floatText(txt, p.x - 24, p.y - 10, cls, icon);
   }
   function toast(opts) {
-    while (toastBox.children.length >= 3) toastBox.firstChild.remove();
+    while (toastBox.children.length >= 2) toastBox.firstChild.remove();
     const el = document.createElement('div');
     el.className = 'toast';
     if (opts.sprite) el.appendChild(opts.sprite);
@@ -194,7 +194,7 @@
     el.appendChild(txt);
     toastBox.appendChild(el);
     paintCloud(el, el.offsetWidth - 26, false);
-    setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 320); }, opts.long ? 6000 : 3600);
+    setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 320); }, opts.long ? 5000 : 2800);
   }
 
   /* ================= CANVAS & CAMERA ================= */
@@ -254,6 +254,9 @@
     const SAND = ['#e0cb98', '#d6bd88', '#eddba9'].map(rgb);
     const DRY = ['#93aa5c', '#a2ae68', '#afb974', '#bcc484', '#c8ce94'].map(rgb);
     const WATER = ['#3f9ec4', '#4fb0d6', '#63c1e2', '#2f86ad'].map(rgb);
+    const TAR = ['#8f6438', '#9c7040', '#835a30', '#aa7d49'].map(rgb);
+    const PAVE = ['#b2ab9c', '#c2bbab', '#a29a8c', '#cdc5b4'].map(rgb);
+    const KERB = rgb('#8a8578'), KERB2 = rgb('#6e6a60');
 
     const nBig = makeNoise(11, 34, W.W, W.H);
     const nSml = makeNoise(29, 9, W.W, W.H);
@@ -265,11 +268,23 @@
     for (let y = 0; y < W.H; y++) {
       for (let x = 0; x < W.W; x++) {
         let c;
-        if (y >= W.roadY) {
-          /* packed dirt road with gravel */
+        if (y >= W.farY) {
+          /* the far side: a stone footpath, then the town's own paving */
           const n = nSml(x, y);
-          c = DIRT[n < 0.3 ? 2 : n < 0.62 ? 0 : n < 0.9 ? 1 : 3];
-          if (y === W.roadY) c = rgb('#8a5e2a');
+          c = PAVE[n < 0.3 ? 2 : n < 0.6 ? 0 : n < 0.88 ? 1 : 3];
+          if (y < W.farY + 3) c = y === W.farY ? KERB2 : KERB;
+          else {
+            /* flagstones: a joint every ten across, every eight down, offset per course */
+            const row = ((y - W.farY - 3) / 8) | 0;
+            if ((y - W.farY - 3) % 8 === 0 || (x + row * 5) % 10 === 0) c = PAVE[2];
+          }
+        } else if (y >= W.roadY) {
+          /* two lanes of packed dirt, kerbed on both sides */
+          const n = nSml(x, y);
+          c = TAR[n < 0.3 ? 2 : n < 0.62 ? 0 : n < 0.9 ? 1 : 3];
+          if (y < W.roadY + 3) c = y === W.roadY ? KERB2 : KERB;
+          else if (y >= W.farY - 3) c = y === W.farY - 1 ? KERB2 : KERB;
+          else if (y === W.roadY + 3 || y === W.farY - 4) c = rgb('#7a5230');
         } else {
           const v = nBig(x, y) * 0.68 + nSml(x, y) * 0.32;
           let idx = v < 0.36 ? 0 : v < 0.46 ? 1 : v < 0.60 ? 2 : v < 0.76 ? 3 : 4;
@@ -303,11 +318,42 @@
       g.fillStyle = '#fff8ec';
       for (let x = L.x + 4; x < L.x + L.w - 4; x += 12) g.fillRect(x, L.y + 2, 6, 1);
     }
-    /* road markings + ruts */
-    g.fillStyle = 'rgba(120,86,44,.5)';
-    for (let x = 0; x < W.W; x += 2) { g.fillRect(x, W.roadY + 9, 1, 1); g.fillRect(x + 1, W.roadY + 22, 1, 1); }
-    g.fillStyle = 'rgba(255,240,200,.35)';
-    for (let x = 6; x < W.W; x += 22) g.fillRect(x, W.roadY + 15, 8, 1);
+    /* road markings: a dashed line down the middle, ruts worn in each lane */
+    const mid = W.roadY + Math.round(W.roadH / 2);
+    g.fillStyle = 'rgba(255,240,200,.42)';
+    for (let x = 8; x < W.W; x += 26) g.fillRect(x, mid - 1, 12, 2);
+    g.fillStyle = 'rgba(120,86,44,.45)';
+    [W.roadY + 10, W.roadY + 19, mid + 9, mid + 18].forEach(ry => {
+      for (let x = 0; x < W.W; x += 2) g.fillRect(x + (ry % 4 ? 1 : 0), ry, 1, 1);
+    });
+    /* a worn white line just inside each kerb */
+    g.fillStyle = 'rgba(255,246,220,.30)';
+    for (let x = 0; x < W.W; x++) {
+      if ((x * 7 + 3) % 11 === 0) continue;
+      g.fillRect(x, W.roadY + 5, 1, 1);
+      g.fillRect(x, W.farY - 6, 1, 1);
+    }
+    /* the odd patch of repair and a drain by the kerb */
+    for (let i = 0; i < 7; i++) {
+      const px0 = Math.floor(rndG() * (W.W - 40)), py0 = W.roadY + 8 + Math.floor(rndG() * 26);
+      g.fillStyle = 'rgba(70,52,30,.22)';
+      g.fillRect(px0, py0, 18 + Math.floor(rndG() * 20), 5 + Math.floor(rndG() * 6));
+    }
+    for (let x = 60; x < W.W; x += 210) {
+      g.fillStyle = '#5a5650'; g.fillRect(x, W.farY - 8, 12, 5);
+      g.fillStyle = '#7a756c'; g.fillRect(x + 1, W.farY - 7, 10, 3);
+      g.fillStyle = '#4a463f';
+      for (let i = 0; i < 4; i++) g.fillRect(x + 2 + i * 2, W.farY - 7, 1, 3);
+    }
+    /* grit and puddles at the kerbs */
+    for (let i = 0; i < 260; i++) {
+      const x = Math.floor(rndG() * W.W);
+      g.fillStyle = rndG() < 0.5 ? 'rgba(90,66,34,.35)' : 'rgba(220,200,160,.35)';
+      g.fillRect(x, W.roadY + 4 + Math.floor(rndG() * 3), 1 + (rndG() < 0.3 ? 1 : 0), 1);
+      g.fillRect(x, W.farY - 6 - Math.floor(rndG() * 3), 1 + (rndG() < 0.3 ? 1 : 0), 1);
+    }
+    /* the town on the far side */
+    buildFarSide(g);
 
     /* grass blades everywhere */
     for (let i = 0; i < 7000; i++) {
@@ -604,6 +650,92 @@
     rail(x0 + 2, y0 + 4, h - 8, false); rail(x0 + w - 5, y0 + 4, h - 8, false);
     for (let x = x0 + 4; x < x0 + w - 4; x += 14) { post(x, y0 + 1); post(x, y0 + h - 14); }
     for (let y = y0 + 6; y < y0 + h - 12; y += 14) { post(x0 + 1, y); post(x0 + w - 4, y); }
+  }
+
+  /* ============================================================
+     THE OTHER SIDE OF THE ROAD
+     Your land stops at the kerb. Across the tarmac is the edge of
+     Cluckton: shop fronts with lit windows and awnings, a bus
+     shelter for the tourists, lamps, planters and a hoarding that
+     is not yours. Baked into the ground once, like the scenery.
+     ============================================================ */
+  function buildFarSide(g) {
+    const rnd = SPR.mulberry(20260907);
+    const groundY = W.H - 2;              /* where the town stands */
+    const pathY = W.farY + 14;            /* the back of the footpath */
+    /* the footpath's back edge, and the shade the frontage casts on it */
+    g.fillStyle = '#9b9b90'; g.fillRect(0, pathY, W.W, 1);
+    g.fillStyle = 'rgba(0,0,0,.10)'; g.fillRect(0, pathY + 1, W.W, 2);
+    g.fillStyle = 'rgba(0,0,0,.16)'; g.fillRect(0, groundY - 1, W.W, 3);
+    g.fillStyle = '#6e6a60'; g.fillRect(0, W.H - 2, W.W, 2);
+    let x = -12;
+    let slot = 0;
+    while (x < W.W + 8) {
+      const roll = rnd();
+      if (slot % 5 === 4 && roll < 0.7) {
+        /* a break in the terrace: the bus stop, or a hoarding, or a tree */
+        const pick = rnd();
+        if (pick < 0.4) {
+          const sh = SPR.shelterSprite(1);
+          g.drawImage(sh, Math.round(x + 4), groundY - sh.height);
+          shadow(g, x + 4 + sh.width / 2, groundY, sh.width * 0.4);
+          /* a bus stop flag on the kerb */
+          g.fillStyle = '#3a3a4a'; g.fillRect(Math.round(x + sh.width + 8), W.farY + 4, 2, 14);
+          g.fillStyle = '#2e2216'; g.fillRect(Math.round(x + sh.width + 4), W.farY, 10, 6);
+          g.fillStyle = '#3fa7d6'; g.fillRect(Math.round(x + sh.width + 5), W.farY + 1, 8, 4);
+          x += sh.width + 20;
+        } else if (pick < 0.72) {
+          /* somebody else's advertising */
+          const bb = SPR.billboardSprite(SPR.billboardPreset('sale'), 1, false);
+          g.drawImage(bb, Math.round(x + 6), groundY - bb.height);
+          shadow(g, x + 6 + bb.width / 2, groundY, bb.width * 0.36);
+          x += bb.width + 16;
+        } else {
+          const t = SPR.decoSprite(rnd() < 0.5 ? 'tree' : 'pine', 1, Math.floor(rnd() * 9999));
+          g.drawImage(t, Math.round(x + 6), groundY - t.height);
+          shadow(g, x + 6 + t.width / 2, groundY, t.width * 0.34);
+          x += t.width + 14;
+        }
+      } else {
+        const kind = roll < 0.22 ? 'shed' : roll < 0.5 ? 'wide' : 'shop';
+        const spr = SPR.townSprite(kind, Math.floor(rnd() * 9999), 1);
+        g.drawImage(spr, Math.round(x), groundY - spr.height);
+        shadow(g, x + spr.width / 2, groundY, spr.width * 0.3);
+        x += spr.width + 2 + Math.floor(rnd() * 5);
+      }
+      slot++;
+    }
+    /* street furniture along the footpath */
+    for (let lx = 26; lx < W.W; lx += 96 + Math.floor(rnd() * 40)) {
+      const lamp = SPR.furnitureSprite('lamp', Math.floor(rnd() * 900), 1);
+      g.drawImage(lamp, Math.round(lx), W.farY + 12 - lamp.height + 6);
+      g.fillStyle = 'rgba(40,40,30,.22)'; g.fillRect(Math.round(lx), W.farY + 16, 8, 2);
+      if (rnd() < 0.5) {
+        const kind = rnd() < 0.5 ? 'mailbox' : 'planter';
+        const f = SPR.furnitureSprite(kind, Math.floor(rnd() * 900), 1);
+        g.drawImage(f, Math.round(lx + 34), W.farY + 14 - f.height + 4);
+      }
+    }
+  }
+  /* the lamps come on over the town at runtime, so they can flicker */
+  function drawFarSide(now) {
+    if (cam().y + W.view.h < W.farY - 8) return;
+    const t0 = Math.floor(now / 520);
+    for (let lx = 26, i = 0; lx < W.W; lx += 96, i++) {
+      if (lx < cam().x - 30 || lx > cam().x + W.view.w + 30) continue;
+      const on = (i + t0) % 23 !== 0;
+      /* a dithered cone of light spilling onto the footpath */
+      ctx.fillStyle = on ? 'rgba(255,232,150,.20)' : 'rgba(255,232,150,.06)';
+      for (let dy = 0; dy < 16; dy++) {
+        const half = 2 + Math.round(dy * 0.55);
+        for (let dx = -half; dx <= half; dx++) {
+          if ((dx + dy + i) % 2 && dy > 4) continue;
+          ctx.fillRect(lx + 4 + dx, W.farY - 3 + dy, 1, 1);
+        }
+      }
+      ctx.fillStyle = on ? '#fff3c4' : '#8a8f98';
+      ctx.fillRect(lx + 2, W.farY - 14, 4, 3);
+    }
   }
 
   /* ================= PARTICLES ================= */
@@ -1256,6 +1388,27 @@
       ctx.fillStyle = '#2e2216'; ctx.fillRect(bx + 1, by, 1, 1);
     }
   }
+  /* ---- the billboard: your poster, up on posts, lit at the top ---- */
+  let stockArt = null, stockArtFor = '';
+  function billArt(bb) {
+    if (bb && bb.art) return bb.art;
+    const co = S().company;
+    if (!stockArt || stockArtFor !== co.name) { stockArtFor = co.name; stockArt = SPR.billboardPreset('eggs', co); }
+    return stockArt;
+  }
+  function drawBillboard(c, r, bb, now) {
+    const x = c * 16, y = r * 16;
+    const spr = SPR.billboardSprite(billArt(bb), 1, true);
+    ctx.fillStyle = 'rgba(40,58,26,.26)';
+    ctx.fillRect(x + 2, y + 30, 28, 3);
+    ctx.drawImage(spr, x - 1, y + 32 - spr.height);
+    /* the lamps throw a little light back onto the poster */
+    if (Math.floor(now / 900) % 7 === 0) {
+      ctx.fillStyle = 'rgba(255,248,220,.30)';
+      ctx.fillRect(x + 2, y + 32 - spr.height + 6, 28, 14);
+    }
+  }
+
   /* the Gene Lab: white tiles, a glass dome, a helix on the door */
   function drawGeneLab(c, r, gl, now) {
     const x = c * 16, y = r * 16;
@@ -1913,6 +2066,90 @@
     }
   }
 
+  /* ============================================================
+     SPEECH IN THE WORLD
+     A generated pixel cloud with the tiny font wrapped inside it,
+     drawn at one world pixel a pixel so it belongs to the farm
+     rather than floating over it in HTML.
+     ============================================================ */
+  const sayCache = new Map();
+  function wrapTiny(text, cols) {
+    const out = [];
+    let line = '';
+    String(text).toUpperCase().split(' ').forEach(w => {
+      if (!line) line = w;
+      else if (line.length + 1 + w.length <= cols) line += ' ' + w;
+      else { out.push(line); line = w; }
+    });
+    if (line) out.push(line);
+    return out;
+  }
+  /* the cloud, cached by what it says */
+  function sayCloud(text) {
+    if (sayCache.has(text)) return sayCache.get(text);
+    const lines = wrapTiny(text, 23);
+    const tw = Math.max(...lines.map(l => SPR.tinyW(l, 1)));
+    const w = tw + 18, h = lines.length * 7 + 13;
+    const cloud = SPR.cloudBubble(w, h, Math.round(w * 0.32), false, { px: 1, fill: '#fff9ec', ink: '#2e2216' });
+    const c = SPR.newCanvas(cloud.width, cloud.height);
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    g.drawImage(cloud, 0, 0);
+    lines.forEach((l, i) => SPR.drawTiny(g, l, 9, 7 + i * 7, '#2e2216', 1));
+    if (sayCache.size > 60) sayCache.clear();
+    sayCache.set(text, c);
+    return c;
+  }
+  /* draw it above a speaker, kept inside the view */
+  function drawSay(text, wx, wy) {
+    const c = sayCloud(text);
+    let x = Math.round(wx - c.width * 0.32);
+    x = Math.max(cam().x + 2, Math.min(cam().x + W.view.w - c.width - 2, x));
+    ctx.drawImage(c, x, Math.round(wy - c.height));
+  }
+
+  /* ============================================================
+     THE FOUNDER
+     The raccoon who inherited the place walks it like everyone
+     else on the payroll - top hat, tail, opinions. Whatever the
+     current job is, he is standing next to it telling you about it.
+     ============================================================ */
+  function bossPose(b, now) {
+    if (b.state === 'walk') return (b.frame ? 'walk1' : 'stand');
+    if (b.pose === 'cheer') return 'cheer';
+    if (b.pose === 'read') return 'read';
+    return 'boss';
+  }
+  function drawBoss(now) {
+    const b = GAME.boss();
+    if (!b || !S().company.done) return;
+    if (b.x + 30 < cam().x || b.x - 10 > cam().x + W.view.w || b.y + 34 < cam().y || b.y - 40 > cam().y + W.view.h) return;
+    const pose = bossPose(b, now);
+    const spr = SPR.raccoonSprite(pose, 1);
+    const walking = b.state === 'walk';
+    const bob = walking ? 0 : Math.sin(now / 620 + 1) * 0.6;
+    const hop = pose === 'cheer' ? Math.abs(Math.sin(now / 190)) * 3 : 0;
+    ctx.fillStyle = 'rgba(40,58,26,.28)';
+    ctx.fillRect(Math.round(b.x + 3), Math.round(b.y + 24), 14, 2);
+    ctx.save();
+    if (b.dir === 1) {
+      ctx.translate(Math.round(b.x) + spr.width, Math.round(b.y - 4 + bob - hop));
+      ctx.scale(-1, 1);
+      ctx.drawImage(spr, 0, 0);
+    } else ctx.drawImage(spr, Math.round(b.x), Math.round(b.y - 4 + bob - hop));
+    ctx.restore();
+    /* the founder's mark on his hat band, so he reads as the company */
+    if (pose === 'boss' || pose === 'cheer') {
+      ctx.fillStyle = S().company.col1;
+      ctx.fillRect(Math.round(b.x + (b.dir === 1 ? 7 : 8)), Math.round(b.y - 3 + bob - hop), 5, 1);
+    }
+    if (b.line) drawSay(b.line, b.x + 10, b.y - 8 - hop);
+    else if (pose === 'read') {
+      /* leafing through the ledger */
+      if (Math.floor(now / 500) % 2) { ctx.fillStyle = '#fff8ec'; ctx.fillRect(Math.round(b.x + 6), Math.round(b.y + 6), 2, 1); }
+    }
+  }
+
   /* ---------- stations ---------- */
   function drawLab(now) {
     const s = W.stations.lab, x = s.x, y = s.y;
@@ -2059,9 +2296,9 @@
     const v = GAME.vehicle();
     const moving = tr.state !== 'parked';
     const spr = SPR.vehicleSprite(v.id, moving ? Math.floor(now / 90) % 2 : 0, 1);
-    const y = W.roadY + 12 - spr.height;
+    const y = W.roadY + 26 - spr.height;
     const bounce = moving ? Math.round(Math.sin(now / 45) * 1) : 0;
-    ctx.fillStyle = 'rgba(40,58,26,.28)'; ctx.fillRect(x + 2, W.roadY + 9, spr.width - 4, 3);
+    ctx.fillStyle = 'rgba(40,58,26,.28)'; ctx.fillRect(x + 2, W.roadY + 23, spr.width - 4, 3);
     ctx.drawImage(spr, x, y + bounce);
     /* the load rides on top of whatever you drive */
     const n = Math.min(tr.load.length, v.id === 'bike' ? 4 : v.id === 'cart' ? 6 : 15);
@@ -2434,6 +2671,7 @@
     else if (buildSel === 'kitchen') drawKitchen(c, r, { pantry: [], counter: [], recipe: 'omelette', cook: null }, now);
     else if (buildSel === 'park') drawPark(c, r, { slots: [] }, now);
     else if (buildSel === 'timemachine') drawTimeMachine(c, r, { on: false, t: 0, T: 1 }, now);
+    else if (buildSel === 'billboard') drawBillboard(c, r, { art: null }, now);
     else drawIncubator(c, r, { queue: [], prog: 0 }, now);
     ctx.globalAlpha = 1;
     if (buildSel === 'well' || buildSel === 'sprinkler' || buildSel === 'coop') {
@@ -2558,6 +2796,7 @@
     for (const k of Object.keys(S().coops)) { const [c, r] = k.split(',').map(Number); drawCoop(c, r, S().coops[k], now); }
     for (const k of Object.keys(S().beehives)) { const [c, r] = k.split(',').map(Number); drawBeehive(c, r, S().beehives[k], now); }
     for (const k of Object.keys(S().genelabs)) { const [c, r] = k.split(',').map(Number); drawGeneLab(c, r, S().genelabs[k], now); }
+    for (const k of Object.keys(S().billboards)) { const [c, r] = k.split(',').map(Number); drawBillboard(c, r, S().billboards[k], now); }
     for (const k of Object.keys(S().kitchens)) { const [c, r] = k.split(',').map(Number); drawKitchen(c, r, S().kitchens[k], now); }
     for (const k of Object.keys(S().parks)) { const [c, r] = k.split(',').map(Number); drawPark(c, r, S().parks[k], now); }
     for (const k of Object.keys(S().timemachines)) { const [c, r] = k.split(',').map(Number); drawTimeMachine(c, r, S().timemachines[k], now); }
@@ -2602,8 +2841,10 @@
     drawMama(now);
     S().chickens.forEach(ch => drawChicken(ch, now));
     S().staff.forEach(w => drawStaff(w, now));
+    drawBoss(now);
     S().visitors.forEach(v => drawVisitor(v, now));
     drawTruck(now);
+    drawFarSide(now);
     drawTraffic(now);
     drawOrders(now);
     drawMovers(now);
@@ -2816,7 +3057,7 @@
   const el = {
     coins: $('#r-coins'), feathers: $('#r-feathers'), feed: $('#r-feed'), feedPill: $('#pill-feed'),
     cap: $('#r-cap'), capPill: $('#pill-cap'), agePill: $('#pill-age'),
-    cursorChip: $('#cursor-chip'), bubble: $('#bubble'),
+    cursorChip: $('#cursor-chip'),
     toolbelt: $('#toolbelt'), deskbar: $('#deskbar'),
     palette: $('#build-palette'), farmPalette: $('#farm-palette'),
   };
@@ -2990,6 +3231,7 @@
       else if (type === 'kitchen') drawKitchen(0, 0, { pantry: [], counter: [], recipe: 'omelette', cook: null }, now);
       else if (type === 'park') drawPark(0, 0, { slots: [] }, now);
       else if (type === 'timemachine') drawTimeMachine(0, 0, { on: false, t: 0, T: 1 }, now);
+      else if (type === 'billboard') drawBillboard(0, 0, { art: null }, now);
       else drawIncubator(0, 0, { queue: [], prog: 0 }, now);
     } finally {
       ctx = saved;
@@ -3227,44 +3469,39 @@
     requestAnimationFrame(syncCamPad);
   }
 
-  /* ---------- speech-bubble hints ---------- */
-  let bubbleText = '';
+  /* ============================================================
+     THE FOUNDER'S NAGGING
+     What used to be a floating hint over the field is now
+     something he says out loud. One line at a time, never twice
+     in a row, and never more often than a person could stand.
+     ============================================================ */
+  let lastHint = '', hintAt = -1e9;
   function hintLogic() {
+    if (!titleEl.hidden) return;
     const st = S(), stats = st.stats;
-    const incK = Object.keys(st.incs)[0];
-    const incPos = incK ? incK.split(',').map(Number) : null;
-    let anchor = null, text = null;
-    if (GAME.mamaHungry()) { anchor = [W.mama.x, W.mama.y - 34]; text = 'feed grandma'; }
-    else if (stats.pets === 0) { anchor = [W.mama.x, W.mama.y - 34]; text = 'pet me'; }
-    else if (S().orders.some(o => o.state === 'wait' && o.t < 25)) { const o = S().orders.find(o2 => o2.state === 'wait' && o2.t < 25); anchor = [o.x + 14, o.y - 22]; text = o.who.toLowerCase() + ' is about to drive off - hand over ' + (o.n - o.got) + ' more eggs'; }
-    else if (Object.keys(st.sites).length && !GAME.movers.van) { anchor = null; text = 'movers coming'; }
-    else if (stats.collected === 0 && st.eggs.length > 1) { anchor = [W.mama.x + 34, W.mama.y - 6]; text = 'sweep eggs'; }
-    else if (stats.hatched === 0 && (st.basket.length > 0 || st.held)) { anchor = incPos ? [incPos[0] * 16 + 16, incPos[1] * 16 - 8] : null; text = 'hatch eggs'; }
-    else if (stats.sold === 0 && (st.basket.length > 2 || st.truck.load.length)) { anchor = [W.truckHome.x + 26, W.truckHome.y - 24]; text = st.truck.load.length ? 'tap the truck to sell' : 'drop eggs on the truck'; }
-    else if (st.truck.state === 'parked' && st.truck.load.length >= GAME.truckCap() && !GAME.lvl('autosend')) { anchor = [W.truckHome.x + 26, W.truckHome.y - 24]; text = 'send truck'; }
-    else if (st.feathers >= 4 && Object.keys(st.sk).length <= 1) { anchor = [W.stations.lab.x + 15, W.stations.lab.y - 10]; text = 'visit the lab'; }
-    else if (st.unpaid) { anchor = null; text = 'pay your crew'; }
-    else if (GAME.lvl('court') && st.built.lovenest === 0 && stats.bred === 0) { anchor = null; text = 'build a love nest'; }
-    else if (GAME.lvl('hiring') && !Object.keys(st.huts).length) { anchor = null; text = 'build a staff hut'; }
-    else if (st.chickens.length > 6 && !st.inspected) { anchor = null; text = 'try the magnifier'; }
-    else if (st.mamaTier < TIER_DIVINE && st.coins >= GAME.mamaCost() * 1.2) { anchor = [W.stations.mamaSign.x + 7, W.stations.mamaSign.y - 8]; text = 'upgrade mama'; }
-    if (!text || !titleEl.hidden) { el.bubble.hidden = true; bubbleText = ''; return; }
-    if (text !== bubbleText) { bubbleText = text; el.bubble.textContent = text; }
-    el.bubble.hidden = false;
-    const r = cv.getBoundingClientRect();
-    const bw = el.bubble.offsetWidth || 140;
-    let left, tailAt = bw / 2;
-    if (anchor) {
-      const sp = worldToScreen(anchor[0], anchor[1]);
-      left = Math.max(r.left + 6, Math.min(sp.x - bw / 2, r.right - bw - 6));
-      el.bubble.style.top = Math.max(r.top + 6, sp.y - 46) + 'px';
-      tailAt = Math.max(16, Math.min(bw - 16, sp.x - left));
-    } else {
-      left = r.left + r.width / 2 - bw / 2;
-      el.bubble.style.top = (r.top + 12) + 'px';
-    }
-    el.bubble.style.left = left + 'px';
-    paintCloud(el.bubble, tailAt, false);
+    let text = null;
+    const ord = st.orders.find(o => o.state === 'wait' && o.t < 25);
+    if (GAME.mamaHungry()) text = 'Grandmama\'s hen is out of supper. Scatter her some feed.';
+    else if (stats.pets === 0) text = 'Give the old hen a pat. She lays when she is fussed over.';
+    else if (ord) text = ord.who + ' is about to drive off. ' + (ord.n - ord.got) + ' more eggs!';
+    else if (stats.collected === 0 && st.eggs.length > 1) text = 'Eggs on the grass, partner. Take the basket to them.';
+    else if (stats.hatched === 0 && (st.basket.length > 0 || st.held)) text = 'Put that egg in the incubator before it goes cold.';
+    else if (stats.sold === 0 && (st.basket.length > 2 || st.truck.load.length)) text = st.truck.load.length ? 'The bike is loaded. Tap it and off to town.' : 'Drop those eggs on the bike. Coins do not walk here.';
+    else if (st.truck.state === 'parked' && st.truck.load.length >= GAME.truckCap() && !GAME.lvl('autosend')) text = 'The bike is full. Send it before something cracks.';
+    else if (st.unpaid) text = 'The payroll is empty and the crew have noticed.';
+    else if (st.feathers >= 4 && Object.keys(st.sk).length <= 1) text = 'Feathers in your pocket and no science. Get to the Lab.';
+    else if (Object.keys(st.sites).length && !GAME.movers.van) text = 'The movers are on the road. They always turn up.';
+    else if (GAME.lvl('court') && st.built.lovenest === 0 && stats.bred === 0) text = 'We can breed hens now. That wants a love nest.';
+    else if (GAME.lvl('hiring') && !Object.keys(st.huts).length) text = 'Nobody will work without a hut to sit in. Build one.';
+    else if (GAME.lvl('billboard') && !st.built.billboard) text = 'Put a billboard by the road. I want them pulling in.';
+    else if (st.chickens.length > 6 && !st.inspected) text = 'Use the magnifier on things. It tells you everything.';
+    else if (st.mamaTier < TIER_DIVINE && st.coins >= GAME.mamaCost() * 1.2) text = 'We can afford to upgrade the old hen. Do it.';
+    if (!text) { lastHint = ''; return; }
+    const now = performance.now();
+    if (text === lastHint && now - hintAt < 30000) return;
+    if (now - hintAt < 11000) return;
+    lastHint = text; hintAt = now;
+    GAME.bossSay(text, 8, 'stand');
   }
 
   let ageShown = -1;
@@ -3291,7 +3528,7 @@
     updateCursorChip();
     updateCrewBadge();
     hintLogic();
-    renderQuestCard();
+    renderDialogue();
     refreshInspect();
     /* the card under the Lab screen keeps up with your feathers */
     if (!$('#modal-skills').hidden && skillCardFeathers !== S().feathers) { renderSkillCard(); $('#research-sub').textContent = GAME.fmt(S().feathers) + ' FEATHERS'; }
@@ -3306,47 +3543,70 @@
     if (GAME.dirty.build) { renderPalette(); renderToolbelt(); }
   }
 
-  /* ================= THE QUEST CARD =================
-     A slip of paper pinned under the resource pills: the current
-     quest, how far along it is, and where to go for it. Tap it
-     and the Lab opens on that very cube.
-     ================================================ */
+  /* ============================================================
+     THE FOUNDER'S DIALOGUE
+     The old quest card was a slip of paper with a hint on it.
+     Now it is the raccoon: his portrait, what he wants in his own
+     words, how far along you are and what it pays. Tap it and the
+     Lab opens on the job.
+     ============================================================ */
   let questSig = '';
-  function renderQuestCard() {
-    const card = $('#quest-card');
-    if (!card) return;
+  function renderDialogue() {
+    const box = $('#quest-dialogue');
+    if (!box) return;
     const q = GAME.currentQuest();
-    const hide = !q || !titleEl.hidden || !!inspect;
-    if (hide) { if (!card.hidden) card.hidden = true; questSig = ''; return; }
+    const b = GAME.boss();
+    if (!q || !titleEl.hidden) { if (!box.hidden) box.hidden = true; questSig = ''; return; }
     const [cur, n] = GAME.questProgress(q);
-    const sig = q.id + '|' + cur + '|' + n;
-    if (sig === questSig && !card.hidden) return;
+    /* he speaks for himself while he has something to say */
+    const said = b && b.line ? b.line : q.say;
+    const cheering = !!(b && b.line && b.pose === 'cheer');
+    const sig = q.id + '|' + cur + '|' + n + '|' + said + '|' + (cheering ? 1 : 0);
+    if (sig === questSig && !box.hidden) return;
     questSig = sig;
-    card.hidden = false;
-    card.innerHTML = '';
-    card.dataset.act = 'quest-card';
-    card.title = 'Open the Lab on this quest';
-    card.appendChild(mkIcon(q.icon, 3));
-    const mid = document.createElement('div');
+    box.hidden = false;
+    box.dataset.act = 'quest-card';
+    box.title = 'What the founder wants next - tap for the Lab';
+    box.classList.toggle('done', cheering);
+    box.innerHTML = '';
+    /* his portrait, framed like a staff photo */
+    const face = document.createElement('div');
+    face.className = 'qd-face';
+    face.appendChild(cloneCanvas(SPR.raccoonSprite(cheering ? 'cheer' : 'boss', 1), 2));
+    box.appendChild(face);
+    const body = document.createElement('div');
+    body.className = 'qd-body';
+    const top = document.createElement('div');
+    top.className = 'qd-top';
+    const who = document.createElement('b');
+    who.textContent = 'THE FOUNDER';
+    top.appendChild(who);
     const tag = document.createElement('small');
-    tag.textContent = 'QUEST ' + (QUESTS.indexOf(q) + 1) + ' / ' + QUESTS.length;
-    mid.appendChild(tag);
-    const b = document.createElement('b');
-    b.textContent = q.name.toUpperCase();
-    mid.appendChild(b);
-    const bar = document.createElement('u');
+    tag.textContent = 'JOB ' + (QUESTS.indexOf(q) + 1) + '/' + QUESTS.length;
+    top.appendChild(tag);
+    body.appendChild(top);
+    const say = document.createElement('div');
+    say.className = 'qd-say';
+    say.textContent = '"' + said + '"';
+    body.appendChild(say);
+    const job = document.createElement('div');
+    job.className = 'qd-job';
+    job.appendChild(mkIcon(q.icon, 2));
+    const jn = document.createElement('i');
+    const rw = [q.rw.c ? GAME.fmt(q.rw.c) + ' COINS' : '', q.rw.f ? q.rw.f + ' FEATHERS' : ''].filter(Boolean).join(' + ');
+    jn.textContent = q.name.toUpperCase() + (rw ? '  -  ' + rw : '');
+    job.appendChild(jn);
+    body.appendChild(job);
+    const rail = document.createElement('div');
+    rail.className = 'qd-rail';
     const fill = document.createElement('s');
     fill.style.width = Math.round(cur / n * 100) + '%';
-    bar.appendChild(fill);
+    rail.appendChild(fill);
     const num = document.createElement('i');
-    num.textContent = cur + '/' + n;
-    bar.appendChild(num);
-    mid.appendChild(bar);
-    const hint = document.createElement('span');
-    hint.textContent = q.hint;
-    mid.appendChild(hint);
-    card.appendChild(mid);
-    paintCloud(card, 22, false);
+    num.textContent = cur + ' / ' + n;
+    rail.appendChild(num);
+    body.appendChild(rail);
+    box.appendChild(body);
   }
 
   /* ================= TITLE SCREEN ================= */
@@ -3494,7 +3754,7 @@
     const blink = Math.floor(now / 480) % 2;
     SPR.drawText(tctx, line, px0 + 7, py0, blink ? '#fff8ec' : '#e8d5a8', 1, '#1a120a');
   }
-  function showTitle() { titleEl.hidden = false; el.bubble.hidden = true; setInspect(null); introMode = null; $('#intro-ui').hidden = true; $('#company-form').hidden = true; $('#title-buttons').hidden = false; }
+  function showTitle() { titleEl.hidden = false; setInspect(null); introMode = null; $('#intro-ui').hidden = true; $('#company-form').hidden = true; $('#title-buttons').hidden = false; }
   function hideTitle() { titleEl.hidden = true; S().seenTitle = true; introMode = null; }
 
   /* ================= THE INTRO =================
@@ -4425,6 +4685,123 @@
       g.drawImage(cur, Math.round(wlMouse.x) - (kind === 'hand' ? 4 : 0), Math.round(wlMouse.y) - (kind === 'hand' ? 2 : 0));
     }
     g.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
+  /* ============================================================
+     THE POSTER DESK
+     A billboard is 28 x 14 fat pixels of your own art. Pick a
+     colour, draw on the board, or start from one of the printed
+     designs. A poster you painted yourself pulls harder than a
+     stock one - the road can tell.
+     ============================================================ */
+  const PCELL = 25;
+  let posterKey = null, posterArt = null, posterCol = 5, posterSize = 1, posterDown = false, posterCv = null, posterCtx = null;
+  function openPoster(k) {
+    if (!S().billboards[k]) return;
+    posterKey = k;
+    posterArt = (GAME.billboardArt(k) || billArt(S().billboards[k])).split('');
+    if (!posterCv) {
+      posterCv = $('#poster-canvas');
+      posterCtx = posterCv.getContext('2d');
+      const at = ev => {
+        const r = posterCv.getBoundingClientRect();
+        return { x: Math.floor((ev.clientX - r.left) / r.width * SPR.BILL_W),
+                 y: Math.floor((ev.clientY - r.top) / r.height * SPR.BILL_H) };
+      };
+      const paint = p => {
+        let any = false;
+        for (let dy = 0; dy < posterSize; dy++) for (let dx = 0; dx < posterSize; dx++) {
+          const x = p.x + dx, y = p.y + dy;
+          if (x < 0 || y < 0 || x >= SPR.BILL_W || y >= SPR.BILL_H) continue;
+          const ch = SPR.BILL_CH[posterCol] || '0';
+          if (posterArt[y * SPR.BILL_W + x] === ch) continue;
+          posterArt[y * SPR.BILL_W + x] = ch;
+          any = true;
+        }
+        if (any) { drawPoster(); posterDirty = true; }
+      };
+      posterCv.addEventListener('pointerdown', ev => {
+        ev.preventDefault();
+        posterCv.setPointerCapture(ev.pointerId);
+        posterDown = true;
+        paint(at(ev));
+      });
+      posterCv.addEventListener('pointermove', ev => { if (posterDown) paint(at(ev)); });
+      posterCv.addEventListener('pointerup', () => { posterDown = false; savePoster(); });
+      posterCv.addEventListener('pointerleave', () => { if (posterDown) { posterDown = false; savePoster(); } });
+    }
+    renderPosterTools();
+    drawPoster();
+    openModal('#modal-poster');
+  }
+  let posterDirty = false;
+  function savePoster() {
+    if (!posterKey || !posterDirty) return;
+    posterDirty = false;
+    GAME.setBillboardArt(posterKey, posterArt.join(''), true);
+    snd.plop();
+  }
+  function drawPoster() {
+    if (!posterCtx) return;
+    const g = posterCtx;
+    g.imageSmoothingEnabled = false;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.fillStyle = '#5e3d18'; g.fillRect(0, 0, posterCv.width, posterCv.height);
+    for (let y = 0; y < SPR.BILL_H; y++) for (let x = 0; x < SPR.BILL_W; x++) {
+      const i = SPR.BILL_CH.indexOf(posterArt[y * SPR.BILL_W + x]);
+      g.fillStyle = BILL_COLS[i > 0 ? i : 0];
+      g.fillRect(x * PCELL, y * PCELL, PCELL, PCELL);
+      /* a faint join so it reads as a grid you are painting */
+      g.fillStyle = 'rgba(0,0,0,.07)';
+      g.fillRect(x * PCELL, y * PCELL, PCELL, 1);
+      g.fillRect(x * PCELL, y * PCELL, 1, PCELL);
+    }
+    /* the poster as the road will see it, pinned in the corner */
+    const mini = SPR.billboardSprite(posterArt.join(''), 2, true);
+    g.drawImage(mini, posterCv.width - mini.width - 8, 8);
+    g.fillStyle = 'rgba(0,0,0,.35)';
+    g.fillRect(posterCv.width - mini.width - 12, 4, mini.width + 8, mini.height + 8);
+    g.drawImage(mini, posterCv.width - mini.width - 8, 8);
+  }
+  function renderPosterTools() {
+    const box = $('#poster-tools');
+    const bb = S().billboards[posterKey];
+    $('#poster-sub').textContent = (bb && bb.custom ? 'HAND PAINTED' : 'STOCK POSTER') +
+      '  -  PULL x' + (1 + ECON.billboardPull * GAME.billboardPull()).toFixed(2);
+    box.innerHTML = '';
+    const cols = document.createElement('div');
+    cols.className = 'pt-cols';
+    BILL_COLS.forEach((col, i) => {
+      const b = document.createElement('button');
+      b.className = 'pt-col' + (posterCol === i ? ' active' : '');
+      b.style.background = col;
+      b.dataset.act = 'poster-col';
+      b.dataset.i = String(i);
+      b.title = i === 0 ? 'The bare board - use it to rub out' : 'Paint with this';
+      cols.appendChild(b);
+    });
+    box.appendChild(cols);
+    const sizes = document.createElement('div');
+    sizes.className = 'pt-size';
+    [1, 2, 3].forEach(n => {
+      const b = document.createElement('button');
+      b.className = 'btn' + (posterSize === n ? ' btn-green' : '');
+      b.dataset.act = 'poster-size';
+      b.dataset.n = String(n);
+      b.textContent = n + 'X' + n;
+      b.title = 'Brush size';
+      sizes.appendChild(b);
+    });
+    box.appendChild(sizes);
+    BILL_PRESETS.forEach(pr => {
+      const b = document.createElement('button');
+      b.className = 'btn';
+      b.dataset.act = 'poster-preset';
+      b.dataset.id = pr.id;
+      b.textContent = pr.name;
+      b.title = 'Print this design on the board';
+      box.appendChild(b);
+    });
   }
 
   /* ================= MODAL PLUMBING ================= */
@@ -5681,6 +6058,15 @@
         ipanel.appendChild(ipRow('brought back', () => String(tm.made || 0)));
         btns.push({ label: () => tm.on ? 'RUNNING' : 'LOAD ' + ECON.dinoFossils + ' FOSSILS', data: { act: 'tm-load', k: o.k },
                     disabled: () => !GAME.canLoadTM(o.k), cls: () => GAME.canLoadTM(o.k) ? 'btn-green' : '' });
+      } else if (o.type === 'billboard') {
+        const bb = st.billboards[o.k];
+        if (!bb) { setInspect({ kind: 'farm' }); return; }
+        ipanel.appendChild(ipRow('poster', () => { const b2 = S().billboards[o.k]; return b2 && b2.custom ? 'hand painted' : 'stock print'; }));
+        ipanel.appendChild(ipRow('pull', () => 'x' + (1 + ECON.billboardPull * GAME.billboardPull()).toFixed(2)));
+        ipanel.appendChild(ipRow('a car every', () => GAME.fmtTime(GAME.orderWait())));
+        ipanel.appendChild(ipRow('lay-by holds', () => String(GAME.maxOrders())));
+        ipanel.appendChild(ipRow('they pay', () => '+' + Math.round(ECON.billboardPay * GAME.billboardPull() * 100) + '%'));
+        btns.push({ label: 'PAINT POSTER', data: { act: 'open-poster', k: o.k }, cls: 'btn-green' });
       } else if (o.type === 'fence') {
         ipanel.appendChild(ipRow('blocks', 'chickens'));
       }
@@ -6977,6 +7363,15 @@
   }
 
   function tapWorld(x, y) {
+    const boss = GAME.bossAt(x, y);
+    if (boss) {
+      if (S().tool === 'inspect') { setInspect({ kind: 'boss' }); return true; }
+      GAME.bossTap();
+      snd.pet();
+      heart(boss.x + 10, boss.y - 6, 1);
+      questSig = '';
+      return true;
+    }
     const st = GAME.inStation(x, y, 5);
     if (st === 'lab') { renderSkills(); openModal('#modal-skills'); snd.build(); return true; }
     if (st === 'stand') { renderPedia(); openModal('#modal-pedia'); snd.build(); return true; }
@@ -7025,6 +7420,7 @@
       if (GAME.ejectNest(o.k)) { snd.plop(); return true; }
     }
     if (o && o.type === 'genelab' && S().tool !== 'build') { openGenes(); snd.build(); return true; }
+    if (o && o.type === 'billboard' && S().tool !== 'build') { openPoster(o.k); snd.build(); return true; }
     if (o && (o.type === 'kitchen' || o.type === 'park' || o.type === 'timemachine') && S().tool !== 'build') { setInspect({ kind: 'build', ref: o }); snd.plop(); return true; }
     if (o && o.type === 'site' && S().tool !== 'build') { setInspect({ kind: 'build', ref: o }); return true; }
     return false;
@@ -7032,6 +7428,7 @@
 
   /* the inspect tool: tap anything to read its stats */
   function inspectAt(x, y) {
+    if (GAME.bossAt(x, y)) { setInspect({ kind: 'boss' }); return; }
     const w = staffAt(x, y);
     if (w) { setInspect({ kind: 'staff', ref: w }); return; }
     const ch = chickenAt(x, y);
@@ -7509,6 +7906,15 @@
       }
       case 'open-genes': { openGenes(btn.dataset.id ? +btn.dataset.id : null); snd.build(); break; }
       case 'open-world': { openWorld(); snd.build(); break; }
+      case 'open-poster': { openPoster(btn.dataset.k); snd.build(); break; }
+      case 'poster-col': { posterCol = +btn.dataset.i; renderPosterTools(); snd.plop(); break; }
+      case 'poster-size': { posterSize = +btn.dataset.n; renderPosterTools(); snd.plop(); break; }
+      case 'poster-preset': {
+        posterArt = SPR.billboardPreset(btn.dataset.id, S().company).split('');
+        GAME.setBillboardArt(posterKey, posterArt.join(''), false);
+        drawPoster(); renderPosterTools(); snd.build();
+        break;
+      }
       case 'set-recipe': { if (GAME.setRecipe(btn.dataset.k, btn.dataset.id)) { snd.plop(); refreshInspect(); } else snd.error(); break; }
       case 'park-eject': { if (GAME.parkEject(btn.dataset.k, +btn.dataset.i)) { snd.plop(); ipSig = ''; renderInspect(); } else snd.error(); break; }
       case 'tm-load': { if (GAME.loadTM(btn.dataset.k)) { snd.grand(); refreshInspect(); } else snd.error(); break; }
@@ -7643,6 +8049,13 @@
   GAME.on('cross', ({ ch, animal, x, y }) => { snd.grand(); puff(x, y, '#ffd23f', 12, 34, 28); toast({ icon: 'atom', title: 'CROSSED WITH A ' + animal.name.toUpperCase(), body: animal.desc }); });
   GAME.on('company', ({ c }) => { toast({ icon: c.logo, title: c.name, body: 'Filed and signed.' }); });
   GAME.on('rain', () => { snd.sprinkle(); });
+  GAME.on('boss', () => { questSig = ''; });
+  GAME.on('poster', ({ k, custom }) => {
+    const [c, r] = k.split(',').map(Number);
+    puff(c * 16 + 16, r * 16 - 6, '#ffd23f', 8, 30, 22);
+    if (custom) floatWorld('PAINTED', c * 16 + 16, r * 16 - 18, 'gold', 'brush');
+    GAME.bossSay(custom ? 'Now that is a poster. They will pull right in.' : 'A printed one. It will do until you paint me a better.', 6, 'stand');
+  });
   GAME.on('region', ({ r }) => { toast({ icon: r.moon ? 'atom' : 'city', title: r.name.toUpperCase(), body: r.moon ? 'The rocket is away.' : 'Open for business.' }); });
   GAME.on('branch', ({ r, n }) => { floatText('+1 BRANCH', innerWidth / 2 - 40, 120, 'gold', 'house'); });
   GAME.on('secret', ({ s }) => { snd.grand(); toast({ icon: s.icon, title: 'SECRET: ' + s.name.toUpperCase(), body: s.desc, long: true }); });
@@ -7696,7 +8109,6 @@
     updateCursorChip();
     requestAnimationFrame(syncCamPad);
     if (S().seenTitle) titleEl.hidden = true;
-    if (!$('#quest-card')) { const qc = document.createElement('div'); qc.id = 'quest-card'; qc.hidden = true; $('#stage-wrap').appendChild(qc); }
     const mb = $('#btn-mute');
     if (mb) mb.textContent = S().muted ? 'SOUND OFF' : 'SOUND ON';
     if (off && (off.laid > 0 || off.hatched > 0 || off.pay > 0)) {

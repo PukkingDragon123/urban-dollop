@@ -1733,6 +1733,18 @@ const SPR = (() => {
     quest: [
       '..oooooo..', '.owwwwwwo.', 'owwoooowwo', 'oooo..owwo', '....oowwo.',
       '...owwoo..', '...owwo...', '...oooo...', '...owwo...', '...oooo...'],
+    sign: [
+      'oooooooooo', 'osssssssso', 'osoyyyyoso', 'osoyyyyoso', 'osssssssso',
+      'oooooooooo', '...oNo....', '...oNo....', '..oNNNo...', '..ooooo...'],
+    brush: [
+      '.......ooo', '......opro', '.....oppro', '....oppro.', '...oppro..',
+      '..owwro...', '.owwwo....', 'ovvvvo....', 'ovvvo.....', 'oooo......'],
+    bus: [
+      '..........', 'oooooooooo', 'obbwwbbwwo', 'obbwwbbwwo', 'oyyyyyyyyo',
+      'oyyyyyyyyo', 'oooooooooo', '.okko.okko', '..oo...oo.', '..........'],
+    racc: [
+      '.o......o.', 'oko....oko', 'okkooookko', 'okwkkkkwko', 'okookkooko',
+      '.okkkkkko.', '..okWWko..', '...okko...', '..ok..ko..', '..oo..oo..'],
   };
   function iconSprite(name, scale) {
     const key = 'ic_' + name + '_' + scale;
@@ -1742,6 +1754,259 @@ const SPR = (() => {
     const c = newCanvas(10 * k, 10 * k);
     const ctx = c.getContext('2d');
     drawGrid(ctx, rows, IP, 0, 0, k);
+    cache.set(key, c);
+    return c;
+  }
+
+  /* ============================================================
+     BILLBOARDS
+     A poster is a grid of fat pixels: BILL_W x BILL_H cells, each
+     one a character indexing BILL_COLS. The presets are painted
+     here with the same 3x5 font the signs use, so a board can
+     carry real lettering at one pixel a cell.
+     ============================================================ */
+  const BILL_W = 28, BILL_H = 14;
+  const CH = '0123456789ab';                       /* cell -> palette index */
+  function blankArt(fill) { return (CH[fill || 0]).repeat(BILL_W * BILL_H); }
+  function artPainter(fill) {
+    const cells = blankArt(fill).split('');
+    const set = (x, y, i) => { if (x >= 0 && y >= 0 && x < BILL_W && y < BILL_H) cells[y * BILL_W + x] = CH[i] || '0'; };
+    const rect = (x, y, w, h, i) => { for (let dy = 0; dy < h; dy++) for (let dx = 0; dx < w; dx++) set(x + dx, y + dy, i); };
+    /* stamp a word in the tiny font, one glyph pixel to one cell */
+    const txt = (str, x, y, i) => {
+      String(str).toUpperCase().split('').forEach((ch, n) => {
+        const g = FONT[ch];
+        if (!g) return;
+        for (let r = 0; r < 5; r++) for (let c = 0; c < 3; c++) if (g[r][c] === '#') set(x + n * 4 + c, y + r, i);
+      });
+    };
+    const disc = (cx, cy, r, i, squash) => {
+      const sq = squash || 1;
+      for (let y = Math.floor(cy - r * sq); y <= cy + r * sq; y++)
+        for (let x = Math.floor(cx - r); x <= cx + r; x++) {
+          const dx = (x - cx) / r, dy = (y - cy) / (r * sq);
+          if (dx * dx + dy * dy <= 1) set(x, y, i);
+        }
+    };
+    return { set, rect, txt, disc, out: () => cells.join('') };
+  }
+  /* the poster designs. `co` is the company, so its own board wears
+     the mark and the name you filed. */
+  function billboardPreset(id, co) {
+    const P = artPainter(id === 'sale' ? 5 : id === 'brand' ? 3 : 1);
+    if (id === 'blank') return blankArt(0);
+    if (id === 'eggs') {
+      /* a fat egg on the left, the shout on the right */
+      P.disc(6, 7, 5.4, 1, 1.15);
+      for (let y = 2; y < 13; y++) for (let x = 1; x < 12; x++) {
+        const dx = (x - 6) / 5.4, dy = (y - 7) / 6.2;
+        if (dx * dx + dy * dy > 1) continue;
+        if (dx * dx + dy * dy > 0.72) P.set(x, y, 4);
+        else if (x < 5 && y < 7) P.set(x, y, 1);
+      }
+      P.set(4, 4, 1); P.set(3, 5, 1);
+      P.txt('EGGS', 14, 2, 5);
+      P.txt('NOW!', 14, 8, 2);
+      P.rect(13, 7, 15, 1, 4);
+      return P.out();
+    }
+    if (id === 'sale') {
+      P.rect(0, 0, BILL_W, 1, 3); P.rect(0, BILL_H - 1, BILL_W, 1, 3);
+      P.txt('BIG', 2, 2, 1);
+      P.txt('SALE', 2, 8, 3);
+      /* one clean starburst badge in the corner, clear of the lettering */
+      for (let a = 0; a < 10; a++) {
+        const t = a / 10 * Math.PI * 2;
+        P.set(Math.round(23 + Math.cos(t) * 5), Math.round(4 + Math.sin(t) * 4.4), 3);
+      }
+      P.disc(23, 4, 3.4, 3, 1);
+      P.disc(23, 4, 2.1, 1, 1);
+      P.txt('!', 22, 8, 1);
+      return P.out();
+    }
+    if (id === 'hen') {
+      P.rect(0, 0, BILL_W, BILL_H, 9);
+      P.txt('OUR', 2, 2, 2);
+      P.txt('HENS', 2, 8, 2);
+      /* a hen, side on, drawn straight into the cells */
+      const rows = ['.....ww.', '....wwww', '.oooowwo', 'oooooowk', 'oooooowo',
+                    '.ooooooo', '..oooo..', '..o..o..'];
+      rows.forEach((row, y) => row.split('').forEach((ch, x) => {
+        if (ch === 'o') P.set(18 + x, 3 + y, 1);
+        else if (ch === 'w') P.set(18 + x, 3 + y, 3);
+        else if (ch === 'k') P.set(18 + x, 3 + y, 2);
+      }));
+      P.rect(0, BILL_H - 2, BILL_W, 2, 7);
+      return P.out();
+    }
+    /* the company's own board */
+    P.rect(0, 0, BILL_W, 2, 2); P.rect(0, BILL_H - 2, BILL_W, 2, 2);
+    const name = ((co && co.name) || 'INF EGG CO.').replace(/[^A-Z0-9 ]/gi, '').trim().toUpperCase();
+    const words = name.split(' ').filter(Boolean).slice(0, 2);
+    words.forEach((w, i) => P.txt(w.slice(0, 6), 2, 4 + i * 6, 2));
+    P.disc(23, 7, 4, 4, 1);
+    P.disc(23, 7, 2.4, 1, 1);
+    return P.out();
+  }
+  /* the hoarding itself: two legs, a braced frame, the poster, a hood of lamps */
+  function billboardSprite(art, k, lit) {
+    const key = 'bill_' + (art || 'x').length + '_' + k + '_' + (lit ? 1 : 0) + '_' + hashStr(art || '');
+    if (cache.has(key)) return cache.get(key);
+    k = k || 1;
+    const W = 34, H = 46;
+    const c = newCanvas(W * k, H * k);
+    const ctx = c.getContext('2d');
+    const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
+    /* legs and cross-brace */
+    R(5, 24, 4, 22, '#3a2a16'); R(6, 24, 2, 21, '#8a5e2a');
+    R(25, 24, 4, 22, '#3a2a16'); R(26, 24, 2, 21, '#8a5e2a');
+    for (let i = 0; i < 18; i++) {
+      ctx.fillStyle = '#6e4a20';
+      ctx.fillRect((7 + i) * k, (27 + i) * k, k, k);
+      ctx.fillRect((26 - i) * k, (27 + i) * k, k, k);
+    }
+    R(4, 43, 26, 3, '#3a2a16');
+    /* the frame */
+    R(0, 3, W, 24, '#2e2216');
+    R(1, 4, W - 2, 22, '#7a5230');
+    R(2, 5, W - 4, 20, '#5e3d18');
+    R(3, 6, BILL_W, BILL_H, BILL_COLS[0]);
+    /* the poster */
+    const a = art || blankArt(0);
+    for (let y = 0; y < BILL_H; y++) for (let x = 0; x < BILL_W; x++) {
+      const i = CH.indexOf(a[y * BILL_W + x]);
+      if (i <= 0) continue;
+      ctx.fillStyle = BILL_COLS[i];
+      ctx.fillRect((3 + x) * k, (6 + y) * k, k, k);
+    }
+    /* glass sheen across the poster */
+    ctx.fillStyle = 'rgba(255,255,255,.14)';
+    for (let i = 0; i < 6; i++) ctx.fillRect((4 + i) * k, (6 + i) * k, 2 * k, k);
+    /* the hood, and three lamps under it */
+    R(2, 0, W - 4, 3, '#3a2a16');
+    R(3, 1, W - 6, 1, '#8a9099');
+    [7, 16, 25].forEach(x => {
+      R(x, 3, 3, 2, '#2e2216');
+      R(x, 3, 3, 1, lit ? '#fff3c4' : '#8a8f98');
+    });
+    if (lit) {
+      ctx.fillStyle = 'rgba(255,235,150,.16)';
+      [7, 16, 25].forEach(x => ctx.fillRect((x - 2) * k, 5 * k, 7 * k, 8 * k));
+    }
+    cache.set(key, c);
+    return c;
+  }
+  function hashStr(str) {
+    let h = 5381;
+    for (let i = 0; i < str.length; i++) h = ((h * 33) ^ str.charCodeAt(i)) >>> 0;
+    return h.toString(36);
+  }
+
+  /* ============================================================
+     THE OTHER SIDE OF THE ROAD
+     Once the road got wide enough to have two sides, the far one
+     needed a town on it: shop fronts with awnings and lit windows,
+     a bus shelter, a post box, lamps and a low wall.
+     ============================================================ */
+  const SHOP_PAL = [
+    ['#e8dcc0', '#c9b48c', '#c94a3a'], ['#d8e4ec', '#b8c4cc', '#3f6fd6'],
+    ['#f2e2c8', '#d9c8a8', '#6ab04c'], ['#e4d4e8', '#c8b4cc', '#b06ee0'],
+    ['#eae0cc', '#cabfa8', '#f0a422'],
+  ];
+  const SHOP_WORDS = ['EGGS', 'CAFE', 'BANK', 'POST', 'SHOP', 'DELI', 'HATS', 'IRON', 'TOYS', 'FEED'];
+  function townSprite(kind, seed, k) {
+    const key = 'town_' + kind + '_' + seed + '_' + k;
+    if (cache.has(key)) return cache.get(key);
+    k = k || 1;
+    const rnd = mulberry(seed * 61 + 17);
+    const wide = kind === 'wide';
+    const W = wide ? 64 : 44, H = kind === 'shed' ? 44 : 62;
+    const c = newCanvas(W * k, H * k);
+    const ctx = c.getContext('2d');
+    const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
+    const pal = SHOP_PAL[Math.floor(rnd() * SHOP_PAL.length)];
+    const OUT = '#2e2216';
+    const wallTop = kind === 'shed' ? 12 : 8;
+    /* the block itself */
+    R(0, wallTop, W, H - wallTop, OUT);
+    R(1, wallTop + 1, W - 2, H - wallTop - 2, pal[0]);
+    R(1, wallTop + 1, W - 2, 2, lighten(pal[0], 0.3));
+    R(1, H - 4, W - 2, 3, pal[1]);
+    /* brick or plaster courses */
+    for (let y = wallTop + 4; y < H - 5; y += 5) { ctx.fillStyle = 'rgba(0,0,0,.06)'; ctx.fillRect(k, y * k, (W - 2) * k, k); }
+    /* roof: a parapet, or a pitch on a shed */
+    if (kind === 'shed') {
+      for (let i = 0; i < 7; i++) { ctx.fillStyle = i === 0 ? OUT : (i % 2 ? '#8a5e2a' : '#a8783f'); ctx.fillRect((1 + i) * k, (wallTop - i) * k, (W - 2 - i * 2) * k, k); }
+    } else {
+      R(0, 4, W, 5, OUT);
+      R(1, 5, W - 2, 3, pal[2]);
+      R(1, 5, W - 2, 1, lighten(pal[2], 0.35));
+      /* the shop name on the fascia */
+      const word = SHOP_WORDS[Math.floor(rnd() * SHOP_WORDS.length)];
+      drawTiny(ctx, word, Math.round(W / 2 - tinyW(word, 1) / 2) * k, 5 * k, lum(pal[2]) > 0.55 ? '#2e2216' : '#fff8ec', k);
+      /* an awning over the window */
+      const ax = 3, aw = W - 6;
+      for (let i = 0; i < 4; i++) {
+        ctx.fillStyle = i === 3 ? OUT : (Math.floor(i) % 2 ? '#fff8ec' : pal[2]);
+        ctx.fillRect((ax + i) * k, (wallTop + 8 + i) * k, (aw - i * 2) * k, k);
+      }
+      for (let x = ax + 4; x < ax + aw - 4; x += 6) { ctx.fillStyle = OUT; ctx.fillRect(x * k, (wallTop + 12) * k, k, 2 * k); }
+    }
+    /* the shop window, lit, with things in it */
+    const wy = wallTop + (kind === 'shed' ? 6 : 15), wh = 14;
+    R(3, wy, W - 6, wh, OUT);
+    R(4, wy + 1, W - 8, wh - 2, '#ffe9a0');
+    ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.fillRect(5 * k, (wy + 2) * k, 6 * k, k);
+    for (let i = 0; i < (wide ? 5 : 3); i++) {
+      const sx = 6 + i * ((W - 14) / (wide ? 5 : 3));
+      ctx.fillStyle = ['#fff8ec', '#e8542f', '#6ab04c', '#3fa7d6', '#c9a35f'][i % 5];
+      ctx.fillRect(Math.round(sx) * k, (wy + wh - 6) * k, 3 * k, 4 * k);
+    }
+    ctx.fillStyle = OUT;
+    for (let x = 3 + Math.round((W - 6) / 2); x < W - 3; x += 100) ctx.fillRect(x * k, wy * k, k, wh * k);
+    /* the door */
+    const dx = wide ? W - 16 : W - 13;
+    R(dx, H - 20, 10, 19, OUT);
+    R(dx + 1, H - 19, 8, 18, '#7a5230');
+    R(dx + 1, H - 19, 8, 1, '#a8783f');
+    R(dx + 2, H - 17, 6, 5, '#d8f2fa');
+    ctx.fillStyle = '#ffd23f'; ctx.fillRect((dx + 7) * k, (H - 10) * k, k, k);
+    /* upstairs windows */
+    if (kind !== 'shed') {
+      const n = wide ? 3 : 2;
+      for (let i = 0; i < n; i++) {
+        const ux = 5 + i * Math.round((W - 10) / n);
+        R(ux, wallTop + 2, 8, 5, OUT);
+        R(ux + 1, wallTop + 3, 6, 3, rnd() < 0.5 ? '#ffe9a0' : '#8fb8d6');
+      }
+    }
+    cache.set(key, c);
+    return c;
+  }
+  /* a bus shelter: a glass box with a bench and a timetable */
+  function shelterSprite(k) {
+    const key = 'shelter_' + k;
+    if (cache.has(key)) return cache.get(key);
+    k = k || 1;
+    const W = 44, H = 34;
+    const c = newCanvas(W * k, H * k);
+    const ctx = c.getContext('2d');
+    const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
+    R(0, 0, W, 5, '#2e2216');
+    R(1, 1, W - 2, 3, '#3fa7d6');
+    R(1, 1, W - 2, 1, '#7fc4e8');
+    R(2, 5, 3, 28, '#2e2216'); R(39, 5, 3, 28, '#2e2216');
+    R(5, 5, 34, 24, 'rgba(200,240,255,.30)');
+    ctx.fillStyle = 'rgba(255,255,255,.45)';
+    ctx.fillRect(7 * k, 7 * k, 8 * k, k); ctx.fillRect(7 * k, 8 * k, 4 * k, k);
+    /* bench */
+    R(7, 24, 26, 3, '#8a5e2a'); R(7, 24, 26, 1, '#c9a35f');
+    R(9, 27, 2, 5, '#5e3d18'); R(29, 27, 2, 5, '#5e3d18');
+    /* timetable */
+    R(33, 8, 7, 11, '#2e2216'); R(34, 9, 5, 9, '#fff8ec');
+    ctx.fillStyle = '#8a8070';
+    for (let y = 10; y < 17; y += 2) ctx.fillRect(34 * k, y * k, 5 * k, k);
+    R(0, 33, W, 1, '#2e2216');
     cache.set(key, c);
     return c;
   }
@@ -3125,6 +3390,8 @@ const SPR = (() => {
     soilSprite, cropSprite, chickSprite, vehicleSprite, skylineSprite, cursorSprite,
     pathSprite, terraceSprite, waterSprite, inkLine, parchment, compassRose, botSprite,
     plumeSprite, signSprite, treeSprite, eggCrackSprite, shellHalfSprite,
+    billboardSprite, billboardPreset, blankArt, townSprite, shelterSprite,
+    BILL_W, BILL_H, BILL_CH: CH,
     drawText, textW, drawTiny, tinyW, drawTitle,
     drawBezel, drawScanlines, drawPips, drawBox, TERM, drawHex, hexHit, hexRows, drawCube,
     carSprite, raccoonSprite, furnitureSprite,
