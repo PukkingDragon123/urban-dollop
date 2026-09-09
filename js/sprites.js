@@ -3341,6 +3341,66 @@ const SPR = (() => {
   }
 
   /* ============================================================
+     THE WARDEN - a short, round, orange thing with a mustache far
+     too big for it, who lives under the stumps and speaks for the
+     trees. He turns up whenever one comes down. 12 x 16, facing
+     right, with five rows of headroom so a raised fist has somewhere
+     to go. Poses: stand, wag (shaking a fist), point, sulk.
+     ============================================================ */
+  const WARDEN_ROWS = [
+    '....oooo....',
+    '..ooffFFoo..',
+    '.offFFFFFfo.',
+    'offFFFFFFFfo',
+    'ofFFffffFFfo',
+    'ofFfeffeFffo',
+    'ofFffffffFfo',
+    'ommMMMMMMmmo',
+    'mmMMMMMMMMmm',
+    'ommMMMMMMmmo',
+    '.oomMMMMmoo.',
+    '..offfffffo.',
+    '.offFFFFFfo.',
+    '.offfffffffo',
+    '..oo.oo.oo..',
+    '...oo...oo..',
+  ];
+  const WARDEN_PAL = { o: '#6b2f0a', f: '#e8721c', F: '#ff9a3d', d: '#b8500c',
+                       m: '#e8c37a', M: '#fff3d0', e: '#201008' };
+  const WARD_OFF = 5;
+  function wardenSprite(pose, scale) {
+    pose = pose || 'stand';
+    const key = 'ward_' + pose + '_' + scale;
+    if (cache.has(key)) return cache.get(key);
+    const k = scale || 1;
+    const c = newCanvas(18 * k, (16 + WARD_OFF) * k);
+    const ctx = c.getContext('2d');
+    drawGrid(ctx, WARDEN_ROWS, WARDEN_PAL, 0, WARD_OFF * k, k);
+    const R = (x, y, w, h, col) => { if (!col) return; ctx.fillStyle = col; ctx.fillRect(x * k, (y + WARD_OFF) * k, w * k, h * k); };
+    const O = WARDEN_PAL.o, f = WARDEN_PAL.f, F = WARDEN_PAL.F;
+    if (pose === 'wag') {
+      /* one fist up over the head, mid-shake */
+      R(11, 8, 3, 4, O); R(12, 9, 1, 2, f);
+      R(12, 4, 4, 4, O); R(13, 5, 2, 2, F);
+      R(-1, 11, 3, 3, O); R(0, 12, 1, 1, f);
+    } else if (pose === 'point') {
+      /* an arm straight out, one stubby finger on the end */
+      R(11, 11, 6, 3, O); R(11, 12, 5, 1, f); R(16, 11, 2, 2, O); R(16, 12, 1, 1, F);
+      R(-1, 11, 3, 3, O); R(0, 12, 1, 1, f);
+    } else if (pose === 'sulk') {
+      /* arms folded, and the mustache droops a row */
+      ctx.clearRect(0, (7 + WARD_OFF) * k, 12 * k, k);
+      R(0, 8, 12, 1, WARDEN_PAL.m);
+      R(2, 12, 8, 2, O); R(3, 12, 6, 1, f);
+    } else {
+      R(11, 11, 3, 3, O); R(11, 12, 2, 1, f);
+      R(-1, 11, 3, 3, O); R(0, 12, 1, 1, f);
+    }
+    cache.set(key, c);
+    return c;
+  }
+
+  /* ============================================================
      THE OVERHAUL'S SMALL ART - tool icons big enough to read, the
      pantry's produce and goods, the limousine's present, a HELP
      WANTED poster, a soft shadow and a bar everything shares.
@@ -3747,6 +3807,7 @@ const SPR = (() => {
     drawBezel, drawScanlines, drawPips, drawBox, TERM, drawHex, hexHit, hexRows, drawCube,
     carSprite, raccoonSprite, furnitureSprite, RAC_OFF, outfitOf,
     toolIconSprite, produceSprite, goodsSprite, presentSprite, posterSprite, shadowEll, drawBar,
+    wardenSprite, WARD_OFF,
     newMask, mRect, mCircle, renderMask, mulberry, newCanvas,
     darken, lighten, warm, cool, lum, px, CELL, ICONS,
   };

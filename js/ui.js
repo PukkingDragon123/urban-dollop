@@ -2218,6 +2218,33 @@
     }
   }
 
+  /* The Warden: he comes up out of the ground where a tree used to be,
+     objects at length, takes a bribe and walks off. */
+  function drawWarden(now) {
+    const w = GAME.warden();
+    if (!w) return;
+    if (ctx === mainCtx && (w.x + 24 < cam().x || w.x - 10 > cam().x + W.view.w || w.y + 20 < cam().y || w.y - 40 > cam().y + W.view.h)) return;
+    const up = Math.min(1, w.t / 0.5);
+    const pose = w.going > 0 ? 'sulk' : w.t < 3 ? (Math.floor(now / 190) % 2 ? 'wag' : 'stand') : 'stand';
+    const spr = SPR.wardenSprite(pose, 1);
+    const bob = w.going > 0 ? Math.abs(Math.sin(now / 150)) : Math.abs(Math.sin(now / 260)) * 1.2;
+    /* the hole he came up out of */
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(Math.round(w.x - 1), Math.round(w.y - 2), 16, 4);
+    ctx.fillStyle = '#241a10'; ctx.fillRect(Math.round(w.x + 1), Math.round(w.y - 1), 12, 2);
+    SPR.shadowEll(ctx, w.x + 6, w.y + 1, 6, 1.5, 0.3);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(w.x - 6, w.y - spr.height, spr.width + 12, spr.height + 2);
+    ctx.clip();
+    ctx.drawImage(spr, Math.round(w.x), Math.round(w.y - spr.height + (1 - up) * 20 - bob));
+    ctx.restore();
+    if (GAME.setting('particles') && w.t < 2 && Math.floor(now / 260) % 2) {
+      ctx.fillStyle = '#7fbf4f';
+      ctx.fillRect(Math.round(w.x + 14 + Math.sin(now / 300) * 3), Math.round(w.y - 26 + (w.t * 14) % 24), 2, 1);
+    }
+    if (up >= 1 && ctx === mainCtx) drawSay(GAME.wardenLine(), w.x + 6, w.y - 22 - bob, 24);
+  }
+
   /* ---------- stations ---------- */
   function drawLab(now) {
     const s = W.stations.lab, x = s.x, y = s.y;
@@ -3085,6 +3112,7 @@
     S().chickens.forEach(ch => drawChicken(ch, now));
     S().staff.forEach(w => drawStaff(w, now));
     drawBoss(now);
+    drawWarden(now);
     S().visitors.forEach(v => drawVisitor(v, now));
     drawTruck(now);
     drawFarSide(now);
@@ -4070,140 +4098,262 @@
      decides to get super rich, and founds a company: you name it,
      pick its mark and paint its colours before the first egg.
      ============================================ */
+  /* Four shots. `hot` names the words the caption sets in amber. */
   const INTRO = [
-    { bg: 'night', pose: 'read', lines: ['A LETTER CAME FOR A RACCOON.', '"GRANDMAMA HAS LEFT YOU THE FARM.', 'MIND THE HEN. SHE IS PARTICULAR."'] },
-    { bg: 'day',   pose: 'walk', lines: ['ONE OLD HEN. ONE BARE FIELD.', 'ONE BICYCLE WITH A BASKET.', 'NOT MUCH OF AN INHERITANCE.'] },
-    { bg: 'dream', pose: 'boss', lines: ['BUT A RACCOON HAS PLANS.', 'EGGS. LOTS OF EGGS. TRUCKS OF EGGS.', 'TIME TO START A COMPANY.'] },
-    { bg: 'factory', pose: 'guitar', lines: ['AND THE RACCOON HAD A THOUGHT.', 'FACTORIES. TRUCKS. A LIMOUSINE.', '"HOW BAD CAN I POSSIBLY BE?"'] },
+    { bg: 'night', lines: ['A LETTER CAME FOR A RACCOON.', '"GRANDMAMA LEFT YOU THE FARM.', 'MIND THE HEN. SHE IS PARTICULAR."'],
+      hot: ['LETTER', 'FARM', 'HEN'], slate: 'ONE WET TUESDAY' },
+    { bg: 'day', lines: ['ONE OLD HEN. ONE BARE FIELD.', 'ONE BICYCLE WITH A BASKET.', 'NOT MUCH OF AN INHERITANCE.'],
+      hot: ['ONE', 'BICYCLE', 'INHERITANCE.'], slate: 'THE GATE, DAWN' },
+    { bg: 'dream', lines: ['SO HE DID THE ARITHMETIC.', 'ONE HEN IS A HOBBY.', 'TEN THOUSAND IS AN INDUSTRY.'],
+      hot: ['ARITHMETIC.', 'HOBBY.', 'INDUSTRY.'], slate: 'A BACK OF AN ENVELOPE' },
+    { bg: 'factory', lines: ['THE PERMITS WENT THROUGH ON A FRIDAY.', 'SMOKE. BELTS. A LIMOUSINE.', '"HOW BAD CAN I POSSIBLY BE?"'],
+      hot: ['PERMITS', 'LIMOUSINE.', 'BAD'], slate: 'GROUND BREAKS' },
   ];
   let introMode = null, introScene = 0, introT = 0;
   function startIntro() {
     introMode = 'scene'; introScene = 0; introT = 0;
     $('#title-buttons').hidden = true;
     if (window.MENU) MENU.hide();
-    $('#intro-ui').hidden = false;
     $('#company-form').hidden = true;
     snd.plop();
   }
   function introNext() {
     if (introMode !== 'scene') return;
-    if (introT < 1.2) { introT = 6; return; }          /* finish the typing first */
-    introScene++; introT = 0; snd.plop();
+    if (introT < 1.1) { introT = 9; return; }          /* let the caption finish first */
+    introScene++; introT = 0; snd.build();
     if (introScene >= INTRO.length) showCompanyForm(true);
   }
   function introSkip() { if (introMode === 'scene') showCompanyForm(true); }
+
+  /* ============================================================
+     THE CUTSCENES
+     Four letterboxed shots with a slate in the corner, parallax
+     behind the cast and a caption that types itself one fat pixel
+     letter at a time - each letter dropping in with a bounce, the
+     words that matter in hazard amber. Click anywhere for the next.
+     ============================================================ */
   function drawIntro(dt) {
     introT += dt;
     const sc = INTRO[Math.min(introScene, INTRO.length - 1)];
     const now = titleT * 1000; titleT += dt;
     tctx.imageSmoothingEnabled = false;
-    /* the caption wraps to whatever width the window gave us; the plate
-       grows to hold it and the horizon rises to stand clear of it, so on
-       a tall narrow card the cast is not standing behind the words */
-    const capW = TW - 40;
-    const caps = [];
-    sc.lines.forEach((src, si) => {
-      let line = '';
-      src.split(' ').forEach(word => {
-        const t = line ? line + ' ' + word : word;
-        if (line && SPR.textW(t, 1) > capW) { caps.push({ t: line, lead: si === 0 }); line = word; }
-        else line = t;
-      });
-      if (line) caps.push({ t: line, lead: si === 0 });
-    });
-    const plateH = caps.length * 12 + 10;
-    const plateY = TH - plateH - 40;   /* clear of the NEXT and SKIP keys */
-    /* sky */
-    const bands = sc.bg === 'night' ? ['#0b1020', '#111a34', '#16203c', '#1d2b4a', '#26375c', '#2f4470']
-                : sc.bg === 'day' ? ['#7fb8e8', '#8fc4ec', '#a2d0f0', '#b8dcf4', '#cfe8f8', '#e4f2fb']
-                : ['#2a1a3c', '#3a2454', '#4d2f6e', '#5f3a86', '#7a4aa8', '#9a62c8'];
-    const per = Math.ceil(TH / bands.length);
-    bands.forEach((b, i) => { tctx.fillStyle = b; tctx.fillRect(0, i * per, TW, per); });
-    if (sc.bg !== 'day') for (let i = 0; i < 40; i++) { if (Math.floor(now / 500 + i) % 7 === 0) continue; tctx.fillStyle = 'rgba(255,255,255,.7)'; tctx.fillRect((i * 97) % TW, (i * 43) % 120, 1, 1); }
-    /* ground */
-    const gy = Math.min(TH - 62, plateY - 12);
-    tctx.fillStyle = sc.bg === 'night' ? '#22301e' : sc.bg === 'day' ? '#6fae4a' : '#3a2a4a'; tctx.fillRect(0, gy, TW, TH - gy);
-    tctx.fillStyle = sc.bg === 'night' ? '#2c3d26' : sc.bg === 'day' ? '#7fbf58' : '#4a3a5a'; tctx.fillRect(0, gy, TW, 2);
-    /* every scene is composed for a card 384 across. The sky and the
-       ground stretch to whatever card we got; the cast is centred in it,
-       so a narrow window keeps the middle of the picture instead of
-       squashing the raccoon. */
+    /* the letterbox: a thin bar on top, and a bottom bar deep enough for the
+       caption, so nothing it says is ever cut off */
+    const capK = TW >= 560 ? 2 : 1;
+    const lineH = 8 * capK + 5;
+    const BAR = Math.max(12, Math.round(TH * 0.075));
+    const BARB = Math.max(BAR, sc.lines.length * lineH + 10);
+    const stage = { y: BAR, h: TH - BAR - BARB };
+    const gy = Math.round(stage.y + stage.h * 0.78);     /* the ground line */
+    const K = TW >= 620 ? 4 : 3;
+
+    tctx.fillStyle = '#07080b'; tctx.fillRect(0, 0, TW, TH);
+
+    /* ---- sky ---- */
+    const skies = {
+      night:   ['#080a18', '#0d1226', '#141b36', '#1d2748', '#28345c'],
+      day:     ['#4d84b8', '#6fa3ce', '#8fbde0', '#b0d4ec', '#d2e8f6'],
+      dream:   ['#1b1030', '#2b1848', '#402260', '#5a2f78', '#78418e'],
+      factory: ['#1a1220', '#2b1a26', '#42232a', '#5e2f2c', '#7d4030'],
+    };
+    const bands = skies[sc.bg] || skies.day;
+    const per = Math.ceil(stage.h / bands.length);
+    bands.forEach((b, i) => { tctx.fillStyle = b; tctx.fillRect(0, stage.y + i * per, TW, per); });
+    if (sc.bg !== 'day') for (let i = 0; i < 46; i++) {
+      if (Math.floor(now / 480 + i) % 9 === 0) continue;
+      tctx.fillStyle = 'rgba(255,255,255,.6)';
+      tctx.fillRect((i * 97) % TW, stage.y + (i * 43) % Math.round(stage.h * 0.5), 1, 1);
+    }
+
+    /* ---- ground ---- */
+    const groundCol = { night: '#141a16', day: '#5f9c40', dream: '#2a1d3c', factory: '#2a211f' }[sc.bg];
+    tctx.fillStyle = groundCol; tctx.fillRect(0, gy, TW, stage.y + stage.h - gy);
+    tctx.fillStyle = { night: '#1d2620', day: '#74b64f', dream: '#3a2a50', factory: '#3a2e28' }[sc.bg];
+    tctx.fillRect(0, gy, TW, 2);
+
+    /* everything is composed for a 384-wide shot and centred in whatever we got */
     tctx.save();
     tctx.translate(Math.round((TW - 384) / 2), 0);
+
     if (sc.bg === 'night') {
-      /* the town: dark house fronts and a lamp post */
-      for (let i = 0; i < 6; i++) { const hx = i * 66 + 10, hh = 30 + (i * 13) % 20; tctx.fillStyle = '#141a2c'; tctx.fillRect(hx, gy - hh, 48, hh); tctx.fillStyle = (i + Math.floor(now / 1700)) % 3 ? '#ffe9a0' : '#3a3a5a'; tctx.fillRect(hx + 10, gy - hh + 8, 6, 6); tctx.fillRect(hx + 30, gy - hh + 8, 6, 6); }
+      /* a wet street: shuttered fronts, one lamp, one raccoon reading */
+      for (let i = 0; i < 7; i++) {
+        const hx = i * 58 - 10, hh = 40 + (i * 17) % 26;
+        tctx.fillStyle = '#0b0e1c'; tctx.fillRect(hx, gy - hh, 46, hh);
+        tctx.fillStyle = '#131830'; tctx.fillRect(hx, gy - hh, 46, 2);
+        tctx.fillStyle = (i + Math.floor(now / 1900)) % 3 ? '#ffd88a' : '#20263f';
+        tctx.fillRect(hx + 9, gy - hh + 10, 7, 8); tctx.fillRect(hx + 29, gy - hh + 10, 7, 8);
+      }
       const lamp = SPR.furnitureSprite('lamp', 3, 3);
-      tctx.drawImage(lamp, 236, gy - lamp.height + 4);
-      tctx.fillStyle = 'rgba(255,230,150,.10)'; tctx.fillRect(196, gy - 40, 100, 44); tctx.fillRect(210, gy - 60, 72, 20);
-      const rac = SPR.raccoonSprite('read', 4);
-      tctx.drawImage(rac, 150, gy - rac.height + 6);
-      /* the envelope drifting in for the first second */
-      if (introT < 1.4) { const f = Math.min(1, introT / 1.4); tctx.fillStyle = '#fff8ec'; tctx.fillRect(Math.round(60 + f * 100), Math.round(30 + f * 60 + Math.sin(introT * 6) * 4), 16, 11); tctx.fillStyle = '#e8542f'; tctx.fillRect(Math.round(66 + f * 100), Math.round(33 + f * 60 + Math.sin(introT * 6) * 4), 4, 4); }
+      tctx.drawImage(lamp, 244, gy - lamp.height + 4);
+      /* the cone, and rain crossing it */
+      for (let i = 0; i < 30; i++) {
+        const p = i / 30;
+        tctx.fillStyle = 'rgba(255,226,150,' + (0.05 * (1 - p)).toFixed(3) + ')';
+        const half = 8 + p * 54;
+        tctx.fillRect(Math.round(252 - half), Math.round(gy - 62 + p * 62), Math.round(half * 2), 3);
+      }
+      tctx.fillStyle = 'rgba(190,215,255,.45)';
+      for (let i = 0; i < 60; i++) {
+        const rx = (i * 137 + Math.floor(now / 3)) % 420 - 20, ry = stage.y + ((i * 313 + Math.floor(now / 2)) % (gy - stage.y));
+        tctx.fillRect(rx, ry, 1, 4);
+      }
+      /* puddle reflection */
+      tctx.fillStyle = 'rgba(255,226,150,.14)'; tctx.fillRect(228, gy + 2, 48, 3);
+      const rac = SPR.raccoonSprite('read', K, S().wardrobe);
+      tctx.drawImage(rac, 150 - (rac.ox || 0) * K, gy - rac.height + 4);
+      /* the letter, blown in during the first beat */
+      if (introT < 1.6) {
+        const f = Math.min(1, introT / 1.6);
+        const lx = Math.round(40 + f * 108), ly = Math.round(stage.y + 14 + f * (gy - stage.y - 60) + Math.sin(introT * 7) * 6);
+        tctx.fillStyle = '#14171a'; tctx.fillRect(lx - 1, ly - 1, 20, 15);
+        tctx.fillStyle = '#fff8ec'; tctx.fillRect(lx, ly, 18, 13);
+        tctx.fillStyle = '#c9c0a8'; tctx.fillRect(lx, ly, 18, 1);
+        tctx.fillStyle = '#e0432c'; tctx.fillRect(lx + 6, ly + 4, 6, 5);
+      }
     } else if (sc.bg === 'day') {
-      /* the farm gate: fence posts, the nest, the bicycle, a FOR SALE sign or two */
-      for (let x = 0; x < TW; x += 14) { tctx.fillStyle = '#8a5e2a'; tctx.fillRect(x, gy - 14, 3, 16); }
-      tctx.fillStyle = '#a8783f'; tctx.fillRect(0, gy - 10, TW, 2); tctx.fillRect(0, gy - 4, TW, 2);
+      /* the gate: fence, nest, bicycle, and a FOR SALE board going up */
+      for (let x = -10; x < 400; x += 15) { tctx.fillStyle = '#8a5e2a'; tctx.fillRect(x, gy - 15, 3, 17); }
+      tctx.fillStyle = '#a8783f'; tctx.fillRect(-10, gy - 11, 410, 2); tctx.fillRect(-10, gy - 5, 410, 2);
+      for (let i = 0; i < 5; i++) { const cx2 = 20 + i * 90; tctx.fillStyle = 'rgba(255,255,255,.5)'; tctx.fillRect(cx2 + ((now / 40) % 60), stage.y + 12 + i * 7, 22, 3); }
       const mama = SPR.mamaSprite(0, 2, Math.floor(now / 3000) % 5 === 4 ? 'blink' : 'idle');
       const nest = SPR.nestSprite(2);
       tctx.drawImage(nest, 300 - nest.width / 2, gy - 16);
       tctx.drawImage(mama, 300 - mama.width / 2, gy - mama.height - 2);
-      const bike = SPR.vehicleSprite('bike', 0, 2);
-      tctx.drawImage(bike, 30, gy - bike.height + 2);
-      const wx = Math.min(150, 40 + introT * 40);
-      const rac = SPR.raccoonSprite(wx < 150 && Math.floor(now / 160) % 2 ? 'walk1' : 'stand', 4);
-      tctx.drawImage(rac, Math.round(wx), gy - rac.height + 6);
-      const case2 = SPR.iconSprite('suitcase', 3);
-      tctx.drawImage(case2, Math.round(wx) - 26, gy - 28);
-      /* dust as it walks */
-      if (wx < 150 && Math.floor(now / 200) % 2) { tctx.fillStyle = 'rgba(200,180,140,.6)'; tctx.fillRect(Math.round(wx) - 6, gy + 2, 4, 2); }
-    } else if (sc.bg === 'factory') {
-      /* the plan: him in the green suit with the guitar, factories rising behind, chickens filing past */
-      for (let i = 0; i < 4; i++) {
-        const fx = 40 + i * 84, rise = Math.min(1, Math.max(0, introT * 0.7 - i * 0.4)), fh = Math.round((36 + (i % 2) * 14) * rise);
-        tctx.fillStyle = '#2a1e3c'; tctx.fillRect(fx, gy - fh, 40, fh); tctx.fillRect(fx + 30, gy - fh - Math.round(14 * rise), 6, Math.round(14 * rise));
-        for (let wy = 6; wy < fh - 6; wy += 9) for (let wx = 4; wx < 34; wx += 9) { tctx.fillStyle = (Math.floor(now / 1200) + wx + wy) % 3 ? '#ffd23f' : '#4a3a5a'; tctx.fillRect(fx + wx, gy - fh + wy, 4, 4); }
-        if (rise >= 1) for (let s2 = 0; s2 < 3; s2++) { const t = ((now / 1200 + s2 * 0.33) % 1); tctx.fillStyle = 'rgba(200,200,210,' + (0.6 - t * 0.5).toFixed(2) + ')'; tctx.fillRect(fx + 30 + Math.round(Math.sin(now / 400 + s2) * 3), Math.round(gy - fh - 16 - t * 24), 6 - Math.floor(t * 3), 3); }
+      const bike = SPR.vehicleSprite('bike', 0, 2, GAME.paintInfo());
+      tctx.drawImage(bike, 22, gy - bike.height + 2);
+      const wx = Math.min(150, 34 + introT * 46);
+      const rac = SPR.raccoonSprite(wx < 150 && Math.floor(now / 150) % 2 ? 'walk1' : 'stand', K, S().wardrobe);
+      tctx.drawImage(rac, Math.round(wx) - (rac.ox || 0) * K, gy - rac.height + 4);
+      const cse = SPR.iconSprite('suitcase', 3);
+      tctx.drawImage(cse, Math.round(wx) - 28, gy - 30);
+      if (wx < 150 && Math.floor(now / 190) % 2) { tctx.fillStyle = 'rgba(210,190,150,.7)'; tctx.fillRect(Math.round(wx) - 8, gy - 3, 5, 2); }
+    } else if (sc.bg === 'dream') {
+      /* the arithmetic: an envelope the size of a wall, sums crawling over it */
+      const bx = 96, by = stage.y + 14, bw = 210, bh = Math.max(60, gy - by - 26);
+      tctx.fillStyle = '#14171a'; tctx.fillRect(bx - 2, by - 2, bw + 4, bh + 4);
+      tctx.fillStyle = '#f2ece0'; tctx.fillRect(bx, by, bw, bh);
+      tctx.fillStyle = 'rgba(90,120,160,.16)';
+      for (let y = 6; y < bh - 4; y += 8) tctx.fillRect(bx + 4, by + y, bw - 8, 1);
+      tctx.fillStyle = 'rgba(210,90,90,.35)'; tctx.fillRect(bx + 16, by, 1, bh);
+      const sums = ['1 HEN = 1 EGG', 'x 10 HENS', 'x 100 COOPS', 'x 1000 TRUCKS', '= ???'];
+      sums.forEach((line, i) => {
+        if (introT < 0.35 + i * 0.42) return;
+        SPR.drawTiny(tctx, line, bx + 24, by + 10 + i * 11, i === sums.length - 1 ? '#bf4f10' : '#14171a', 1);
+        if (i === sums.length - 1 && Math.floor(now / 300) % 2) SPR.drawTiny(tctx, 'RICH', bx + 74, by + 10 + i * 11, '#bf4f10', 1);
+      });
+      /* a graph climbing out of the top of the envelope */
+      const rise = Math.min(1, Math.max(0, (introT - 1.2) / 2.2));
+      tctx.fillStyle = '#2f6b28';
+      for (let i = 0; i < Math.round(rise * 26); i++) {
+        const px2 = bx + 150 + i * 2, py2 = by + bh - 14 - Math.round(Math.pow(i / 26, 1.7) * (bh - 22));
+        tctx.fillRect(px2, py2, 2, 2);
       }
-      const rac = SPR.raccoonSprite(Math.floor(now / 250) % 2 ? 'guitar1' : 'guitar0', 4, Object.assign({}, S().wardrobe, { suit: 'suit_green', glasses: 'gl_star', acc: 'acc_guitar' }));
-      const rhop = Math.abs(Math.sin(now / 250)) * 6;
-      tctx.drawImage(rac, 160 - (rac.ox || 0) * 4, gy - rac.height + 6 - rhop);
-      for (let i = 0; i < 4; i++) { const cx = ((now / 30 + i * 90) % (TW + 60)) - 30; const c = SPR.chickenSprite(SPECIES[(i * 5) % 20], 2, false); tctx.drawImage(c, Math.round(cx), gy - c.height + 4 - Math.abs(Math.sin(now / 200 + i)) * 3); }
-      for (let i = 0; i < 12; i++) { const cy = ((now / 12 + i * 37) % (gy + 20)) - 10; tctx.fillStyle = '#ffd23f'; tctx.fillRect((i * 67 + 20) % 384, Math.round(cy), 3, 3); }
+      const rac = SPR.raccoonSprite(Math.floor(now / 400) % 4 === 0 ? 'cheer' : 'boss', K, S().wardrobe);
+      tctx.drawImage(rac, 30 - (rac.ox || 0) * K, gy - rac.height + 4);
+      for (let i = 0; i < 10; i++) {
+        const cy2 = ((now / 16 + i * 41) % (gy - stage.y)) + stage.y;
+        tctx.fillStyle = '#ffb32e'; tctx.fillRect((i * 67 + 26) % 384, Math.round(cy2), 3, 3);
+      }
     } else {
-      /* the dream: coins piling, a tower rising, the raccoon in a top hat */
-      const rac = SPR.raccoonSprite('boss', 4);
-      tctx.drawImage(rac, 60, gy - rac.height + 6);
-      const bx = 170, by = 30, bw = 190, bh = 110;
-      tctx.fillStyle = '#2e2216'; tctx.fillRect(bx - 1, by, bw + 2, bh); tctx.fillRect(bx, by - 1, bw, bh + 2);
-      tctx.fillStyle = '#fff8ec'; tctx.fillRect(bx, by, bw, bh);
-      tctx.fillStyle = '#2e2216'; tctx.fillRect(bx - 14, by + bh - 20, 8, 8); tctx.fillRect(bx - 22, by + bh - 8, 5, 5);
-      tctx.fillStyle = '#fff8ec'; tctx.fillRect(bx - 13, by + bh - 19, 6, 6); tctx.fillRect(bx - 21, by + bh - 7, 3, 3);
-      const rise = Math.min(1, introT / 2.5);
-      /* a skyscraper with the company mark on top */
-      const th = Math.round(80 * rise);
-      tctx.fillStyle = '#3fa7d6'; tctx.fillRect(bx + 110, by + bh - 6 - th, 40, th);
-      tctx.fillStyle = '#7fc4e8'; for (let yy = 4; yy < th - 4; yy += 8) for (let xx = 4; xx < 36; xx += 8) tctx.fillRect(bx + 114 + xx, by + bh - 6 - th + yy, 4, 4);
-      if (rise >= 1) tctx.drawImage(SPR.iconSprite(S().company.logo || 'egg', 2), bx + 120, by + bh - 6 - th - 22);
-      /* coins stacking */
-      const nC = Math.floor(rise * 18);
-      for (let i = 0; i < nC; i++) { const cx = bx + 12 + (i % 6) * 14, cy = by + bh - 12 - Math.floor(i / 6) * 6; tctx.fillStyle = '#e0a416'; tctx.fillRect(cx, cy, 10, 5); tctx.fillStyle = '#ffd23f'; tctx.fillRect(cx, cy, 10, 3); tctx.fillStyle = '#fff3c4'; tctx.fillRect(cx + 2, cy, 3, 1); }
-      /* trucks rolling along the bottom of the thought */
-      const tr = SPR.vehicleSprite('truck', Math.floor(now / 90) % 2, 1);
-      tctx.drawImage(tr, bx + 6 + Math.round((introT * 30) % 120), by + 8);
-      SPR.drawTiny(tctx, 'SUPER RICH', bx + 8, by + 6, '#8a5e2a', 1);
+      /* ground breaks: chimneys climb, belts turn, and someone objects */
+      for (let i = 0; i < 5; i++) {
+        const fx = 6 + i * 78, rise = Math.min(1, Math.max(0, introT * 0.62 - i * 0.34));
+        const fh = Math.round((44 + (i % 2) * 18) * rise), fw = 56;
+        if (fh < 2) continue;
+        tctx.fillStyle = '#14171a'; tctx.fillRect(fx, gy - fh, fw, fh);
+        tctx.fillStyle = '#4a2f2c'; tctx.fillRect(fx + 1, gy - fh + 1, fw - 2, fh - 1);
+        for (let wy = 5; wy < fh - 6; wy += 9) for (let wx = 4; wx < fw - 6; wx += 10) {
+          tctx.fillStyle = (Math.floor(now / 1300) + wx + wy + i) % 3 ? '#ffb32e' : '#241a20';
+          tctx.fillRect(fx + wx, gy - fh + wy, 5, 5);
+        }
+        tctx.fillStyle = '#14171a'; tctx.fillRect(fx + fw - 14, gy - fh - Math.round(16 * rise), 8, Math.round(16 * rise));
+        if (rise >= 1) for (let s2 = 0; s2 < 4; s2++) {
+          const p = ((now / 1100 + s2 * 0.25 + i * 0.13) % 1);
+          tctx.fillStyle = 'rgba(200,200,210,' + (0.5 - p * 0.45).toFixed(2) + ')';
+          tctx.fillRect(fx + fw - 12 + Math.round(Math.sin(now / 420 + s2) * 4), Math.round(gy - fh - 18 - p * 30), 7 - Math.floor(p * 4), 3);
+        }
+      }
+      /* a belt across the foreground with eggs on it */
+      tctx.fillStyle = '#14171a'; tctx.fillRect(-10, gy + 2, 410, 9);
+      tctx.fillStyle = '#3f464d'; tctx.fillRect(-10, gy + 3, 410, 7);
+      for (let x = -10; x < 400; x += 8) { tctx.fillStyle = '#2b3137'; tctx.fillRect(x + ((now / 22) % 8), gy + 3, 3, 7); }
+      for (let i = 0; i < 9; i++) {
+        const ex = ((i * 46 + now / 18) % 420) - 20;
+        tctx.drawImage(SPR.eggSprite(i % 4, 1), Math.round(ex), gy - 6);
+      }
+      const rac = SPR.raccoonSprite(Math.floor(now / 240) % 2 ? 'guitar1' : 'guitar0', K,
+                                    Object.assign({}, S().wardrobe, { suit: 'suit_green', glasses: 'gl_star', acc: 'acc_guitar' }));
+      const hop = Math.abs(Math.sin(now / 240)) * 5;
+      tctx.drawImage(rac, 132 - (rac.ox || 0) * K, gy - rac.height + 4 - hop);
+      /* the Warden, arriving late with an objection */
+      if (introT > 1.4) {
+        const wt = introT - 1.4;
+        const wsp = SPR.wardenSprite(Math.floor(wt * 5) % 2 ? 'wag' : 'stand', 3);
+        const wx2 = Math.max(292, 400 - wt * 70);
+        tctx.drawImage(wsp, Math.round(wx2), gy - wsp.height + 4);
+        if (wt > 0.7) {
+          const line = 'I SPEAK FOR THE TREES';
+          const w2 = SPR.tinyW(line, 1) + 8;
+          const bx2 = Math.round(wx2 - w2 + 24), by2 = gy - wsp.height - 6;
+          tctx.fillStyle = '#fff8ec'; tctx.fillRect(bx2, by2, w2, 11);
+          tctx.fillStyle = '#14171a';
+          tctx.fillRect(bx2, by2, w2, 1); tctx.fillRect(bx2, by2 + 10, w2, 1);
+          tctx.fillRect(bx2, by2, 1, 11); tctx.fillRect(bx2 + w2 - 1, by2, 1, 11);
+          tctx.fillRect(bx2 + w2 - 12, by2 + 11, 2, 2);
+          SPR.drawTiny(tctx, line, bx2 + 4, by2 + 3, '#14171a', 1);
+        }
+      }
     }
     tctx.restore();
-    /* the caption plate, typed out */
-    tctx.fillStyle = 'rgba(24,18,12,.82)'; tctx.fillRect(12, plateY, TW - 24, plateH);
-    tctx.fillStyle = 'rgba(255,232,180,.35)'; tctx.fillRect(12, plateY, TW - 24, 1); tctx.fillRect(12, plateY + plateH - 1, TW - 24, 1);
-    let budget = Math.floor(introT * 28);
-    caps.forEach((ln, i) => {
-      const shown = ln.t.slice(0, Math.max(0, budget));
-      budget -= ln.t.length + 3;
-      SPR.drawText(tctx, shown, 20, plateY + 7 + i * 12, ln.lead ? '#ffd23f' : '#fff8ec', 1, '#1a120a');
+
+    /* ---- a vignette, then the bars over everything ---- */
+    tctx.fillStyle = 'rgba(7,8,11,.30)';
+    for (let i = 0; i < 10; i++) { tctx.fillRect(0, stage.y + i, TW, 1); tctx.fillRect(0, stage.y + stage.h - 1 - i, TW, 1); }
+    tctx.fillStyle = '#07080b';
+    tctx.fillRect(0, 0, TW, BAR); tctx.fillRect(0, TH - BARB, TW, BARB);
+    tctx.fillStyle = '#ffb32e';
+    tctx.fillRect(0, BAR - 1, TW, 1); tctx.fillRect(0, TH - BARB, TW, 1);
+
+    /* ---- the slate, top left ---- */
+    const slate = 'SHOT ' + (introScene + 1) + ' OF ' + INTRO.length + '   ' + sc.slate;
+    SPR.drawTiny(tctx, slate, 8, Math.round(BAR / 2) - 2, '#8f9298', 1);
+    /* clapper stripes */
+    for (let i = 0; i < 5; i++) { tctx.fillStyle = i % 2 ? '#f0eee8' : '#3f464d'; tctx.fillRect(TW - 46 + i * 8, Math.round(BAR / 2) - 3, 8, 5); }
+
+    /* ---- the caption: fat pixel letters, each dropped in on its own ---- */
+    const capY = TH - BARB + Math.max(4, Math.round((BARB - sc.lines.length * lineH) / 2));
+    const hot = (sc.hot || []).map(h => h.replace(/[^A-Z0-9]/g, ''));
+    let shown = 0;                                   /* letters revealed so far */
+    const budget = introT * 30;
+    sc.lines.forEach((line, li) => {
+      let x = Math.round(TW / 2 - SPR.textW(line, capK) / 2);
+      const y = capY + li * lineH;
+      /* which words in this line are set in amber */
+      const amber = new Uint8Array(line.length);
+      let at = 0;
+      line.split(' ').forEach(word => {
+        if (hot.includes(word.replace(/[^A-Z0-9]/g, ''))) for (let i = 0; i < word.length; i++) amber[at + i] = 1;
+        at += word.length + 1;
+      });
+      for (let ci = 0; ci < line.length; ci++) {
+        const ch = line[ci];
+        if (ch !== ' ') {
+          const rev = budget - shown;
+          if (rev <= 0) { shown++; x += 6 * capK; continue; }
+          const drop = Math.min(1, rev / 2.6);
+          const dy = drop >= 1 ? 0 : Math.round(-13 * (1 - drop) + Math.sin(drop * Math.PI) * 3);
+          SPR.drawText(tctx, ch, x, y + dy, amber[ci] ? '#ffb32e' : '#f0eee8', capK, '#07080b');
+        }
+        shown++;
+        x += 6 * capK;
+      }
     });
-    SPR.drawTiny(tctx, (introScene + 1) + ' / ' + INTRO.length, TW - 30, plateY - 8, '#e8d5a8', 1);
+    /* ---- and the one control ---- */
+    if (introT > 1.4 && Math.floor(now / 560) % 2) {
+      const nx = 'CLICK FOR THE NEXT SHOT';
+      SPR.drawTiny(tctx, nx, TW - 8 - SPR.tinyW(nx, 1), TH - 9, '#ffb32e', 1);
+    }
   }
 
   /* ---- the company form: name, mark and colours ---- */
@@ -6085,6 +6235,18 @@
       return;
     }
 
+    if (kind === 'warden') {
+      const w = GAME.warden();
+      if (!w) { setInspect({ kind: 'farm' }); return; }
+      ipanel.appendChild(ipHead(cloneCanvas(SPR.wardenSprite('stand', 1), 2), 'THE WARDEN', 'speaks for the trees'));
+      const p = document.createElement('p');
+      p.className = 'ip-note';
+      p.textContent = 'He lives under the stumps and comes up whenever one of his trees does. Tap him once and he takes a bribe in feathers and says no more about it.';
+      ipanel.appendChild(p);
+      ipanel.appendChild(ipRow('leaving in', () => GAME.warden() ? GAME.fmtTime(Math.max(0, GAME.warden().T - GAME.warden().t)) : '-'));
+      ipanel.appendChild(ipRow('bribed', () => GAME.warden() && GAME.warden().paid ? 'yes' : 'not yet'));
+      return;
+    }
     if (kind === 'chicken') {
       const ch = inspect.ref;
       if (st.chickens.indexOf(ch) === -1) { setInspect({ kind: 'farm' }); return; }
@@ -7732,6 +7894,17 @@
   }
 
   function tapWorld(x, y) {
+    const ward = GAME.wardenAt(x, y);
+    if (ward) {
+      if (S().tool === 'inspect') { setInspect({ kind: 'warden' }); return true; }
+      const f = GAME.tapWarden();
+      if (f) {
+        snd.grand();
+        puff(ward.x + 6, ward.y - 10, '#e8721c', 12, 40, 30);
+        floatWorld('HUSH MONEY +' + f, ward.x + 6, ward.y - 30, 'gold', 'feather');
+      } else { snd.plop(); heart(ward.x + 6, ward.y - 12, 1); }
+      return true;
+    }
     const boss = GAME.bossAt(x, y);
     if (boss) {
       if (S().tool === 'inspect') { setInspect({ kind: 'boss' }); return true; }
@@ -8430,6 +8603,17 @@
   GAME.on('factory', ({ city }) => { snd.grand(); });
   GAME.on('upgrade', () => { snd.skill(); });
   GAME.on('train', ({ w, stat }) => { snd.sparkle(); floatWorld('+1 ' + STATS[stat].name, w.x + 6, w.y - 10, 'green', STATS[stat].icon); });
+  GAME.on('warden', ({ x, y }) => {
+    snd.demolish();
+    puff(x + 6, y - 4, '#8a5e2a', 12, 40, 22);
+    puff(x + 6, y - 10, '#7fbf4f', 8, 34, 26);
+    floatWorld('THE WARDEN', x + 6, y - 34, 'pink', 'tree');
+  });
+  GAME.on('hatchick', ({ x, y }) => {
+    snd.hatch(); snd.sparkle();
+    puff(x, y, '#fff8ec', 14, 46, 34);
+    floatWorld('OUT OF THE HAT', x, y - 20, 'gold', 'chick');
+  });
   GAME.on('slot', () => { reloadWorld(); });
   GAME.on('settings', ({ k, v }) => { if (k === 'bigUI') document.body.classList.toggle('big-ui', !!v); });
   GAME.on('customer', ({ o }) => { snd.plop(); floatWorld(o.who + ': ' + o.n + ' EGGS', o.x + 14, o.y - 28, 'gold', 'doc'); });
@@ -8498,6 +8682,42 @@
     snd.sparkle();
   });
 
+  /* ============================================================
+     THE SHUTTER
+     One transition for the whole game: a corrugated roller door
+     drops over whatever is on screen, the world changes behind it,
+     and it rolls back up. It draws on the title canvas while the
+     front of house is up and on the world canvas once it is not,
+     so it can carry you across that boundary.
+     ============================================================ */
+  let shut = null;
+  function startShutter(dur, half) { shut = { t: 0, dur: dur || 1, half: half || null, done: false }; }
+  function shuttering() { return !!shut; }
+  function drawShutter(dt) {
+    if (!shut) return;
+    shut.t += dt;
+    const p = Math.min(1, shut.t / shut.dur);
+    if (p >= 0.46 && !shut.done) { shut.done = true; if (shut.half) shut.half(); }
+    const onTitle = !titleEl.hidden;
+    const g2 = onTitle ? tctx : ctx;
+    const k = onTitle ? 1 : SC;
+    const w = onTitle ? TW : Math.round(cv.width / SC), h = onTitle ? TH : Math.round(cv.height / SC);
+    g2.setTransform(k, 0, 0, k, 0, 0);
+    const cover = p < 0.46 ? p / 0.46 : 1 - (p - 0.46) / 0.54;
+    const hh = Math.round(h * Math.min(1, cover * 1.02));
+    for (let y = 0; y < hh; y += 6) {
+      g2.fillStyle = '#3f464d'; g2.fillRect(0, y, w, 4);
+      g2.fillStyle = '#2b3137'; g2.fillRect(0, y + 4, w, 2);
+    }
+    if (hh > 0) {
+      g2.fillStyle = '#14171a'; g2.fillRect(0, hh - 6, w, 6);
+      for (let x = 0; x < w; x += 10) { g2.fillStyle = '#ffb32e'; g2.fillRect(x + ((shut.t * 34) | 0) % 10, hh - 5, 5, 4); }
+      g2.fillStyle = 'rgba(0,0,0,.4)'; g2.fillRect(0, hh, w, 3);
+    }
+    g2.setTransform(1, 0, 0, 1, 0, 0);
+    if (p >= 1) shut = null;
+  }
+
   /* ================= THE HELPER BAG =================
      The modules in their own files - the menu, the quest board, the
      pantry, the garage, the map and the HR room - reach the view
@@ -8506,6 +8726,7 @@
     $, S, W, snd, mkIcon, cloneCanvas, floatText, floatWorld, toast, openModal, closeModals, setInspect, refreshInspect,
     puff, heart, coinBurst, worldToScreen, cam, paintCloud,
     showTitle, hideTitle, startIntro, openCompany, reloadWorld, renderToolbelt, renderPalette, renderHire,
+    introNext, introSkip, shutter: startShutter, shuttering,
     cameraFeed, buildingThumb, statRow, statBlock, traitChips, crewCard, applicantCard, noticeBoard, botBench,
     labOn(id) { termSel = id; renderSkills(); openModal('#modal-skills'); if (id) centerOn(id); },
     get SC() { return SC; }, get titleHidden() { return titleEl.hidden; }, get introMode() { return introMode; },
@@ -8572,6 +8793,7 @@
       if (window.WMAP && !$('#modal-wmap').hidden) WMAP.draw(now, dt);
       if (window.HR && !$('#modal-hr').hidden) HR.draw(now, dt);
       drawTrip(now);
+      drawShutter(dt);
       hudAcc += dt;
       if (hudAcc > 0.12) {
         hudAcc = 0;

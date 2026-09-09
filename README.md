@@ -8,6 +8,28 @@ Nothing is shown before it is earned. The rack starts with three tools, the desk
 
 ![Inf Egg Co. screenshot](docs/screenshot.png)
 
+## The plant
+
+The interface is the company's, not the farm's: **galvanised zinc plate** with a lit top edge and a dark sill, stencilled labels, screws in the nameplates and hazard tape wherever the company wants your attention. Hazard amber is the only loud colour, and the warm pixel valley inside the stage is the only warm thing on screen - the machinery is bolted around it.
+
+Every word in the game is set in **Eggworks**, a pixel typeface drawn cell by cell for it and packed into a TrueType file by `tools/mkfont.py`. One drawn cell is 128 of 1024 units - ten cells to the em - so at any font-size that is a multiple of 8 every cell lands on a whole device pixel and the type has hard edges with no blur. The bold weight is the same drawings smeared one cell to the right, with a rule that never closes a one-cell counter, so `m` and `w` keep their strokes. Nothing is loaded from a font host; the face rides in the stylesheet as base64.
+
+## The front of house
+
+There is no interface furniture on the way in. The game opens on an **attract screen** with the works behind it - chimneys smoking, banknotes coming down, footlights along a stage - and the founder running his act: a number with the red guitar on a pile of money, a tree taken down in four chops, a factory hammered up storey by storey with the company's mark on it, and a line of chickens punched into the wings with a POW. Hens wander on and can be clicked; the game keeps a tally of how many you have bothered. One instruction: **click anywhere**.
+
+A **roller shutter** comes down over the whole screen and lifts on a crate of straw with **three eggs** in it. Each egg is a save, drawn with the same egg art the game uses: the further a company has come the finer its shell tier and the more it has **cracked**, because it is closer to hatching, with the company's mark stencilled on the side and a rail of completion under it. Tap one to play it - it splits open and the shutter carries you to the farm. To delete a save you **pick the egg up and throw it away**: drag it out of the crate, a scrap bin slides in, and dropping it there asks once before the egg arcs off and smashes. A single settings key sits in the corner; there is nothing else.
+
+The four **cutscenes** are letterboxed shots with a slate in the corner - a wet street under a lamp with the letter blowing in, the farm gate at dawn, the arithmetic on the back of an envelope, and the permits going through - and the captions type themselves one fat pixel letter at a time, each letter dropping in with a bounce, the words that matter in amber.
+
+## Work orders
+
+The founder no longer stands over you narrating the job list. Work comes down as **paperwork**: a numbered order (WO-014) from a department, a scope of work with tick boxes, a site, and a reward payable on completion. Three are open at once on a clipboard under the readout, and you **sign for** a finished one yourself - then the company car brings the reward. He is still out on the farm with his own opinions; he just does not read you the objectives.
+
+## The Warden
+
+Fell a tree and something comes up out of the stump: a short, round, orange thing with a mustache far too big for it, who **speaks for the trees** and would like a word. He objects at length, takes a bribe in feathers if you tap him, and sulks off. He turns up in the menu's chopping act and in the fourth cutscene too, and meeting him is one of twenty secrets. Bother the founder ten times, meanwhile, and a hen climbs out of his hat.
+
 ## The overhaul
 
 The game opens on a **main menu** now, not a title card. The founder is on a stage in his uniform running through his act while you choose a save - a dance with the red guitar in front of stacks of money, a tree to chop down, a factory hammered up plank by plank with the company mark on it, and a line of chickens to punch into the wings with a POW - each to a line of his song. Three **eggs** are the three save slots, each filled to the percentage of the game it has finished, with the company's name and colours, its age and how long it has been played on the shell. Settings, the Wardrobe and the Achievements are on the menu and on the in-game gear key. The intro has a fourth scene: the plan.
@@ -326,7 +348,9 @@ open index.html        # or serve the folder with any static server
 | `js/data.js` | eleven tiers, economy, 128 species, 29 buildings in five sections, six terrain tools, 31 decorations, eight crops, six vehicles, five cities, five crew stats, seven roles and seven robot chassis, twelve quirks, twenty land plots, five genes and five animals, the company defaults, four rival stocks, ten regions of the world with the Moon, six ages, five ranks, eighteen secrets, five recipes, the billboard palette and its five poster designs, 132 research packages in fourteen lanes plus the age lane with their grid layout, and the 47-job chain with a line of the founder's dialogue for every one of them |
 | `js/sprites.js` | the procedural pixel-art engine (two fonts, icons, foliage and furniture, chickens and chicks, crops, soil, paths, terraces and ponds, procedural people, cute robots, machines, cars and the movers' van, vehicles, skylines, parchment and ink, CRT chrome, cubes, the raccoon, dinosaurs, fossils, dishes, billboards and their posters, the town across the road) |
 | `js/game.js` | world simulation: twenty plots, brush-painted terrain and decoration, a grandma hen with a belly to fill, chicks that grow and hens that get hungry, genes, slow farming that needs water, rain showers, bees and honey, feed, flyers and applicants who walk to the board, per-role crew AI for people and robots, stamina, wages, belts, splitters, silos, loaders, hatcheries, construction sites and the movers, traffic, roadside customers and VIPs, second storeys, vehicles, routes and trips, the ledger and the market, the world and its branches, ranks, the six ages and the lanes they open, secrets, the kitchen and its diners, the park and its tour buses, fossils and the time machine, billboards and the pull they have on the road, the founder walking his own farm, the job chain, the company and its signed certificate, diary |
-| `js/menu.js` | the main menu: the founder's act on stage, the three egg save slots, settings, the wardrobe and the achievements |
+| `tools/mkfont.py` | draws the Eggworks pixel typeface cell by cell and packs it into a TrueType file |
+| `tools/build-artifact.py` | inlines the whole game into one self-contained HTML file, ready to publish |
+| `js/menu.js` | the front of house: the founder's act on stage, the three egg save slots, settings, the wardrobe and the achievements |
 | `js/quests.js` | the to-do list under the HUD and the quest board with the founder's dialogue and the claim buttons |
 | `js/food.js` | the pantry: produce, goods and the Cannery's recipe |
 | `js/garage.js` | the garage: vehicles, upgrades, paint and the route to every town |

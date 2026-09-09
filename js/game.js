@@ -57,6 +57,7 @@ const GAME = (() => {
       barns: {}, troughs: {}, wells: {}, sprinklers: {}, mills: {}, coops: {}, boards: {}, hqs: {},
       beehives: {}, genelabs: {}, billboards: {}, kitchens: {}, parks: {}, timemachines: {},
       hrs: {}, canneries: {},   /* the HR Office and the Cannery */
+      warden: null,          /* the small orange objection, when a tree comes down */
       pantry: {},            /* produce id -> count, what harvests leave besides feed */
       goods: {},             /* goods id -> count, what the Cannery makes */
       premiumT: 0,           /* seconds of super feed left in the scatter */
@@ -1037,13 +1038,54 @@ const GAME = (() => {
     emit('decorate', { c, r, kind });
     return true;
   }
+  const WARDEN_TREES = ['tree', 'pine', 'apple', 'bamboo'];
+  const WARDEN_LINES = [
+    'I speak for the trees. The trees are unavailable.',
+    'That one was ninety years old. You had it down in four seconds.',
+    'Every one you fell, I have to write up. Do you know the paperwork?',
+    'I am not angry. I am orange. It reads as angry.',
+    'Plant another and I will consider forgetting this.',
+    'A raccoon in a top hat. I might have known.',
+  ];
   function undecorate(c, r) {
     const k = key(c, r), d = S.deco[k];
     if (!d) return false;
     S.coins += Math.round(DECOS[d.kind].cost * ECON.decoRefund);
+    const felled = DECOS[d.kind] && WARDEN_TREES.includes(DECOS[d.kind].kind);
     delete S.deco[k];
     emit('decorate', { c, r, kind: null });
+    /* fell a tree and somebody comes out from under the stump about it */
+    if (felled && !S.warden && Math.random() < 0.4) {
+      S.warden = { x: c * 16 + 2, y: r * 16 + 15, t: 0, T: 11, said: Math.floor(Math.random() * WARDEN_LINES.length), paid: false, going: 0 };
+      emit('warden', { x: S.warden.x, y: S.warden.y, line: WARDEN_LINES[S.warden.said] });
+    }
     return true;
+  }
+  function warden() { return S.warden; }
+  function wardenLine() { return S.warden ? WARDEN_LINES[S.warden.said % WARDEN_LINES.length] : null; }
+  function tickWarden(dt) {
+    const w = S.warden;
+    if (!w) return;
+    w.t += dt;
+    if (w.t > w.T) { w.going += dt; w.x += 26 * dt; if (w.going > 2.5) S.warden = null; }
+  }
+  function wardenAt(x, y) {
+    const w = S.warden;
+    if (!w) return null;
+    return (x > w.x - 4 && x < w.x + 18 && y > w.y - 24 && y < w.y + 4) ? w : null;
+  }
+  /* tap him once and he hands over a bribe of feathers, under protest */
+  function tapWarden() {
+    const w = S.warden;
+    if (!w) return 0;
+    w.said = (w.said + 1) % WARDEN_LINES.length;
+    w.t = Math.min(w.t, 1);
+    findSecret('warden');
+    if (w.paid) return 0;
+    w.paid = true;
+    const f = 30 + Math.floor(Math.random() * 40);
+    dropPlumes(w.x + 6, w.y - 6, f);
+    return f;
   }
   function decoAt(c, r) { return S.deco[key(c, r)] || null; }
   /* soil lives on the paint grid like every other ground kind, so a
@@ -2340,7 +2382,6 @@ const GAME = (() => {
       S.quests[q.id] = 1;
       mark('skills');
       emit('questready', { q });
-      bossSay(q.doneSay || BOSS_DONE[(S.stats.questsDone + QUESTS.indexOf(q)) % BOSS_DONE.length], 6, 'cheer');
     }
   }
   function claimQuest(id) {
@@ -2354,7 +2395,6 @@ const GAME = (() => {
     /* the reward arrives by limousine, in a box, on the grass by the road */
     sendPresent({ c: q.rw.c || 0, f: q.rw.f || 0, from: q.name, icon: q.icon });
     emit('quest', { q });
-    bossOnQuest(currentQuest());
     return true;
   }
   function claimAll() { let n = 0; QUESTS.forEach(q => { if (claimQuest(q.id)) n++; }); return n; }
@@ -3586,8 +3626,7 @@ const GAME = (() => {
   const pickLine = arr => arr[Math.floor(Math.random() * arr.length)];
   /* what he has to say where he is standing: the job first, then the place */
   function bossLineHere() {
-    const q = currentQuest();
-    if (q && q.where === S.boss.at && S.boss.said !== q.id) { S.boss.said = q.id; return q.say; }
+    /* the jobs come down as paperwork now; he only has opinions */
     const at = BOSS_AT[S.boss.at];
     if (at && Math.random() < 0.6) return pickLine(at);
     return pickLine(BOSS_IDLE);
@@ -3619,24 +3658,24 @@ const GAME = (() => {
     bossGo(q && Math.random() < 0.7 ? q.where : 'field');
   }
   /* a fresh job: he goes and stands where it happens, and says so */
-  function bossOnQuest(q) {
-    const b = S.boss;
-    if (!b || !q) return;
-    b.said = null;
-    if (b.at !== q.where) { bossGo(q.where); return; }
-    /* already standing in the right place: he says it as soon as he stops cheering */
-    b.said = q.id;
-    b.state = 'talk';
-    b.t = Math.max(b.t, b.lineT + 1);
-    setTimeout(() => { if (S.boss === b && b.said === q.id && !b.line) bossSay(q.say, 8, 'stand'); }, 0);
-  }
   function bossTap() {
     const b = S.boss;
     if (!b) return null;
     S.stats.bossPets++;
-    const q = currentQuest();
-    bossSay(q ? q.say : pickLine(BOSS_IDLE), 7, S.stats.bossPets % 4 === 0 ? 'cheer' : 'stand');
-    return q;
+    /* keep bothering him and something comes out of the hat */
+    if (S.stats.bossPets % 10 === 0 && S.chickens.length < chickenCap()) {
+      const sp = pickSpecies(Math.min(TIER_DIVINE, 1 + Math.floor(Math.random() * 3)));
+      if (!S.disc.includes(sp.id)) { S.disc.push(sp.id); mark('pedia'); }
+      const born = spawnChicken(sp.id, b.x + 4, b.y - 6);
+      born.age = 1; born.fed = 1; born.raised = 1e9; born.food = 1;
+      findSecret('tophat');
+      note('hat', 'A ' + sp.name + ' climbed out of the founder\'s hat.', sp.id);
+      emit('hatchick', { x: b.x + 10, y: b.y - 8, sp });
+      bossSay('That is not mine. I have never seen that hen before.', 7, 'cheer');
+      return currentQuest();
+    }
+    bossSay(pickLine(BOSS_IDLE), 7, S.stats.bossPets % 4 === 0 ? 'cheer' : 'stand');
+    return currentQuest();
   }
   function bossAt(x, y) {
     const b = S.boss;
@@ -3683,6 +3722,7 @@ const GAME = (() => {
     tickLimo(dt);
     tickPresents(dt);
     tickAch(dt);
+    tickWarden(dt);
   }
 
   /* ---------- offline ---------- */
@@ -3865,6 +3905,7 @@ const GAME = (() => {
       if (!Array.isArray(S.presents)) S.presents = [];
       if (!Array.isArray(S.limoQueue)) S.limoQueue = [];
       S.limo = null;
+      if (S.warden && typeof S.warden.x !== 'number') S.warden = null;
       S.garage = Object.assign({ col: null, decal: 'none', upg: {}, routes: {} }, S.garage || {});
       if (!S.garage.upg) S.garage.upg = {};
       if (!S.garage.routes) S.garage.routes = {};
@@ -4004,6 +4045,7 @@ const GAME = (() => {
     orderAt, orderSpots, giveEgg, basketToOrder, maxOrders, orderWait,
     billboardPull, billboardArt, setBillboardArt,
     boss, bossSay, bossTap, bossAt, bossGo,
+    warden, wardenLine, wardenAt, tapWarden,
     siteFor, storeyMult, canStorey, addStorey, storeyCost, finishSites: () => Object.keys(S.sites).forEach(finishSite),
     cropSpeed, cropTimeLeft, beeBoost,
     genesOf, gene, chScore, bestChickens, hasGeneLab, chLayTime,

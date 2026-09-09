@@ -504,6 +504,8 @@ const SECRETS = [
   { id:'sleeper',    name:'Sleeper',             icon:'clock',   rw:{ f:80 },   desc:'Came back after eight hours away.' },
   { id:'typist',     name:'The Password',        icon:'key',     rw:{ f:200 },  desc:'Typed E, G, G on the keyboard.' },
   { id:'champion',   name:'Champion Layer',      icon:'medal',   rw:{ c:2000 }, desc:'A hen reached Champion rank.' },
+  { id:'warden',     name:'Speaks For The Trees', icon:'tree',   rw:{ f:120 },  desc:'Met the Warden under a felled tree.' },
+  { id:'tophat',     name:'Something In The Hat', icon:'chick',  rw:{ f:150 },  desc:'Bothered the founder until a hen climbed out of his hat.' },
 ];
 const SECRET_BY_ID = Object.fromEntries(SECRETS.map(s => [s.id, s]));
 

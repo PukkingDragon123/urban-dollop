@@ -1,9 +1,10 @@
 /* ============================================================
-   INF EGG CO. - THE QUEST BOARD
-   Several jobs at once, each a to-do list with tick boxes, the
-   founder talking you through them, and a CLAIM button that sends
-   the limousine round with the reward in a box.
-   The to-do panel sits under the HUD; the board is a modal.
+   INF EGG CO. - WORK ORDERS
+   The founder does not stand over you explaining the job any
+   more. It comes down as paperwork: a numbered order, a scope,
+   a list of things to tick off and a reward you sign for.
+   The clipboard sits under the readout; the full book of orders
+   is the board.
    ============================================================ */
 'use strict';
 
@@ -11,10 +12,14 @@ window.QUESTS_UI = (() => {
   let UI = null, $ = null, S = null;
   let sig = '', collapsed = false, sel = null, boardSig = '';
 
-  function rewardText(q) {
-    return [q.rw.c ? GAME.fmt(q.rw.c) + ' COINS' : '', q.rw.f ? q.rw.f + ' FEATHERS' : ''].filter(Boolean).join(' + ');
+  const orderNo = q => 'WO-' + String(QUESTS.indexOf(q) + 1).padStart(3, '0');
+  const DEPT = { 'THE FARM': 'HUSBANDRY', 'THE BUSINESS': 'OPERATIONS', 'THE COMPANY': 'EXPANSION',
+                 'THE EMPIRE': 'OVERSEAS', 'THE STARS': 'SPECIAL PROJECTS' };
+  function rewardChips(q, into) {
+    if (q.rw.c) { into.appendChild(UI.mkIcon('coin', 2)); into.appendChild(document.createTextNode(GAME.fmt(q.rw.c))); }
+    if (q.rw.f) { into.appendChild(UI.mkIcon('feather', 2)); into.appendChild(document.createTextNode(String(q.rw.f))); }
   }
-  function objRow(o, big) {
+  function objRow(o) {
     const [c, n] = GAME.goalProgress(o);
     const done = c >= n;
     const row = document.createElement('div');
@@ -39,64 +44,61 @@ window.QUESTS_UI = (() => {
     return row;
   }
 
-  /* ---- the to-do panel under the HUD ---- */
+  /* ---- the clipboard under the readout ---- */
   function update() {
     const box = $('#todo-panel');
     if (!box) return;
     if (!UI.titleHidden) { if (!box.hidden) box.hidden = true; sig = ''; return; }
     const act = GAME.activeQuests();
-    const b = GAME.boss();
-    const line = b && b.line ? b.line : '';
-    const s2 = collapsed + '|' + line + '|' + act.map(q => q.id + ':' + GAME.questState(q) + ':' + GAME.questObjs(q).map(o => GAME.goalProgress(o).join('/')).join(',')).join(';');
+    const s2 = collapsed + '|' + act.map(q => q.id + ':' + GAME.questState(q) + ':' +
+      GAME.questObjs(q).map(o => GAME.goalProgress(o).join('/')).join(',')).join(';');
     if (s2 === sig && !box.hidden) return;
     sig = s2;
     box.hidden = false;
     box.innerHTML = '';
     box.classList.toggle('collapsed', collapsed);
+
     const head = document.createElement('div');
     head.className = 'td-head';
     head.dataset.act = 'todo-toggle';
-    head.appendChild(UI.mkIcon('quest', 2));
+    head.setAttribute('role', 'button');
+    head.title = collapsed ? 'Show the work orders' : 'Roll the clipboard up';
+    head.appendChild(UI.mkIcon('doc', 2));
     const ht = document.createElement('b');
-    ht.textContent = 'TO DO';
+    ht.textContent = 'WORK ORDERS';
     head.appendChild(ht);
     const ready = act.filter(GAME.questReady).length;
     const cnt = document.createElement('small');
-    cnt.textContent = ready ? ready + ' TO CLAIM' : act.length + ' JOBS';
+    cnt.textContent = ready ? ready + ' TO SIGN' : act.length + ' OPEN';
     if (ready) cnt.classList.add('hot');
     head.appendChild(cnt);
     const open = document.createElement('button');
     open.className = 'td-open';
     open.dataset.act = 'open-quests';
-    open.title = 'Open the quest board';
+    open.title = 'Open the order book';
     open.appendChild(UI.mkIcon('book', 2));
     head.appendChild(open);
     box.appendChild(head);
     if (collapsed) return;
-    /* what the founder is saying right now */
-    if (line) {
-      const say = document.createElement('div');
-      say.className = 'td-say';
-      say.appendChild(UI.cloneCanvas(SPR.raccoonSprite(b.pose === 'cheer' ? 'cheer' : 'boss', 1, S().wardrobe), 2));
-      const t = document.createElement('span');
-      t.textContent = '"' + line + '"';
-      say.appendChild(t);
-      box.appendChild(say);
-    }
+
     act.forEach(q => {
       const st = GAME.questState(q);
       const card = document.createElement('div');
       card.className = 'td-quest ' + st;
       card.dataset.act = 'quest-focus';
       card.dataset.id = q.id;
+      card.title = orderNo(q) + ' - ' + q.name;
       const top = document.createElement('div');
       top.className = 'td-top';
-      top.appendChild(UI.mkIcon(q.icon, 2));
+      const no = document.createElement('u');
+      no.className = 'td-no';
+      no.textContent = orderNo(q);
+      top.appendChild(no);
       const nm = document.createElement('b');
       nm.textContent = q.name.toUpperCase();
       top.appendChild(nm);
       const rw = document.createElement('em');
-      rw.textContent = rewardText(q);
+      rewardChips(q, rw);
       top.appendChild(rw);
       card.appendChild(top);
       if (st === 'ready') {
@@ -104,8 +106,8 @@ window.QUESTS_UI = (() => {
         btn.className = 'btn btn-green td-claim';
         btn.dataset.act = 'claim-quest';
         btn.dataset.id = q.id;
-        btn.appendChild(UI.mkIcon('star', 2));
-        btn.appendChild(document.createTextNode('CLAIM'));
+        btn.appendChild(UI.mkIcon('tick', 2));
+        btn.appendChild(document.createTextNode('SIGN FOR IT'));
         card.appendChild(btn);
       } else {
         const list = document.createElement('div');
@@ -117,10 +119,13 @@ window.QUESTS_UI = (() => {
     });
   }
 
-  /* ---- the board ---- */
+  /* ---- the order book ---- */
   function open(id) {
     if (id) sel = id;
-    if (!sel || !QUEST_BY_ID[sel] || GAME.questState(QUEST_BY_ID[sel]) === 'later') { const cq = GAME.currentQuest(); sel = cq ? cq.id : QUESTS[0].id; }
+    if (!sel || !QUEST_BY_ID[sel] || GAME.questState(QUEST_BY_ID[sel]) === 'later') {
+      const cq = GAME.currentQuest();
+      sel = cq ? cq.id : QUESTS[0].id;
+    }
     boardSig = '';
     render();
     UI.openModal('#modal-quests');
@@ -132,11 +137,13 @@ window.QUESTS_UI = (() => {
     const s2 = sel + '|' + QUESTS.map(q => GAME.questState(q) + GAME.questProgress(q).join('/')).join('');
     if (s2 === boardSig) return;
     boardSig = s2;
-    $('#quests-sub').textContent = claimed + ' / ' + QUESTS.length + ' CLAIMED  -  ' + GAME.activeQuests().filter(GAME.questReady).length + ' WAITING';
+    $('#quests-sub').textContent = claimed + ' / ' + QUESTS.length + ' SIGNED OFF  -  ' +
+      QUESTS.filter(GAME.questReady).length + ' AWAITING SIGNATURE';
     box.innerHTML = '';
     const wrap = document.createElement('div');
     wrap.className = 'qb-wrap';
-    /* the list, by chapter */
+
+    /* the file: orders by department */
     const list = document.createElement('div');
     list.className = 'qb-list';
     let chapter = null;
@@ -145,7 +152,7 @@ window.QUESTS_UI = (() => {
         chapter = q.chapter;
         const h = document.createElement('div');
         h.className = 'qb-chapter';
-        h.textContent = chapter;
+        h.textContent = DEPT[chapter] || chapter;
         list.appendChild(h);
       }
       const st = GAME.questState(q);
@@ -153,101 +160,117 @@ window.QUESTS_UI = (() => {
       row.className = 'qb-row ' + st + (q.id === sel ? ' sel' : '');
       row.dataset.act = 'quest-sel';
       row.dataset.id = q.id;
-      row.appendChild(UI.mkIcon(st === 'later' ? 'lock' : q.icon, 2));
+      const no = document.createElement('u');
+      no.className = 'td-no';
+      no.textContent = String(i + 1).padStart(3, '0');
+      row.appendChild(no);
       const nm = document.createElement('b');
-      nm.textContent = st === 'later' ? '? ? ?' : q.name.toUpperCase();
+      nm.textContent = st === 'later' ? 'NOT YET ISSUED' : q.name.toUpperCase();
       row.appendChild(nm);
       const tag = document.createElement('small');
-      if (st === 'claimed') tag.textContent = 'DONE';
-      else if (st === 'ready') { tag.textContent = 'CLAIM'; tag.className = 'hot'; }
+      if (st === 'claimed') tag.textContent = 'CLOSED';
+      else if (st === 'ready') { tag.textContent = 'SIGN'; tag.className = 'hot'; }
       else if (st === 'active') { const [c, n] = GAME.questProgress(q); tag.textContent = c + '/' + n; }
-      else tag.textContent = '#' + (i + 1);
+      else tag.textContent = '-';
       row.appendChild(tag);
       list.appendChild(row);
     });
     wrap.appendChild(list);
-    /* the detail: the founder talking, then the to-do list, then the reward */
+
+    /* the order itself */
     const q = QUEST_BY_ID[sel];
     const det = document.createElement('div');
     det.className = 'qb-detail';
     if (q) {
       const st = GAME.questState(q);
-      const talk = document.createElement('div');
-      talk.className = 'qb-talk';
-      const face = document.createElement('div');
-      face.className = 'qb-face';
-      face.appendChild(UI.cloneCanvas(SPR.raccoonSprite(st === 'claimed' ? 'cheer' : 'boss', 1, S().wardrobe), 4));
-      talk.appendChild(face);
-      const bub = document.createElement('div');
-      bub.className = 'qb-bubble';
-      const who = document.createElement('b');
-      who.textContent = 'THE FOUNDER';
-      bub.appendChild(who);
-      const txt = document.createElement('span');
-      txt.textContent = '"' + (st === 'claimed' && q.doneSay ? q.doneSay : st === 'later' ? 'One thing at a time. Finish what is on the board first.' : q.say) + '"';
-      bub.appendChild(txt);
-      talk.appendChild(bub);
-      det.appendChild(talk);
-      requestAnimationFrame(() => UI.paintCloud(bub, 14, false, { px: 3, fill: '#fff9ec', ink: '#2e2216' }));
-
       const head = document.createElement('div');
-      head.className = 'qb-head';
-      head.appendChild(UI.mkIcon(q.icon, 4));
-      const hn = document.createElement('div');
-      const b = document.createElement('b'); b.textContent = q.name.toUpperCase(); hn.appendChild(b);
-      const c2 = document.createElement('small'); c2.textContent = q.chapter + '  -  QUEST ' + (QUESTS.indexOf(q) + 1) + ' OF ' + QUESTS.length; hn.appendChild(c2);
-      head.appendChild(hn);
+      head.className = 'qb-order';
+      const left = document.createElement('div');
+      const no = document.createElement('b');
+      no.textContent = orderNo(q);
+      left.appendChild(no);
+      const dept = document.createElement('small');
+      dept.textContent = (DEPT[q.chapter] || q.chapter) + '  -  ISSUED BY THE OFFICE OF THE FOUNDER';
+      left.appendChild(dept);
+      head.appendChild(left);
       const stamp = document.createElement('div');
       stamp.className = 'qb-stamp ' + st;
-      stamp.textContent = st === 'claimed' ? 'CLAIMED' : st === 'ready' ? 'READY' : st === 'active' ? 'ACTIVE' : 'LATER';
+      stamp.textContent = st === 'claimed' ? 'CLOSED' : st === 'ready' ? 'COMPLETE' : st === 'active' ? 'OPEN' : 'PENDING';
       head.appendChild(stamp);
       det.appendChild(head);
 
+      const title = document.createElement('div');
+      title.className = 'qb-title';
+      title.appendChild(UI.mkIcon(st === 'later' ? 'lock' : q.icon, 4));
+      const tw = document.createElement('div');
+      const tb = document.createElement('b');
+      tb.textContent = st === 'later' ? 'NOT YET ISSUED' : q.name.toUpperCase();
+      tw.appendChild(tb);
+      const scope = document.createElement('span');
+      scope.textContent = st === 'later'
+        ? 'This order is released when the ones before it are closed.'
+        : q.hint + '.';
+      tw.appendChild(scope);
+      title.appendChild(tw);
+      det.appendChild(title);
+
       const objs = document.createElement('div');
       objs.className = 'qb-objs';
-      const ot = document.createElement('i'); ot.textContent = 'TO DO'; objs.appendChild(ot);
-      GAME.questObjs(q).forEach(o => objs.appendChild(objRow(o, true)));
+      const ot = document.createElement('i');
+      ot.textContent = 'SCOPE OF WORK';
+      objs.appendChild(ot);
+      GAME.questObjs(q).forEach(o => objs.appendChild(objRow(o)));
       det.appendChild(objs);
+
+      const where = document.createElement('div');
+      where.className = 'qb-where';
+      const wl = document.createElement('i');
+      wl.textContent = 'SITE';
+      where.appendChild(wl);
+      const wv = document.createElement('span');
+      wv.textContent = ({ mama: 'The nest, by the farmhouse', lab: 'The Lab', truck: 'The loading bay on the road',
+                          road: 'The lay-by on the road', inc: 'The incubators', field: 'Out on the field' }[q.where] || 'The ranch').toUpperCase();
+      where.appendChild(wv);
+      det.appendChild(where);
 
       const foot = document.createElement('div');
       foot.className = 'qb-foot';
       const rw = document.createElement('div');
       rw.className = 'qb-reward';
-      const rl = document.createElement('i'); rl.textContent = 'REWARD, BY LIMOUSINE'; rw.appendChild(rl);
+      const rl = document.createElement('i');
+      rl.textContent = 'PAYABLE ON COMPLETION  -  DELIVERED BY COMPANY CAR';
+      rw.appendChild(rl);
       const rv = document.createElement('span');
-      if (q.rw.c) { rv.appendChild(UI.mkIcon('coin', 2)); rv.appendChild(document.createTextNode(GAME.fmt(q.rw.c))); }
-      if (q.rw.f) { rv.appendChild(UI.mkIcon('feather', 2)); rv.appendChild(document.createTextNode(String(q.rw.f))); }
+      rewardChips(q, rv);
       rw.appendChild(rv);
       foot.appendChild(rw);
       if (st === 'ready') {
         const btn = document.createElement('button');
         btn.className = 'btn btn-green';
-        btn.dataset.act = 'claim-quest'; btn.dataset.id = q.id;
-        btn.appendChild(UI.mkIcon('star', 2)); btn.appendChild(document.createTextNode('CLAIM IT'));
+        btn.dataset.act = 'claim-quest';
+        btn.dataset.id = q.id;
+        btn.appendChild(UI.mkIcon('tick', 2));
+        btn.appendChild(document.createTextNode('SIGN FOR IT'));
         foot.appendChild(btn);
       } else if (st === 'active' && q.where === 'lab') {
         const btn = document.createElement('button');
         btn.className = 'btn';
-        btn.dataset.act = 'quest-lab'; btn.dataset.id = q.id;
+        btn.dataset.act = 'quest-lab';
+        btn.dataset.id = q.id;
         btn.textContent = 'OPEN THE LAB';
         foot.appendChild(btn);
       }
       det.appendChild(foot);
-      if (q.hint && st !== 'claimed') {
-        const hint = document.createElement('p');
-        hint.className = 'qb-hint';
-        hint.textContent = 'Where: ' + ({ mama: 'by Mama\'s nest', lab: 'the Lab', truck: 'the vehicle on the road', road: 'the lay-by on the road', inc: 'the incubator', field: 'out on the field' }[q.where] || 'the ranch') + '. ' + q.hint + '.';
-        det.appendChild(hint);
-      }
     }
     wrap.appendChild(det);
     box.appendChild(wrap);
+
     const ready = QUESTS.filter(GAME.questReady).length;
     if (ready > 1) {
       const all = document.createElement('button');
       all.className = 'btn btn-green qb-all';
       all.dataset.act = 'claim-all';
-      all.textContent = 'CLAIM ALL ' + ready;
+      all.textContent = 'SIGN FOR ALL ' + ready;
       box.appendChild(all);
     }
   }
@@ -262,13 +285,16 @@ window.QUESTS_UI = (() => {
         case 'quest-focus': if (ev.target.closest('.td-claim')) return; open(btn.dataset.id); UI.snd.build(); break;
         case 'quest-sel': sel = btn.dataset.id; boardSig = ''; render(); UI.snd.plop(); break;
         case 'claim-quest': {
-          if (GAME.claimQuest(btn.dataset.id)) { UI.snd.grand(); UI.floatText('THE LIMO IS ON ITS WAY', ev.clientX - 90, ev.clientY - 30, 'gold', 'car'); }
-          else UI.snd.error();
-          sig = ''; boardSig = ''; if (!$('#modal-quests').hidden) render();
+          if (GAME.claimQuest(btn.dataset.id)) {
+            UI.snd.grand();
+            UI.floatText('SIGNED - THE CAR IS ON ITS WAY', ev.clientX - 100, ev.clientY - 30, 'gold', 'car');
+          } else UI.snd.error();
+          sig = ''; boardSig = '';
+          if (!$('#modal-quests').hidden) render();
           break;
         }
         case 'claim-all': { const n = GAME.claimAll(); if (n) UI.snd.grand(); sig = ''; boardSig = ''; render(); break; }
-        case 'quest-lab': { UI.labOn(btn.dataset.id); break; }
+        case 'quest-lab': UI.labOn(btn.dataset.id); break;
       }
     });
     GAME.on('quest', () => { sig = ''; boardSig = ''; if (!$('#modal-quests').hidden) render(); });
