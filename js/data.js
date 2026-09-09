@@ -54,8 +54,9 @@ const ECON = {
   basePetCd: 6,            // seconds between pets per chicken
   mamaPetCd: 4,            // mama likes attention, in moderation
   mamaLayMult: 3.2,        // mama takes her time between eggs - the flock is the engine
-  mamaHunger: 150,         // seconds a full grandma keeps laying before she wants feeding
-  mamaPellets: 4,          // pellets that fill her right back up
+  mamaHunger: 260,         // seconds a full grandma keeps laying before she wants feeding
+  mamaPellets: 5,          // pellets that fill her right back up
+  mamaPetCost: 0.5,        // pellets a pet costs her, against a whole one before
   mamaReach: 34,           // px around the nest she can reach without getting up
   chickPellets: 12,        // pellets a chick eats to grow up
   growTime: 300,           // seconds a chick needs to grow, however well fed
@@ -171,7 +172,52 @@ const CROPS = {
             desc:'Hot stuff. A heavy, fiery harvest.' },
   pumpkin:{ name:'Pumpkin',   grow:600, yield:60, seed:80, col:'#f0a422', stages:4, needs:'pumpkins',
             desc:'Slow as anything, and worth the wait.' },
+  carrot: { name:'Carrot',    grow:120, yield:6,  seed:6,  col:'#f0872f', stages:4, needs:'carrots',
+            desc:'Quick, crunchy and orange.' },
+  potato: { name:'Potato',    grow:170, yield:10, seed:9,  col:'#c9a35f', stages:4, needs:'potatoes',
+            desc:'Humble. Fills a barn.' },
+  tomato: { name:'Tomato',    grow:200, yield:12, seed:14, col:'#e8402f', stages:4, needs:'tomatoes', regrow:true,
+            desc:'Fruits again and again on the vine.' },
+  cabbage:{ name:'Cabbage',   grow:230, yield:16, seed:18, col:'#8fd14f', stages:4, needs:'cabbages',
+            desc:'A big green head of feed.' },
+  melon:  { name:'Watermelon',grow:380, yield:28, seed:40, col:'#3f9a4f', stages:4, needs:'melons',
+            desc:'Green outside, red inside, the founder\'s favourite.' },
+  rice:   { name:'Rice',      grow:300, yield:20, seed:26, col:'#e8dcb0', stages:4, needs:'rice',
+            desc:'Wants water. Gives plenty.' },
 };
+/* what a harvest leaves in the pantry besides feed pellets */
+const PRODUCE = {
+  wheat:        { name:'Wheat',        val:6,  col:'#e8c458', crop:'wheat' },
+  corn:         { name:'Corn',         val:12, col:'#f2d24c', crop:'corn' },
+  sunseeds:     { name:'Sunseeds',     val:18, col:'#f0a422', crop:'sunseed' },
+  berries:      { name:'Berries',      val:10, col:'#c94a6a', crop:'berry' },
+  strawberries: { name:'Strawberries', val:12, col:'#e8324a', crop:'strawberry' },
+  chilis:       { name:'Chilis',       val:14, col:'#e8402f', crop:'chili' },
+  pumpkin:      { name:'Pumpkin',      val:40, col:'#f0a422', crop:'pumpkin' },
+  carrots:      { name:'Carrots',      val:5,  col:'#f0872f', crop:'carrot' },
+  potatoes:     { name:'Potatoes',     val:8,  col:'#c9a35f', crop:'potato' },
+  tomatoes:     { name:'Tomatoes',     val:9,  col:'#e8402f', crop:'tomato' },
+  cabbage:      { name:'Cabbage',      val:11, col:'#8fd14f', crop:'cabbage' },
+  melon:        { name:'Watermelon',   val:30, col:'#3f9a4f', crop:'melon' },
+  rice:         { name:'Rice',         val:15, col:'#e8dcb0', crop:'rice' },
+};
+const PRODUCE_KEYS = Object.keys(PRODUCE);
+const PRODUCE_BY_CROP = Object.fromEntries(PRODUCE_KEYS.map(k => [PRODUCE[k].crop, k]));
+/* the Cannery turns produce into goods worth far more than the sum of it */
+const GOODS = {
+  flour:    { name:'Flour',        val:30,  col:'#fff3d6', icon:'bowl',   time:30, need:{ wheat:3 } },
+  popcorn:  { name:'Popcorn',      val:42,  col:'#fff8ec', icon:'sparkle',time:25, need:{ corn:2 } },
+  jam:      { name:'Berry Jam',    val:58,  col:'#b02a4a', icon:'heart',  time:40, need:{ berries:2, strawberries:1 } },
+  hotsauce: { name:'Hot Sauce',    val:84,  col:'#d92f1f', icon:'flame',  time:45, need:{ chilis:3, tomatoes:1 } },
+  chips:    { name:'Crisps',       val:40,  col:'#f2c94c', icon:'crate',  time:30, need:{ potatoes:3 } },
+  slaw:     { name:'Coleslaw',     val:52,  col:'#c8f0a0', icon:'sprout', time:30, need:{ cabbage:2, carrots:2 } },
+  juice:    { name:'Melon Juice',  val:66,  col:'#ff6b7a', icon:'water',  time:25, need:{ melon:1 } },
+  ricecake: { name:'Rice Cakes',   val:72,  col:'#f6efe0', icon:'cake',   time:40, need:{ rice:3 } },
+  pie:      { name:'Pumpkin Pie',  val:130, col:'#e09a3f', icon:'pan',    time:60, need:{ pumpkin:1, wheat:2 } },
+  superfeed:{ name:'Super Feed',   val:0,   col:'#ffd23f', icon:'seed',   time:20, need:{ corn:1, sunseeds:1 }, feed:24,
+              desc:'Twenty-four premium pellets: a hen fed on them lays double for three times as long.' },
+};
+const GOODS_KEYS = Object.keys(GOODS);
 const CROP_KEYS = Object.keys(CROPS);
 
 /* ------------------------------------------------------------
@@ -321,6 +367,10 @@ const BUILDS = {
                desc:'Put your finest hens on show. Tour buses bring visitors who pay at the gate.', needs:'park' },
   timemachine: { name:'Time Machine', sec:'empire', w:2, h:2, base:250000, growth:2.5, refund:100000,
                desc:'Three fossils in, one dinosaur out, sixty-five million years later.', needs:'timemachine' },
+  hr:        { name:'HR Office', sec:'crew', w:2, h:2, base:520, growth:2.0, refund:200,
+               desc:'A security room: a wall of cameras on every worker. Inspect, train, hire and fire from one chair.', needs:'hiring' },
+  cannery:   { name:'Cannery', sec:'farm', w:2, h:2, base:700, growth:1.8, refund:280,
+               desc:'Turns pantry produce into jam, flour, crisps and pie worth far more than the harvest.', needs:'processing' },
   board:     { name:'Noticeboard', sec:'crew', w:1, h:1, base:40, growth:1.4, refund:15,
                desc:'Where flyers get pinned. Applicants walk up to it and wait.', needs:'hiring' },
   billboard: { name:'Billboard', sec:'empire', w:2, h:2, base:300, growth:1.7, refund:120,
@@ -875,6 +925,13 @@ const SKILLS = [
   K('slowbelly',  'farm', 5, 'hearty',     'Slow Bellies',   'heart',   5, 110, 2.3, 'the flock stays full 25% longer'),
   U('harvestbot', 'farm', 6, 'mill',       'Auto Harvest',   'robot',   900, 'ripe crops harvest themselves'),
   U('pumpkins',   'farm', 6, 'berries',    'Pumpkin Seed',   'sparkle', 220, 'Unlock pumpkins: slow as anything, worth the wait'),
+  U('carrots',    'farm', 2, 'farming',    'Carrot Seed',    'seed',    5,   'Unlock carrots: quick and crunchy'),
+  U('potatoes',   'farm', 3, 'carrots',    'Potato Seed',    'bowl',    12,  'Unlock potatoes: humble, and they fill a barn'),
+  U('tomatoes',   'farm', 3, 'carrots',    'Tomato Seed',    'heart',   16,  'Unlock tomatoes: they fruit again on the vine'),
+  U('processing', 'farm', 3, 'bumper',     'Food Processing','gear',    45,  'Unlock the CANNERY: produce becomes jam, flour and pie worth far more'),
+  U('cabbages',   'farm', 4, 'potatoes',   'Cabbage Seed',   'sprout',  38,  'Unlock cabbages: a big green head of feed'),
+  U('melons',     'farm', 4, 'tomatoes',   'Melon Seed',     'sparkle', 50,  'Unlock watermelons: the founder\'s favourite'),
+  U('rice',       'farm', 5, 'melons',     'Rice Paddy',     'water',   140, 'Unlock rice: wants water, gives plenty'),
 
   /* ---- HENS ---- */
   K('happy',      'hens', 1, 'root',   'Happy Hens',     'heart',   12, 4,  1.9, '+10% lay speed'),
@@ -1207,3 +1264,180 @@ const GRID_POS = GRID.pos;
 /* modules keep their packages in dependency order */
 const SKILLS_BY_MODULE = MODULES.map(m =>
   SKILLS.filter(sk => sk.br === m.id && sk.id !== 'root').sort((a, b) => a.d - b.d || a.name.localeCompare(b.name)));
+
+/* ============================================================
+   THE OVERHAUL - quest objectives and dialogue, the road and its
+   events, the garage, town factories, the founder's wardrobe,
+   achievements, settings and save slots.
+   ============================================================ */
+
+/* ---- quests: several at once, each a to-do list, claimed by hand ----
+   objs: a list of goals (the plain goal is still the last one). Every
+   objective wears a short label for the to-do list. */
+const QUEST_ACTIVE = 3;
+const QUEST_OBJS = {
+  q_sweep:   [{ k:'stat', s:'pets', n:1, label:'Pet Mama Hen' }, { k:'stat', s:'collected', n:5, label:'Sweep 5 eggs' }],
+  q_sale:    [{ k:'stat', s:'collected', n:4, label:'Sweep 4 eggs' }, { k:'stat', s:'trips', n:1, label:'Send the bike to town' }],
+  q_water:   [{ k:'stat', s:'planted', n:3, label:'Sow 3 seeds' }, { k:'stat', s:'watered', n:3, label:'Water 3 crops' }],
+  q_harvest: [{ k:'stat', s:'harvested', n:1, label:'Harvest a crop' }, { k:'stat', s:'feedMade', n:4, label:'Bank 4 feed' }],
+  q_grown:   [{ k:'stat', s:'hatched', n:1, label:'Hatch a chick' }, { k:'stat', s:'grown', n:1, label:'Raise it to a hen' }],
+  q_build:   [{ k:'skill', id:'buildtool', label:'Install the Toolbox' }, { k:'stat', s:'builtN', n:1, label:'Build something' }],
+  q_order:   [{ k:'skill', id:'orders', label:'Install Roadside Orders' }, { k:'stat', s:'orders', n:1, label:'Fill a roadside order' }],
+  q_hire:    [{ k:'built', t:'staffhut', n:1, label:'Build a Staff Hut' }, { k:'stat', s:'flyers', n:1, label:'Put posters up' }, { k:'stat', s:'hired', n:1, label:'Hire someone' }],
+  q_cook:    [{ k:'built', t:'kitchen', n:1, label:'Build a Kitchen' }, { k:'stat', s:'cooked', n:1, label:'Cook a dish' }],
+  q_belts:   [{ k:'skill', id:'belts', label:'Install Conveyor Tech' }, { k:'built', t:'belt', n:4, label:'Lay 4 belts' }],
+  q_regulars:[{ k:'stat', s:'orders', n:5, label:'Fill 5 orders' }, { k:'built', t:'billboard', n:1, label:'Put a billboard up' }],
+  q_land:    [{ k:'plots', n:2, label:'Buy a second plot' }, { k:'plots', n:3, label:'Own 3 plots' }],
+  q_park:    [{ k:'built', t:'park', n:1, label:'Build the park' }, { k:'stat', s:'visitors', n:5, label:'Sell 5 tickets' }],
+  q_fingers: [{ k:'stat', s:'harvested', n:25, label:'Harvest 25 crops' }, { k:'stat', s:'goods', n:1, label:'Can something at the Cannery' }],
+};
+/* what he says when you claim it, per quest; the pool below covers the rest */
+const QUEST_DONE_SAY = {
+  q_sweep:   'Five eggs and a clean lawn. I could get used to this.',
+  q_sale:    'Our first coin. I have framed it. Mentally.',
+  q_hatch:   'It cheeped at me. I think it knows who the boss is.',
+  q_harvest: 'Food out of dirt. Farming is basically alchemy.',
+  q_hire:    'Staff! Now I can supervise properly, from a chair.',
+  q_order:   'They paid extra for the convenience. Convenience is our product now.',
+  q_iron:    'The Iron Age. Sounds heavy. Feels rich.',
+  q_land:    'Three plots. The neighbours are calling me sir.',
+  q_public:  'We are on the market. Buy low, sell to your cousin.',
+  q_moon:    'The Moon. Grandmama, if you can see this: I told you so.',
+};
+QUESTS.forEach((q, i) => {
+  q.objs = QUEST_OBJS[q.id] || [Object.assign({ label: q.hint }, q.goal)];
+  q.doneSay = QUEST_DONE_SAY[q.id] || null;
+  q.chapter = i < 10 ? 'THE FARM' : i < 20 ? 'THE BUSINESS' : i < 32 ? 'THE COMPANY' : i < 40 ? 'THE EMPIRE' : 'THE STARS';
+});
+
+/* ---- the road between here and the towns ---- */
+const ROUTE_STYLES = {
+  fast:   { id:'fast',   name:'Highway',       icon:'road',    time:0.78, toll:0.07, pay:1.0,  events:0.6,
+            desc:'Quick, but the toll booth takes 7% of the load.' },
+  safe:   { id:'safe',   name:'Country Lane',  icon:'tree',    time:1.0,  toll:0,    pay:1.0,  events:1.0,
+            desc:'Free and steady. Whatever happens on the road happens to you.' },
+  scenic: { id:'scenic', name:'Scenic Route',  icon:'sparkle', time:1.28, toll:0,    pay:1.12, events:0.8,
+            desc:'Slow, pretty, and the eggs arrive in a good mood: 12% more at the market.' },
+};
+const ROUTE_STYLE_KEYS = Object.keys(ROUTE_STYLES);
+/* things that happen on the map: each sits on a town's road for a while */
+const ROAD_EVENTS = [
+  { id:'jam',    name:'Traffic Jam',  icon:'car',    slow:1.45, pay:1,    dur:120, col:'#e8542f', desc:'Everything crawls. Trips through here take half again as long.' },
+  { id:'works',  name:'Roadworks',    icon:'hammer', slow:1.25, pay:1,    dur:200, col:'#f0a422', desc:'Cones and a man with a flag. A quarter slower.' },
+  { id:'fair',   name:'Egg Fair',     icon:'star',   slow:1,    pay:1.35, dur:150, col:'#ffd23f', desc:'The town wants eggs today. 35% more for every load here.' },
+  { id:'storm',  name:'Storm',        icon:'water',  slow:1.5,  pay:1,    dur:90,  col:'#3fa7d6', desc:'Sheets of rain on the road. Half again as slow.' },
+  { id:'parade', name:'Parade',       icon:'flag',   slow:1.6,  pay:1.15, dur:100, col:'#b06ee0', desc:'The whole town is in the street. Slow, but they buy.' },
+  { id:'market', name:'Market Day',   icon:'coin',   slow:1.1,  pay:1.2,  dur:180, col:'#6ab04c', desc:'Stalls in the square. A fifth more for eggs.' },
+];
+const ROAD_EVENT_BY_ID = Object.fromEntries(ROAD_EVENTS.map(e => [e.id, e]));
+const ROAD = {
+  eventEvery: 110,        // seconds between something happening on some road
+  weatherEvery: 75,       // seconds between the weather in a town changing
+  factoryCostMult: 6,     // a town factory costs this much of the route to it (min below)
+  factoryMin: 1500,
+  factoryPay: 0.15,       // what a factory adds to every delivery to its town
+  factoryIncome: 3,       // coins a minute per point of the town's multiplier
+  rainSlow: 1.15,         // rain over a town slows a trip there
+};
+/* the weather each town can be having */
+const TOWN_WEATHER = ['sun', 'sun', 'cloud', 'rain', 'sun', 'wind', 'fog'];
+
+/* ---- the garage ---- */
+const GARAGE_UPGRADES = {
+  engine: { id:'engine', name:'Engine',     icon:'gear',    max:5, base:600,  growth:2.0, desc:'-8% round trip per level' },
+  tyres:  { id:'tyres',  name:'Tyres',      icon:'wind',    max:4, base:400,  growth:2.0, desc:'road events slow you 20% less per level' },
+  cargo:  { id:'cargo',  name:'Cargo Rack', icon:'crate',   max:5, base:800,  growth:2.1, desc:'+4 eggs per level' },
+  cooler: { id:'cooler', name:'Egg Cooler', icon:'sparkle', max:4, base:1500, growth:2.2, desc:'+6% at the market per level: fresher eggs' },
+  horn:   { id:'horn',   name:'Big Horn',   icon:'bolt',    max:1, base:250,  growth:1,   desc:'customers on the lay-by wait 20% longer' },
+};
+const GARAGE_KEYS = Object.keys(GARAGE_UPGRADES);
+const CAR_DECALS = ['none', 'egg', 'stripe', 'flames', 'logo', 'stars'];
+function garageCost(id, lvl) { const u = GARAGE_UPGRADES[id]; return Math.round(u.base * Math.pow(u.growth, lvl || 0)); }
+
+/* ---- the founder's wardrobe ---- */
+const COSMETICS = [
+  /* hats */
+  { id:'hat_top',    kind:'hat',   name:'Top Hat',      free:true },
+  { id:'hat_none',   kind:'hat',   name:'Bare Ears',    free:true },
+  { id:'hat_cap',    kind:'hat',   name:'Flat Cap',     unlock:'a_hire' },
+  { id:'hat_straw',  kind:'hat',   name:'Straw Hat',    unlock:'a_harvest' },
+  { id:'hat_crown',  kind:'hat',   name:'Crown',        unlock:'a_rich' },
+  { id:'hat_beanie', kind:'hat',   name:'Beanie',       unlock:'a_rain' },
+  { id:'hat_wizard', kind:'hat',   name:'Wizard Hat',   unlock:'a_genes' },
+  { id:'hat_cowboy', kind:'hat',   name:'Ten Gallon',   unlock:'a_trips' },
+  { id:'hat_halo',   kind:'hat',   name:'Halo',         unlock:'a_moon' },
+  { id:'hat_chef',   kind:'hat',   name:'Chef Toque',   unlock:'a_cook' },
+  /* suits */
+  { id:'suit_black', kind:'suit',  name:'Black Suit',   free:true,  col:'#2c2a36', trim:'#e8542f' },
+  { id:'suit_green', kind:'suit',  name:'Tycoon Green', unlock:'a_factory', col:'#2f8f4f', trim:'#1f5f33' },
+  { id:'suit_red',   kind:'suit',  name:'Racing Red',   unlock:'a_garage', col:'#c9302f', trim:'#ffd23f' },
+  { id:'suit_blue',  kind:'suit',  name:'Navy Pinstripe', unlock:'a_orders', col:'#2f4f9e', trim:'#c9ced6' },
+  { id:'suit_purple',kind:'suit',  name:'Royal Purple', unlock:'a_species', col:'#7a3fb0', trim:'#ffd23f' },
+  { id:'suit_gold',  kind:'suit',  name:'Solid Gold',   unlock:'a_tycoon',  col:'#e0a416', trim:'#fff3c4' },
+  { id:'suit_pink',  kind:'suit',  name:'Bubblegum',    unlock:'a_breed',   col:'#ff5f9e', trim:'#fff8ec' },
+  { id:'suit_white', kind:'suit',  name:'Ice White',    unlock:'a_park',    col:'#f2ece0', trim:'#3fa7d6' },
+  /* glasses */
+  { id:'gl_none',    kind:'glasses', name:'No Glasses', free:true },
+  { id:'gl_round',   kind:'glasses', name:'Round Specs', unlock:'a_lab' },
+  { id:'gl_star',    kind:'glasses', name:'Sparkle Shades', unlock:'a_factory' },
+  { id:'gl_shades',  kind:'glasses', name:'Black Shades', unlock:'a_secret' },
+  /* the thing in his hand */
+  { id:'acc_coin',   kind:'acc',   name:'A Coin',       free:true },
+  { id:'acc_none',   kind:'acc',   name:'Empty Paws',   free:true },
+  { id:'acc_guitar', kind:'acc',   name:'Red Guitar',   unlock:'a_factory' },
+  { id:'acc_cane',   kind:'acc',   name:'Cane',         unlock:'a_rich' },
+  { id:'acc_egg',    kind:'acc',   name:'Golden Egg',   unlock:'a_golden' },
+  { id:'acc_axe',    kind:'acc',   name:'Axe',          unlock:'a_trees' },
+];
+const COSMETIC_BY_ID = Object.fromEntries(COSMETICS.map(c => [c.id, c]));
+const COSMETIC_KINDS = [
+  { id:'hat', name:'HATS' }, { id:'suit', name:'SUITS' }, { id:'glasses', name:'GLASSES' }, { id:'acc', name:'IN HAND' },
+];
+const WARDROBE_DEFAULT = { hat:'hat_top', suit:'suit_black', glasses:'gl_none', acc:'acc_coin' };
+
+/* ---- achievements: things worth a plaque, each one worth a cosmetic ---- */
+const ACHIEVEMENTS = [
+  { id:'a_first',   name:'First Egg',        icon:'egg',      desc:'Sweep your first egg.',                 goal:{ k:'stat', s:'collected', n:1 } },
+  { id:'a_lab',     name:'Lab Coat',         icon:'flask',    desc:'Install five cubes in the Lab.',        goal:{ k:'skills', n:5 } },
+  { id:'a_harvest', name:'Green Fingers',    icon:'scythe',   desc:'Harvest ten crops.',                    goal:{ k:'stat', s:'harvested', n:10 } },
+  { id:'a_hire',    name:'The Boss',         icon:'hands',    desc:'Hire your first worker.',               goal:{ k:'stat', s:'hired', n:1 } },
+  { id:'a_trips',   name:'Road Warrior',     icon:'truck',    desc:'Send fifty loads to market.',           goal:{ k:'stat', s:'trips', n:50 } },
+  { id:'a_orders',  name:'Regular Custom',   icon:'doc',      desc:'Fill twenty roadside orders.',          goal:{ k:'stat', s:'orders', n:20 } },
+  { id:'a_rain',    name:'Rain Or Shine',    icon:'water',    desc:'Sit through ten showers.',              goal:{ k:'stat', s:'rains', n:10 } },
+  { id:'a_species', name:'Collector',        icon:'book',     desc:'Find twenty-five species.',             goal:{ k:'disc', n:25 } },
+  { id:'a_breed',   name:'Matchmaker',       icon:'cupid',    desc:'Breed ten eggs in love nests.',         goal:{ k:'stat', s:'bred', n:10 } },
+  { id:'a_genes',   name:'Mad Science',      icon:'dna',      desc:'Edit five hens in the Gene Lab.',       goal:{ k:'stat', s:'edits', n:5 } },
+  { id:'a_golden',  name:'Midas Beak',       icon:'sparkle',  desc:'Earn a hundred thousand coins.',        goal:{ k:'stat', s:'coinsEarned', n:1e5 } },
+  { id:'a_rich',    name:'Super Rich',       icon:'crown',    desc:'Earn a million coins.',                 goal:{ k:'stat', s:'coinsEarned', n:1e6 } },
+  { id:'a_tycoon',  name:'Egg Tycoon',       icon:'coin',     desc:'Earn a hundred million coins.',         goal:{ k:'stat', s:'coinsEarned', n:1e8 } },
+  { id:'a_factory', name:'How Bad Can I Be', icon:'gear',     desc:'Build twenty things and lay eight belts.', goal:{ k:'multi', all:[{ k:'stat', s:'builtN', n:20 }, { k:'built', t:'belt', n:8 }] } },
+  { id:'a_trees',   name:'Lumberjack',       icon:'tree',     desc:'Plant thirty decorations.',             goal:{ k:'deco', n:30 } },
+  { id:'a_garage',  name:'Grease Monkey',    icon:'gear',     desc:'Buy five garage upgrades.',             goal:{ k:'stat', s:'upgrades', n:5 } },
+  { id:'a_cook',    name:'Short Order',      icon:'pan',      desc:'Sell fifty dishes.',                    goal:{ k:'stat', s:'dishes', n:50 } },
+  { id:'a_cannery', name:'Preserved',        icon:'crate',    desc:'Can twenty-five goods at the Cannery.',  goal:{ k:'stat', s:'goods', n:25 } },
+  { id:'a_park',    name:'Showman',          icon:'ticket',   desc:'Two hundred visitors through the park.', goal:{ k:'stat', s:'visitors', n:200 } },
+  { id:'a_secret',  name:'Nosy',             icon:'key',      desc:'Find six secrets.',                     goal:{ k:'stat', s:'secrets', n:6 } },
+  { id:'a_quests',  name:'Yes Boss',         icon:'star',     desc:'Claim twenty quests.',                  goal:{ k:'stat', s:'questsDone', n:20 } },
+  { id:'a_land',    name:'Landlord',         icon:'house',    desc:'Own eight plots.',                      goal:{ k:'plots', n:8 } },
+  { id:'a_crew',    name:'Full Roster',      icon:'person',   desc:'Employ ten workers at once.',           goal:{ k:'staff', n:10 } },
+  { id:'a_train',   name:'Staff Training',   icon:'medal',    desc:'Train a worker ten times at the HR Office.', goal:{ k:'stat', s:'trained', n:10 } },
+  { id:'a_present', name:'Unwrapped',        icon:'heart',    desc:'Open ten presents from the limousine.', goal:{ k:'stat', s:'presents', n:10 } },
+  { id:'a_abroad',  name:'Passport',         icon:'globe',    desc:'Open three countries.',                 goal:{ k:'regions', n:3 } },
+  { id:'a_moon',    name:'Moonlighting',     icon:'moon',     desc:'Open the Moon.',                        goal:{ k:'region', id:'moon' } },
+  { id:'a_dino',    name:'Life Finds A Way', icon:'dino',     desc:'Hatch a dinosaur.',                     goal:{ k:'stat', s:'dinos', n:1 } },
+  { id:'a_ages',    name:'Old Money',        icon:'scroll',   desc:'Reach the Electric Age.',               goal:{ k:'age', id:'electric' } },
+  { id:'a_mama',    name:'Grandma\'s Boy',   icon:'crown',    desc:'Feed Mama fifty times.',                goal:{ k:'stat', s:'mamaFed', n:50 } },
+];
+const ACH_BY_ID = Object.fromEntries(ACHIEVEMENTS.map(a => [a.id, a]));
+
+/* ---- settings and slots ---- */
+const SETTINGS_DEFAULT = { sound:true, volume:0.7, news:false, shake:true, dayNight:true, particles:true, bigUI:false, showFps:false, autosave:true };
+const SAVE_SLOTS = 3;
+
+/* ---- the founder's sequence on the main menu: what he sings while he does it ---- */
+const MENU_ACTS = [
+  { id:'dance',  secs:5.0, line:'HOW BAD CAN I POSSIBLY BE?' },
+  { id:'chop',   secs:4.2, line:'I\'M JUST BUILDING THE ECONOMY' },
+  { id:'build',  secs:4.6, line:'A LITTLE SMOKE NEVER HURT ANYONE' },
+  { id:'punch',  secs:3.6, line:'ALL THE CHICKENS WORK FOR ME' },
+];

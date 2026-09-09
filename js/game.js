@@ -56,6 +56,19 @@ const GAME = (() => {
       polishers: {}, graders: {}, dynamos: {},
       barns: {}, troughs: {}, wells: {}, sprinklers: {}, mills: {}, coops: {}, boards: {}, hqs: {},
       beehives: {}, genelabs: {}, billboards: {}, kitchens: {}, parks: {}, timemachines: {},
+      hrs: {}, canneries: {},   /* the HR Office and the Cannery */
+      pantry: {},            /* produce id -> count, what harvests leave besides feed */
+      goods: {},             /* goods id -> count, what the Cannery makes */
+      premiumT: 0,           /* seconds of super feed left in the scatter */
+      garage: { col: null, decal: 'none', upg: {}, routes: {} },
+      factories: {},         /* city id -> true: a factory of ours in that town */
+      road: { events: [], t: 90, weather: {}, wt: 40 },
+      presents: [],          /* gift boxes on the grass {id,x,y,z,vz,rw,t} */
+      limo: null, limoQueue: [],
+      ach: {},               /* achievement id -> when */
+      cosOwned: {},          /* cosmetics unlocked beyond the free ones */
+      wardrobe: Object.assign({}, WARDROBE_DEFAULT),
+      settings: Object.assign({}, SETTINGS_DEFAULT),
       secrets: {},           /* secret id -> when it was found */
       cooked: {},            /* recipe id -> dishes made */
       fossils: [],           /* bones lying on the ground {id,x,y,z,vz,seed} */
@@ -109,7 +122,8 @@ const GAME = (() => {
                mamaFed: 0, watered: 0, builtN: 0, orders: 0, ordersMissed: 0, edits: 0, storeys: 0,
                honey: 0, questsDone: 0, trades: 0, rains: 0, vips: 0, regions: 0, branches: 0, posters: 0, bossPets: 0,
                cooked: 0, dishes: 0, roasts: 0, ranked: 0, champions: 0, secrets: 0, visitors: 0,
-               celestial: 0, fossils: 0, dinos: 0, dinoShown: 0, mamaPets: 0 },
+               celestial: 0, fossils: 0, dinos: 0, dinoShown: 0, mamaPets: 0,
+               goods: 0, produce: 0, presents: 0, upgrades: 0, trained: 0, factories: 0, claimed: 0 },
       muted: false, last: Date.now(),
     };
   }
@@ -161,13 +175,22 @@ const GAME = (() => {
   function vacInterval() { return ECON.vacInterval / (1 + 0.25 * lvl('vacspeed')) / overclock(); }
   function vacIntervalAt(x, y) { return vacInterval() / machineBoost(x, y); }
   function beltSpeed() { return ECON.beltSpeed * (1 + 0.20 * lvl('beltspeed')) * overclock(); }
-  function truckCap() { return vehicle().cap + 5 * lvl('truckcap'); }
+  function truckCap() { return vehicle().cap + 5 * lvl('truckcap') + 4 * garageLevel('cargo'); }
   function hqMult() {
     const ks = Object.keys(S.hqs);
     if (!ks.length) return 1;
     return ks.some(k => S.storeys[k]) ? 0.85 : 0.9;      /* a dispatch office trims every trip */
   }
-  function tripTime() { return vehicle().trip * city().dist * Math.pow(0.85, lvl('route')) * Math.pow(0.75, lvl('fleet')) * hqMult(); }
+  function tripTimeTo(id) {
+    const c = CITY_BY_ID[id] || city();
+    const st = routeStyle(c.id);
+    let m = st.time * Math.pow(0.92, garageLevel('engine'));
+    const ev = eventAt(c.id);
+    if (ev) m *= 1 + (ROAD_EVENT_BY_ID[ev.id].slow - 1) * (1 - 0.2 * garageLevel('tyres'));
+    if (townWeather(c.id) === 'rain') m *= ROAD.rainSlow;
+    return vehicle().trip * c.dist * Math.pow(0.85, lvl('route')) * Math.pow(0.75, lvl('fleet')) * hqMult() * m;
+  }
+  function tripTime() { return tripTimeTo(S.route); }
   function mutationChance() { return ECON.baseMutation + 0.015 * lvl('mutate'); }
   function goldenChance() { return 0.03 * lvl('golden'); }
   function mamaCost() { return ECON.mamaCost(S.mamaTier); }
@@ -181,14 +204,21 @@ const GAME = (() => {
     if (isNew) f += ECON.discoveryBonus(t);
     return Math.ceil(f * (1 + 0.2 * lvl('whisper')));
   }
-  function truckPayout() {
+  function truckPayoutBase() {
     const c = city();
     /* bigger cities pay a premium, and a steeper one for rare eggs */
     let sum = S.truck.load.reduce((a, e) => a + eggValue(e.tier, e.golden, e.pol) * (1 + 0.08 * c.sky * e.tier), 0);
     sum *= c.mult;
     if (S.truck.load.length >= truckCap()) sum *= 1 + 0.06 * lvl('fullbonus');
     return Math.round(sum);
+  }  function payMultTo(id) {
+    const c = CITY_BY_ID[id] || city();
+    const st = routeStyle(c.id);
+    const ev = eventAt(c.id);
+    return st.pay * (1 - st.toll) * (1 + 0.06 * garageLevel('cooler')) * (ev ? ROAD_EVENT_BY_ID[ev.id].pay : 1) * (S.factories[c.id] ? 1 + ROAD.factoryPay : 1);
   }
+  function truckPayout() { return Math.round(truckPayoutBase() * payMultTo(S.route)); }
+
 
   /* ---------- geography ---------- */
   const key = (c, r) => c + ',' + r;
@@ -320,6 +350,8 @@ const GAME = (() => {
     two(S.kitchens, 'kitchen');
     box(S.parks, 'park', 3, 3);
     two(S.timemachines, 'timemachine');
+    two(S.hrs, 'hr');
+    two(S.canneries, 'cannery');
     /* a site holds its footprint until the movers are done */
     Object.keys(S.sites).forEach(k => {
       const s = S.sites[k];
@@ -571,14 +603,17 @@ const GAME = (() => {
     });
   }
   /* a chicken eats one pellet: chicks grow, adults fill up and lay faster */
-  function eat(ch) {
+  function eat(ch, f) {
+    const prem = f && f.prem ? 3 : 1;
+    ch.eat = 1.1;                                       /* the pecking animation */
     if (isChick(ch)) {
-      ch.fed = Math.min(1, (ch.fed || 0) + 1 / growPellets());
+      ch.fed = Math.min(1, (ch.fed || 0) + (prem > 1 ? 2 : 1) / growPellets());
       ch.food = 1;
     } else {
       ch.food = 1;
-      ch.buffT = ECON.feedBuff * (1 + 0.5 * lvl('feedplus'));
+      ch.buffT = Math.max(ch.buffT || 0, ECON.feedBuff * (1 + 0.5 * lvl('feedplus')) * prem);
     }
+    emit('eat', { ch, prem: prem > 1 });
   }
   function pickSpecies(tier) {
     const pool = SPECIES_BY_TIER[tier];
@@ -650,6 +685,7 @@ const GAME = (() => {
     ch.t -= dt;
     ch.petCd = Math.max(0, ch.petCd - dt);
     ch.buffT = Math.max(0, ch.buffT - dt);
+    if (ch.eat > 0) ch.eat -= dt;
     if (ch.age === undefined) ch.age = 1;
     if (ch.food === undefined) ch.food = 1;
     const chick = isChick(ch);
@@ -685,7 +721,7 @@ const GAME = (() => {
         const d = Math.hypot(dx, dy);
         if (d < 6) {
           takeBite(f);
-          eat(ch);
+          eat(ch, f);
           ch.state = 'peck'; ch.t = 0.8; ch.target = null;
           emit('feedeat', { x: ch.x + 10, y: ch.y, chick });
         } else {
@@ -725,7 +761,7 @@ const GAME = (() => {
     /* a hungry grandma will take the fuss but she has no egg to give */
     if (mamaHungry()) { S.mama.petCd = 1.2; emit('mamahungry', {}); return 'hungry'; }
     S.mama.petCd = petCd(true);
-    S.mama.belly = Math.max(0, mamaBelly() - 1 / ECON.mamaPellets);
+    S.mama.belly = Math.max(0, mamaBelly() - (ECON.mamaPetCost || 1) / ECON.mamaPellets);
     S.stats.pets++;
     S.stats.mamaPets++;
     layEgg(WORLD.mama.x, WORLD.mama.y + 8, S.mamaTier, true);
@@ -868,7 +904,7 @@ const GAME = (() => {
     const n = Math.min(ECON.sprinkle, Math.floor(S.feedStore));
     S.feedStore -= n;
     for (let i = 0; i < n; i++) {
-      S.feed.push({ x: x + (Math.random() * 18 - 9), y: y + (Math.random() * 12 - 6), n: 1 });
+      S.feed.push({ x: x + (Math.random() * 18 - 9), y: y + (Math.random() * 12 - 6), n: 1, prem: S.premiumT > 0 ? 1 : 0 });
     }
     if (S.feed.length > 160) S.feed.splice(0, S.feed.length - 160);
     emit('sprinkle', { x, y });
@@ -1131,6 +1167,14 @@ const GAME = (() => {
     const n = harvestYield(t.crop);
     addFeed(n, c * 16 + 8, r * 16 + 8);
     S.stats.harvested++;
+    /* and a share of the crop itself goes to the pantry */
+    const pid = PRODUCE_BY_CROP[t.crop];
+    if (pid) {
+      const pn = 1 + (Math.random() < 0.15 + 0.08 * lvl('bumper') ? 1 : 0);
+      S.pantry[pid] = (S.pantry[pid] || 0) + pn;
+      S.stats.produce += pn;
+      emit('produce', { c, r, id: pid, n: pn });
+    }
     if (lvl('amber') && Math.random() < 0.04) dropFossil(c * 16 + 8, r * 16 + 2);
     /* no seeds come back: the next packet is bought */
     if (d.regrow) t.growth = 0.3;
@@ -2246,10 +2290,15 @@ const GAME = (() => {
   const TOOL_NEEDS = { feed: 'feedtool', farm: 'hoe', build: 'buildtool' };
   function toolOpen(t) { const n = TOOL_NEEDS[t]; return !n || lvl(n) > 0; }
 
-  /* ---------- quests: one chain, paid out the moment a goal is met ---------- */
-  function questProgress(q) {
-    const g = q.goal;
+  /* ---------- quests: several at once, each a to-do list, claimed by hand ----------
+     S.quests[id]: undefined = open, 1 = every objective met and waiting to be
+     claimed, 2 = claimed (old saves carry `true`, which counts as claimed). */
+  function goalProgress(g) {
+    if (!g) return [0, 1];
     if (g.k === 'skill') return [lvl(g.id) > 0 ? 1 : 0, 1];
+    if (g.k === 'region') return [regionOpen(g.id) ? 1 : 0, 1];
+    if (g.k === 'age') return [ageIndex() >= AGE_INDEX[g.id] ? 1 : 0, 1];
+    if (g.k === 'multi') { const parts = g.all.map(goalProgress); return [parts.filter(([c, n]) => c >= n).length, parts.length]; }
     let cur = 0;
     if (g.k === 'stat') cur = S.stats[g.s] || 0;
     else if (g.k === 'soil') cur = Object.keys(S.soil).length;
@@ -2257,28 +2306,315 @@ const GAME = (() => {
     else if (g.k === 'built') cur = S.built[g.t] || 0;
     else if (g.k === 'plots') cur = S.plots.filter(Boolean).length;
     else if (g.k === 'regions') cur = REGIONS.filter(r => !r.home && regionOpen(r.id)).length;
-    else if (g.k === 'region') return [regionOpen(g.id) ? 1 : 0, 1];
-    else if (g.k === 'age') return [ageIndex() >= AGE_INDEX[g.id] ? 1 : 0, 1];
     else if (g.k === 'flock') cur = S.chickens.filter(ch => !isChick(ch)).length;
+    else if (g.k === 'skills') cur = Object.keys(S.sk).filter(id => id !== 'root').reduce((a, id) => a + S.sk[id], 0);
+    else if (g.k === 'deco') cur = Object.keys(S.deco).length;
+    else if (g.k === 'staff') cur = S.staff.length;
     return [Math.min(cur, g.n), g.n];
   }
-  function questDone(q) { return !!S.quests[q.id]; }
-  function currentQuest() { return QUESTS.find(q => !S.quests[q.id]) || null; }
+  function objDone(o) { const [c, n] = goalProgress(o); return c >= n; }
+  function questObjs(q) { return q.objs || [q.goal]; }
+  /* [met, total] over the objectives; a single-objective quest reports its own numbers */
+  function questProgress(q) {
+    const objs = questObjs(q);
+    if (objs.length === 1) return goalProgress(objs[0]);
+    return [objs.filter(objDone).length, objs.length];
+  }
+  function questDone(q) { const v = S.quests[q.id]; return v === 2 || v === true; }
+  function questReady(q) { return S.quests[q.id] === 1; }
+  function questState(q) {
+    if (questDone(q)) return 'claimed';
+    if (questReady(q)) return 'ready';
+    return activeQuests().includes(q) ? 'active' : 'later';
+  }
+  function activeQuests() { return QUESTS.filter(q => !questDone(q)).slice(0, QUEST_ACTIVE); }
+  /* the one the founder talks about: the first still in progress, else the first waiting to be claimed */
+  function currentQuest() {
+    const act = activeQuests();
+    return act.find(q => !questReady(q)) || act[0] || null;
+  }
   function tickQuests() {
-    const q = currentQuest();
-    if (!q) return;
-    const [cur, n] = questProgress(q);
-    if (cur < n) return;
-    S.quests[q.id] = true;
+    for (const q of activeQuests()) {
+      if (questReady(q)) continue;
+      if (!questObjs(q).every(objDone)) continue;
+      S.quests[q.id] = 1;
+      mark('skills');
+      emit('questready', { q });
+      bossSay(q.doneSay || BOSS_DONE[(S.stats.questsDone + QUESTS.indexOf(q)) % BOSS_DONE.length], 6, 'cheer');
+    }
+  }
+  function claimQuest(id) {
+    const q = QUEST_BY_ID[id];
+    if (!q || !questReady(q)) return false;
+    S.quests[id] = 2;
     S.stats.questsDone++;
-    if (q.rw.c) earn(q.rw.c, 'quests');
-    if (q.rw.f) S.feathers += q.rw.f;
-    note('quest', 'Quest done: ' + q.name + '.');
+    S.stats.claimed++;
+    note('quest', 'Claimed the reward for ' + q.name + '.');
     mark('skills');
+    /* the reward arrives by limousine, in a box, on the grass by the road */
+    sendPresent({ c: q.rw.c || 0, f: q.rw.f || 0, from: q.name, icon: q.icon });
     emit('quest', { q });
-    /* the founder takes the credit, then points at the next thing */
-    bossSay(BOSS_DONE[S.stats.questsDone % BOSS_DONE.length], 6, 'cheer');
     bossOnQuest(currentQuest());
+    return true;
+  }
+  function claimAll() { let n = 0; QUESTS.forEach(q => { if (claimQuest(q.id)) n++; }); return n; }
+
+  /* ---------- the limousine and its presents ---------- */
+  function sendPresent(rw) { S.limoQueue.push(rw); }
+  function limoSpot() { return { x: WORLD.layby.x + 44, y: WORLD.layby.y - 6 }; }
+  function tickLimo(dt) {
+    if (!S.limo) {
+      if (!S.limoQueue.length) return;
+      S.limo = { state: 'arrive', x: WORLD.W + 80, y: WORLD.roadY + 6, t: 0, rw: S.limoQueue.shift(), anim: 0 };
+      emit('limo', { state: 'coming' });
+    }
+    const L = S.limo, sp = limoSpot();
+    L.anim += dt;
+    if (L.state === 'arrive') {
+      const d = L.x - sp.x;
+      L.x -= Math.min(d, 78 * dt);
+      if (d < 60) L.y = WORLD.roadY + 6 + (sp.y - WORLD.roadY - 6) * (1 - Math.max(0, d) / 60);
+      if (d <= 0.5) { L.x = sp.x; L.y = sp.y; L.state = 'drop'; L.t = 1.6; emit('limo', { state: 'here', x: L.x, y: L.y }); }
+    } else if (L.state === 'drop') {
+      L.t -= dt;
+      if (L.t <= 0) {
+        const p = { id: nextId++, x: L.x + 12 + Math.random() * 10, y: WORLD.roadY - 14 - Math.random() * 6, z: -22, vz: 0, rw: L.rw, t: 90, wob: Math.random() * 6 };
+        S.presents.push(p);
+        L.state = 'leave';
+        emit('present', { p, state: 'dropped' });
+      }
+    } else {
+      L.x -= 84 * dt;
+      L.y += (WORLD.roadY + 6 - L.y) * Math.min(1, dt * 3);
+      if (L.x < -90) S.limo = null;
+    }
+  }
+  function tickPresents(dt) {
+    for (let i = S.presents.length - 1; i >= 0; i--) {
+      const p = S.presents[i];
+      if (p.z < 0) { p.vz += 90 * dt; p.z = Math.min(0, p.z + p.vz * dt); if (p.z >= 0 && p.vz > 30) { p.z = -0.01; p.vz = -p.vz * 0.35; } }
+      p.t -= dt;
+      if (p.t <= 0) openPresent(p);
+    }
+  }
+  function presentAt(x, y) { return S.presents.find(p => Math.abs(x - p.x) < 9 && Math.abs(y - p.y) < 10) || null; }
+  function openPresent(p) {
+    const i = S.presents.indexOf(p);
+    if (i === -1) return null;
+    S.presents.splice(i, 1);
+    const rw = p.rw || {};
+    if (rw.c) earn(rw.c, 'quests');
+    if (rw.f) S.feathers += rw.f;
+    if (rw.cos) rw.cos.forEach(id => { S.cosOwned[id] = true; });
+    S.stats.presents++;
+    emit('present', { p, state: 'opened', rw });
+    return rw;
+  }
+
+  /* ---------- the pantry and the Cannery ---------- */
+  function pantryCount(id) { return S.pantry[id] || 0; }
+  function goodsCount(id) { return S.goods[id] || 0; }
+  function pantryTotal() { return PRODUCE_KEYS.reduce((a, k) => a + pantryCount(k), 0) + GOODS_KEYS.reduce((a, k) => a + goodsCount(k), 0); }
+  function sellProduce(id, n) {
+    const have = pantryCount(id);
+    n = Math.min(n === undefined ? have : n, have);
+    if (n <= 0 || !PRODUCE[id]) return 0;
+    S.pantry[id] = have - n;
+    const got = Math.round(PRODUCE[id].val * n * (1 + 0.15 * lvl('value')));
+    earn(got, 'food');
+    emit('soldfood', { id, n, got });
+    return got;
+  }
+  function sellGoods(id, n) {
+    const have = goodsCount(id);
+    n = Math.min(n === undefined ? have : n, have);
+    if (n <= 0 || !GOODS[id] || !GOODS[id].val) return 0;
+    S.goods[id] = have - n;
+    const got = Math.round(GOODS[id].val * n * (1 + 0.15 * lvl('value')) * dishMult());
+    earn(got, 'food');
+    emit('soldfood', { id, n, got });
+    return got;
+  }
+  /* super feed goes to the barn, and everything scattered for a while is premium */
+  function useGoods(id) {
+    const G = GOODS[id];
+    if (!G || !G.feed || goodsCount(id) <= 0) return false;
+    S.goods[id]--;
+    addFeed(G.feed, WORLD.mama.x, WORLD.mama.y);
+    S.premiumT = Math.max(S.premiumT, 90);
+    emit('superfeed', {});
+    return true;
+  }
+  function canMake(id) { const G = GOODS[id]; return !!G && Object.keys(G.need).every(k => pantryCount(k) >= G.need[k]); }
+  function hasCannery() { return Object.keys(S.canneries).length > 0; }
+  function setCanneryRecipe(k, id) { const cn = S.canneries[k]; if (!cn || !GOODS[id]) return false; cn.recipe = id; return true; }
+  function setAllCanneries(id) { Object.keys(S.canneries).forEach(k => setCanneryRecipe(k, id)); return hasCannery(); }
+  function canneryTime(k, G) { return G.time * Math.pow(0.88, lvl('chef')) / storeyMult(k); }
+  function tickCanneries(dt) {
+    S.premiumT = Math.max(0, S.premiumT - dt);
+    for (const k of Object.keys(S.canneries)) {
+      const cn = S.canneries[k];
+      const [c, r] = k.split(',').map(Number);
+      if (cn.cook) {
+        cn.cook.t += dt * machineBoost(c * 16 + 16, r * 16 + 16);
+        if (cn.cook.t >= cn.cook.T) {
+          S.goods[cn.cook.id] = (S.goods[cn.cook.id] || 0) + 1;
+          cn.made++;
+          S.stats.goods++;
+          emit('canned', { k, id: cn.cook.id, x: c * 16 + 16, y: r * 16 });
+          cn.cook = null;
+        }
+        continue;
+      }
+      const G = GOODS[cn.recipe] || GOODS.flour;
+      if (!canMake(cn.recipe)) continue;
+      Object.keys(G.need).forEach(pk => { S.pantry[pk] -= G.need[pk]; });
+      cn.cook = { id: cn.recipe, t: 0, T: canneryTime(k, G) };
+    }
+  }
+
+  /* ---------- the garage ---------- */
+  function garageLevel(id) { return (S.garage && S.garage.upg && S.garage.upg[id]) || 0; }
+  function garagePrice(id) { return garageCost(id, garageLevel(id)); }
+  function canUpgrade(id) { const u = GARAGE_UPGRADES[id]; return !!u && depotOpen() && garageLevel(id) < u.max && S.coins >= garagePrice(id); }
+  function buyUpgrade(id) {
+    if (!canUpgrade(id)) return false;
+    S.coins -= garagePrice(id);
+    S.garage.upg[id] = garageLevel(id) + 1;
+    S.stats.upgrades++;
+    note('garage', 'Fitted ' + GARAGE_UPGRADES[id].name + ' level ' + S.garage.upg[id] + '.');
+    emit('upgrade', { id, lvl: S.garage.upg[id] });
+    return true;
+  }
+  function setPaint(col, decal) {
+    if (col !== undefined) S.garage.col = col;
+    if (decal !== undefined) S.garage.decal = decal;
+    emit('paint', {});
+    return true;
+  }
+  function paintInfo() { return { col: S.garage.col, decal: S.garage.decal, logo: S.company.logo }; }
+  function routeStyle(cityId) { return ROUTE_STYLES[(S.garage.routes || {})[cityId]] || ROUTE_STYLES.safe; }
+  function setRouteStyle(cityId, styleId) {
+    if (!ROUTE_STYLES[styleId] || !CITY_BY_ID[cityId]) return false;
+    S.garage.routes[cityId] = styleId;
+    return true;
+  }
+
+  /* ---------- the road: events on it, weather over the towns, our factories in them ---------- */
+  function eventAt(cityId) { return S.road.events.find(e => e.city === cityId) || null; }
+  function townWeather(cityId) { return S.road.weather[cityId] || 'sun'; }
+  function tickRoad(dt) {
+    const R = S.road;
+    R.t -= dt;
+    if (R.t <= 0) {
+      R.t = ROAD.eventEvery * (0.6 + Math.random() * 0.8);
+      const towns = CITIES.filter(c => !eventAt(c.id));
+      if (towns.length && R.events.length < 3) {
+        const c = towns[Math.floor(Math.random() * towns.length)];
+        const ev = ROAD_EVENTS[Math.floor(Math.random() * ROAD_EVENTS.length)];
+        R.events.push({ id: ev.id, city: c.id, t: ev.dur, T: ev.dur });
+        emit('roadevent', { ev, city: c });
+      }
+    }
+    for (let i = R.events.length - 1; i >= 0; i--) { R.events[i].t -= dt; if (R.events[i].t <= 0) R.events.splice(i, 1); }
+    R.wt -= dt;
+    if (R.wt <= 0) {
+      R.wt = ROAD.weatherEvery * (0.5 + Math.random());
+      const c = CITIES[Math.floor(Math.random() * CITIES.length)];
+      R.weather[c.id] = TOWN_WEATHER[Math.floor(Math.random() * TOWN_WEATHER.length)];
+    }
+  }
+  function factoryCost(cityId) { const c = CITY_BY_ID[cityId]; return c ? Math.max(ROAD.factoryMin, Math.round(c.cost * ROAD.factoryCostMult)) : 0; }
+  function canFactory(cityId) { return depotOpen() && S.routes.includes(cityId) && !S.factories[cityId] && S.coins >= factoryCost(cityId); }
+  function buyFactory(cityId) {
+    if (!canFactory(cityId)) return false;
+    S.coins -= factoryCost(cityId);
+    S.factories[cityId] = true;
+    S.stats.factories++;
+    note('factory', 'Opened a factory in ' + CITY_BY_ID[cityId].name + '.');
+    emit('factory', { city: CITY_BY_ID[cityId] });
+    return true;
+  }
+  function factoryIncome() { return Object.keys(S.factories).reduce((a, id) => a + (CITY_BY_ID[id] ? CITY_BY_ID[id].mult * ROAD.factoryIncome : 0), 0); }
+  let factoryAcc = 0;
+  function tickFactories(dt) {
+    const perMin = factoryIncome();
+    if (!perMin) return;
+    factoryAcc += perMin / 60 * dt;
+    if (factoryAcc >= 1) { const n = Math.floor(factoryAcc); factoryAcc -= n; earn(n, 'factories'); }
+  }
+
+  /* ---------- HR: training ---------- */
+  function hasHR() { return Object.keys(S.hrs).length > 0; }
+  function trainCost(w) { return Math.round(150 * Math.pow(1.6, w.trained || 0)); }
+  function canTrain(id, stat) {
+    const w = S.staff.find(x => x.id === id);
+    return !!w && !w.bot && hasHR() && STATS[stat] && (w.st[stat] || 0) < RECRUIT.statMax && S.coins >= trainCost(w);
+  }
+  function trainStaff(id, stat) {
+    if (!canTrain(id, stat)) return false;
+    const w = S.staff.find(x => x.id === id);
+    S.coins -= trainCost(w);
+    w.st[stat] = (w.st[stat] || 0) + 1;
+    w.trained = (w.trained || 0) + 1;
+    w.wage = crewWage(w.st, w.traits);
+    S.stats.trained++;
+    note('train', w.name + ' trained up their ' + STATS[stat].name + '.');
+    emit('train', { w, stat });
+    return true;
+  }
+
+  /* ---------- achievements and the wardrobe ---------- */
+  function achDone(id) { return !!S.ach[id]; }
+  function achProgress(a) { return goalProgress(a.goal); }
+  let achT = 0;
+  function tickAch(dt) {
+    achT += dt;
+    if (achT < 1) return;
+    achT = 0;
+    for (const a of ACHIEVEMENTS) {
+      if (S.ach[a.id]) continue;
+      const [c, n] = achProgress(a);
+      if (c < n) continue;
+      S.ach[a.id] = Date.now();
+      const cos = COSMETICS.filter(k => k.unlock === a.id).map(k => k.id);
+      note('achievement', 'Achievement: ' + a.name + '.');
+      sendPresent({ f: 25, cos, from: a.name, icon: a.icon, ach: a.id });
+      emit('achievement', { a, cos });
+    }
+  }
+  function ownsCosmetic(id) { const c = COSMETIC_BY_ID[id]; return !!c && (c.free || !!S.cosOwned[id]); }
+  function wearCosmetic(id) {
+    const c = COSMETIC_BY_ID[id];
+    if (!c || !ownsCosmetic(id)) return false;
+    S.wardrobe[c.kind] = id;
+    emit('wardrobe', { id });
+    return true;
+  }
+  function wardrobe() { return S.wardrobe; }
+
+  /* ---------- settings ---------- */
+  function setting(k) { return S.settings[k]; }
+  function setSetting(k, v) {
+    if (!(k in SETTINGS_DEFAULT)) return false;
+    S.settings[k] = v;
+    if (k === 'sound') S.muted = !v;
+    emit('settings', { k, v });
+    return true;
+  }
+  /* 0..1 through the ranch's day; a day is one dayT cycle */
+  function dayPhase() { return ((S.dayT || 0) % 300) / 300; }
+
+  /* ---------- completion, for the egg on the save slot ---------- */
+  function completion() {
+    const q = QUESTS.filter(questDone).length / QUESTS.length;
+    const d = S.disc.length / SPECIES_TOTAL;
+    const skMax = SKILLS.reduce((a, sk) => a + (sk.id === 'root' ? 0 : sk.max), 0);
+    const sk = Object.keys(S.sk).filter(id => id !== 'root').reduce((a, id) => a + S.sk[id], 0) / skMax;
+    const ac = Object.keys(S.ach).length / ACHIEVEMENTS.length;
+    const pl = S.plots.filter(Boolean).length / PLOTS.length;
+    const ag = ageIndex() / (AGES.length - 1);
+    return Math.round(100 * (q * 0.3 + d * 0.2 + sk * 0.2 + ac * 0.15 + pl * 0.1 + ag * 0.05));
   }
 
   /* ---------- the ledger and the market ---------- */
@@ -2479,7 +2815,7 @@ const GAME = (() => {
     if (vip) n += 3;
     const unit = Math.round(eggValue(tier, false) * ECON.orderPay * (vip ? ECON.vipPay : 1)
                             * (1 + ECON.billboardPay * billboardPull()));
-    const wait = vip ? ECON.vipTime : ECON.orderTime;
+    const wait = (vip ? ECON.vipTime : ECON.orderTime) * (garageLevel('horn') ? 1.2 : 1);
     return { id: nextId++, tier, n, got: 0, unit, pay: unit * n, t: wait, T: wait, vip,
              who: vip ? pickOne(VIP_NAMES) : pickOne(CUSTOMER_NAMES),
              kind: vip ? 'limo' : pickOne(CUSTOMER_CARS), col: vip ? '#2e2216' : pickOne(CAR_COLS),
@@ -2549,7 +2885,7 @@ const GAME = (() => {
   ];
   function siteTime(type) { return ECON.siteBase + Math.sqrt(BUILDS[type].base) / 3; }
   function siteFor(k) { return S.sites[k] || null; }
-  const STOREY_OK = ['incubator', 'coop', 'barn', 'staffhut', 'silo', 'hq', 'mill', 'well', 'sprinkler', 'beehive', 'trough', 'hatchery', 'lovenest', 'kitchen', 'park', 'timemachine'];
+  const STOREY_OK = ['incubator', 'coop', 'barn', 'staffhut', 'silo', 'hq', 'mill', 'well', 'sprinkler', 'beehive', 'trough', 'hatchery', 'lovenest', 'kitchen', 'park', 'timemachine', 'cannery', 'hr'];
   function storeyMult(k) { return S.storeys && S.storeys[k] ? ECON.storeyMult : 1; }
   function storeyCost(type) { return Math.round(BUILDS[type].base * ECON.storeyCost); }
   function canStorey(k) {
@@ -2678,6 +3014,8 @@ const GAME = (() => {
     else if (type === 'kitchen') S.kitchens[k] = { pantry: [], recipe: 'omelette', cook: null, counter: [], sold: 0 };
     else if (type === 'park') S.parks[k] = { slots: [], t: 0, visitors: 0 };
     else if (type === 'timemachine') S.timemachines[k] = { on: false, t: 0, T: 0, made: 0 };
+    else if (type === 'hr') S.hrs[k] = { built: Date.now() };
+    else if (type === 'cannery') S.canneries[k] = { recipe: 'flour', cook: null, made: 0 };
   }
   function build(type, c, r, dir) {
     const cost = buildCost(type, S.built[type]);
@@ -2781,6 +3119,10 @@ const GAME = (() => {
     } else if (o.type === 'timemachine') {
       if (S.timemachines[k].on) S.fossilCount += ECON.dinoFossils;
       delete S.timemachines[k]; S.built.timemachine = Math.max(0, S.built.timemachine - 1);
+    } else if (o.type === 'hr') {
+      delete S.hrs[k]; S.built.hr = Math.max(0, S.built.hr - 1);
+    } else if (o.type === 'cannery') {
+      delete S.canneries[k]; S.built.cannery = Math.max(0, S.built.cannery - 1);
     }
     S.coins += BUILDS[o.type].refund;
     S.eggs.forEach(e => { if (e.suck === k) e.suck = null; });
@@ -3335,6 +3677,12 @@ const GAME = (() => {
     tickTimeMachines(dt);
     tickAges();
     tickSecrets(dt);
+    tickCanneries(dt);
+    tickRoad(dt);
+    tickFactories(dt);
+    tickLimo(dt);
+    tickPresents(dt);
+    tickAch(dt);
   }
 
   /* ---------- offline ---------- */
@@ -3423,11 +3771,54 @@ const GAME = (() => {
     }
     Object.keys(S.sites).forEach(finishSite);
     S.orders = [];
+    S.limo = null;
+    if (factoryIncome()) earn(Math.round(factoryIncome() / 60 * dt), 'factories');
     S.eggs.forEach(e => { e.z = 0; e.vz = 0; });
     return { seconds: dt, laid, hatched, pay, feathersGot, wages };
   }
 
   /* ---------- save / load ---------- */
+  /* ---------- save slots: three eggs on the menu ---------- */
+  let slot = 0;
+  try { slot = Math.max(0, Math.min(SAVE_SLOTS - 1, +(localStorage.getItem('infEggCo_slot') || 0))); } catch (e) {}
+  function slotKey(i) { return SAVE_KEY + (i ? '_s' + i : ''); }
+  function currentSlot() { return slot; }
+  function saveMeta() {
+    return { name: S.company.name, done: !!S.company.done, pct: completion(), playT: S.playT || 0, coins: S.coins, age: ageIndex(),
+             disc: S.disc.length, logo: S.company.logo, col1: S.company.col1, col2: S.company.col2, at: Date.now(),
+             wardrobe: Object.assign({}, S.wardrobe), quests: QUESTS.filter(questDone).length };
+  }
+  /* what is in a slot, without loading it */
+  function slotInfo(i) {
+    try {
+      const raw = localStorage.getItem(slotKey(i));
+      if (!raw) return null;
+      const d = JSON.parse(raw);
+      if (!d || d.v !== 7) return null;
+      if (d.meta) return d.meta;
+      return { name: (d.company || {}).name || 'INF EGG CO.', done: !!(d.company || {}).done, pct: 0, playT: d.playT || 0, coins: d.coins || 0, age: d.age || 0,
+               disc: (d.disc || []).length, logo: (d.company || {}).logo, col1: (d.company || {}).col1, col2: (d.company || {}).col2, at: d.last || 0, quests: 0 };
+    } catch (e) { return null; }
+  }
+  function setSlot(i) {
+    i = Math.max(0, Math.min(SAVE_SLOTS - 1, i | 0));
+    if (i === slot) return false;
+    save();
+    slot = i;
+    try { localStorage.setItem('infEggCo_slot', String(slot)); } catch (e) {}
+    S = freshState();
+    nextId = 1;
+    if (!load()) { ensureStarterInc(); rebuildOcc(); clampCam(); }
+    mark('skills', 'pedia', 'build', 'ground');
+    emit('slot', { slot });
+    return true;
+  }
+  function deleteSlot(i) {
+    try { localStorage.removeItem(slotKey(i)); } catch (e) {}
+    if (i === slot) reset();
+    emit('slot', { slot });
+    return true;
+  }
   function save() {
     try {
       /* anything in hand goes back to the world first */
@@ -3438,13 +3829,14 @@ const GAME = (() => {
       }
       S.last = Date.now();
       const slim = JSON.parse(JSON.stringify(S));
+      slim.meta = saveMeta();
       slim.eggs.forEach(e => { e.x = Math.round(e.x); e.y = Math.round(e.y); e.z = 0; e.vz = 0; e.suck = null; });
       slim.chickens.forEach(c => { c.x = Math.round(c.x); c.y = Math.round(c.y); c.target = null; });
       slim.items.forEach(i => { i.x = Math.round(i.x); i.y = Math.round(i.y); });
       slim.plumes.forEach(p => { p.x = Math.round(p.x); p.y = Math.round(p.y); p.z = 0; });
       slim.staff.forEach(w => { w.x = Math.round(w.x); w.y = Math.round(w.y); w.target = null; });
       slim.orders.forEach(o => { o.x = Math.round(o.x); o.y = Math.round(o.y); });
-      localStorage.setItem(SAVE_KEY, JSON.stringify(slim));
+      localStorage.setItem(slotKey(slot), JSON.stringify(slim));
       return true;
     } catch (e) { return false; }
   }
@@ -3454,7 +3846,7 @@ const GAME = (() => {
   }
   function load() {
     try {
-      const raw = localStorage.getItem(SAVE_KEY);
+      const raw = localStorage.getItem(slotKey(slot));
       if (!raw) { ensureStarterInc(); rebuildOcc(); return false; }
       const d = JSON.parse(raw);
       if (!d || d.v !== 7) { ensureStarterInc(); rebuildOcc(); return false; }
@@ -3469,7 +3861,22 @@ const GAME = (() => {
       ['huts', 'silos', 'blowers', 'sorters', 'fences', 'hatchers', 'splitters', 'loaders',
        'barns', 'troughs', 'wells', 'sprinklers', 'mills', 'coops', 'boards', 'hqs', 'soil',
        'paint', 'deco', 'polishers', 'graders', 'dynamos', 'beehives', 'genelabs', 'sites', 'storeys', 'quests', 'billboards',
-       'kitchens', 'parks', 'timemachines', 'secrets', 'cooked'].forEach(m => { if (!S[m]) S[m] = {}; });
+       'kitchens', 'parks', 'timemachines', 'secrets', 'cooked', 'hrs', 'canneries', 'pantry', 'goods', 'factories', 'ach', 'cosOwned'].forEach(m => { if (!S[m]) S[m] = {}; });
+      if (!Array.isArray(S.presents)) S.presents = [];
+      if (!Array.isArray(S.limoQueue)) S.limoQueue = [];
+      S.limo = null;
+      S.garage = Object.assign({ col: null, decal: 'none', upg: {}, routes: {} }, S.garage || {});
+      if (!S.garage.upg) S.garage.upg = {};
+      if (!S.garage.routes) S.garage.routes = {};
+      S.road = Object.assign({ events: [], t: 90, weather: {}, wt: 40 }, S.road || {});
+      if (!Array.isArray(S.road.events)) S.road.events = [];
+      if (!S.road.weather) S.road.weather = {};
+      S.wardrobe = Object.assign({}, WARDROBE_DEFAULT, S.wardrobe || {});
+      S.settings = Object.assign({}, SETTINGS_DEFAULT, S.settings || {});
+      S.muted = !S.settings.sound;
+      if (typeof S.premiumT !== 'number') S.premiumT = 0;
+      Object.values(S.canneries).forEach(cn => { if (!GOODS[cn.recipe]) cn.recipe = 'flour'; if (typeof cn.made !== 'number') cn.made = 0; });
+      Object.keys(S.quests).forEach(id => { if (S.quests[id] === true) S.quests[id] = 2; });
       if (!Array.isArray(S.fossils)) S.fossils = [];
       if (!Array.isArray(S.visitors)) S.visitors = [];
       S.visitors = S.visitors.filter(v => v && typeof v.x === 'number' && v.k);
@@ -3534,7 +3941,7 @@ const GAME = (() => {
     ensureStarterInc();
     rebuildOcc();
     clampCam();
-    try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+    try { localStorage.removeItem(slotKey(slot)); } catch (e) {}
     mark('skills', 'pedia', 'build', 'ground');
   }
 
@@ -3584,7 +3991,15 @@ const GAME = (() => {
     vehicle, city, tripPhase, buyVehicle, buyRoute, setRoute, applicantAt, boardSpot,
     note,
     toolOpen, depotOpen, incCapAt,
-    questProgress, questDone, currentQuest,
+    questProgress, questDone, currentQuest, questState, questReady, activeQuests, questObjs, objDone, goalProgress, claimQuest, claimAll,
+    presentAt, openPresent, get limo() { return S.limo; }, get presents() { return S.presents; },
+    pantryCount, goodsCount, pantryTotal, sellProduce, sellGoods, useGoods, canMake, hasCannery, setCanneryRecipe, setAllCanneries, canneryTime,
+    garageLevel, garagePrice, canUpgrade, buyUpgrade, setPaint, paintInfo, routeStyle, setRouteStyle, tripTimeTo, payMultTo,
+    eventAt, townWeather, factoryCost, canFactory, buyFactory, factoryIncome,
+    hasHR, trainCost, canTrain, trainStaff,
+    achDone, achProgress, ownsCosmetic, wearCosmetic, wardrobe,
+    setting, setSetting, dayPhase, completion,
+    currentSlot, slotInfo, setSlot, deleteSlot,
     get cars() { return cars; }, get movers() { return movers; },
     orderAt, orderSpots, giveEgg, basketToOrder, maxOrders, orderWait,
     billboardPull, billboardArt, setBillboardArt,

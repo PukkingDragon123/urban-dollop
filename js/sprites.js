@@ -2731,6 +2731,53 @@ const SPR = (() => {
         R(px0 + Math.floor(pw / 2), py0 - 2, 1, 2, gd);
         R(px0 + 1, py0, 2, 1, ripe ? '#ffd28a' : '#b8e28a');
       }
+    } else if (kind === 'carrot') {
+      /* feathery tops, and the orange shoulder showing once it is ripe */
+      const h = stage === 1 ? 4 : stage === 2 ? 7 : 8;
+      [3, 7, 11].forEach((x, i) => {
+        R(x, 16 - h, 1, h, green); R(x - 1, 16 - h + 1, 1, 2, gl); R(x + 1, 16 - h + 2, 1, 2, green); R(x, 16 - h - 1, 1, 1, gl);
+        if (ripe) { R(x - 1, 15, 3, 2, def.col); R(x, 16, 1, 1, '#c96a1f'); }
+      });
+    } else if (kind === 'potato') {
+      const w = stage === 1 ? 6 : 10, h = stage === 1 ? 4 : 6;
+      const x0 = 8 - w / 2;
+      R(x0, 16 - h, w, h, gd); R(x0 + 1, 16 - h, w - 2, 2, green); R(x0 + 2, 16 - h, 2, 1, gl);
+      if (stage >= 2) { R(x0 + 2, 15 - h, 1, 1, '#f2e2c8'); R(x0 + w - 3, 15 - h, 1, 1, '#f2e2c8'); }
+      if (ripe) for (let i = 0; i < 3; i++) { const bx = x0 + 1 + i * 3; R(bx, 15, 2, 2, def.col); R(bx, 15, 1, 1, '#e8c98a'); }
+    } else if (kind === 'tomato') {
+      /* a staked vine with fruit hanging in pairs */
+      const h = stage === 1 ? 6 : stage === 2 ? 10 : 13;
+      R(8, 16 - h, 1, h, '#8a5e2a'); R(7, 16 - h + 1, 1, h - 1, green);
+      for (let l = 0; l < Math.floor(h / 3); l++) { const ly = 14 - l * 3; R(4 + (l % 2) * 4, ly, 3, 1, green); R(4 + (l % 2) * 4, ly - 1, 1, 1, gl); }
+      if (ripe) for (let i = 0; i < 3; i++) { const ty = 14 - i * 4, tx = i % 2 ? 4 : 10; R(tx, ty, 2, 2, def.col); R(tx, ty, 1, 1, '#ff8a7a'); R(tx, ty - 1, 1, 1, gd); }
+      else if (stage === 2) { R(4, 12, 2, 2, '#8fd14f'); R(10, 9, 2, 2, '#8fd14f'); }
+    } else if (kind === 'cabbage') {
+      const w = stage === 1 ? 5 : stage === 2 ? 8 : 11, h = stage === 1 ? 3 : stage === 2 ? 6 : 8;
+      const x0 = 8 - Math.floor(w / 2);
+      R(x0, 16 - h, w, h, gd); R(x0 + 1, 15 - h, w - 2, 1, gd);
+      R(x0 + 1, 16 - h + 1, w - 2, h - 2, ripe ? def.col : green);
+      R(x0 + 2, 16 - h + 1, w - 4, 1, gl); R(x0 + 1, 16 - h + 2, 1, h - 4, gl);
+      if (ripe) { R(x0 + Math.floor(w / 2) - 1, 16 - h + 2, 3, h - 4, '#c8f0a0'); R(x0 + Math.floor(w / 2), 16 - h + 3, 1, 1, '#fff8ec'); }
+    } else if (kind === 'melon') {
+      /* a vine, then a striped green fruit swelling on it */
+      R(2, 14, 12, 1, gd); R(4, 13, 2, 1, green); R(9, 13, 3, 1, gl);
+      if (stage >= 2) {
+        const pw = ripe ? 10 : 6, ph = ripe ? 7 : 4, px0 = 8 - Math.floor(pw / 2), py0 = 15 - ph;
+        R(px0, py0, pw, ph, def.col); R(px0 + 1, py0 - 1, pw - 2, 1, def.col); R(px0, py0 + ph - 1, pw, 1, '#2f7a3a');
+        for (let sx = px0 + 1; sx < px0 + pw; sx += 3) R(sx, py0, 1, ph, '#8fd14f');
+        R(px0 + 2, py0, 2, 1, '#c8f0a0');
+        if (ripe) { R(px0 + pw - 2, py0 + 1, 1, 1, '#ff6b7a'); }
+      }
+    } else if (kind === 'rice') {
+      /* a paddy: standing water under drooping stalks */
+      R(1, 14, 14, 2, '#5fa8e8'); R(2, 14, 4, 1, '#9fd6ff'); R(9, 15, 3, 1, '#9fd6ff');
+      const h = stage === 1 ? 5 : stage === 2 ? 8 : 10;
+      for (let i = 0; i < 6; i++) {
+        const x = 2 + i * 2 + (i % 2);
+        R(x, 15 - h, 1, h, ripe ? '#c9c07a' : green);
+        if (ripe) { R(x + (i % 2 ? -1 : 1), 15 - h - 1, 1, 3, def.col); R(x, 15 - h - 1, 1, 1, '#fff8ec'); }
+        else if (stage === 2) R(x, 15 - h - 1, 1, 1, gl);
+      }
     } else {
       /* clover */
       const n = stage === 1 ? 3 : 6;
@@ -2790,8 +2837,10 @@ const SPR = (() => {
   /* ============================================================
      VEHICLES - from a bicycle to a private railcar
      ============================================================ */
-  function vehicleSprite(id, frame, scale) {
-    const key = 'veh_' + id + '_' + frame + '_' + scale;
+  function vehicleSprite(id, frame, scale, paint) {
+    const P = paint && paint.col ? paint.col : null;
+    const DEC = paint && paint.decal && paint.decal !== 'none' ? paint.decal : null;
+    const key = 'veh_' + id + '_' + frame + '_' + scale + '_' + (P || '') + '_' + (DEC || '');
     if (cache.has(key)) return cache.get(key);
     const k = scale || 1;
     const dims = { bike: [26, 20], cart: [38, 22], van: [46, 26], truck: [60, 30], lorry: [78, 32], train: [92, 34] }[id] || [60, 30];
@@ -2799,6 +2848,7 @@ const SPR = (() => {
     const ctx = c.getContext('2d');
     const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
     const OUT = '#2e2216';
+    const BODY = P || null, LIT = P ? lighten(P, 0.38) : null, DRK = P ? darken(P, 0.32) : null;
     const wheel = (x, y, r) => {
       R(x - r, y - r + 1, r * 2 + 1, r * 2 - 1, OUT); R(x - r + 1, y - r, r * 2 - 1, r * 2 + 1, OUT);
       R(x - r + 1, y - r + 1, r * 2 - 1, r * 2 - 1, '#3a3a4a');
@@ -2819,7 +2869,7 @@ const SPR = (() => {
       spokeWheel(5, 14, 5); spokeWheel(20, 14, 5);
       /* frame */
       R(5, 14, 1, 1, OUT); R(6, 9, 8, 1, OUT); R(9, 9, 1, 5, OUT); R(13, 8, 1, 6, OUT); R(5, 13, 5, 1, OUT);
-      R(6, 8, 8, 1, '#e8542f'); R(9, 10, 1, 4, '#e8542f'); R(5, 12, 5, 1, '#e8542f');
+      R(6, 8, 8, 1, BODY || '#e8542f'); R(9, 10, 1, 4, BODY || '#e8542f'); R(5, 12, 5, 1, BODY || '#e8542f');
       /* saddle, bars, basket of eggs */
       R(8, 7, 3, 1, OUT); R(13, 6, 3, 1, OUT); R(15, 5, 1, 2, OUT);
       R(17, 3, 8, 5, OUT); R(18, 4, 6, 3, '#c9924f'); R(18, 4, 6, 1, '#e0bd82');
@@ -2827,7 +2877,7 @@ const SPR = (() => {
     } else if (id === 'cart') {
       spokeWheel(5, 16, 5); spokeWheel(17, 16, 4);
       R(5, 16, 1, 1, OUT); R(6, 11, 6, 1, OUT); R(8, 11, 1, 5, OUT); R(5, 15, 4, 1, OUT);
-      R(6, 10, 6, 1, '#e8542f'); R(8, 12, 1, 4, '#e8542f');
+      R(6, 10, 6, 1, BODY || '#e8542f'); R(8, 12, 1, 4, BODY || '#e8542f');
       R(7, 9, 3, 1, OUT); R(11, 8, 3, 1, OUT);
       /* trailer crate */
       R(21, 8, 16, 10, OUT); R(22, 9, 14, 8, '#c9924f'); R(22, 9, 14, 1, '#e0bd82');
@@ -2837,7 +2887,7 @@ const SPR = (() => {
       wheel(30, 18, 3);
     } else if (id === 'van') {
       /* body */
-      R(1, 8, 44, 14, OUT); R(2, 9, 42, 12, '#7fc4e8'); R(2, 9, 42, 2, '#b5e0f5'); R(2, 19, 42, 2, '#4a86a8');
+      R(1, 8, 44, 14, OUT); R(2, 9, 42, 12, BODY || '#7fc4e8'); R(2, 9, 42, 2, LIT || '#b5e0f5'); R(2, 19, 42, 2, DRK || '#4a86a8');
       /* cab window */
       R(33, 10, 9, 6, OUT); R(34, 11, 7, 4, '#d8f2fa'); R(34, 11, 3, 1, '#ffffff');
       R(2, 11, 28, 6, '#fff8ee'); R(3, 12, 26, 4, '#5fa8e8');
@@ -2852,22 +2902,22 @@ const SPR = (() => {
       R(1, 5, 32, 1, '#e0bd82'); R(1, 23, 32, 2, '#7a5230');
       for (let i = 0; i < 4; i++) R(3 + i * 9, 5, 1, 20, '#8a5e2a');
       /* cab */
-      R(34, 9, 24, 16, OUT); R(35, 10, 22, 14, '#3f6fd6'); R(35, 10, 22, 2, '#6f9af0'); R(35, 22, 22, 2, '#2a4a9e');
+      R(34, 9, 24, 16, OUT); R(35, 10, 22, 14, BODY || '#3f6fd6'); R(35, 10, 22, 2, LIT || '#6f9af0'); R(35, 22, 22, 2, DRK || '#2a4a9e');
       R(37, 11, 12, 7, OUT); R(38, 12, 10, 5, '#d8f2fa'); R(38, 12, 4, 1, '#ffffff');
       R(55, 19, 3, 3, '#ffd23f'); R(52, 16, 4, 1, '#c9ced6');
       wheel(8, 26, 3); wheel(26, 26, 3); wheel(50, 26, 3);
     } else if (id === 'lorry') {
       R(0, 2, 52, 24, OUT); R(1, 3, 50, 22, '#e8e2d0'); R(1, 3, 50, 2, '#fff8ee'); R(1, 23, 50, 2, '#b8b0a0');
-      R(4, 8, 44, 8, '#e8542f'); R(4, 8, 44, 1, '#ff8f6a');
+      R(4, 8, 44, 8, BODY || '#e8542f'); R(4, 8, 44, 1, LIT || '#ff8f6a');
       R(20, 10, 6, 5, '#fff8ee'); R(21, 9, 4, 1, '#fff8ee');
-      R(52, 10, 25, 16, OUT); R(53, 11, 23, 14, '#e8542f'); R(53, 11, 23, 2, '#ff8f6a'); R(53, 23, 23, 2, '#a83a22');
+      R(52, 10, 25, 16, OUT); R(53, 11, 23, 14, BODY || '#e8542f'); R(53, 11, 23, 2, LIT || '#ff8f6a'); R(53, 23, 23, 2, DRK || '#a83a22');
       R(56, 12, 12, 7, OUT); R(57, 13, 10, 5, '#d8f2fa'); R(57, 13, 4, 1, '#ffffff');
       R(74, 20, 3, 3, '#ffd23f'); R(52, 2, 3, 8, '#8a9099');
       wheel(8, 28, 3); wheel(18, 28, 3); wheel(40, 28, 3); wheel(66, 28, 3);
     } else {
       /* railcar */
       R(0, 30, 92, 2, '#8a9099'); for (let i = 0; i < 92; i += 6) R(i, 32, 3, 1, '#5e3d18');
-      R(2, 4, 62, 24, OUT); R(3, 5, 60, 22, '#3f6fd6'); R(3, 5, 60, 2, '#6f9af0'); R(3, 25, 60, 2, '#2a4a9e');
+      R(2, 4, 62, 24, OUT); R(3, 5, 60, 22, BODY || '#3f6fd6'); R(3, 5, 60, 2, LIT || '#6f9af0'); R(3, 25, 60, 2, DRK || '#2a4a9e');
       for (let i = 0; i < 6; i++) { R(6 + i * 10, 9, 7, 7, OUT); R(7 + i * 10, 10, 5, 5, '#d8f2fa'); R(7 + i * 10, 10, 2, 1, '#ffffff'); }
       R(3, 18, 60, 3, '#ffd23f');
       R(64, 8, 26, 20, OUT); R(65, 9, 24, 18, '#2e2216'); R(66, 10, 22, 16, '#3a3a4a'); R(66, 10, 22, 2, '#6a6f78');
@@ -2875,6 +2925,18 @@ const SPR = (() => {
       R(80, 12, 8, 8, OUT); R(81, 13, 6, 6, '#d8f2fa');
       R(86, 22, 4, 4, '#ffd23f');
       wheel(10, 28, 3); wheel(22, 28, 3); wheel(46, 28, 3); wheel(58, 28, 3); wheel(72, 28, 3); wheel(84, 28, 3);
+    }
+    /* a decal on the flank, for anything with a flank */
+    if (DEC) {
+      const spot = { van: [20, 12], truck: [10, 12], lorry: [30, 17], train: [30, 21], cart: [23, 11] }[id];
+      if (spot) {
+        const [dx, dy] = spot;
+        if (DEC === 'egg') { R(dx, dy, 3, 4, '#fff8ee'); R(dx + 1, dy - 1, 1, 1, '#fff8ee'); R(dx + 1, dy + 4, 1, 1, '#fff8ee'); R(dx + 1, dy + 1, 1, 1, '#ffd23f'); }
+        else if (DEC === 'stripe') { R(dx - 8, dy + 1, 20, 1, '#fff8ee'); R(dx - 8, dy + 3, 20, 1, LIT || '#ffd23f'); }
+        else if (DEC === 'flames') { for (let i = 0; i < 5; i++) { R(dx - 6 + i * 3, dy + 3 - (i % 2), 2, 2 + (i % 2), '#f0a422'); R(dx - 6 + i * 3, dy + 4, 2, 1, '#e8542f'); } }
+        else if (DEC === 'stars') { [[0, 0], [5, 2], [10, -1]].forEach(([sx, sy]) => { R(dx + sx, dy + sy + 1, 3, 1, '#ffd23f'); R(dx + sx + 1, dy + sy, 1, 3, '#ffd23f'); }); }
+        else if (DEC === 'logo' && paint.logo) { ctx.drawImage(iconSprite(paint.logo, k), dx * k, (dy - 2) * k); }
+      }
     }
     cache.set(key, c);
     return c;
@@ -3095,8 +3157,11 @@ const SPR = (() => {
 
   /* ============================================================
      THE RACCOON - who inherited the farm and means to get rich.
-     20 x 26, facing right. Poses: stand, walk0, walk1, read,
-     cheer, boss (top hat and tie).
+     A 20 x 22 body on a canvas with six rows of headroom for a hat,
+     dressed from a wardrobe record { hat, suit, glasses, acc } and
+     posed. The wide poses (dancing, chopping, hammering, punching,
+     the guitar) get a 32-wide canvas and report where the body sits
+     on it as .ox, so a caller can keep the feet where they were.
      ============================================================ */
   const RACCOON_ROWS = [
     '......oo......oo....',
@@ -3123,35 +3188,316 @@ const SPR = (() => {
     '...oooo.oooo..oooo..',
   ];
   const RACCOON_PAL = { o: '#1e1a1e', g: '#8a8f98', G: '#c9cdd4', k: '#2c2a36', w: '#ffffff', n: '#1a1a1a', p: '#d98a8a', t: '#4d4f58' };
-  function raccoonSprite(pose, scale) {
-    const key = 'racc_' + pose + '_' + scale;
+  const RAC_OFF = 6;                       /* rows of headroom above the ears */
+  const WIDE_POSES = ['dance0', 'dance1', 'dance2', 'guitar0', 'guitar1', 'chop0', 'chop1', 'hammer0', 'hammer1', 'punch0', 'punch1'];
+  function outfitOf(w) {
+    const o = Object.assign({}, (typeof WARDROBE_DEFAULT !== 'undefined' ? WARDROBE_DEFAULT : {}), w || {});
+    const suit = (typeof COSMETIC_BY_ID !== 'undefined' && COSMETIC_BY_ID[o.suit]) || { col: '#2c2a36', trim: '#e8542f' };
+    return { hat: o.hat || 'hat_top', suit, glasses: o.glasses || 'gl_none', acc: o.acc || 'acc_coin' };
+  }
+  function raccoonSprite(pose, scale, wardrobe) {
+    pose = pose || 'stand';
+    const of = outfitOf(wardrobe);
+    const key = 'racc2_' + pose + '_' + scale + '_' + of.hat + of.suit.id + of.glasses + of.acc;
     if (cache.has(key)) return cache.get(key);
     const k = scale || 1;
-    const c = newCanvas(20 * k, 26 * k);
+    const wide = WIDE_POSES.includes(pose);
+    const ox = wide ? 6 : 0;
+    const c = newCanvas((wide ? 32 : 20) * k, (22 + RAC_OFF) * k);
+    c.ox = ox;
     const ctx = c.getContext('2d');
-    const OFF = 4;   /* room above the head for a hat */
-    drawGrid(ctx, RACCOON_ROWS, RACCOON_PAL, 0, OFF, k);
-    const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, (y + OFF) * k, w * k, h * k); };
+    const R = (x, y, w, h, col) => { if (!col) return; ctx.fillStyle = col; ctx.fillRect((x + ox) * k, (y + RAC_OFF) * k, w * k, h * k); };
+    const CLR = (x, y, w, h) => ctx.clearRect((x + ox) * k, (y + RAC_OFF) * k, w * k, h * k);
     const O = RACCOON_PAL.o, g = RACCOON_PAL.g, G = RACCOON_PAL.G;
-    /* arms */
+    const suitCol = of.suit.col || '#2c2a36', trim = of.suit.trim || '#e8542f';
+    const suitLit = lighten(suitCol, 0.22), suitDk = darken(suitCol, 0.3);
+    const green = of.suit.id === 'suit_green';
+    const paw = green ? '#3fa85f' : g;
+    const dancing = pose.startsWith('dance') || pose.startsWith('guitar');
+
+    /* ---- the body ---- */
+    drawGrid(ctx, RACCOON_ROWS, RACCOON_PAL, ox * k, RAC_OFF * k, k);
+    /* legs apart while dancing, one foot up */
+    if (dancing) {
+      CLR(7, 18, 12, 4);
+      const lift = pose === 'dance1' || pose === 'guitar1' ? 1 : 0;
+      R(6, 18 - lift, 4, 3, O); R(7, 18 - lift, 2, 2, g); R(6, 20 - lift, 4, 1, O);
+      R(14, 18 + (lift ? 0 : -1), 4, 3, O); R(15, 18 + (lift ? 0 : -1), 2, 2, g); R(14, 20 + (lift ? 0 : -1), 4, 1, O);
+      R(9, 18, 5, 1, suitDk);
+    }
+    if (pose === 'walk1') { CLR(8, 19, 4, 3); R(8, 18, 4, 3, O); R(9, 18, 2, 2, g); }
+    /* ---- the suit: a jacket over the torso, a shirt and a tie ---- */
+    R(7, 12, 9, 1, suitCol); R(6, 13, 11, 4, suitCol); R(8, 17, 8, 1, suitDk);
+    R(6, 13, 1, 4, suitLit); R(7, 12, 9, 1, suitLit);
+    R(10, 12, 3, 5, '#fff8ec');
+    R(9, 12, 1, 3, suitDk); R(13, 12, 1, 3, suitDk);
+    R(11, 13, 1, 4, trim); R(11, 12, 1, 1, darken(trim, 0.3));
+    if (green) { R(7, 14, 1, 1, '#fff8ec'); R(15, 15, 1, 1, '#fff8ec'); }
+    else { R(8, 15, 1, 1, trim); }
+    /* trousers */
+    R(8, 18, 3, 1, suitDk); R(14, 18, 3, 1, suitDk);
+
+    /* ---- arms, per pose ---- */
+    const arm = (x, y, h) => { R(x, y, 2, h, O); R(x, y + 1, 1, h - 2, suitCol); R(x, y + h - 1, 2, 1, paw); };
+    const fist = (x, y) => { R(x, y, 3, 3, O); R(x + 1, y + 1, 1, 1, paw); };
     if (pose === 'cheer') {
-      R(4, 8, 2, 6, O); R(5, 9, 1, 4, g); R(17, 8, 2, 6, O); R(17, 9, 1, 4, g);
-      R(3, 7, 3, 2, O); R(4, 7, 1, 1, G); R(17, 7, 3, 2, O); R(18, 7, 1, 1, G);
+      R(4, 8, 2, 6, O); R(5, 9, 1, 4, suitCol); R(17, 8, 2, 6, O); R(17, 9, 1, 4, suitCol);
+      R(3, 7, 3, 2, O); R(4, 7, 1, 1, paw); R(17, 7, 3, 2, O); R(18, 7, 1, 1, paw);
     } else if (pose === 'read') {
       R(7, 13, 10, 7, O); R(8, 14, 8, 5, '#fff8ec'); R(9, 15, 6, 1, '#b8b0a0'); R(9, 17, 4, 1, '#b8b0a0');
-      R(6, 15, 2, 4, O); R(7, 16, 1, 2, g); R(16, 15, 2, 4, O); R(16, 16, 1, 2, g);
-    } else if (pose === 'boss') {
-      R(10, 12, 3, 5, O); R(11, 12, 1, 4, '#e8542f');
-      R(4, 0, 12, 2, O); R(5, 0, 10, 1, '#2e2216'); R(6, -4, 8, 5, O); R(7, -3, 6, 4, '#2e2216'); R(7, -1, 6, 1, '#e8542f');
-      R(15, 12, 3, 5, O); R(16, 13, 1, 3, g); R(15, 10, 4, 4, O); R(16, 11, 2, 2, '#ffd23f');
+      R(6, 15, 2, 4, O); R(7, 16, 1, 2, paw); R(16, 15, 2, 4, O); R(16, 16, 1, 2, paw);
+    } else if (pose === 'dance0') { R(3, 9, 2, 5, O); R(3, 10, 1, 3, suitCol); fist(2, 7); arm(17, 13, 5); }
+    else if (pose === 'dance1') { R(3, 8, 2, 5, O); R(3, 9, 1, 3, suitCol); fist(2, 6); R(18, 8, 2, 5, O); R(18, 9, 1, 3, suitCol); fist(18, 6); }
+    else if (pose === 'dance2') { arm(5, 13, 5); R(18, 9, 2, 5, O); R(18, 10, 1, 3, suitCol); fist(18, 7); }
+    else if (pose.startsWith('guitar')) {
+      /* a red flying-V slung across him, one paw on the neck, one strumming */
+      const strum = pose === 'guitar1' ? 1 : 0;
+      R(3, 11, 14, 1, '#3a2a16');                          /* strap */
+      R(9, 13, 9, 6, O); R(10, 14, 7, 4, '#c9302f'); R(16, 13, 6, 3, O); R(16, 14, 5, 1, '#c9302f');
+      R(10, 14, 7, 1, '#ff6b5a'); R(12, 16, 3, 1, '#ffd23f'); R(13, 15, 1, 3, '#2e2216');
+      R(-3, 7, 13, 2, O); R(-2, 8, 11, 1, '#5e3d18'); for (let i = 0; i < 5; i++) R(-2 + i * 2, 7, 1, 1, '#c9ced6');
+      R(-5, 6, 3, 4, O); R(-4, 7, 1, 2, '#c9302f');
+      R(4, 9, 2, 5, O); R(4, 10, 1, 3, suitCol); R(2, 6, 3, 3, O); R(3, 7, 1, 1, paw);   /* neck hand */
+      R(16, 12 + strum, 2, 4, O); R(16, 13 + strum, 1, 2, suitCol); R(14, 15 + strum, 3, 2, O); R(15, 15 + strum, 1, 1, paw);
+    } else if (pose === 'chop0') {
+      /* axe raised behind the head */
+      R(16, 5, 2, 8, O); R(16, 6, 1, 6, suitCol); fist(16, 3);
+      R(18, -2, 1, 7, '#8a5e2a'); R(17, -2, 1, 1, O); R(15, -6, 5, 4, O); R(16, -5, 3, 2, '#c9ced6'); R(16, -5, 3, 1, '#eef2f6');
+      arm(6, 13, 5);
+    } else if (pose === 'chop1') {
+      /* axe swung down and out to the right */
+      R(16, 12, 2, 4, O); R(16, 13, 1, 2, suitCol); fist(17, 14);
+      R(19, 15, 6, 1, '#8a5e2a'); R(24, 13, 4, 5, O); R(25, 14, 2, 3, '#c9ced6'); R(25, 14, 1, 3, '#eef2f6');
+      arm(6, 12, 5);
+    } else if (pose === 'hammer0') {
+      R(16, 5, 2, 8, O); R(16, 6, 1, 6, suitCol); fist(16, 3);
+      R(18, -1, 1, 6, '#8a5e2a'); R(15, -4, 7, 3, O); R(16, -3, 5, 1, '#a8adb8');
+      arm(6, 13, 5);
+    } else if (pose === 'hammer1') {
+      R(16, 12, 2, 4, O); R(16, 13, 1, 2, suitCol); fist(17, 14);
+      R(19, 16, 5, 1, '#8a5e2a'); R(22, 14, 4, 5, O); R(23, 15, 2, 3, '#a8adb8');
+      arm(6, 12, 5);
+    } else if (pose === 'punch0') {
+      /* wound up: fist pulled back by the ear */
+      R(4, 10, 2, 4, O); R(4, 11, 1, 2, suitCol); fist(1, 9);
+      arm(17, 13, 5);
+    } else if (pose === 'punch1') {
+      /* the punch: an arm straight out to the right, a fist at the end */
+      R(17, 12, 8, 2, O); R(17, 13, 7, 1, suitCol); fist(24, 11);
+      R(22, 11, 3, 1, '#fff8ec');
+      arm(5, 13, 5);
     } else {
-      R(6, 13, 2, 5, O); R(6, 14, 1, 3, g); R(17, 13, 2, 5, O); R(17, 14, 1, 3, g);
+      /* standing, walking, boss: arms down, something in the right paw */
+      arm(6, 13, 5);
+      if (of.acc === 'acc_coin') { R(15, 12, 3, 5, O); R(16, 13, 1, 3, suitCol); R(15, 10, 4, 4, O); R(16, 11, 2, 2, '#ffd23f'); }
+      else if (of.acc === 'acc_egg') { R(15, 12, 3, 5, O); R(16, 13, 1, 3, suitCol); R(15, 9, 4, 5, O); R(16, 10, 2, 3, '#ffd23f'); R(16, 10, 1, 1, '#fff3c4'); }
+      else if (of.acc === 'acc_cane') { arm(17, 13, 5); R(19, 11, 1, 10, '#5e3d18'); R(18, 10, 3, 1, '#ffd23f'); }
+      else if (of.acc === 'acc_axe') { arm(17, 12, 5); R(19, 8, 1, 10, '#8a5e2a'); R(17, 7, 4, 3, O); R(18, 8, 2, 1, '#c9ced6'); }
+      else if (of.acc === 'acc_guitar') { R(3, 11, 14, 1, '#3a2a16'); R(9, 14, 9, 5, O); R(10, 15, 7, 3, '#c9302f'); R(10, 15, 7, 1, '#ff6b5a'); R(13, 15, 1, 3, '#2e2216'); R(0, 9, 11, 2, O); R(1, 10, 9, 1, '#5e3d18'); arm(17, 12, 5); }
+      else arm(17, 13, 5);
     }
-    if (pose === 'walk1') { ctx.clearRect(8 * k, (19 + OFF) * k, 4 * k, 3 * k); R(8, 18, 4, 3, O); R(9, 18, 2, 2, g); }
+
+    /* ---- glasses over the eyes (which sit at row 6, x 7 and 15) ---- */
+    if (of.glasses === 'gl_round') {
+      const fr = '#c9a35f';
+      [6, 14].forEach(x => { R(x, 5, 3, 1, fr); R(x, 7, 3, 1, fr); R(x, 6, 1, 1, fr); R(x + 2, 6, 1, 1, fr); });
+      R(9, 6, 5, 1, fr);
+    } else if (of.glasses === 'gl_star') {
+      [6, 14].forEach(x => { R(x - 1, 4, 5, 5, '#7fe8ff'); R(x, 5, 3, 3, '#3fa7d6'); R(x, 5, 1, 1, '#ffffff'); R(x + 2, 7, 1, 1, '#c9f4ff'); });
+      R(10, 6, 3, 1, '#7fe8ff'); R(4, 5, 1, 1, '#ffffff'); R(18, 4, 1, 1, '#ffffff');
+    } else if (of.glasses === 'gl_shades') {
+      R(5, 5, 5, 3, '#14141c'); R(13, 5, 5, 3, '#14141c'); R(10, 6, 3, 1, '#14141c'); R(6, 5, 1, 1, '#5a5a6a'); R(14, 5, 1, 1, '#5a5a6a');
+    }
+
+    /* ---- the hat, on the ears ---- */
+    const H = of.hat;
+    if (H === 'hat_top') {
+      R(4, 0, 12, 2, O); R(5, 0, 10, 1, '#2e2216');
+      R(6, -5, 8, 6, O); R(7, -4, 6, 5, '#2e2216'); R(7, -4, 1, 5, '#443a44'); R(7, -1, 6, 1, trim);
+    } else if (H === 'hat_cap') {
+      R(5, -1, 10, 3, O); R(6, -1, 8, 2, suitCol); R(6, -1, 8, 1, suitLit); R(13, 1, 5, 1, O); R(13, 0, 4, 1, suitDk);
+    } else if (H === 'hat_straw') {
+      R(3, 1, 14, 1, O); R(4, 1, 12, 1, '#e0bd82'); R(6, -2, 8, 3, O); R(7, -2, 6, 3, '#e0bd82'); R(7, -2, 6, 1, '#f2dcb0'); R(7, 0, 6, 1, '#c9a35f');
+    } else if (H === 'hat_crown') {
+      R(6, -3, 8, 4, O); R(7, -2, 6, 3, '#ffd23f'); R(7, -2, 6, 1, '#fff3c4');
+      R(6, -5, 2, 2, O); R(9, -5, 2, 2, O); R(12, -5, 2, 2, O); R(7, -5, 1, 2, '#ffd23f'); R(10, -5, 1, 2, '#ffd23f'); R(12, -5, 1, 2, '#ffd23f');
+      R(8, -1, 1, 1, '#e8542f'); R(11, -1, 1, 1, '#3fa7d6');
+    } else if (H === 'hat_beanie') {
+      R(5, -2, 10, 3, O); R(6, -2, 8, 2, '#6a7ac9'); R(6, -2, 8, 1, '#8f9ee0'); R(6, 0, 8, 1, '#4a5a9e'); R(9, -4, 2, 2, '#fff8ec');
+    } else if (H === 'hat_wizard') {
+      const wc = '#4a3a9e';
+      R(9, -6, 2, 1, O); R(8, -5, 4, 1, O); R(9, -5, 2, 1, wc); R(7, -4, 6, 1, O); R(8, -4, 4, 1, wc);
+      R(6, -3, 8, 1, O); R(7, -3, 6, 1, wc); R(5, -2, 10, 2, O); R(6, -2, 8, 2, wc); R(3, 0, 14, 1, O); R(4, 0, 12, 1, wc);
+      R(9, -3, 1, 1, '#ffd23f'); R(11, -1, 1, 1, '#ffd23f');
+    } else if (H === 'hat_cowboy') {
+      R(2, 1, 16, 1, O); R(3, 1, 14, 1, '#a8783f'); R(6, -3, 8, 4, O); R(7, -2, 6, 3, '#a8783f'); R(7, -2, 6, 1, '#c9924f'); R(7, 0, 6, 1, '#3a2a16'); R(9, -3, 2, 1, '#a8783f');
+    } else if (H === 'hat_halo') {
+      R(5, -4, 10, 1, '#ffd23f'); R(4, -3, 1, 1, '#ffd23f'); R(15, -3, 1, 1, '#ffd23f'); R(5, -2, 10, 1, '#ffd23f'); R(6, -3, 8, 1, '#fff3c4');
+    } else if (H === 'hat_chef') {
+      R(5, -1, 10, 2, O); R(6, -1, 8, 2, '#e8dcc0'); R(4, -5, 12, 4, O); R(5, -4, 10, 3, '#fff8ec'); R(5, -4, 10, 1, '#ffffff'); R(8, -5, 4, 1, '#fff8ec');
+    }
     cache.set(key, c);
     return c;
   }
 
+  /* ============================================================
+     THE OVERHAUL'S SMALL ART - tool icons big enough to read, the
+     pantry's produce and goods, the limousine's present, a HELP
+     WANTED poster, a soft shadow and a bar everything shares.
+     ============================================================ */
+  const TOOL_ICONS = {
+    hand: [
+      '.....oo.......', '....owwo..oo..', '....owwo.owwo.', '....owwooowwoo', 'oo..owwowwowwo',
+      'owoowwwwwwwwwo', 'owwowwwwwwwwwo', '.owwwwwwwwwwwo', '.owwwwwwwwwwo.', '..owwwwwwwwwo.',
+      '..owwwwwwwwwo.', '...owwwwwwwo..', '...oSSSSSSSo..', '....ooooooo...'],
+    basket: [
+      '.....oooo.....', '....oNNNNo....', '...oN....No...', '...oN....No...', 'ooooNooooNoooo',
+      'ossssssssssssso', 'oNnNnNnNnNnNno', 'onNnNnNnNnNnNo', 'oNnNnNnNnNnNno', '.onNnNnNnNnNo.',
+      '.oNnNnNnNnNno.', '..onNnNnNnNo..', '..oNNNNNNNNo..', '...oooooooo...'],
+    bowl: [
+      '......oo......', '.....onno.....', '....on..no....', '...onnnnnno...', '..onsssssssno.',
+      '.ossyysyyssso.', 'ossyyssyysyyso', 'oNNNNNNNNNNNNo', 'oNnnnnnnnnnnNo', '.oNnnnnnnnnNo.',
+      '.oNNnnnnnnNNo.', '..oNNNNNNNNo..', '...oNNNNNNo...', '....oooooo....'],
+    hoe: [
+      '...........oo.', '..........onno', '.........onno.', '........onno..', '.......onno...',
+      '......onno....', '.....onno.....', '....onno......', 'ooooonno......', 'oggggnno......',
+      'ogggggo.......', 'oggggo........', 'ooooo.........', '..............'],
+    hammer: [
+      '.....ooooooo..', '....oWWWWWWWo.', '....oWmmmmmWo.', '....oWmmmmmWo.', '....oggmmmgoo.',
+      '.....oonnnoo..', '.......onNo...', '.......onNo...', '.......onNo...', '.......onNo...',
+      '.......onNo...', '.......onNo...', '.......onNo...', '........oo....'],
+    magnify: [
+      '...ooooo......', '..obbbbbo.....', '.obwwbbbbo....', 'obwbbbbbbbo...', 'obbbbbbbbbo...',
+      'obbbbbbbbbo...', 'obbbbbbbbbo...', '.obbbbbbbo....', '..obbbbboo....', '...oooooono...',
+      '........onno..', '.........onno.', '..........onno', '...........oo.'],
+  };
+  const TOOL_PAL = Object.assign({}, IP, { S: '#c9b8a4', N: '#7a5230', n: '#c9924f', s: '#f2e2c8', W: '#d8dde6', m: '#a8adb8' });
+  function toolIconSprite(name, scale) {
+    const key = 'tool_' + name + '_' + scale;
+    if (cache.has(key)) return cache.get(key);
+    const rows = TOOL_ICONS[name] || TOOL_ICONS.hand;
+    const k = scale || 1;
+    const c = newCanvas(14 * k, 14 * k);
+    drawGrid(c.getContext('2d'), rows, TOOL_PAL, 0, 0, k);
+    cache.set(key, c);
+    return c;
+  }
+
+  /* produce: a 10x10 tile per crop's harvest */
+  function produceSprite(id, scale) {
+    const key = 'prod_' + id + '_' + scale;
+    if (cache.has(key)) return cache.get(key);
+    const P = (typeof PRODUCE !== 'undefined' && PRODUCE[id]) || { col: '#c9a35f' };
+    const k = scale || 1;
+    const c = newCanvas(10 * k, 10 * k);
+    const ctx = c.getContext('2d');
+    const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
+    const col = P.col, lit = lighten(col, 0.4), dk = darken(col, 0.35), O = '#2e2216';
+    if (id === 'wheat' || id === 'rice' || id === 'sunseeds') {
+      /* a sheaf */
+      for (let i = 0; i < 4; i++) { R(2 + i * 2, 4 - (i % 2), 1, 6, dk); R(1 + i * 2, 1 + (i % 2), 3, 3, col); R(2 + i * 2, 1 + (i % 2), 1, 1, lit); }
+      R(1, 7, 8, 1, '#8a5e2a');
+    } else if (id === 'corn') {
+      R(3, 0, 4, 9, O); R(4, 1, 2, 7, col); R(4, 1, 1, 7, lit); R(2, 3, 2, 6, '#6ab04c'); R(6, 4, 2, 5, '#6ab04c'); R(4, 3, 2, 1, dk); R(4, 5, 2, 1, dk);
+    } else if (id === 'carrots' || id === 'chilis') {
+      R(4, 0, 2, 2, '#6ab04c'); R(3, 0, 1, 1, '#8fd14f'); R(3, 2, 4, 6, O); R(4, 3, 2, 4, col); R(4, 3, 1, 4, lit); R(4, 7, 2, 2, O); R(4, 8, 1, 1, dk);
+    } else if (id === 'berries' || id === 'strawberries') {
+      [[2, 3], [5, 2], [4, 6], [7, 5]].forEach(([x, y]) => { R(x, y, 3, 3, O); R(x + 1, y + 1, 1, 1, col); R(x + 1, y, 1, 1, lit); });
+      R(4, 1, 2, 1, '#6ab04c');
+    } else {
+      /* round things: tomato, cabbage, melon, pumpkin, potatoes */
+      R(2, 2, 6, 6, O); R(1, 3, 8, 4, O); R(3, 1, 4, 8, O);
+      R(3, 2, 4, 6, col); R(2, 3, 6, 4, col); R(3, 2, 2, 1, lit); R(2, 3, 1, 2, lit); R(3, 7, 4, 1, dk); R(7, 4, 1, 3, dk);
+      if (id === 'melon') { R(4, 2, 1, 6, '#8fd14f'); R(6, 3, 1, 4, '#8fd14f'); }
+      if (id === 'pumpkin') { R(5, 2, 1, 6, dk); R(4, 0, 2, 2, '#5e3d18'); }
+      if (id === 'tomato') { R(4, 1, 2, 1, '#6ab04c'); }
+      if (id === 'cabbage') { R(4, 4, 2, 2, '#e0f8c0'); }
+    }
+    cache.set(key, c);
+    return c;
+  }
+  /* goods: jars, bags, boxes, a pie */
+  function goodsSprite(id, scale) {
+    const key = 'goods_' + id + '_' + scale;
+    if (cache.has(key)) return cache.get(key);
+    const G = (typeof GOODS !== 'undefined' && GOODS[id]) || { col: '#c9a35f' };
+    const k = scale || 1;
+    const c = newCanvas(10 * k, 10 * k);
+    const ctx = c.getContext('2d');
+    const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
+    const col = G.col, O = '#2e2216';
+    if (id === 'jam' || id === 'hotsauce' || id === 'juice') {
+      R(3, 0, 4, 2, O); R(4, 0, 2, 1, '#c9a35f'); R(2, 2, 6, 8, O); R(3, 3, 4, 6, col); R(3, 3, 1, 6, lighten(col, 0.4)); R(3, 5, 4, 2, '#fff8ec'); R(4, 6, 2, 1, darken(col, 0.4));
+    } else if (id === 'flour' || id === 'superfeed' || id === 'ricecake') {
+      R(2, 1, 6, 9, O); R(3, 2, 4, 7, col); R(3, 2, 1, 7, lighten(col, 0.2)); R(3, 1, 4, 1, '#8a5e2a'); R(4, 4, 2, 2, id === 'superfeed' ? '#e8542f' : '#3fa7d6');
+    } else if (id === 'pie') {
+      R(1, 4, 8, 5, O); R(2, 5, 6, 3, '#e0bd82'); R(2, 2, 6, 3, O); R(3, 3, 4, 2, col); R(3, 3, 1, 1, lighten(col, 0.4)); R(4, 1, 2, 1, 'rgba(255,255,255,.7)');
+    } else if (id === 'slaw') {
+      R(1, 4, 8, 5, O); R(2, 5, 6, 3, '#fff8ec'); R(2, 3, 6, 2, col); R(3, 2, 4, 1, col); R(4, 3, 1, 1, '#f0872f');
+    } else {
+      R(1, 2, 8, 8, O); R(2, 3, 6, 6, col); R(2, 3, 6, 1, lighten(col, 0.4)); R(3, 5, 4, 2, '#e8542f'); R(4, 5, 2, 1, '#fff8ec');
+    }
+    cache.set(key, c);
+    return c;
+  }
+  /* the present the limousine leaves: a box, a ribbon and a bow */
+  function presentSprite(scale, col1, col2, open) {
+    const c1 = col1 || '#e8542f', c2 = col2 || '#ffd23f';
+    const key = 'gift_' + scale + c1 + c2 + (open ? 'o' : '');
+    if (cache.has(key)) return cache.get(key);
+    const k = scale || 1;
+    const c = newCanvas(14 * k, 14 * k);
+    const ctx = c.getContext('2d');
+    const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
+    const O = '#2e2216';
+    R(1, 5, 12, 9, O); R(2, 6, 10, 7, c1); R(2, 6, 10, 1, lighten(c1, 0.35)); R(2, 12, 10, 1, darken(c1, 0.3));
+    R(6, 6, 2, 7, c2); R(2, 9, 10, 1, c2);
+    if (open) { R(1, 4, 12, 2, O); R(2, 4, 10, 1, darken(c1, 0.3)); R(4, 1, 6, 3, 'rgba(255,255,255,.5)'); }
+    else { R(1, 3, 12, 3, O); R(2, 4, 10, 1, lighten(c1, 0.2)); R(6, 4, 2, 1, c2); R(3, 0, 8, 4, O); R(4, 1, 2, 2, c2); R(8, 1, 2, 2, c2); R(6, 2, 2, 1, darken(c2, 0.3)); }
+    cache.set(key, c);
+    return c;
+  }
+  /* HELP WANTED, pinned to a post */
+  function posterSprite(scale) {
+    const key = 'poster_' + scale;
+    if (cache.has(key)) return cache.get(key);
+    const k = scale || 1;
+    const c = newCanvas(12 * k, 18 * k);
+    const ctx = c.getContext('2d');
+    const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
+    R(5, 10, 2, 8, '#5e3d18'); R(5, 10, 1, 8, '#8a5e2a');
+    R(0, 0, 12, 11, '#2e2216'); R(1, 1, 10, 9, '#fff8ec'); R(1, 1, 10, 1, '#ffffff');
+    R(2, 3, 8, 1, '#e8542f'); R(2, 5, 6, 1, '#2e2216'); R(2, 7, 8, 1, '#2e2216'); R(9, 2, 1, 1, '#ffd23f');
+    cache.set(key, c);
+    return c;
+  }
+  /* a soft, dithered elliptical shadow under anything that stands */
+  function shadowEll(ctx, cx, cy, rx, ry, alpha) {
+    ctx.fillStyle = 'rgba(30,44,22,' + (alpha === undefined ? 0.26 : alpha) + ')';
+    const RY = Math.max(1, ry);
+    for (let dy = -RY; dy <= RY; dy++) {
+      const half = Math.round(rx * Math.sqrt(Math.max(0, 1 - (dy / (RY + 0.5)) ** 2)));
+      if (half <= 0) continue;
+      const y = Math.round(cy + dy);
+      /* the outer pixel of every row is dithered so the rim melts into the grass */
+      ctx.fillRect(Math.round(cx) - half + 1, y, half * 2 - 1, 1);
+      if ((y + Math.round(cx)) % 2 === 0) { ctx.fillRect(Math.round(cx) - half, y, 1, 1); ctx.fillRect(Math.round(cx) + half, y, 1, 1); }
+    }
+  }
+  /* the one progress bar everything wears: a dark frame, a pale trough, a
+     fill with a lit top edge */
+  function drawBar(ctx, x, y, w, f, col, opts) {
+    const o = opts || {};
+    const h = o.h || 4;
+    ctx.fillStyle = o.frame || '#2e2216'; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = o.trough || '#5a4a32'; ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
+    const fw = Math.round((w - 2) * Math.max(0, Math.min(1, f)));
+    if (fw > 0) {
+      ctx.fillStyle = col; ctx.fillRect(x + 1, y + 1, fw, h - 2);
+      if (h > 3) { ctx.fillStyle = lighten(col, 0.4); ctx.fillRect(x + 1, y + 1, fw, 1); }
+    }
+    if (o.tick !== undefined) { ctx.fillStyle = '#fff8ec'; ctx.fillRect(x + 1 + Math.round((w - 2) * o.tick), y, 1, h); }
+  }
 
   /* ============================================================
      TERRAIN - what the landscaping tool paints
@@ -3399,7 +3745,8 @@ const SPR = (() => {
     BILL_W, BILL_H, BILL_CH: CH,
     drawText, textW, drawTiny, tinyW, drawTitle,
     drawBezel, drawScanlines, drawPips, drawBox, TERM, drawHex, hexHit, hexRows, drawCube,
-    carSprite, raccoonSprite, furnitureSprite,
+    carSprite, raccoonSprite, furnitureSprite, RAC_OFF, outfitOf,
+    toolIconSprite, produceSprite, goodsSprite, presentSprite, posterSprite, shadowEll, drawBar,
     newMask, mRect, mCircle, renderMask, mulberry, newCanvas,
     darken, lighten, warm, cool, lum, px, CELL, ICONS,
   };

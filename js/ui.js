@@ -28,7 +28,7 @@
         o.frequency.setValueAtTime(f, st);
         if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40, f * slide), st + dur);
         g.gain.setValueAtTime(0.0001, st);
-        g.gain.exponentialRampToValueAtTime(vol || 0.07, st + 0.01);
+        g.gain.exponentialRampToValueAtTime((vol || 0.07) * Math.max(0.05, (GAME.setting('volume') || 0.7) / 0.7), st + 0.01);
         g.gain.exponentialRampToValueAtTime(0.0001, st + dur);
         o.connect(g).connect(a.destination);
         o.start(st); o.stop(st + dur + 0.02);
@@ -189,11 +189,14 @@
     setTimeout(() => el.remove(), 1150);
   }
   function floatWorld(txt, wx, wy, cls, icon) {
+    /* a number over the field means nothing while a panel covers the field */
+    if (document.querySelector('.modal:not([hidden])')) return;
     const p = worldToScreen(wx, wy);
     if (p.x < -60 || p.x > innerWidth + 60) return;
     floatText(txt, p.x - 24, p.y - 10, cls, icon);
   }
   function toast(opts) {
+    if (!GAME.setting('news')) return;
     while (toastBox.children.length >= 2) toastBox.firstChild.remove();
     const el = document.createElement('div');
     el.className = 'toast';
@@ -211,6 +214,7 @@
   /* ================= CANVAS & CAMERA ================= */
   const cv = $('#world');
   let ctx = cv.getContext('2d');   /* swapped temporarily when painting thumbnails */
+  const mainCtx = ctx;
   /* how many screen pixels one world pixel gets. Measured from the window
      rather than fixed, so the stage fills whatever room there is and the
      page never has anything below the fold. */
@@ -1601,7 +1605,7 @@
   /* diners and tourists: people who are not on the payroll */
   const visitorLooks = new Map();
   function drawVisitor(v, now) {
-    if (v.x + 20 < cam().x || v.x > cam().x + W.view.w || v.y + 24 < cam().y || v.y > cam().y + W.view.h) return;
+    if (ctx === mainCtx && (v.x + 20 < cam().x || v.x > cam().x + W.view.w || v.y + 24 < cam().y || v.y > cam().y + W.view.h)) return;
     let look = visitorLooks.get(v.id);
     if (!look) {
       const rnd = SPR.mulberry(v.seed || v.id);
@@ -1662,8 +1666,7 @@
     }
     if (prog > 0.85) { ctx.fillStyle = 'rgba(224,189,130,.6)'; ctx.fillRect(x + 3, y - 2, w - 6, h - 2); }
     /* progress plank */
-    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x, y - 8, w, 4);
-    ctx.fillStyle = st.stage === 'work' ? '#ffd23f' : '#8a7a5a'; ctx.fillRect(x + 1, y - 7, Math.round((w - 2) * prog), 2);
+    SPR.drawBar(ctx, x, y - 9, w, prog, st.stage === 'work' ? '#ffd23f' : '#8a7a5a', { h: 5 });
   }
   /* a second floor: a lighter box with windows and a little roof, sat over
      the building's own roof */
@@ -1854,12 +1857,11 @@
   /* somebody who answered a flyer, standing by the board */
   function drawApplicant(a, now) {
     if (a.x === undefined) return;
-    if (a.x + 20 < cam().x || a.x > cam().x + W.view.w || a.y + 24 < cam().y || a.y > cam().y + W.view.h) return;
+    if (ctx === mainCtx && (a.x + 20 < cam().x || a.x > cam().x + W.view.w || a.y + 24 < cam().y || a.y > cam().y + W.view.h)) return;
     const moving = a.state !== 'waiting';
     const spr = SPR.personSprite(a.look, moving ? a.frame : 0, 1);
     const bob = moving ? 0 : Math.abs(Math.sin(now / 420 + a.id)) * (Math.floor((now + a.id * 300) / 2600) % 3 === 0 ? 2 : 0);
-    ctx.fillStyle = 'rgba(40,58,26,.26)';
-    ctx.fillRect(Math.round(a.x + 1), Math.round(a.y + spr.height - 2), 10, 2);
+    SPR.shadowEll(ctx, a.x + 6, a.y + spr.height - 1, 5.5, 1.5, 0.26);
     ctx.save();
     if (a.dir === 1) { ctx.translate(Math.round(a.x) + spr.width, Math.round(a.y - bob)); ctx.scale(-1, 1); ctx.drawImage(spr, 0, 0); }
     else ctx.drawImage(spr, Math.round(a.x), Math.round(a.y - bob));
@@ -1872,8 +1874,7 @@
       ctx.fillStyle = '#2e2216'; ctx.fillRect(Math.round(a.x + 6), by + 9, 2, 2);
       ctx.drawImage(SPR.iconSprite('doc', 1), Math.round(a.x + 3), by - 1);
       /* patience bar */
-      ctx.fillStyle = '#2e2216'; ctx.fillRect(Math.round(a.x), Math.round(a.y + spr.height), 12, 2);
-      ctx.fillStyle = a.t < 90 ? '#e8542f' : '#7ac74f'; ctx.fillRect(Math.round(a.x + 1), Math.round(a.y + spr.height), Math.round(10 * Math.max(0, a.t) / RECRUIT.applicantLife), 1);
+      SPR.drawBar(ctx, Math.round(a.x), Math.round(a.y + spr.height), 12, Math.max(0, a.t) / RECRUIT.applicantLife, a.t < 90 ? '#e8542f' : '#7ac74f', { h: 3 });
     }
   }
 
@@ -2018,12 +2019,12 @@
   }
 
   function drawStaff(w, now) {
-    if (w.x + 20 < cam().x || w.x > cam().x + W.view.w || w.y + 24 < cam().y || w.y > cam().y + W.view.h) return;
+    if (ctx === mainCtx && (w.x + 20 < cam().x || w.x > cam().x + W.view.w || w.y + 24 < cam().y || w.y > cam().y + W.view.h)) return;
     const moving = w.state === 'walk';
     const spr = SPR.staffSprite(w, moving ? w.frame : 0, 1);
     const bob = moving ? 0 : Math.sin(now / 600 + w.id) * 0.5;
-    ctx.fillStyle = 'rgba(40,58,26,.26)';
-    ctx.fillRect(Math.round(w.x + 1), Math.round(w.y + spr.height - 2), 10, 2);
+    SPR.shadowEll(ctx, w.x + 6, w.y + spr.height - 1, 5.5, 1.5, 0.26);
+    if (moving && w.frame && GAME.setting('particles') && Math.floor(now / 130) % 2) { ctx.fillStyle = 'rgba(200,180,140,.5)'; ctx.fillRect(Math.round(w.x + (w.dir === 1 ? 0 : 10)), Math.round(w.y + spr.height - 2), 2, 1); }
     ctx.save();
     if (w.dir === 1) {
       ctx.translate(Math.round(w.x) + spr.width, Math.round(w.y + bob));
@@ -2170,7 +2171,7 @@
     let y = Math.round(below ? wy + height : wy - c.height);
     /* if it would land under the dialogue panel, slide it clear */
     const panelX = cam().x + PANEL_W, panelY = cam().y + PANEL_H;
-    if (x < panelX && y < panelY && !$('#quest-dialogue').hidden) {
+    if (x < panelX && y < panelY && !$('#todo-panel').hidden) {
       if (panelX + c.width + 2 < cam().x + W.view.w) x = panelX;
       else y = panelY;
     }
@@ -2194,27 +2195,23 @@
   function drawBoss(now) {
     const b = GAME.boss();
     if (!b || !S().company.done) return;
-    if (b.x + 30 < cam().x || b.x - 10 > cam().x + W.view.w || b.y + 34 < cam().y || b.y - 40 > cam().y + W.view.h) return;
+    if (ctx === mainCtx && (b.x + 30 < cam().x || b.x - 10 > cam().x + W.view.w || b.y + 34 < cam().y || b.y - 40 > cam().y + W.view.h)) return;
     const pose = bossPose(b, now);
-    const spr = SPR.raccoonSprite(pose, 1);
+    const spr = SPR.raccoonSprite(pose, 1, S().wardrobe);
     const walking = b.state === 'walk';
     const bob = walking ? 0 : Math.sin(now / 620 + 1) * 0.6;
     const hop = pose === 'cheer' ? Math.abs(Math.sin(now / 190)) * 3 : 0;
-    ctx.fillStyle = 'rgba(40,58,26,.28)';
-    ctx.fillRect(Math.round(b.x + 3), Math.round(b.y + 24), 14, 2);
+    SPR.shadowEll(ctx, b.x + 10, b.y + 24.5, 8 - hop * 0.4, 1.5, 0.28);
     ctx.save();
     if (b.dir === 1) {
-      ctx.translate(Math.round(b.x) + spr.width, Math.round(b.y - 4 + bob - hop));
+      ctx.translate(Math.round(b.x) + spr.width, Math.round(b.y - SPR.RAC_OFF + bob - hop));
       ctx.scale(-1, 1);
       ctx.drawImage(spr, 0, 0);
-    } else ctx.drawImage(spr, Math.round(b.x), Math.round(b.y - 4 + bob - hop));
+    } else ctx.drawImage(spr, Math.round(b.x), Math.round(b.y - SPR.RAC_OFF + bob - hop));
     ctx.restore();
-    /* the founder's mark on his hat band, so he reads as the company */
-    if (pose === 'boss' || pose === 'cheer') {
-      ctx.fillStyle = S().company.col1;
-      ctx.fillRect(Math.round(b.x + (b.dir === 1 ? 7 : 8)), Math.round(b.y - 3 + bob - hop), 5, 1);
-    }
-    if (b.line) drawSay(b.line, b.x + 10, b.y - 8 - hop, 34);
+    /* dust off his heels while he walks */
+    if (walking && b.frame && GAME.setting('particles') && Math.floor(now / 120) % 2) { ctx.fillStyle = 'rgba(200,180,140,.55)'; ctx.fillRect(Math.round(b.x + (b.dir === 1 ? 2 : 14)), Math.round(b.y + 23), 3, 1); }
+    if (b.line && ctx === mainCtx) drawSay(b.line, b.x + 10, b.y - 8 - hop, 34);
     else if (pose === 'read') {
       /* leafing through the ledger */
       if (Math.floor(now / 500) % 2) { ctx.fillStyle = '#fff8ec'; ctx.fillRect(Math.round(b.x + 6), Math.round(b.y + 6), 2, 1); }
@@ -2466,7 +2463,7 @@
     }
   }
   function drawChicken(ch, now) {
-    if (ch.x + 24 < cam().x || ch.x > cam().x + W.view.w || ch.y + 24 < cam().y || ch.y > cam().y + W.view.h) return;
+    if (ctx === mainCtx && (ch.x + 24 < cam().x || ch.x > cam().x + W.view.w || ch.y + 24 < cam().y || ch.y > cam().y + W.view.h)) return;
     const sp = SPECIES[ch.sp];
     const chick = GAME.isChick(ch);
     const spr = chick ? SPR.chickSprite(sp, 1) : SPR.chickenSprite(sp, 1, false);
@@ -2483,11 +2480,17 @@
       if (bp >= 1) bornFx.delete(ch.id);
       else { grow = 0.45 + 0.55 * bp; hop += Math.sin(bp * Math.PI) * 3; }
     }
-    const yy = Math.round(ch.y - bob - hop) + (chick ? 7 : 0);
+    /* eating: quick pecks down at the ground, crumbs flying */
+    const eating = (ch.eat || 0) > 0;
+    const peck = eating ? Math.max(0, Math.sin(now / 70)) * 2 : 0;
+    const yy = Math.round(ch.y - bob - hop + peck) + (chick ? 7 : 0);
     /* soft shadow that shrinks as it hops */
-    const sw = 12 - Math.round(hop * 0.6);
-    ctx.fillStyle = 'rgba(40,58,26,.26)';
-    ctx.fillRect(Math.round(ch.x + 4 + (12 - sw) / 2), Math.round(ch.y + 17), sw, 2);
+    SPR.shadowEll(ctx, ch.x + 10, ch.y + 17.5, (chick ? 5 : 7) - hop * 0.3, 1.5, 0.26);
+    if (eating && GAME.setting('particles') && Math.floor(now / 140) % 2) {
+      ctx.fillStyle = '#f2c94c';
+      ctx.fillRect(Math.round(ch.x + (ch.dir === 1 ? 17 : 1) + Math.sin(now / 50) * 2), Math.round(ch.y + 16 - Math.abs(Math.cos(now / 90)) * 4), 1, 1);
+      ctx.fillRect(Math.round(ch.x + (ch.dir === 1 ? 19 : 0)), Math.round(ch.y + 15 - Math.abs(Math.sin(now / 110)) * 3), 1, 1);
+    }
     ctx.save();
     if (grow !== 1) {
       ctx.translate(Math.round(ch.x) + spr.width / 2, yy + spr.height);
@@ -2507,13 +2510,11 @@
     if (chick) {
       /* two rails: what it has been fed on top, how long it has been
          growing underneath. It is ready when both are full. */
-      const bx = Math.round(ch.x + 4), by = yy - 6;
+      const bx = Math.round(ch.x + 4), by = yy - 7;
       const fed = Math.max(0, Math.min(1, ch.fed === undefined ? ch.age : ch.fed));
       const timed = Math.max(0, Math.min(1, (ch.raised || 0) / GAME.growTime()));
-      ctx.fillStyle = '#2e2216'; ctx.fillRect(bx, by, 14, 5);
-      ctx.fillStyle = '#5a4a32'; ctx.fillRect(bx + 1, by + 1, 12, 3);
-      ctx.fillStyle = '#e8a53f'; ctx.fillRect(bx + 1, by + 1, Math.round(12 * fed), 1);
-      ctx.fillStyle = '#7ac74f'; ctx.fillRect(bx + 1, by + 3, Math.round(12 * timed), 1);
+      SPR.drawBar(ctx, bx, by, 14, fed, '#e8a53f', { h: 3 });
+      SPR.drawBar(ctx, bx, by + 3, 14, timed, '#7ac74f', { h: 3 });
     } else if (ch.food <= 0 && Math.floor(now / 500) % 2) {
       ctx.fillStyle = '#fff9ec'; ctx.fillRect(Math.round(ch.x + 6), yy - 9, 9, 8);
       ctx.fillStyle = '#2e2216'; ctx.fillRect(Math.round(ch.x + 6), yy - 9, 9, 1); ctx.fillRect(Math.round(ch.x + 6), yy - 1, 9, 1);
@@ -2585,11 +2586,8 @@
     /* only once supper is wearing off: a small gauge on her nest rail */
     const belly = GAME.mamaBelly();
     if (belly < 0.6) {
-      const bw = 16, bx = m.x - 7, by = m.y - 26;
-      ctx.fillStyle = '#2a2018'; ctx.fillRect(bx - 1, by - 1, bw + 2, 4);
-      ctx.fillStyle = '#e8dcc0'; ctx.fillRect(bx, by, bw, 2);
-      ctx.fillStyle = belly < 0.25 ? '#e8542f' : '#e8a92f';
-      ctx.fillRect(bx, by, Math.max(1, Math.round(bw * belly)), 2);
+      const bw = 18, bx = m.x - 8, by = m.y - 27;
+      SPR.drawBar(ctx, bx, by, bw, belly, belly < 0.25 ? '#e8542f' : '#e8a92f', { h: 4 });
       if (belly <= 0 && Math.floor(now / 380) % 2)
         ctx.drawImage(SPR.iconSprite('seed', 1), m.x - 5, by - 12);
     }
@@ -2776,6 +2774,173 @@
   }
 
   /* ================= MAIN RENDER ================= */
+  /* the HR Office: a squat brick block with a camera on every corner and a
+     wall of little screens glowing in the window */
+  function drawHR(c, r, hr, now) {
+    const x = c * 16, y = r * 16;
+    SPR.shadowEll(ctx, x + 16, y + 31, 16, 2, 0.26);
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 1, y + 6, 30, 26);
+    ctx.fillStyle = '#9aa3ad'; ctx.fillRect(x + 2, y + 7, 28, 24);
+    ctx.fillStyle = '#c9ced6'; ctx.fillRect(x + 2, y + 7, 28, 2);
+    ctx.fillStyle = '#6a7280'; ctx.fillRect(x + 2, y + 28, 28, 3);
+    /* the wall of monitors in the window */
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 4, y + 11, 15, 11);
+    for (let i = 0; i < 6; i++) {
+      const mx = x + 5 + (i % 3) * 5, my = y + 12 + Math.floor(i / 3) * 5;
+      ctx.fillStyle = (Math.floor(now / 700) + i) % 5 === 0 ? '#1a2a24' : '#7ef2a8'; ctx.fillRect(mx, my, 4, 4);
+      ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(mx, my, 4, 1);
+    }
+    /* door, a sign, a camera on a stalk */
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 21, y + 18, 8, 13); ctx.fillStyle = '#5e3d18'; ctx.fillRect(x + 22, y + 19, 6, 12); ctx.fillStyle = '#ffd23f'; ctx.fillRect(x + 26, y + 25, 1, 1);
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 20, y + 10, 10, 6); ctx.fillStyle = '#e8542f'; ctx.fillRect(x + 21, y + 11, 8, 4); SPR.drawTiny(ctx, 'HR', x + 22, y + 11, '#ffffff', 1);
+    const sw = Math.round(Math.sin(now / 1400) * 2);
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 29, y + 1, 1, 6); ctx.fillRect(x + 26 + sw, y + 1, 5, 3);
+    ctx.fillStyle = Math.floor(now / 500) % 2 ? '#ff4a3a' : '#7a1a12'; ctx.fillRect(x + 27 + sw, y + 2, 1, 1);
+    if (S().staff.length && Math.floor(now / 900) % 3 === 0) { ctx.fillStyle = 'rgba(126,242,168,.5)'; ctx.fillRect(x + 4, y + 22, 15, 1); }
+  }
+  /* the Cannery: a tin-roofed shed with a chimney and a conveyor of jars in the window */
+  function drawCannery(c, r, cn, now) {
+    const x = c * 16, y = r * 16;
+    SPR.shadowEll(ctx, x + 16, y + 31, 16, 2, 0.26);
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 1, y + 10, 30, 22);
+    ctx.fillStyle = '#e8b96f'; ctx.fillRect(x + 2, y + 11, 28, 20);
+    ctx.fillStyle = '#c9924f'; for (let i = 0; i < 5; i++) ctx.fillRect(x + 2, y + 13 + i * 4, 28, 1);
+    ctx.fillStyle = '#a8785a'; ctx.fillRect(x + 2, y + 28, 28, 3);
+    /* corrugated tin roof */
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x - 1, y + 4, 34, 7);
+    for (let i = 0; i < 16; i++) { ctx.fillStyle = i % 2 ? '#c9ced6' : '#9aa3ad'; ctx.fillRect(x + i * 2, y + 5, 2, 5); }
+    /* chimney and smoke while it works */
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 24, y - 3, 5, 8); ctx.fillStyle = '#6a7280'; ctx.fillRect(x + 25, y - 2, 3, 7);
+    if (cn.cook && GAME.setting('particles')) for (let i = 0; i < 3; i++) { const t = ((now / 700 + i * 0.33) % 1); ctx.fillStyle = 'rgba(240,240,240,' + (0.6 - t * 0.5).toFixed(2) + ')'; ctx.fillRect(x + 25 + Math.round(Math.sin(now / 300 + i) * 2), Math.round(y - 4 - t * 12), 3 - Math.floor(t * 2), 2); }
+    /* window with jars going by */
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 4, y + 14, 14, 9); ctx.fillStyle = '#bfe8f5'; ctx.fillRect(x + 5, y + 15, 12, 7);
+    const G = GOODS[cn.recipe] || GOODS.flour;
+    for (let i = 0; i < 3; i++) { const jx = x + 5 + ((i * 5 + Math.floor(now / 200)) % 13); if (jx < x + 15) { ctx.fillStyle = G.col; ctx.fillRect(jx, y + 18, 2, 3); ctx.fillStyle = '#c9a35f'; ctx.fillRect(jx, y + 17, 2, 1); } }
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 20, y + 18, 8, 13); ctx.fillStyle = '#5e3d18'; ctx.fillRect(x + 21, y + 19, 6, 12);
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 19, y + 11, 11, 6); ctx.fillStyle = '#6ab04c'; ctx.fillRect(x + 20, y + 12, 9, 4); SPR.drawTiny(ctx, 'CAN', x + 20, y + 12, '#fff8ec', 1);
+    if (cn.cook) SPR.drawBar(ctx, x + 2, y + 1, 20, Math.min(1, cn.cook.t / cn.cook.T), '#ffd23f', { h: 4 });
+  }
+  /* the limousine, on its way in with a present */
+  function drawLimo(now) {
+    const L = GAME.limo;
+    if (!L) return;
+    const spr = drawCar('limo', '#1a1a22', L.x, L.y, -1, Math.floor(now / 90) % 2);
+    /* a gold pennant and a glow while it waits */
+    if (L.state === 'drop') {
+      ctx.fillStyle = '#ffd23f'; ctx.fillRect(Math.round(L.x + 18), Math.round(L.y - 4 + Math.sin(now / 200)), 4, 2);
+      if (Math.floor(now / 250) % 2) { ctx.fillStyle = 'rgba(255,240,180,.6)'; ctx.fillRect(Math.round(L.x + spr.width - 2), Math.round(L.y + 6), 2, 3); }
+    }
+  }
+  function drawPresents(now) {
+    S().presents.forEach(p => {
+      const spr = SPR.presentSprite(1, S().company.col1, S().company.col2);
+      const bob = p.z >= 0 ? Math.sin(now / 260 + p.wob) * 1 : 0;
+      SPR.shadowEll(ctx, p.x, p.y + 1, 6 + Math.min(0, p.z) * 0.15, 1.5, 0.24);
+      ctx.drawImage(spr, Math.round(p.x - 7), Math.round(p.y - 13 + p.z + bob));
+      /* a sparkle, and the clock running down */
+      if (Math.floor(now / 300 + p.id) % 3 === 0) { ctx.fillStyle = '#ffffff'; ctx.fillRect(Math.round(p.x + 6), Math.round(p.y - 14 + bob), 1, 1); ctx.fillRect(Math.round(p.x - 8), Math.round(p.y - 6 + bob), 1, 1); }
+      if (p.t < 30) SPR.drawBar(ctx, Math.round(p.x - 7), Math.round(p.y + 3), 14, p.t / 30, '#e8542f', { h: 3 });
+    });
+  }
+  /* HELP WANTED posters along the road while a campaign is out */
+  function drawPosters(now) {
+    if (!S().flyer) return;
+    const e = GAME.boardSpot(0);
+    [[e.x - 40, W.roadY - 22], [e.x + 30, W.roadY - 24], [W.stations.depot.x - 30, W.roadY - 20]].forEach(([px, py], i) => {
+      if (px < 8) return;
+      const spr = SPR.posterSprite(1);
+      ctx.drawImage(spr, Math.round(px), Math.round(py + (Math.floor(now / 500 + i) % 2 ? 0 : -0.5)));
+    });
+  }
+  /* the day turns: a warm dawn, a clear noon, a blue dusk and a dark night
+     with lamps in it, across one 300 second day */
+  function drawDayNight(now) {
+    if (!GAME.setting('dayNight')) return;
+    const ph = GAME.dayPhase();
+    const cx = cam().x, cy = cam().y, vw = W.view.w, vh = W.view.h;
+    let tint = null;
+    if (ph < 0.12) tint = 'rgba(255,170,90,' + (0.16 * (1 - ph / 0.12)).toFixed(3) + ')';
+    else if (ph > 0.62 && ph <= 0.78) tint = 'rgba(255,140,80,' + (0.14 * ((ph - 0.62) / 0.16)).toFixed(3) + ')';
+    else if (ph > 0.78) { const d = Math.min(1, (ph - 0.78) / 0.1) * (ph > 0.95 ? (1 - ph) / 0.05 : 1); tint = 'rgba(20,30,70,' + (0.34 * d).toFixed(3) + ')'; }
+    if (tint) { ctx.fillStyle = tint; ctx.fillRect(cx, cy, vw, vh); }
+    if (ph > 0.76) {
+      /* lamp posts and lit windows push the dark back */
+      const glow = Math.min(1, (ph - 0.76) / 0.08);
+      ctx.fillStyle = 'rgba(255,220,140,' + (0.16 * glow).toFixed(3) + ')';
+      for (const k of Object.keys(S().deco)) {
+        if (S().deco[k].kind !== 'lamp') continue;
+        const [c, r] = k.split(',').map(Number);
+        const lx = c * 16 + 8, ly = r * 16 + 4;
+        if (lx < cx - 40 || lx > cx + vw + 40 || ly < cy - 40 || ly > cy + vh + 40) continue;
+        for (let dy = -2; dy <= 26; dy += 2) { const half = Math.round(4 + dy * 0.55); ctx.fillRect(lx - half, ly + dy, half * 2, 2); }
+      }
+      /* fireflies */
+      if (GAME.setting('particles')) for (let i = 0; i < 12; i++) {
+        if ((i + Math.floor(now / 400)) % 3 === 0) continue;
+        const fx = cx + ((i * 97 + Math.floor(now / 110 + i * 30)) % vw), fy = cy + ((i * 53 + Math.floor(Math.sin(now / 900 + i) * 6) + vh) % vh);
+        ctx.fillStyle = 'rgba(255,240,150,' + (0.9 * glow).toFixed(2) + ')'; ctx.fillRect(Math.round(fx), Math.round(fy), 1, 1);
+      }
+    }
+  }
+  /* leaves blowing off the trees, and the odd gust across the grass */
+  let leaves = [];
+  function drawLeaves(dt, now) {
+    if (!GAME.setting('particles')) return;
+    const cx = cam().x, cy = cam().y, vw = W.view.w, vh = W.view.h;
+    if (leaves.length < 10 && Math.random() < dt * 1.5) {
+      const trees = Object.keys(S().deco).filter(k => ['tree', 'pine', 'apple'].includes(S().deco[k].kind));
+      if (trees.length) {
+        const [c, r] = trees[Math.floor(Math.random() * trees.length)].split(',').map(Number);
+        leaves.push({ x: c * 16 + 4 + Math.random() * 8, y: r * 16 - 10, t: 0, life: 2.5 + Math.random() * 2, ph: Math.random() * 6, col: Math.random() < 0.3 ? '#e0a416' : '#7fbf4f' });
+      }
+    }
+    leaves = leaves.filter(l => (l.t += dt) < l.life);
+    leaves.forEach(l => {
+      l.x += (9 + Math.sin(l.t * 3 + l.ph) * 6) * dt; l.y += (7 + Math.cos(l.t * 4 + l.ph) * 3) * dt;
+      if (l.x < cx - 10 || l.x > cx + vw + 10 || l.y < cy - 10 || l.y > cy + vh + 10) return;
+      ctx.globalAlpha = Math.min(1, (l.life - l.t)); ctx.fillStyle = l.col;
+      ctx.fillRect(Math.round(l.x), Math.round(l.y), Math.floor(l.t * 6) % 2 ? 2 : 1, 1); ctx.globalAlpha = 1;
+    });
+    /* gusts: pale streaks racing over the grass during rain or at random */
+    if (S().weather.rain || Math.floor(now / 9000) % 4 === 0) {
+      ctx.fillStyle = 'rgba(255,255,255,.14)';
+      for (let i = 0; i < 6; i++) {
+        const gx = ((i * 211 + now / 6) % (vw + 80)) + cx - 40, gy = ((i * 97) % vh) + cy;
+        ctx.fillRect(Math.round(gx), Math.round(gy), 9, 1);
+      }
+    }
+  }
+  /* a camera feed for the HR room: the ground and whoever stands on it,
+     framed on one point, drawn into someone else's canvas */
+  function cameraFeed(g, wx, wy, vw, vh, now) {
+    if (!groundCv) buildGround();
+    if (terrDirty) rebuildTerrain();
+    const saved = ctx;
+    ctx = g;
+    try {
+      const ox = Math.round(wx - vw / 2), oy = Math.round(wy - vh / 2);
+      g.save();
+      g.beginPath(); g.rect(0, 0, vw, vh); g.clip();
+      g.translate(-ox, -oy);
+      g.imageSmoothingEnabled = false;
+      g.drawImage(groundCv, 0, 0);
+      g.drawImage(terrCv, 0, -TERR_LIFT);
+      const near = (x, y) => x > ox - 48 && x < ox + vw + 48 && y > oy - 48 && y < oy + vh + 48;
+      for (const k of Object.keys(S().soil)) { const [c, r] = k.split(',').map(Number); const t = S().soil[k]; if (t.crop && near(c * 16, r * 16)) g.drawImage(SPR.cropSprite(t.crop, GAME.cropStage(t), t.seed, 1), c * 16, r * 16 - 4); }
+      const stores = [['belts', drawBelt, true], ['fences', drawFence, true], ['incs', drawIncubator], ['nests', drawLoveNest], ['huts', drawStaffHut], ['silos', drawSilo], ['barns', drawBarn], ['coops', drawCoop], ['wells', drawWell], ['troughs', drawTrough], ['boards', drawBoard], ['hqs', drawHQ], ['kitchens', drawKitchen], ['hrs', drawHR], ['canneries', drawCannery], ['mills', drawMill], ['beehives', drawBeehive], ['genelabs', drawGeneLab]];
+      stores.forEach(([m, fn, dirOnly]) => Object.keys(S()[m] || {}).forEach(k => { const [c, r] = k.split(',').map(Number); if (!near(c * 16, r * 16)) return; if (m === 'belts') fn(c, r, S()[m][k].dir, now); else if (m === 'fences') fn(c, r, now); else fn(c, r, S()[m][k], now); }));
+      for (const k of Object.keys(S().deco)) { const [c, r] = k.split(',').map(Number); if (!near(c * 16, r * 16)) continue; const d = S().deco[k]; const spr = SPR.decoSprite(DECOS[d.kind] ? DECOS[d.kind].kind : 'tuft', 1, d.seed); g.drawImage(spr, c * 16 + 8 - Math.floor(spr.width / 2), r * 16 + 15 - spr.height); }
+      S().eggs.forEach(e => { if (near(e.x, e.y)) drawEgg(e, now); });
+      S().feed.forEach(f => { if (near(f.x, f.y)) { g.fillStyle = '#e0a416'; g.fillRect(Math.round(f.x), Math.round(f.y), 2, 2); } });
+      if (near(W.mama.x, W.mama.y)) drawMama(now);
+      S().chickens.forEach(ch => { if (near(ch.x, ch.y)) drawChicken(ch, now); });
+      S().staff.forEach(w => { if (near(w.x, w.y)) drawStaff(w, now); });
+      const b = GAME.boss(); if (b && near(b.x, b.y)) drawBoss(now);
+      S().applicants.forEach(a2 => { if (a2.x !== undefined && near(a2.x, a2.y)) drawApplicant(a2, now); });
+      g.restore();
+    } finally { ctx = saved; }
+  }
+
   function render(now, dt) {
     if (GAME.dirty.ground || !groundCv) buildGround();
     /* the camera can sit a little past the foot of the map so the dock
@@ -2875,6 +3040,9 @@
     for (const k of Object.keys(S().kitchens)) { const [c, r] = k.split(',').map(Number); drawKitchen(c, r, S().kitchens[k], now); }
     for (const k of Object.keys(S().parks)) { const [c, r] = k.split(',').map(Number); drawPark(c, r, S().parks[k], now); }
     for (const k of Object.keys(S().timemachines)) { const [c, r] = k.split(',').map(Number); drawTimeMachine(c, r, S().timemachines[k], now); }
+    for (const k of Object.keys(S().hrs)) { const [c, r] = k.split(',').map(Number); drawHR(c, r, S().hrs[k], now); }
+    for (const k of Object.keys(S().canneries)) { const [c, r] = k.split(',').map(Number); drawCannery(c, r, S().canneries[k], now); }
+    drawPosters(now);
     for (const k of Object.keys(S().storeys)) drawStorey(k, now);
     for (const k of Object.keys(S().sites)) drawSite(k, S().sites[k], now);
     drawBrand(now);
@@ -2923,6 +3091,8 @@
     drawTraffic(now);
     drawOrders(now);
     drawMovers(now);
+    drawLimo(now);
+    drawPresents(now);
     drawSaleSigns(now);
 
     /* butterflies */
@@ -2957,6 +3127,8 @@
       }
     });
 
+    drawLeaves(dt, now);
+    drawDayNight(now);
     drawWeather(now);
     drawAge(now, dt);
 
@@ -3023,20 +3195,6 @@
         if ((i + s2) % 3) continue;
         ctx.fillRect(Math.round(x) - 1, Math.round(y), 3, 1);
       }
-    } else if (w.after > 0) {
-      /* the rainbow, up in the top right, fading */
-      const a = Math.min(1, w.after / 14) * 0.8;
-      const cols = ['#e8542f', '#f0a422', '#ffd23f', '#6ab04c', '#3fa7d6', '#b06ee0'];
-      const ox = cx + vw - 40, oy = cy + vh * 0.55, R0 = 92;
-      cols.forEach((col, i) => {
-        ctx.fillStyle = col;
-        ctx.globalAlpha = a;
-        const R = R0 - i * 3;
-        for (let ang = Math.PI * 1.02; ang < Math.PI * 1.98; ang += 0.012) {
-          ctx.fillRect(Math.round(ox + Math.cos(ang) * R), Math.round(oy + Math.sin(ang) * R * 0.85), 2, 2);
-        }
-      });
-      ctx.globalAlpha = 1;
     }
   }
 
@@ -3132,16 +3290,19 @@
   const el = {
     coins: $('#r-coins'), feathers: $('#r-feathers'), feed: $('#r-feed'), feedPill: $('#pill-feed'),
     cap: $('#r-cap'), capPill: $('#pill-cap'), agePill: $('#pill-age'),
+    food: $('#r-food'), foodPill: $('#pill-food'), sky: $('#r-sky'), skyPill: $('#pill-sky'),
     cursorChip: $('#cursor-chip'),
     toolbelt: $('#toolbelt'), deskbar: $('#deskbar'),
     palette: $('#build-palette'), farmPalette: $('#farm-palette'),
   };
   /* prepend pixel icons to the resource pills once */
   (function seedPills() {
-    const cp = $('#pill-coins'), fp = $('#pill-feathers'), hp = $('#pill-cap');
+    const cp = $('#pill-coins'), fp = $('#pill-feathers'), hp = $('#pill-cap'), fd = $('#pill-feed'), pp = $('#pill-food');
     cp.insertBefore(mkIcon('coin', 2), cp.firstChild);
     fp.insertBefore(mkIcon('feather', 2), fp.firstChild);
     hp.insertBefore(mkIcon('chick', 2), hp.firstChild);
+    fd.insertBefore(mkIcon('bowl', 2), fd.firstChild);
+    pp.insertBefore(mkIcon('crate', 2), pp.firstChild);
   })();
 
   function updateCursorChip() {
@@ -3168,24 +3329,32 @@
      so the row never jumps about under your finger.
      ------------------------------------------------------------ */
   const DESK = [
-    { act: 'open-lab',   icon: 'flask',  name: 'LAB',
+    { act: 'open-lab',    icon: 'flask',  name: 'LAB',
       tip: 'The Lab - spend feathers on research', open: () => true },
-    { act: 'open-book',  icon: 'book',   name: 'INDEX',
+    { act: 'open-quests', icon: 'quest',  name: 'QUESTS',
+      tip: 'The quest board - what the founder wants, and the rewards to claim', open: () => true },
+    { act: 'open-book',   icon: 'book',   name: 'INDEX',
       tip: 'The Index - chickens, crops, routes, eggs and the diary', open: () => true },
-    { act: 'open-mama',  icon: 'crown',  name: 'MAMA',
-      tip: 'Mama Hen - feed her, pet her and upgrade her tier', open: () => true },
-    { act: 'crew',       icon: 'hands',  name: 'CREW',
-      tip: 'The crew - flyers, applications and the payroll',
+    { act: 'open-food',   icon: 'crate',  name: 'PANTRY',
+      tip: 'The pantry - produce off the field, goods out of the Cannery',
+      open: () => GAME.lvl('hoe') > 0, why: 'research The Hoe' },
+    { act: 'crew',        icon: 'hands',  name: 'CREW',
+      tip: 'The crew - posters, applications and the payroll; the HR security room once it is built',
       open: () => GAME.lvl('hiring'), why: 'research Recruiting' },
-    { act: 'open-depot', icon: 'truck',  name: 'DEPOT',
-      tip: 'Logistics - vehicles, routes and the wall map',
+    { act: 'open-wmap',   icon: 'road',   name: 'MAP',
+      tip: 'The valley map - towns, roads, weather, your vehicle on its way',
       open: () => GAME.depotOpen(), why: 'research Logistics' },
-    { act: 'open-world', icon: 'globe',  name: 'WORLD',
+    { act: 'open-garage', icon: 'truck',  name: 'GARAGE',
+      tip: 'The garage - buy, paint and upgrade the wheels; pick how you drive',
+      open: () => GAME.depotOpen(), why: 'research Logistics' },
+    { act: 'open-world',  icon: 'globe',  name: 'WORLD',
       tip: 'The world - branches abroad, and the Moon',
       open: () => GAME.lvl('worldmap') > 0, why: 'research the World Map' },
-    { act: 'open-genes', icon: 'dna',    name: 'GENES',
+    { act: 'open-genes',  icon: 'dna',    name: 'GENES',
       tip: 'The Gene Lab - read, splice, clone and cross your hens',
       open: () => GAME.hasGeneLab(), why: GAME.lvl('genelab') ? 'build a Gene Lab' : 'research the Gene Lab' },
+    { act: 'open-ach',    icon: 'medal',  name: 'AWARDS',
+      tip: 'Achievements and the wardrobe they unlock', open: () => true },
   ];
   let crewBadgeDesk = null;
   function renderDeskbar() {
@@ -3231,7 +3400,7 @@
         build: 'Build - place machines and buildings',
         inspect: 'Inspect - tap anything for its stats',
       }[id];
-      b.appendChild(mkIcon(TOOL_ICON[id], 3));
+      b.appendChild(cloneCanvas(SPR.toolIconSprite(TOOL_ICON[id], 3)));
       const lab = document.createElement('small');
       lab.textContent = TOOL_LABEL[id];
       b.appendChild(lab);
@@ -3307,6 +3476,8 @@
       else if (type === 'park') drawPark(0, 0, { slots: [] }, now);
       else if (type === 'timemachine') drawTimeMachine(0, 0, { on: false, t: 0, T: 1 }, now);
       else if (type === 'billboard') drawBillboard(0, 0, { art: null }, now);
+      else if (type === 'hr') drawHR(0, 0, {}, now);
+      else if (type === 'cannery') drawCannery(0, 0, { recipe: 'flour', cook: null }, now);
       else drawIncubator(0, 0, { queue: [], prog: 0 }, now);
     } finally {
       ctx = saved;
@@ -3590,6 +3761,28 @@
     set(el.cap, n + '/' + capn);
     const full = n >= capn;
     if (el.capPill.classList.contains('full') !== full) el.capPill.classList.toggle('full', full);
+    if (el.food) {
+      set(el.food, GAME.fmt(GAME.pantryTotal()));
+      const canPantry = GAME.lvl('hoe') > 0;
+      if (el.foodPill.hidden !== !canPantry) el.foodPill.hidden = !canPantry;
+    }
+    if (el.sky) {
+      const w = GAME.weather, ph = GAME.dayPhase();
+      const night = GAME.setting('dayNight') && (ph > 0.78 || ph < 0.08);
+      const txt = w.rain ? 'RAIN' : night ? 'NIGHT' : ph > 0.66 ? 'DUSK' : ph < 0.16 ? 'DAWN' : 'CLEAR';
+      if (el.skyPill.dataset.sky !== txt) {
+        el.skyPill.dataset.sky = txt;
+        el.skyPill.innerHTML = '';
+        el.skyPill.appendChild(mkIcon(w.rain ? 'water' : night ? 'moon' : 'sparkle', 2));
+        const sb = document.createElement('b'); sb.textContent = txt; el.skyPill.appendChild(sb);
+      }
+    }
+    /* a number that just changed pops */
+    [['coins', el.coins], ['feathers', el.feathers]].forEach(([k, node]) => {
+      const v = node.textContent;
+      if (node.dataset.last !== undefined && node.dataset.last !== v) { node.classList.remove('pop'); void node.offsetWidth; node.classList.add('pop'); }
+      node.dataset.last = v;
+    });
     if (el.agePill && ageShown !== GAME.ageIndex()) {
       ageShown = GAME.ageIndex();
       el.agePill.innerHTML = '';
@@ -3602,7 +3795,7 @@
     updateCursorChip();
     updateCrewBadge();
     hintLogic();
-    renderDialogue();
+    if (window.QUESTS_UI) QUESTS_UI.update();
     refreshInspect();
     /* the card under the Lab screen keeps up with your feathers */
     if (!$('#modal-skills').hidden && skillCardFeathers !== S().feathers) { renderSkillCard(); $('#research-sub').textContent = GAME.fmt(S().feathers) + ' FEATHERS'; }
@@ -3646,7 +3839,7 @@
     /* his portrait, framed like a staff photo */
     const face = document.createElement('div');
     face.className = 'qd-face';
-    face.appendChild(cloneCanvas(SPR.raccoonSprite(cheering ? 'cheer' : 'boss', 1), 3));
+    face.appendChild(cloneCanvas(SPR.raccoonSprite(cheering ? 'cheer' : 'boss', 1, S().wardrobe), 3));
     box.appendChild(face);
     const body = document.createElement('div');
     body.className = 'qd-body';
@@ -3856,8 +4049,20 @@
      covers it. Blank the strap instead of removing it: taking it out of
      the row would widen the stage and snap it back again. */
   function railUp(up) { const a = $('#app'); if (a) a.classList.toggle('title-up', !up); }
-  function showTitle() { titleEl.hidden = false; railUp(false); setInspect(null); introMode = null; $('#intro-ui').hidden = true; $('#company-form').hidden = true; $('#title-buttons').hidden = false; }
-  function hideTitle() { titleEl.hidden = true; railUp(true); S().seenTitle = true; introMode = null; }
+  function showTitle() {
+    titleEl.hidden = false; railUp(false); setInspect(null); introMode = null; closeModals();
+    $('#intro-ui').hidden = true; $('#company-form').hidden = true; $('#title-buttons').hidden = true;
+    if (window.MENU) MENU.show(); else $('#title-buttons').hidden = false;
+  }
+  function hideTitle() { titleEl.hidden = true; railUp(true); S().seenTitle = true; introMode = null; if (window.MENU) MENU.hide(); }
+  /* the world after a slot change or a reset: everything baked from the save is stale */
+  function reloadWorld() {
+    buildGround(); terrDirty = true; leaves = [];
+    buildSel = null; setInspect(null);
+    renderToolbelt(); renderPalette(); updateCursorChip();
+    GAME.clampCam();
+    questSig = '';
+  }
 
   /* ================= THE INTRO =================
      A raccoon gets a letter: Grandmama's farm is theirs. One old
@@ -3869,11 +4074,13 @@
     { bg: 'night', pose: 'read', lines: ['A LETTER CAME FOR A RACCOON.', '"GRANDMAMA HAS LEFT YOU THE FARM.', 'MIND THE HEN. SHE IS PARTICULAR."'] },
     { bg: 'day',   pose: 'walk', lines: ['ONE OLD HEN. ONE BARE FIELD.', 'ONE BICYCLE WITH A BASKET.', 'NOT MUCH OF AN INHERITANCE.'] },
     { bg: 'dream', pose: 'boss', lines: ['BUT A RACCOON HAS PLANS.', 'EGGS. LOTS OF EGGS. TRUCKS OF EGGS.', 'TIME TO START A COMPANY.'] },
+    { bg: 'factory', pose: 'guitar', lines: ['AND THE RACCOON HAD A THOUGHT.', 'FACTORIES. TRUCKS. A LIMOUSINE.', '"HOW BAD CAN I POSSIBLY BE?"'] },
   ];
   let introMode = null, introScene = 0, introT = 0;
   function startIntro() {
     introMode = 'scene'; introScene = 0; introT = 0;
     $('#title-buttons').hidden = true;
+    if (window.MENU) MENU.hide();
     $('#intro-ui').hidden = false;
     $('#company-form').hidden = true;
     snd.plop();
@@ -3950,6 +4157,19 @@
       tctx.drawImage(case2, Math.round(wx) - 26, gy - 28);
       /* dust as it walks */
       if (wx < 150 && Math.floor(now / 200) % 2) { tctx.fillStyle = 'rgba(200,180,140,.6)'; tctx.fillRect(Math.round(wx) - 6, gy + 2, 4, 2); }
+    } else if (sc.bg === 'factory') {
+      /* the plan: him in the green suit with the guitar, factories rising behind, chickens filing past */
+      for (let i = 0; i < 4; i++) {
+        const fx = 40 + i * 84, rise = Math.min(1, Math.max(0, introT * 0.7 - i * 0.4)), fh = Math.round((36 + (i % 2) * 14) * rise);
+        tctx.fillStyle = '#2a1e3c'; tctx.fillRect(fx, gy - fh, 40, fh); tctx.fillRect(fx + 30, gy - fh - Math.round(14 * rise), 6, Math.round(14 * rise));
+        for (let wy = 6; wy < fh - 6; wy += 9) for (let wx = 4; wx < 34; wx += 9) { tctx.fillStyle = (Math.floor(now / 1200) + wx + wy) % 3 ? '#ffd23f' : '#4a3a5a'; tctx.fillRect(fx + wx, gy - fh + wy, 4, 4); }
+        if (rise >= 1) for (let s2 = 0; s2 < 3; s2++) { const t = ((now / 1200 + s2 * 0.33) % 1); tctx.fillStyle = 'rgba(200,200,210,' + (0.6 - t * 0.5).toFixed(2) + ')'; tctx.fillRect(fx + 30 + Math.round(Math.sin(now / 400 + s2) * 3), Math.round(gy - fh - 16 - t * 24), 6 - Math.floor(t * 3), 3); }
+      }
+      const rac = SPR.raccoonSprite(Math.floor(now / 250) % 2 ? 'guitar1' : 'guitar0', 4, Object.assign({}, S().wardrobe, { suit: 'suit_green', glasses: 'gl_star', acc: 'acc_guitar' }));
+      const rhop = Math.abs(Math.sin(now / 250)) * 6;
+      tctx.drawImage(rac, 160 - (rac.ox || 0) * 4, gy - rac.height + 6 - rhop);
+      for (let i = 0; i < 4; i++) { const cx = ((now / 30 + i * 90) % (TW + 60)) - 30; const c = SPR.chickenSprite(SPECIES[(i * 5) % 20], 2, false); tctx.drawImage(c, Math.round(cx), gy - c.height + 4 - Math.abs(Math.sin(now / 200 + i)) * 3); }
+      for (let i = 0; i < 12; i++) { const cy = ((now / 12 + i * 37) % (gy + 20)) - 10; tctx.fillStyle = '#ffd23f'; tctx.fillRect((i * 67 + 20) % 384, Math.round(cy), 3, 3); }
     } else {
       /* the dream: coins piling, a tower rising, the raccoon in a top hat */
       const rac = SPR.raccoonSprite('boss', 4);
@@ -4116,7 +4336,7 @@
     body.className = 'cf-body';
     const photo = document.createElement('div');
     photo.className = 'cf-photo';
-    photo.appendChild(cloneCanvas(SPR.raccoonSprite('boss', 1), 3));
+    photo.appendChild(cloneCanvas(SPR.raccoonSprite('boss', 1, S().wardrobe), 3));
     body.appendChild(photo);
     const fields = document.createElement('div');
     fields.className = 'cf-fields';
@@ -4224,7 +4444,6 @@
     snd.grand();
     if (companyInIntro) {
       $('#company-form').hidden = true;
-      $('#title-buttons').hidden = false;
       hideTitle();
       const q = GAME.currentQuest();
       toast({ icon: S().company.logo, title: S().company.name + ' IS OPEN', body: q ? 'First job: ' + q.name.toLowerCase() + '. ' + q.hint + '.' : 'Good luck.', long: true });
@@ -4958,7 +5177,7 @@
      you have installed or could install right now are on the map;
      the rest is dark. A pixel mouse pointer follows your finger.
      ============================================================ */
-  const TERM_W = 760, TERM_H = 440, TK = 2;
+  const TERM_W = 1140, TERM_H = 660, TK = 3;
   const VW = TERM_W / TK, VH = TERM_H / TK;         /* 380 x 220 */
   const SCR = { x: 18, y: 10, w: 344, h: 166 };     /* the glass */
   const MAPW = { x: SCR.x + 4, y: SCR.y + 4, w: 236, h: 146 };
@@ -6166,6 +6385,18 @@
         ipanel.appendChild(ipRow('staff', () => S().staff.length + ' / ' + GAME.staffSlots()));
         ipanel.appendChild(ipRow('wages', () => GAME.wagePerSec().toFixed(2) + '/s'));
         btns.push({ label: 'HIRE CREW', data: { act: 'open-hire' }, cls: 'btn-green' });
+      } else if (o.type === 'cannery') {
+        const cn = st.canneries[o.k];
+        if (!cn) { setInspect({ kind: 'farm' }); return; }
+        ipanel.appendChild(ipRow('making', () => { const G = GOODS[cn.recipe] || GOODS.flour; return G.name + (cn.cook ? ' ' + Math.round(Math.min(1, cn.cook.t / cn.cook.T) * 100) + '%' : GAME.canMake(cn.recipe) ? ' - starting' : ' - short of produce'); }));
+        ipanel.appendChild(ipRow('needs', () => { const G = GOODS[cn.recipe] || GOODS.flour; return Object.keys(G.need).map(k => G.need[k] + ' ' + PRODUCE[k].name.toLowerCase()).join(', '); }));
+        ipanel.appendChild(ipRow('made here', () => String(cn.made || 0)));
+        btns.push({ label: 'THE PANTRY', data: { act: 'open-food' } });
+        btns.push({ label: 'CHANGE RECIPE', data: { act: 'open-food', tab: 'cannery' } });
+      } else if (o.type === 'hr') {
+        ipanel.appendChild(ipRow('on the payroll', () => S().staff.length + ' / ' + GAME.staffSlots()));
+        ipanel.appendChild(ipRow('trained', () => String(S().stats.trained)));
+        btns.push({ label: 'SECURITY ROOM', data: { act: 'open-hr' }, cls: 'btn-green' });
       } else if (o.type === 'kitchen') {
         const kt = st.kitchens[o.k];
         if (!kt) { setInspect({ kind: 'farm' }); return; }
@@ -7513,10 +7744,23 @@
     const st = GAME.inStation(x, y, 5);
     if (st === 'lab') { renderSkills(); openModal('#modal-skills'); snd.build(); return true; }
     if (st === 'stand') { renderPedia(); openModal('#modal-pedia'); snd.build(); return true; }
-    if (st === 'depot') { renderDepot(); openModal('#modal-depot'); snd.build(); return true; }
+    if (st === 'depot') { if (window.WMAP) WMAP.open(); else { renderDepot(); openModal('#modal-depot'); } snd.build(); return true; }
     if (st === 'brand') { openCompany(); snd.build(); return true; }
     const fos = GAME.fossilAt(x, y);
     if (fos && GAME.collectFossil(fos)) { snd.sparkle(); floatWorld('FOSSIL', x, y - 14, 'gold', 'fossil'); return true; }
+    const gift = GAME.presentAt(x, y);
+    if (gift) {
+      const rw = GAME.openPresent(gift);
+      if (rw) {
+        snd.grand(); puff(gift.x, gift.y - 8, S().company.col2, 16, 60, 40); coinBurst(gift.x, gift.y - 6, rw.c ? 10 : 3);
+        if (rw.c) floatWorld('+' + GAME.fmt(rw.c), gift.x, gift.y - 22, 'gold', 'coin');
+        if (rw.f) floatWorld('+' + rw.f + ' FEATHERS', gift.x, gift.y - 34, 'green', 'feather');
+        if (rw.cos && rw.cos.length) floatWorld('NEW OUTFIT', gift.x, gift.y - 46, 'pink', 'star');
+      }
+      return true;
+    }
+    const lm = GAME.limo;
+    if (lm && x > lm.x - 4 && x < lm.x + 44 && y > lm.y - 8 && y < lm.y + 18) { snd.engine(); floatWorld('HONK HONK', x, y - 14, 'gold'); return true; }
     const mv = GAME.movers.van;
     if (mv && x > mv.x - 4 && x < mv.x + 44 && y > mv.y - 8 && y < mv.y + 20) {
       if (GAME.findSecret('vanmover')) snd.grand(); else { snd.engine(); floatWorld('HONK', x, y - 14, 'gold'); }
@@ -7554,6 +7798,8 @@
     if (o && o.type === 'staffhut' && S().tool !== 'build') {
       renderHire(); openModal('#modal-hire'); snd.build(); return true;
     }
+    if (o && o.type === 'hr' && S().tool !== 'build') { if (window.HR) HR.open(); snd.build(); return true; }
+    if (o && o.type === 'cannery' && S().tool !== 'build') { setInspect({ kind: 'build', ref: o }); snd.plop(); return true; }
     if (o && o.type === 'lovenest' && S().tool === 'hand' && !S().held) {
       if (GAME.ejectNest(o.k)) { snd.plop(); return true; }
     }
@@ -7921,10 +8167,18 @@
       case 'close-modal': closeModals(); break;
       case 'close-inspect': setInspect(null); break;
       case 'start-game': { if (!S().company.done) startIntro(); else { hideTitle(); snd.sparkle(); } break; }
-      case 'title': showTitle(); $('#menu-pop').hidden = true; break;
+      case 'title': GAME.save(); showTitle(); $('#menu-pop').hidden = true; break;
+      case 'open-quests': { if (window.QUESTS_UI) QUESTS_UI.open(); snd.build(); break; }
+      case 'open-food': { if (window.FOODUI) FOODUI.open(btn.dataset.tab); snd.build(); break; }
+      case 'open-garage': { if (window.GARAGE) GARAGE.open(); snd.build(); break; }
+      case 'open-wmap': { if (window.WMAP) WMAP.open(); snd.build(); break; }
+      case 'open-hr': { if (window.HR) HR.open(); snd.build(); break; }
+      case 'open-settings': { if (window.MENU) MENU.openSettings(); $('#menu-pop').hidden = true; snd.build(); break; }
+      case 'open-wardrobe': { if (window.MENU) MENU.openWardrobe(); $('#menu-pop').hidden = true; snd.build(); break; }
+      case 'open-ach': { if (window.MENU) MENU.openAch(); $('#menu-pop').hidden = true; snd.build(); break; }
       case 'crew': {
-        renderHire();
-        openModal('#modal-hire');
+        if (GAME.hasHR() && window.HR) HR.open();
+        else { renderHire(); openModal('#modal-hire'); }
         $('#menu-pop').hidden = true;
         snd.build();
         break;
@@ -7976,7 +8230,7 @@
       case 'index-tab': { indexTab = btn.dataset.tab; flipBook(); renderPedia(); break; }
       case 'harvest-here': { const [c, r] = btn.dataset.k.split(',').map(Number); if (!GAME.harvest(c, r)) snd.error(); refreshInspect(); break; }
       case 'untill-here': { const [c, r] = btn.dataset.k.split(',').map(Number); if (GAME.untill(c, r)) { snd.demolish(); setInspect({ kind: 'farm' }); } else snd.error(); break; }
-      case 'open-depot': renderDepot(); openModal('#modal-depot'); break;
+      case 'open-depot': { if (window.WMAP) WMAP.open(); else { renderDepot(); openModal('#modal-depot'); } break; }
       case 'buy-vehicle': { if (GAME.buyVehicle()) renderDepot(); else snd.error(); break; }
       case 'buy-route': { if (GAME.buyRoute(btn.dataset.id)) renderDepot(); else snd.error(); break; }
       case 'set-route': { if (GAME.setRoute(btn.dataset.id)) { snd.plop(); renderDepot(); } else snd.error(); break; }
@@ -8103,15 +8357,11 @@
         } else snd.error();
         break;
       }
-      case 'mute':
-        S().muted = !S().muted;
-        btn.textContent = S().muted ? 'SOUND OFF' : 'SOUND ON';
-        break;
+      case 'mute': GAME.setSetting('sound', !GAME.setting('sound')); break;
       case 'save': GAME.save(); floatText('SAVED', ev.clientX - 20, ev.clientY - 24, 'green'); break;
       case 'reset':
         if (confirm('Reset everything? The chickens will write memoirs.')) {
-          GAME.reset(); buildSel = null; setInspect(null);
-          renderToolbelt(); renderPalette(); updateCursorChip();
+          GAME.reset(); reloadWorld(); closeModals();
         }
         break;
     }
@@ -8168,12 +8418,20 @@
     floatWorld('TO ' + to.name.toUpperCase(), W.truckHome.x + 20, W.roadY - 26, 'gold');
   });
   GAME.on('home', () => { puff(W.truckHome.x + 30, W.roadY + 8, '#c9a35f', 6, 30, 12); });
-  GAME.on('quest', ({ q }) => {
-    snd.grand();
-    const rw = [q.rw.c ? '+' + q.rw.c + ' coins' : '', q.rw.f ? '+' + q.rw.f + ' feathers' : ''].filter(Boolean).join(', ');
-    toast({ icon: q.icon, title: 'QUEST DONE', body: rw, long: true });
-    questSig = '';
-  });
+  GAME.on('quest', ({ q }) => { snd.grand(); questSig = ''; });
+  GAME.on('questready', ({ q }) => { snd.sparkle(); const b = GAME.boss(); if (b) { heart(b.x + 10, b.y - 6, 3); } floatText('QUEST READY: ' + q.name.toUpperCase(), innerWidth / 2 - 90, 90, 'gold', 'quest'); });
+  GAME.on('limo', ({ state, x, y }) => { if (state === 'here') { snd.engine(); floatWorld('A DELIVERY', x + 20, y - 18, 'gold', 'star'); } else if (state === 'coming') snd.engine(); });
+  GAME.on('present', ({ p, state }) => { if (state === 'dropped') { snd.plop(); puff(p.x, p.y - 4, '#c9a35f', 6, 24, 14); } });
+  GAME.on('achievement', ({ a }) => { snd.grand(); floatText('ACHIEVEMENT: ' + a.name.toUpperCase(), innerWidth / 2 - 100, 130, 'pink', 'medal'); });
+  GAME.on('canned', ({ id, x, y }) => { puff(x, y, GOODS[id].col, 6, 24, 20); floatWorld(GOODS[id].name.toUpperCase(), x, y - 10, 'green', GOODS[id].icon); snd.clink(); });
+  GAME.on('produce', ({ c, r, id, n }) => { floatWorld('+' + n + ' ' + PRODUCE[id].name.toUpperCase(), c * 16 + 8, r * 16 - 18, 'gold', 'crate'); });
+  GAME.on('eat', ({ ch, prem }) => { if (GAME.setting('particles')) puff(ch.x + 10, ch.y + 14, prem ? '#ffd23f' : '#e8b84c', prem ? 6 : 3, 16, 12); });
+  GAME.on('soldfood', ({ got }) => { snd.coin(); });
+  GAME.on('factory', ({ city }) => { snd.grand(); });
+  GAME.on('upgrade', () => { snd.skill(); });
+  GAME.on('train', ({ w, stat }) => { snd.sparkle(); floatWorld('+1 ' + STATS[stat].name, w.x + 6, w.y - 10, 'green', STATS[stat].icon); });
+  GAME.on('slot', () => { reloadWorld(); });
+  GAME.on('settings', ({ k, v }) => { if (k === 'bigUI') document.body.classList.toggle('big-ui', !!v); });
   GAME.on('customer', ({ o }) => { snd.plop(); floatWorld(o.who + ': ' + o.n + ' EGGS', o.x + 14, o.y - 28, 'gold', 'doc'); });
   GAME.on('orderdone', ({ o }) => { snd.grand(); puff(o.x + 14, o.y, '#ffd23f', 10, 34, 26); floatWorld('+' + GAME.fmt(o.pay), o.x + 14, o.y - 30, 'gold', 'coin'); });
   GAME.on('ordermiss', ({ o }) => { snd.error(); puff(o.x + 14, o.y + 4, '#8a8f98', 6, 24, 14); floatWorld('DROVE OFF', o.x + 14, o.y - 26, 'pink'); });
@@ -8240,6 +8498,21 @@
     snd.sparkle();
   });
 
+  /* ================= THE HELPER BAG =================
+     The modules in their own files - the menu, the quest board, the
+     pantry, the garage, the map and the HR room - reach the view
+     through this and nothing else. */
+  const UI = {
+    $, S, W, snd, mkIcon, cloneCanvas, floatText, floatWorld, toast, openModal, closeModals, setInspect, refreshInspect,
+    puff, heart, coinBurst, worldToScreen, cam, paintCloud,
+    showTitle, hideTitle, startIntro, openCompany, reloadWorld, renderToolbelt, renderPalette, renderHire,
+    cameraFeed, buildingThumb, statRow, statBlock, traitChips, crewCard, applicantCard, noticeBoard, botBench,
+    labOn(id) { termSel = id; renderSkills(); openModal('#modal-skills'); if (id) centerOn(id); },
+    get SC() { return SC; }, get titleHidden() { return titleEl.hidden; }, get introMode() { return introMode; },
+    railUp,
+  };
+  window.UI = UI;
+
   /* ================= BOOT ================= */
   function boot() {
     GAME.load();
@@ -8250,10 +8523,9 @@
     renderPalette();
     updateCursorChip();
     requestAnimationFrame(syncCamPad);
-    if (S().seenTitle) titleEl.hidden = true;
-    railUp(titleEl.hidden);
-    const mb = $('#btn-mute');
-    if (mb) mb.textContent = S().muted ? 'SOUND OFF' : 'SOUND ON';
+    /* the modules that live in their own files hook up here */
+    [window.QUESTS_UI, window.FOODUI, window.GARAGE, window.WMAP, window.HR, window.MENU].forEach(m => { if (m && m.init) m.init(UI); });
+    showTitle();
     if (off && (off.laid > 0 || off.hatched > 0 || off.pay > 0)) {
       toast({
         icon: 'egg',
@@ -8291,12 +8563,14 @@
         if (ey < 0.05) pdy -= 1; if (ey > 0.95) pdy += 1;
       }
       if (pdx || pdy) { cam().x += pdx * 150 * dt; cam().y += pdy * 150 * dt; GAME.clampCam(); }
-      if (!titleEl.hidden) { if (introMode) drawIntro(dt); else drawTitleScreen(dt); }
+      if (!titleEl.hidden) { if (introMode) drawIntro(dt); else if (window.MENU) MENU.draw(dt, now); else drawTitleScreen(dt); }
       render(now, dt);
       if (!$('#modal-skills').hidden) drawTerm(now);
       if (!$('#modal-genes').hidden) drawGenes(now);
       if (!$('#modal-world').hidden) drawWorld(now);
       if (!$('#modal-depot').hidden && mapCv) drawValleyMap(now);
+      if (window.WMAP && !$('#modal-wmap').hidden) WMAP.draw(now, dt);
+      if (window.HR && !$('#modal-hr').hidden) HR.draw(now, dt);
       drawTrip(now);
       hudAcc += dt;
       if (hudAcc > 0.12) {

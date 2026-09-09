@@ -23,6 +23,8 @@
         <span class="pill" id="pill-feathers" title="Feathers, for research at the Lab"><b id="r-feathers">0</b></span>
         <span class="pill" id="pill-feed" title="Feed pellets in the barn"><b id="r-feed">0/40</b></span>
         <span class="pill" id="pill-cap" title="Chickens on the ranch"><b id="r-cap">0/10</b></span>
+        <button class="pill" id="pill-food" data-act="open-food" title="The pantry - produce and goods, tap to open"><b id="r-food">0</b></button>
+        <span class="pill" id="pill-sky" title="The weather over the valley"><b id="r-sky">CLEAR</b></span>
         <button class="pill" id="pill-age" data-act="open-ages" title="The age the company is in - tap for what the next one needs"><b id="r-age">STRAW AGE</b></button>
       </div>
     </div>
@@ -34,18 +36,19 @@
     </div>
 
     <div id="menu-pop" hidden>
-      <button class="btn" id="btn-mute" data-act="mute">SOUND ON</button>
-      <button class="btn" data-act="crew">CREW</button>
+      <button class="btn" data-act="open-settings">SETTINGS</button>
+      <button class="btn" data-act="open-wardrobe">WARDROBE</button>
+      <button class="btn" data-act="open-ach">ACHIEVEMENTS</button>
       <button class="btn" data-act="open-company">COMPANY</button>
       <button class="btn" data-act="save">SAVE</button>
-      <button class="btn" data-act="title">TITLE</button>
-      <button class="btn" data-act="reset">RESET</button>
+      <button class="btn" data-act="title">MAIN MENU</button>
     </div>
 
     <div id="inspect-panel" hidden></div>
     <div id="title-screen">
       <canvas id="title-canvas" width="384" height="208"></canvas>
-      <div id="title-buttons">
+      <div id="menu-ui" hidden></div>
+      <div id="title-buttons" hidden>
         <button class="btn btn-green" data-act="start-game">START</button>
       </div>
       <div id="intro-ui" hidden>
@@ -54,7 +57,7 @@
       </div>
       <div id="company-form" hidden></div>
     </div>
-    <div id="quest-dialogue" hidden></div>
+    <div id="todo-panel" hidden></div>
     <div id="cursor-chip" hidden></div>
   </div>
 
@@ -174,6 +177,92 @@
     </div>
   </div>
 
+  <!-- THE QUEST BOARD: what the founder wants, several at a time, claimed by hand -->
+  <div class="modal" id="modal-quests" hidden>
+    <div class="modal-panel board">
+      <div class="modal-head">
+        <h2>THE QUEST BOARD</h2>
+        <span class="panel-sub" id="quests-sub"></span>
+        <button class="btn btn-tiny" data-act="close-modal">CLOSE</button>
+      </div>
+      <div id="quests-body"></div>
+    </div>
+  </div>
+
+  <!-- THE WORLD MAP: the valley, its towns and its roads, live -->
+  <div class="modal dark" id="modal-wmap" hidden>
+    <div class="modal-panel wmap">
+      <div class="modal-head">
+        <h2>THE VALLEY MAP</h2>
+        <span class="panel-sub" id="wmap-sub"></span>
+        <button class="btn btn-tiny" data-act="close-modal">CLOSE</button>
+      </div>
+      <div id="wmap-wrap">
+        <canvas id="wmap-canvas" width="960" height="540"></canvas>
+        <div id="wmap-side"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- THE GARAGE: wheels, paint, upgrades and the way you drive -->
+  <div class="modal dark" id="modal-garage" hidden>
+    <div class="modal-panel garage">
+      <div class="modal-head">
+        <h2>THE GARAGE</h2>
+        <span class="panel-sub" id="garage-sub"></span>
+        <button class="btn btn-tiny" data-act="close-modal">CLOSE</button>
+      </div>
+      <div id="garage-body"></div>
+    </div>
+  </div>
+
+  <!-- THE HR OFFICE: a wall of cameras on every worker -->
+  <div class="modal dark" id="modal-hr" hidden>
+    <div class="modal-panel hrroom">
+      <div class="modal-head">
+        <h2>HR - SECURITY ROOM</h2>
+        <span class="panel-sub" id="hr-sub"></span>
+        <button class="btn btn-tiny" data-act="close-modal">CLOSE</button>
+      </div>
+      <div id="hr-wrap">
+        <canvas id="hr-canvas" width="900" height="500"></canvas>
+        <div id="hr-side"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- THE PANTRY: produce off the field and goods out of the Cannery -->
+  <div class="modal" id="modal-food" hidden>
+    <div class="modal-panel pantry">
+      <div class="modal-head">
+        <h2>THE PANTRY</h2>
+        <span class="panel-sub" id="food-sub"></span>
+        <button class="btn btn-tiny" data-act="close-modal">CLOSE</button>
+      </div>
+      <div id="food-body"></div>
+    </div>
+  </div>
+
+  <!-- SETTINGS, WARDROBE, ACHIEVEMENTS - shared by the menu and the game -->
+  <div class="modal" id="modal-settings" hidden>
+    <div class="modal-panel small">
+      <div class="modal-head"><h2>SETTINGS</h2><button class="btn btn-tiny" data-act="close-modal">CLOSE</button></div>
+      <div id="settings-body"></div>
+    </div>
+  </div>
+  <div class="modal" id="modal-wardrobe" hidden>
+    <div class="modal-panel wardrobe">
+      <div class="modal-head"><h2>THE WARDROBE</h2><span class="panel-sub" id="wardrobe-sub"></span><button class="btn btn-tiny" data-act="close-modal">CLOSE</button></div>
+      <div id="wardrobe-body"></div>
+    </div>
+  </div>
+  <div class="modal" id="modal-ach" hidden>
+    <div class="modal-panel ach">
+      <div class="modal-head"><h2>ACHIEVEMENTS</h2><span class="panel-sub" id="ach-sub"></span><button class="btn btn-tiny" data-act="close-modal">CLOSE</button></div>
+      <div id="ach-body"></div>
+    </div>
+  </div>
+
   <div id="fx-layer"></div>
   <div id="toasts"></div>
 </div>
@@ -182,5 +271,11 @@
 <script src="js/sprites.js"></script>
 <script src="js/game.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/quests.js"></script>
+<script src="js/food.js"></script>
+<script src="js/garage.js"></script>
+<script src="js/worldmap.js"></script>
+<script src="js/hr.js"></script>
+<script src="js/menu.js"></script>
 </body>
 </html>
