@@ -1221,7 +1221,7 @@ const GAME = (() => {
     /* no seeds come back: the next packet is bought */
     if (d.regrow) t.growth = 0.3;
     else { t.crop = null; t.growth = 0; }
-    emit('harvest', { c, r, crop: d, n });
+    emit('harvest', { c, r, crop: d, id: t.crop || null, n });
     return n;
   }
   function tickFarm(dt) {

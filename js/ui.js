@@ -791,52 +791,314 @@
     }
   }
 
-  /* ================= PARTICLES ================= */
+  /* ============================================================
+     PARTICLES AND SCREEN FEEL
+     One flat array of particles, each with a type that says how to
+     draw it, plus three screen-wide effects (shake, flash, a hit
+     freeze) that everything else borrows to land a punch. All of it
+     is off when the particles setting is off, except the numbers,
+     which are information rather than decoration.
+     ============================================================ */
   let parts = [];
+  const PCAP = 640;                          /* a ceiling, so a long chain never stutters */
+  function pOn() { return GAME.setting('particles'); }
+  function P(p) { if (parts.length < PCAP) parts.push(p); }
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const pick = a => a[(Math.random() * a.length) | 0];
+
+  /* --- squares of dust, the old faithful --- */
   function puff(x, y, col, n, spread, up) {
+    if (!pOn()) return;
     for (let i = 0; i < n; i++) {
-      parts.push({ type: 'px', x: x + (Math.random() - 0.5) * 6, y: y + (Math.random() - 0.5) * 4,
-        vx: (Math.random() - 0.5) * (spread || 30), vy: -(up || 26) - Math.random() * 18,
-        g: 90, t: 0, life: 0.5 + Math.random() * 0.4, col, s: Math.random() < 0.4 ? 2 : 1 });
+      P({ type: 'px', x: x + rnd(-3, 3), y: y + rnd(-2, 2),
+        vx: rnd(-0.5, 0.5) * (spread || 30), vy: -(up || 26) - Math.random() * 18,
+        g: 90, drag: 1.2, t: 0, life: rnd(0.5, 0.9), col, s: Math.random() < 0.4 ? 2 : 1 });
     }
   }
+  /* --- hot sparks with a trail: hammering, machinery, impacts --- */
+  function sparks(x, y, n, col, spread) {
+    if (!pOn()) return;
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, sp = rnd(0.35, 1) * (spread || 90);
+      P({ type: 'spark', x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 20,
+        g: 220, drag: 2.4, t: 0, life: rnd(0.22, 0.46), col: col || '#ffd23f' });
+    }
+  }
+  /* --- smoke that grows as it climbs --- */
+  function smoke(x, y, n, col, rise) {
+    if (!pOn()) return;
+    for (let i = 0; i < n; i++) {
+      P({ type: 'smoke', x: x + rnd(-3, 3), y, vx: rnd(-6, 6), vy: -(rise || 12) - Math.random() * 10,
+        g: -4, t: 0, life: rnd(0.8, 1.6), col: col || 'rgba(226,226,232,1)', s: rnd(2, 4), grow: rnd(3, 7) });
+    }
+  }
+  /* --- feathers, which flutter instead of falling --- */
+  function feathers(x, y, n, col) {
+    if (!pOn()) return;
+    for (let i = 0; i < n; i++) {
+      P({ type: 'feather', x: x + rnd(-5, 5), y: y + rnd(-4, 2), vx: rnd(-16, 16), vy: rnd(-46, -18),
+        g: 42, drag: 1.6, t: 0, life: rnd(1.1, 2.0), col: col || pick(['#fff8ec', '#f2e6cf', '#e8dcc0']),
+        ph: Math.random() * 6, wob: rnd(10, 22) });
+    }
+  }
+  /* --- a ring of twinkles: something good just happened --- */
+  function twinkles(x, y, n, col, r) {
+    if (!pOn()) return;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + Math.random();
+      const rr = (r || 12) * rnd(0.6, 1.15);
+      P({ type: 'star', x: x + Math.cos(a) * rr, y: y + Math.sin(a) * rr * 0.6,
+        vx: Math.cos(a) * 10, vy: Math.sin(a) * 6 - 8, g: 0, t: 0, life: rnd(0.4, 0.8),
+        col: col || '#fff8ec', s: Math.random() < 0.4 ? 3 : 2 });
+    }
+  }
+  /* --- chips of something solid, tumbling --- */
+  function shards(x, y, n, col, spread) {
+    if (!pOn()) return;
+    for (let i = 0; i < n; i++) {
+      P({ type: 'shard', x, y, vx: rnd(-1, 1) * (spread || 60), vy: rnd(-70, -26),
+        g: 260, t: 0, life: rnd(0.5, 0.95), col: col || '#8a5e2a',
+        w: 2 + ((Math.random() * 2) | 0), h: 1 + ((Math.random() * 3) | 0), spin: rnd(-14, 14) });
+    }
+  }
+  /* --- an expanding ring, flattened to sit on the ground plane --- */
+  function ring(x, y, col, r1, life, thick) {
+    if (!pOn()) return;
+    P({ type: 'ring', x, y, vx: 0, vy: 0, g: 0, t: 0, life: life || 0.34,
+      col: col || 'rgba(255,255,255,1)', r1: r1 || 26, th: thick || 1 });
+  }
+  /* --- a four-point sparkle that pops and goes --- */
+  function glint(x, y, col, size) {
+    if (!pOn()) return;
+    P({ type: 'glint', x, y, vx: 0, vy: -6, g: 0, t: 0, life: 0.34, col: col || '#fff8ec', s: size || 4 });
+  }
+  /* --- dust kicked sideways along the ground --- */
+  function groundDust(x, y, n, col) {
+    if (!pOn()) return;
+    for (let i = 0; i < n; i++) {
+      const side = Math.random() < 0.5 ? -1 : 1;
+      P({ type: 'px', x: x + rnd(-2, 2), y: y + rnd(-1, 1), vx: side * rnd(24, 74), vy: rnd(-16, -2),
+        g: 40, drag: 3.2, t: 0, life: rnd(0.3, 0.6), col: col || '#c9a878', s: Math.random() < 0.5 ? 2 : 1 });
+    }
+  }
+  /* --- bubbles, for anything that boils or brews --- */
+  function bubbles(x, y, n, col) {
+    if (!pOn()) return;
+    for (let i = 0; i < n; i++) {
+      P({ type: 'bubble', x: x + rnd(-4, 4), y, vx: rnd(-3, 3), vy: rnd(-22, -10), g: 0,
+        t: 0, life: rnd(0.5, 1.0), col: col || '#aee7ff', s: 1 + ((Math.random() * 2) | 0), ph: Math.random() * 6 });
+    }
+  }
+  /* --- a column of light: something arrived --- */
+  function beam(x, y, col, h, life) {
+    P({ type: 'beam', x, y, vx: 0, vy: 0, g: 0, t: 0, life: life || 0.7, col: col || '#ffd23f', h: h || 60 });
+  }
+  /* --- a sprite that flies off and pops: whatever you just picked up --- */
+  function fly(canvas, x, y, opts) {
+    if (!pOn() || !canvas) return;
+    const o = opts || {};
+    P({ type: 'spr', cv: canvas, x, y, vx: o.vx === undefined ? rnd(-14, 14) : o.vx,
+      vy: o.vy === undefined ? -58 : o.vy, g: o.g === undefined ? 40 : o.g, drag: 1.1,
+      t: 0, life: o.life || 0.5, spin: o.spin === undefined ? rnd(-5, 5) : o.spin,
+      s0: o.s0 || 1, s1: o.s1 === undefined ? 1.7 : o.s1 });
+  }
+
+  /* --- a number in the world, in the game's own type --- */
+  function popNum(x, y, txt, col) {
+    P({ type: 'num', x, y, vx: rnd(-10, 10), vy: -46, g: 96, drag: 1.2, t: 0, life: 1.0,
+      col: col || '#fff8ec', txt: String(txt) });
+  }
   function heart(x, y, n) {
+    if (!pOn()) return;
     for (let i = 0; i < (n || 2); i++) {
-      parts.push({ type: 'heart', x: x + (Math.random() - 0.5) * 12, y: y - 4,
-        vx: (Math.random() - 0.5) * 8, vy: -14 - Math.random() * 8, g: 0, t: 0, life: 0.9, col: '#ff5f9e', s: 1 });
+      P({ type: 'heart', x: x + rnd(-6, 6), y: y - 4, vx: rnd(-4, 4), vy: rnd(-22, -14),
+        g: 0, drag: 0.6, t: 0, life: 1.0, col: '#ff5f9e', s: 1 });
     }
   }
   function shellBurst(x, y, tier) {
-    puff(x, y, EGG_SHELL[Math.min(tier, EGG_SHELL.length - 1)], 9, 44, 32);
+    const col = EGG_SHELL[Math.min(tier, EGG_SHELL.length - 1)];
+    shards(x, y, 7, col, 70);
     puff(x, y, '#ffffff', 4, 30, 34);
+    ring(x, y, 'rgba(255,255,255,1)', 20, 0.3);
   }
   function coinBurst(x, y, n) {
-    for (let i = 0; i < Math.min(n, 14); i++) {
-      parts.push({ type: 'coin', x, y, vx: (Math.random() - 0.5) * 50, vy: -40 - Math.random() * 30,
-        g: 130, t: 0, life: 0.8 + Math.random() * 0.3, col: '#ffd23f', s: 1 });
+    if (!pOn()) return;
+    for (let i = 0; i < Math.min(n, 16); i++) {
+      P({ type: 'coin', x, y, vx: rnd(-1, 1) * 56, vy: rnd(-78, -40),
+        g: 220, t: 0, life: rnd(0.6, 1.0), col: '#ffd23f', ph: Math.random() * 6 });
     }
   }
+  /* --- the all-purpose hit: a ring, a spray of sparks, dust below --- */
+  function impact(x, y, col, big) {
+    ring(x, y, 'rgba(255,255,255,1)', big ? 40 : 22, big ? 0.4 : 0.28, big ? 2 : 1);
+    sparks(x, y, big ? 12 : 6, col, big ? 130 : 90);
+    groundDust(x, y + 4, big ? 8 : 4);
+  }
+
   const HEART_PX = [[1,0],[3,0],[0,1],[1,1],[2,1],[3,1],[4,1],[1,2],[2,2],[3,2],[2,3]];
+  const FEATHER_PX = [[1,0],[0,1],[1,1],[2,1],[0,2],[1,2],[2,2],[1,3],[1,4]];
   function drawParts(dt) {
     parts = parts.filter(p => (p.t += dt) < p.life);
-    parts.forEach(p => {
+    for (const p of parts) {
       p.vy += (p.g || 0) * dt;
+      if (p.drag) { const d = Math.max(0, 1 - p.drag * dt); p.vx *= d; p.vy *= d; }
+      const ox = p.x, oy = p.y;
       p.x += p.vx * dt; p.y += p.vy * dt;
-      ctx.globalAlpha = Math.max(0, 1 - p.t / p.life);
-      if (p.type === 'heart') {
-        ctx.fillStyle = p.col;
-        HEART_PX.forEach(([hx, hy]) => ctx.fillRect(Math.round(p.x + hx), Math.round(p.y + hy), 1, 1));
-        ctx.fillStyle = '#ffb0d0';
-        ctx.fillRect(Math.round(p.x + 1), Math.round(p.y + 1), 1, 1);
-      } else if (p.type === 'coin') {
-        ctx.fillStyle = '#e0a416'; ctx.fillRect(Math.round(p.x), Math.round(p.y), 3, 3);
-        ctx.fillStyle = '#ffd23f'; ctx.fillRect(Math.round(p.x), Math.round(p.y), 2, 2);
-        ctx.fillStyle = '#fff2b0'; ctx.fillRect(Math.round(p.x), Math.round(p.y), 1, 1);
-      } else {
-        ctx.fillStyle = p.col;
-        ctx.fillRect(Math.round(p.x), Math.round(p.y), p.s, p.s);
+      const f = p.t / p.life;
+      ctx.globalAlpha = Math.max(0, 1 - f * f);
+      const X = Math.round(p.x), Y = Math.round(p.y);
+      switch (p.type) {
+        case 'heart':
+          ctx.fillStyle = p.col;
+          HEART_PX.forEach(([hx, hy]) => ctx.fillRect(X + hx, Y + hy, 1, 1));
+          ctx.fillStyle = '#ffb0d0'; ctx.fillRect(X + 1, Y + 1, 1, 1);
+          break;
+        case 'coin': {
+          /* it flips as it flies */
+          const w = 1 + Math.round(Math.abs(Math.cos(p.t * 15 + p.ph)) * 2);
+          ctx.fillStyle = '#8a6410'; ctx.fillRect(X, Y, w, 4);
+          ctx.fillStyle = '#ffd23f'; ctx.fillRect(X, Y, w, 3);
+          ctx.fillStyle = '#fff2b0'; ctx.fillRect(X, Y, Math.min(w, 1), 1);
+          break;
+        }
+        case 'spark': {
+          /* a short streak back along its own path, hottest at the head */
+          ctx.fillStyle = p.col;
+          ctx.fillRect(X, Y, 1, 1);
+          const bx = Math.round(ox), by = Math.round(oy);
+          if (bx !== X || by !== Y) { ctx.globalAlpha *= 0.6; ctx.fillRect(bx, by, 1, 1); }
+          ctx.globalAlpha = Math.max(0, 1 - f * f);
+          if (f < 0.35) { ctx.fillStyle = '#ffffff'; ctx.fillRect(X, Y, 1, 1); }
+          break;
+        }
+        case 'smoke': {
+          const s = Math.max(1, Math.round(p.s + f * p.grow));
+          ctx.globalAlpha *= 0.62;
+          ctx.fillStyle = p.col;
+          ctx.fillRect(X - (s >> 1), Y - (s >> 1), s, s);
+          ctx.fillRect(X - (s >> 1) - 1, Y - (s >> 1) + 1, s + 2, Math.max(1, s - 2));
+          break;
+        }
+        case 'feather': {
+          const wob = Math.sin(p.t * 6 + p.ph) * p.wob;
+          ctx.fillStyle = p.col;
+          FEATHER_PX.forEach(([hx, hy]) => ctx.fillRect(X + Math.round(wob * 0.1) + hx, Y + hy, 1, 1));
+          ctx.fillStyle = 'rgba(140,130,110,.5)'; ctx.fillRect(X + Math.round(wob * 0.1) + 1, Y + 2, 1, 2);
+          break;
+        }
+        case 'star': {
+          const s = Math.max(1, Math.round(Math.sin(Math.min(1, f * 1.2) * Math.PI) * p.s) || 1);
+          ctx.fillStyle = p.col;
+          ctx.fillRect(X - s, Y, s * 2 + 1, 1);
+          ctx.fillRect(X, Y - s, 1, s * 2 + 1);
+          break;
+        }
+        case 'shard': {
+          ctx.save();
+          ctx.translate(X, Y); ctx.rotate(p.t * p.spin);
+          ctx.fillStyle = '#171420'; ctx.fillRect(-p.w / 2 - 1, -p.h / 2 - 1, p.w + 2, p.h + 2);
+          ctx.fillStyle = p.col; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+          ctx.restore();
+          break;
+        }
+        case 'ring': {
+          const r = 2 + Math.pow(f, 0.6) * p.r1;              /* fast out, then eases */
+          ctx.globalAlpha = Math.max(0, 1 - f);
+          const steps = Math.max(12, Math.round(r * 2));
+          ctx.fillStyle = p.col;
+          for (let i = 0; i < steps; i++) {
+            const a = (i / steps) * Math.PI * 2;
+            ctx.fillRect(Math.round(p.x + Math.cos(a) * r), Math.round(p.y + Math.sin(a) * r * 0.55), p.th, p.th);
+          }
+          if (f < 0.3) {                                      /* a hot inner ring while it is young */
+            ctx.globalAlpha = (1 - f / 0.3) * 0.8;
+            ctx.fillStyle = '#ffffff';
+            for (let i = 0; i < steps; i += 2) {
+              const a = (i / steps) * Math.PI * 2;
+              ctx.fillRect(Math.round(p.x + Math.cos(a) * r * 0.7), Math.round(p.y + Math.sin(a) * r * 0.39), 1, 1);
+            }
+          }
+          break;
+        }
+        case 'glint': {
+          const s = Math.max(1, Math.round(Math.sin(f * Math.PI) * p.s));
+          ctx.fillStyle = p.col;
+          ctx.fillRect(X - s, Y, s * 2 + 1, 1); ctx.fillRect(X, Y - s, 1, s * 2 + 1);
+          ctx.fillRect(X - 1, Y - 1, 3, 3);
+          break;
+        }
+        case 'bubble': {
+          const wob = Math.sin(p.t * 8 + p.ph) * 3;
+          const s = p.s;
+          ctx.fillStyle = p.col;
+          ctx.fillRect(X + Math.round(wob), Y, s + 1, 1);
+          ctx.fillRect(X + Math.round(wob) - 1, Y + 1, 1, s);
+          ctx.fillRect(X + Math.round(wob) + s + 1, Y + 1, 1, s);
+          ctx.fillRect(X + Math.round(wob), Y + s + 1, s + 1, 1);
+          break;
+        }
+        case 'beam': {
+          const a0 = Math.sin(Math.min(1, f * 1.5) * Math.PI);
+          for (let i = 0; i < p.h; i++) {
+            const t = i / p.h;
+            const wd = 3 + Math.round(t * 9);
+            ctx.globalAlpha = a0 * (1 - t) * 0.55;
+            ctx.fillStyle = p.col;
+            ctx.fillRect(X - (wd >> 1), Y - i, wd, 1);
+            if (t < 0.5) { ctx.globalAlpha = a0 * (1 - t * 2) * 0.7; ctx.fillStyle = '#ffffff'; ctx.fillRect(X - 1, Y - i, 2, 1); }
+          }
+          break;
+        }
+        case 'spr': {
+          const sc = p.s0 + (p.s1 - p.s0) * f;
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.t * p.spin * 0.4);
+          ctx.scale(sc, sc);
+          ctx.drawImage(p.cv, -p.cv.width / 2, -p.cv.height / 2);
+          ctx.restore();
+          break;
+        }
+        case 'num': {
+          /* it pops out, holds, then goes: bigger for the first beat */
+          const kk = f < 0.12 ? 2 : 1;
+          const w = SPR.tinyW(p.txt, kk);
+          SPR.drawTiny(ctx, p.txt, X - ((w / 2) | 0), Y, p.col, kk, '#171420');
+          break;
+        }
+        default:
+          ctx.fillStyle = p.col;
+          ctx.fillRect(X, Y, p.s, p.s);
       }
-    });
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /* ---- screen feel: a shake, a flash, and a held frame ---- */
+  let shk = { t: 0, dur: 0, mag: 0 };
+  function shake(mag, dur) {
+    if (!pOn()) return;
+    if (mag * 1.0 < shk.mag * (1 - shk.t / (shk.dur || 1))) return;   /* never soften a bigger one */
+    shk = { t: 0, dur: dur || 0.24, mag };
+  }
+  function shakeOff() {
+    if (shk.t >= shk.dur) return [0, 0];
+    const f = 1 - shk.t / shk.dur;
+    const m = shk.mag * f * f;
+    return [Math.round(Math.sin(shk.t * 92) * m), Math.round(Math.sin(shk.t * 71 + 1.7) * m * 0.7)];
+  }
+  let hold = 0, realDt = 0.016;
+  function holdFrame(s) { if (pOn()) hold = Math.max(hold, s || 0.06); }
+  let fla = null;
+  function flash(col, a, dur) { if (pOn()) fla = { col, a, dur: dur || 0.2, t: 0 }; }
+  function drawFlash(dt) {
+    if (!fla) return;
+    fla.t += dt;
+    if (fla.t >= fla.dur) { fla = null; return; }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = fla.a * (1 - fla.t / fla.dur);
+    ctx.fillStyle = fla.col;
+    ctx.fillRect(0, 0, cv.width, cv.height);
     ctx.globalAlpha = 1;
   }
   /* hatch bursts: shell halves fly, the chick pops out and hops */
@@ -905,10 +1167,23 @@
   /* ================= WORLD DRAWING ================= */
   function drawEgg(e, now) {
     const spr = e.rainbow ? SPR.eggSprite(e.tier, 1, true, Math.floor(now / 120) % 6) : SPR.eggSprite(e.tier, 1);
+    /* while the basket has hold of it, it stretches toward the cursor */
+    const pulling = ptr.down && ptr.inside && S().tool === 'basket' &&
+                    Math.hypot(ptr.x - e.x, ptr.y - e.y) < GAME.scoopR();
     ctx.fillStyle = 'rgba(40,58,26,.26)';
     ctx.fillRect(Math.round(e.x - 3), Math.round(e.y - 1), 7, 2);
     ctx.fillRect(Math.round(e.x - 4), Math.round(e.y - 2), 9, 1);
-    ctx.drawImage(spr, Math.round(e.x - 5), Math.round(e.y - 12 + e.z));
+    if (pulling) {
+      const d = Math.hypot(ptr.x - e.x, ptr.y - e.y) || 1;
+      const lean = Math.min(1, (1 - d / GAME.scoopR()) * 1.4);
+      ctx.save();
+      ctx.translate(Math.round(e.x), Math.round(e.y + e.z));
+      ctx.rotate(Math.atan2(ptr.y - e.y, ptr.x - e.x) * 0.12 * lean);
+      ctx.scale(1 - lean * 0.1, 1 + lean * 0.14);
+      ctx.drawImage(spr, -5, -12);
+      ctx.restore();
+      if (Math.floor(now / 90) % 3 === 0) { ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.fillRect(Math.round(e.x - 1), Math.round(e.y - 14 + e.z), 1, 1); }
+    } else ctx.drawImage(spr, Math.round(e.x - 5), Math.round(e.y - 12 + e.z));
     if (e.golden) {
       const s = Math.floor(now / 160) % 4;
       ctx.fillStyle = '#fff6c0';
@@ -2187,9 +2462,11 @@
      current job is, he is standing next to it telling you about it.
      ============================================================ */
   function bossPose(b, now) {
-    if (b.state === 'walk') return (b.frame ? 'walk1' : 'stand');
+    if (b.state === 'walk') return (b.frame ? 'walk1' : 'walk0');
     if (b.pose === 'cheer') return 'cheer';
     if (b.pose === 'read') return 'read';
+    /* he blinks: a quarter second every four, out of phase per save */
+    if ((now % 4200) < 190) return 'blink';
     return 'boss';
   }
   function drawBoss(now) {
@@ -2975,7 +3252,9 @@
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = '#3c5a24';
     ctx.fillRect(0, 0, cv.width, cv.height);
-    ctx.setTransform(SC, 0, 0, SC, Math.round(-cam().x * SC), Math.round(-cam().y * SC));
+    shk.t += realDt;
+    const [shx, shy] = shakeOff();
+    ctx.setTransform(SC, 0, 0, SC, Math.round((-cam().x + shx) * SC), Math.round((-cam().y + shy) * SC));
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(groundCv, 0, 0);
 
@@ -3139,6 +3418,7 @@
       ctx.fillStyle = '#3a2a16'; ctx.fillRect(Math.round(f.x), Math.round(f.y), 1, 2);
     });
 
+    drawAmbientFx(now, dt);
     drawHatchFx(dt, now);
     drawParts(dt);
 
@@ -3160,13 +3440,26 @@
     drawWeather(now);
     drawAge(now, dt);
 
-    /* scoop ring */
+    /* scoop ring: two dashed rings turning against each other, and it
+       snaps in for a frame every time something goes in the basket */
     if (ptr.down && S().tool === 'basket' && ptr.inside) {
-      const R = GAME.scoopR();
-      ctx.fillStyle = 'rgba(255,255,255,.75)';
+      const R0 = GAME.scoopR();
+      const kick = Math.max(0, 1 - (performance.now() - scoopAt) / 140);
+      const R = R0 * (1 - kick * 0.12);
+      ctx.fillStyle = 'rgba(255,255,255,' + (0.7 + kick * 0.3).toFixed(2) + ')';
       for (let a = 0; a < Math.PI * 2; a += 0.22) {
         if (Math.floor(a * 4 + now / 200) % 2) continue;
         ctx.fillRect(Math.round(ptr.x + Math.cos(a) * R), Math.round(ptr.y + Math.sin(a) * R * 0.85), 1, 1);
+      }
+      ctx.fillStyle = 'rgba(255,210,63,.5)';
+      for (let a = 0; a < Math.PI * 2; a += 0.3) {
+        if (Math.floor(a * 3 - now / 260) % 2) continue;
+        const r2 = R * 0.72;
+        ctx.fillRect(Math.round(ptr.x + Math.cos(a) * r2), Math.round(ptr.y + Math.sin(a) * r2 * 0.85), 1, 1);
+      }
+      if (kick > 0) {
+        ctx.fillStyle = 'rgba(255,255,255,' + (kick * 0.5).toFixed(2) + ')';
+        for (let a = 0; a < Math.PI * 2; a += 0.5) ctx.fillRect(Math.round(ptr.x + Math.cos(a) * R * 1.1), Math.round(ptr.y + Math.sin(a) * R * 0.94), 2, 2);
       }
     }
     /* drop-target highlights */
@@ -3188,6 +3481,8 @@
     }
     drawGhost(now);
     drawHand(now);
+
+    drawFlash(realDt);
 
     /* vignette */
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -3290,7 +3585,27 @@
       const d = Math.hypot(dx, dy);
       if (d < 7) {
         const r = GAME.scoopEgg(e);
-        if (r === true) { snd.scoop(); updateCursorChip(); if (e.golden) { sweepGold++; if (sweepGold >= 3) GAME.findSecret('goldrush'); } }
+        if (r === true) {
+          snd.scoop(); updateCursorChip();
+          /* the pop: a ring off the shell, a glint, a few sparks in its colour */
+          const col = EGG_SHELL[Math.min(e.tier, EGG_SHELL.length - 1)];
+          fly(SPR.eggSprite(e.tier, 1, false), e.x, e.y, { life: 0.36, s1: 1.9, vy: -70 });
+          ring(e.x, e.y, 'rgba(255,255,255,1)', 14, 0.22);
+          glint(e.x, e.y - 2, '#fff8ec', 3);
+          sparks(e.x, e.y, 3, col, 50);
+          /* a run of them builds: every fifth says so and hits harder */
+          const nowMs = performance.now();
+          scoopCombo = nowMs - scoopAt < 700 ? scoopCombo + 1 : 1;
+          scoopAt = nowMs;
+          if (scoopCombo % 5 === 0) {
+            popNum(e.x - 6, e.y - 12, 'x' + scoopCombo, '#ffd23f');
+            twinkles(e.x, e.y, 6, '#ffd23f', 14); shake(0.7, 0.14); snd.clink();
+          }
+          if (e.golden) {
+            sweepGold++; if (sweepGold >= 3) GAME.findSecret('goldrush');
+            coinBurst(e.x, e.y, 5); flash('#ffd23f', 0.10, 0.14); shake(1.1, 0.18);
+          }
+        }
         else if (r === 'full' && Math.random() < 0.05) floatWorld('BASKET FULL', ptr.x, ptr.y - 14, 'pink');
         continue;
       }
@@ -3303,7 +3618,10 @@
       const pl = S().plumes[i];
       if (Math.hypot(ptr.x - pl.x, ptr.y - pl.y) < R * 0.8) {
         const v = GAME.collectPlume(pl);
-        if (v) { snd.plume(); floatWorld('+' + v, pl.x, pl.y - 8, 'green', 'feather'); }
+        if (v) {
+          snd.plume(); floatWorld('+' + v, pl.x, pl.y - 8, 'green', 'feather');
+          feathers(pl.x, pl.y, 3); glint(pl.x, pl.y - 4, '#fff8ec', 3);
+        }
       }
     }
     /* bones come up with the basket too */
@@ -3312,7 +3630,7 @@
       if (Math.hypot(ptr.x - f.x, ptr.y - f.y) < R * 0.8 && GAME.collectFossil(f)) { snd.sparkle(); floatWorld('FOSSIL', f.x, f.y - 8, 'gold', 'fossil'); }
     }
   }
-  let sweepGold = 0;
+  let sweepGold = 0, scoopCombo = 0, scoopAt = 0;
 
   /* ================= HUD ================= */
   const el = {
@@ -3778,10 +4096,31 @@
   }
 
   let ageShown = -1;
+  /* a counter rolls to its new figure rather than snapping to it, which
+     is how a mechanical readout behaves and reads as money arriving */
+  const rolls = new Map();
+  function setRoll(node, target) {
+    let r = rolls.get(node);
+    if (!r) { r = { shown: target, target }; rolls.set(node, r); }
+    r.target = target;
+    /* a jump of nothing much, or the first paint, lands straight away */
+    if (Math.abs(r.target - r.shown) < 2) r.shown = r.target;
+  }
+  function tickRolls(dt) {
+    rolls.forEach((r, node) => {
+      const d = r.target - r.shown;
+      if (d === 0) { if (node.classList.contains('rolling')) node.classList.remove('rolling'); return; }
+      if (Math.abs(d) < 1.2) r.shown = r.target;
+      else r.shown += d * Math.min(1, dt * 9) + Math.sign(d) * Math.min(Math.abs(d), dt * 4);
+      const txt = GAME.fmt(Math.round(r.shown));
+      if (node.textContent !== txt) node.textContent = txt;
+      node.classList.toggle('rolling', r.shown !== r.target);
+    });
+  }
   function lightUpdate() {
     const set = (node, v) => { if (node.textContent !== v) node.textContent = v; };
-    set(el.coins, GAME.fmt(S().coins));
-    set(el.feathers, GAME.fmt(S().feathers));
+    setRoll(el.coins, S().coins);
+    setRoll(el.feathers, S().feathers);
     set(el.feed, Math.floor(S().feedStore) + '/' + GAME.feedCap());
     const nofeed = S().feedStore < 1;
     if (el.feedPill.classList.contains('full') !== nofeed) el.feedPill.classList.toggle('full', nofeed);
@@ -3805,11 +4144,12 @@
         const sb = document.createElement('b'); sb.textContent = txt; el.skyPill.appendChild(sb);
       }
     }
-    /* a number that just changed pops */
-    [['coins', el.coins], ['feathers', el.feathers]].forEach(([k, node]) => {
-      const v = node.textContent;
-      if (node.dataset.last !== undefined && node.dataset.last !== v) { node.classList.remove('pop'); void node.offsetWidth; node.classList.add('pop'); }
-      node.dataset.last = v;
+    /* a number that just changed pops - measured on the target, so the
+       punch lands when the money arrives and not on every rolling frame */
+    [[el.coins, S().coins], [el.feathers, S().feathers]].forEach(([node, v]) => {
+      const key = GAME.fmt(v);
+      if (node.dataset.last !== undefined && node.dataset.last !== key) { node.classList.remove('pop'); void node.offsetWidth; node.classList.add('pop'); }
+      node.dataset.last = key;
     });
     if (el.agePill && ageShown !== GAME.ageIndex()) {
       ageShown = GAME.ageIndex();
@@ -7901,6 +8241,8 @@
       if (f) {
         snd.grand();
         puff(ward.x + 6, ward.y - 10, '#e8721c', 12, 40, 30);
+        coinBurst(ward.x + 6, ward.y - 8, 6); twinkles(ward.x + 6, ward.y - 6, 7, '#ffd23f', 16);
+        ring(ward.x + 6, ward.y + 6, 'rgba(255,210,63,1)', 26, 0.34); shake(0.8, 0.16);
         floatWorld('HUSH MONEY +' + f, ward.x + 6, ward.y - 30, 'gold', 'feather');
       } else { snd.plop(); heart(ward.x + 6, ward.y - 12, 1); }
       return true;
@@ -7911,6 +8253,8 @@
       GAME.bossTap();
       snd.pet();
       heart(boss.x + 10, boss.y - 6, 1);
+      twinkles(boss.x + 10, boss.y + 6, 5, '#fff8ec', 12);
+      shake(0.5, 0.12);
       questSig = '';
       return true;
     }
@@ -7926,6 +8270,8 @@
       const rw = GAME.openPresent(gift);
       if (rw) {
         snd.grand(); puff(gift.x, gift.y - 8, S().company.col2, 16, 60, 40); coinBurst(gift.x, gift.y - 6, rw.c ? 10 : 3);
+        shards(gift.x, gift.y - 4, 8, S().company.col2, 80); ring(gift.x, gift.y + 4, 'rgba(255,255,255,1)', 34, 0.36);
+        twinkles(gift.x, gift.y - 6, 9, '#fff8ec', 20); shake(1.2, 0.24); flash('#fff8ec', 0.12, 0.16);
         if (rw.c) floatWorld('+' + GAME.fmt(rw.c), gift.x, gift.y - 22, 'gold', 'coin');
         if (rw.f) floatWorld('+' + rw.f + ' FEATHERS', gift.x, gift.y - 34, 'green', 'feather');
         if (rw.cos && rw.cos.length) floatWorld('NEW OUTFIT', gift.x, gift.y - 46, 'pink', 'star');
@@ -7955,6 +8301,9 @@
       if (GAME.buyPlot(sign.id)) {
         snd.grand();
         puff(x, y, '#ffd23f', 18, 64, 44);
+        ring(x, y, 'rgba(255,210,63,1)', 90, 0.6, 2); ring(x, y, 'rgba(255,255,255,1)', 60, 0.45);
+        beam(x, y, '#ffd23f', 80, 0.9); twinkles(x, y, 12, '#fff8ec', 34);
+        flash('#ffe9a8', 0.16, 0.26); shake(1.8, 0.4); holdFrame(0.08);
         toast({ icon: 'house', title: 'NEW LAND', body: 'The fences come down. Room to grow!' });
         GAME.clampCam();
       } else {
@@ -8074,7 +8423,10 @@
           petFx.set('mama', performance.now());
           floatWorld('FEED ME', W.mama.x, W.mama.y - 30, 'pink', 'seed');
           snd.error();
-        } else if (pet) { petFx.set('mama', performance.now()); heart(W.mama.x, W.mama.y - 22, 3); snd.pet(); }
+        } else if (pet) {
+          petFx.set('mama', performance.now());
+          heart(W.mama.x, W.mama.y - 22, 3); twinkles(W.mama.x, W.mama.y - 8, 5, '#ffd6e8', 14); snd.pet();
+        }
         return;
       }
       if (cand.app) { setInspect({ kind: 'applicant', ref: cand.app }); snd.plop(); return; }
@@ -8087,6 +8439,8 @@
         if (GAME.petChicken(cand.ch)) {
           petFx.set(cand.ch.id, performance.now());
           heart(cand.ch.x + 10, cand.ch.y - 4, 2);
+          twinkles(cand.ch.x + 10, cand.ch.y + 4, 4, '#ffd6e8', 11);
+          feathers(cand.ch.x + 10, cand.ch.y + 2, 2);
           snd.pet();
         }
         return;
@@ -8099,7 +8453,10 @@
       {
         /* a butterfly, if you are quick */
         const fly = flies.find(f => Math.abs(f.x - x) < 6 && Math.abs(f.y - y) < 6);
-        if (fly) { puff(fly.x, fly.y, fly.col, 6, 20, 16); if (GAME.findSecret('butterfly')) snd.grand(); else snd.plume(); return; }
+        if (fly) {
+          puff(fly.x, fly.y, fly.col, 6, 20, 16); twinkles(fly.x, fly.y, 5, fly.col, 10);
+          if (GAME.findSecret('butterfly')) snd.grand(); else snd.plume(); return;
+        }
       }
       if (cand.egg) {
         if (GAME.grabEgg(cand.egg)) { snd.plop(); heldSince = performance.now(); }
@@ -8571,32 +8928,70 @@
         snd.sparkle();
       }
     });
-    if (rainbow) { puff(x, y - 10, '#ff5fd0', 16, 64, 42); snd.grand(); }
+    feathers(x, y - 6, 4 + births.length * 2);
+    ring(x, y + 4, 'rgba(255,255,255,1)', 30, 0.36); twinkles(x, y - 4, 7, '#fff8ec', 16);
+    shake(0.8, 0.18);
+    if (rainbow) {
+      puff(x, y - 10, '#ff5fd0', 16, 64, 42); snd.grand();
+      beam(x, y, '#ff5fd0', 70, 0.9); flash('#ffb0e8', 0.18, 0.28); shake(2, 0.4);
+      twinkles(x, y - 8, 14, '#ff8ae0', 30); holdFrame(0.08);
+    }
     if (births.length > 1) floatWorld('TWINS', x, y - 24, 'pink');
   });
   GAME.on('breed', ({ x, y, rainbow, tier }) => {
     snd.breed();
     heart(x, y - 10, 6);
     floatWorld(rainbow ? 'RAINBOW EGG' : TIERS[tier].n + ' EGG', x, y - 18, rainbow ? 'pink' : 'green');
-    if (rainbow) puff(x, y - 6, '#ff5fd0', 14, 54, 38);
+    twinkles(x, y - 6, 5, rainbow ? '#ff8ae0' : '#ffd6e8', 13);
+    if (rainbow) { puff(x, y - 6, '#ff5fd0', 14, 54, 38); beam(x, y, '#ff5fd0', 56, 0.8); shake(1.2, 0.24); }
   });
   GAME.on('sell', ({ pay, n }) => {
     snd.coin();
     coinBurst(W.truckHome.x + 26, W.truckHome.y - 4, n);
+    twinkles(W.truckHome.x + 26, W.truckHome.y - 6, 6, '#ffd23f', 18);
+    ring(W.truckHome.x + 26, W.truckHome.y + 6, 'rgba(255,210,63,1)', 30, 0.34);
+    beam(W.truckHome.x + 26, W.truckHome.y, '#ffd23f', 44, 0.7);
+    shake(Math.min(1.6, 0.5 + n * 0.05), 0.2);
     floatWorld('+' + GAME.fmt(pay), W.truckHome.x + 20, W.truckHome.y - 22, 'gold', 'coin');
   });
   GAME.on('depart', ({ n, to }) => {
     snd.engine();
     puff(W.truckHome.x - 4, W.roadY + 8, '#c9a35f', 9, 44, 16);
+    smoke(W.truckHome.x - 6, W.roadY + 6, 5, 'rgba(190,186,180,1)', 16);
     floatWorld('TO ' + to.name.toUpperCase(), W.truckHome.x + 20, W.roadY - 26, 'gold');
   });
-  GAME.on('home', () => { puff(W.truckHome.x + 30, W.roadY + 8, '#c9a35f', 6, 30, 12); });
-  GAME.on('quest', ({ q }) => { snd.grand(); questSig = ''; });
-  GAME.on('questready', ({ q }) => { snd.sparkle(); const b = GAME.boss(); if (b) { heart(b.x + 10, b.y - 6, 3); } floatText('QUEST READY: ' + q.name.toUpperCase(), innerWidth / 2 - 90, 90, 'gold', 'quest'); });
-  GAME.on('limo', ({ state, x, y }) => { if (state === 'here') { snd.engine(); floatWorld('A DELIVERY', x + 20, y - 18, 'gold', 'star'); } else if (state === 'coming') snd.engine(); });
-  GAME.on('present', ({ p, state }) => { if (state === 'dropped') { snd.plop(); puff(p.x, p.y - 4, '#c9a35f', 6, 24, 14); } });
-  GAME.on('achievement', ({ a }) => { snd.grand(); floatText('ACHIEVEMENT: ' + a.name.toUpperCase(), innerWidth / 2 - 100, 130, 'pink', 'medal'); });
-  GAME.on('canned', ({ id, x, y }) => { puff(x, y, GOODS[id].col, 6, 24, 20); floatWorld(GOODS[id].name.toUpperCase(), x, y - 10, 'green', GOODS[id].icon); snd.clink(); });
+  GAME.on('home', () => {
+    puff(W.truckHome.x + 30, W.roadY + 8, '#c9a35f', 6, 30, 12);
+    smoke(W.truckHome.x + 32, W.roadY + 6, 4, 'rgba(190,186,180,1)', 14);
+    groundDust(W.truckHome.x + 26, W.roadY + 10, 5, '#c9a878');
+  });
+  GAME.on('quest', ({ q }) => {
+    snd.grand(); questSig = '';
+    const b = GAME.boss();
+    if (b) { twinkles(b.x + 10, b.y + 4, 10, '#ffd23f', 22); coinBurst(b.x + 10, b.y - 2, 8); beam(b.x + 10, b.y + 20, '#ffd23f', 60, 0.8); }
+    flash('#ffe9a8', 0.14, 0.22); shake(1.4, 0.3); holdFrame(0.07);
+  });
+  GAME.on('questready', ({ q }) => { snd.sparkle(); const b = GAME.boss(); if (b) { heart(b.x + 10, b.y - 6, 3); twinkles(b.x + 10, b.y, 6, '#ffd23f', 16); } floatText('QUEST READY: ' + q.name.toUpperCase(), innerWidth / 2 - 90, 90, 'gold', 'quest'); });
+  GAME.on('limo', ({ state, x, y }) => {
+    if (state === 'here') {
+      snd.engine(); floatWorld('A DELIVERY', x + 20, y - 18, 'gold', 'star');
+      groundDust(x + 20, y + 14, 10, '#c9a878'); smoke(x + 2, y + 10, 4, 'rgba(190,186,180,1)', 14);
+      shake(0.9, 0.24);
+    } else if (state === 'coming') snd.engine();
+  });
+  GAME.on('present', ({ p, state }) => {
+    if (state === 'dropped') {
+      snd.plop(); puff(p.x, p.y - 4, '#c9a35f', 6, 24, 14);
+      groundDust(p.x, p.y + 2, 6); ring(p.x, p.y + 2, 'rgba(255,255,255,1)', 18, 0.26); shake(0.6, 0.14);
+    }
+  });
+  GAME.on('achievement', ({ a }) => {
+    snd.grand();
+    floatText('ACHIEVEMENT: ' + a.name.toUpperCase(), innerWidth / 2 - 100, 130, 'pink', 'medal');
+    const cx = cam().x + W.view.w / 2, cy = cam().y + W.view.h / 2;
+    twinkles(cx, cy - 20, 16, '#ff8ac0', 70); flash('#ffd0e8', 0.14, 0.3); shake(1.2, 0.3);
+  });
+  GAME.on('canned', ({ id, x, y }) => { puff(x, y, GOODS[id].col, 6, 24, 20); bubbles(x, y - 2, 4, '#cfe8f5'); smoke(x, y - 6, 3, 'rgba(255,255,255,1)', 18); floatWorld(GOODS[id].name.toUpperCase(), x, y - 10, 'green', GOODS[id].icon); snd.clink(); });
   GAME.on('produce', ({ c, r, id, n }) => { floatWorld('+' + n + ' ' + PRODUCE[id].name.toUpperCase(), c * 16 + 8, r * 16 - 18, 'gold', 'crate'); });
   GAME.on('eat', ({ ch, prem }) => { if (GAME.setting('particles')) puff(ch.x + 10, ch.y + 14, prem ? '#ffd23f' : '#e8b84c', prem ? 6 : 3, 16, 12); });
   GAME.on('soldfood', ({ got }) => { snd.coin(); });
@@ -8607,30 +9002,42 @@
     snd.demolish();
     puff(x + 6, y - 4, '#8a5e2a', 12, 40, 22);
     puff(x + 6, y - 10, '#7fbf4f', 8, 34, 26);
+    shards(x + 6, y - 2, 9, '#8a5e2a', 70); groundDust(x + 6, y + 6, 10, '#a07444');
+    ring(x + 6, y + 6, 'rgba(255,255,255,1)', 30, 0.34); shake(1.6, 0.34);
     floatWorld('THE WARDEN', x + 6, y - 34, 'pink', 'tree');
   });
   GAME.on('hatchick', ({ x, y }) => {
     snd.hatch(); snd.sparkle();
     puff(x, y, '#fff8ec', 14, 46, 34);
+    feathers(x, y - 4, 6); twinkles(x, y - 4, 9, '#fff8ec', 18); beam(x, y + 6, '#fff8ec', 46, 0.8);
+    flash('#ffffff', 0.12, 0.18); shake(1, 0.22);
     floatWorld('OUT OF THE HAT', x, y - 20, 'gold', 'chick');
   });
   GAME.on('slot', () => { reloadWorld(); });
   GAME.on('settings', ({ k, v }) => { if (k === 'bigUI') document.body.classList.toggle('big-ui', !!v); });
   GAME.on('customer', ({ o }) => { snd.plop(); floatWorld(o.who + ': ' + o.n + ' EGGS', o.x + 14, o.y - 28, 'gold', 'doc'); });
-  GAME.on('orderdone', ({ o }) => { snd.grand(); puff(o.x + 14, o.y, '#ffd23f', 10, 34, 26); floatWorld('+' + GAME.fmt(o.pay), o.x + 14, o.y - 30, 'gold', 'coin'); });
-  GAME.on('ordermiss', ({ o }) => { snd.error(); puff(o.x + 14, o.y + 4, '#8a8f98', 6, 24, 14); floatWorld('DROVE OFF', o.x + 14, o.y - 26, 'pink'); });
+  GAME.on('orderdone', ({ o }) => { snd.grand(); puff(o.x + 14, o.y, '#ffd23f', 10, 34, 26); coinBurst(o.x + 14, o.y - 2, 7); twinkles(o.x + 14, o.y, 6, '#ffd23f', 16); shake(0.9, 0.2); floatWorld('+' + GAME.fmt(o.pay), o.x + 14, o.y - 30, 'gold', 'coin'); });
+  GAME.on('ordermiss', ({ o }) => { snd.error(); puff(o.x + 14, o.y + 4, '#8a8f98', 6, 24, 14); smoke(o.x + 8, o.y + 6, 4, 'rgba(160,160,168,1)', 14); groundDust(o.x + 14, o.y + 12, 6); floatWorld('DROVE OFF', o.x + 14, o.y - 26, 'pink'); });
   GAME.on('site', ({ type, c, r, kind }) => { snd.build(); if (c !== undefined) floatWorld(kind === 'storey' ? 'MOVERS CALLED' : 'MOVERS CALLED', c * 16 + 16, r * 16 - 12, 'gold', 'hammer'); });
   GAME.on('movers', ({ state, x }) => { if (state === 'here') { snd.engine(); floatWorld('MOVERS', x + 20, W.roadY - 16, 'gold'); } else if (state === 'coming') snd.engine(); });
   GAME.on('built', ({ type, c, r, kind }) => {
     snd.grand();
     const b = BUILDS[type];
-    puff(c * 16 + b.w * 8, r * 16 + b.h * 8, '#e0bd82', 14, 40, 30);
+    const bx = c * 16 + b.w * 8, by = r * 16 + b.h * 8;
+    puff(bx, by, '#e0bd82', 14, 40, 30);
+    /* it lands: dust out sideways, chips of timber, a ring and a thump */
+    groundDust(bx, r * 16 + b.h * 16 - 2, 16, '#c9a878');
+    shards(bx, by, 10, '#a07444', 80);
+    ring(bx, r * 16 + b.h * 16 - 2, 'rgba(255,255,255,1)', 16 + b.w * 12, 0.4, 2);
+    smoke(bx, by - 4, 5, 'rgba(220,214,204,1)', 14);
+    sparks(bx, by, 6, '#ffd23f', 70);
+    shake(1.8, 0.36); holdFrame(0.07);
     floatWorld(kind === 'storey' ? 'SECOND FLOOR' : b.name.toUpperCase() + ' BUILT', c * 16 + b.w * 8, r * 16 - 14, 'green');
   });
-  GAME.on('honey', ({ x, y, v }) => { floatWorld('+' + v, x, y - 6, 'gold', 'honey'); snd.clink(); });
-  GAME.on('splice', ({ ch, x, y }) => { snd.grand(); puff(x, y, '#ff5f9e', 12, 34, 28); toast({ icon: 'dna', title: 'SPLICED', body: SPECIES[ch.sp].name + ' carries the best of both birds now.' }); });
-  GAME.on('clone', ({ ch, x, y }) => { snd.grand(); puff(x, y, '#9fe8ff', 12, 34, 28); bornFx.set(ch.id, performance.now()); toast({ icon: 'twins', title: 'CLONED', body: 'A second ' + SPECIES[ch.sp].name + ', genes and all.' }); });
-  GAME.on('cross', ({ ch, animal, x, y }) => { snd.grand(); puff(x, y, '#ffd23f', 12, 34, 28); toast({ icon: 'atom', title: 'CROSSED WITH A ' + animal.name.toUpperCase(), body: animal.desc }); });
+  GAME.on('honey', ({ x, y, v }) => { floatWorld('+' + v, x, y - 6, 'gold', 'honey'); twinkles(x, y - 4, 3, '#ffd23f', 9); snd.clink(); });
+  GAME.on('splice', ({ ch, x, y }) => { snd.grand(); puff(x, y, '#ff5f9e', 12, 34, 28); beam(x, y, '#ff5f9e', 54, 0.8); twinkles(x, y - 6, 8, '#ff8ac0', 18); flash('#ffd0e8', 0.1, 0.2); shake(1.1, 0.24); toast({ icon: 'dna', title: 'SPLICED', body: SPECIES[ch.sp].name + ' carries the best of both birds now.' }); });
+  GAME.on('clone', ({ ch, x, y }) => { snd.grand(); puff(x, y, '#9fe8ff', 12, 34, 28); beam(x, y, '#9fe8ff', 54, 0.8); twinkles(x, y - 6, 8, '#cff4ff', 18); flash('#d8f4ff', 0.1, 0.2); shake(1.1, 0.24); bornFx.set(ch.id, performance.now()); toast({ icon: 'twins', title: 'CLONED', body: 'A second ' + SPECIES[ch.sp].name + ', genes and all.' }); });
+  GAME.on('cross', ({ ch, animal, x, y }) => { snd.grand(); puff(x, y, '#ffd23f', 12, 34, 28); beam(x, y, '#ffd23f', 54, 0.8); twinkles(x, y - 6, 8, '#fff2b0', 18); shake(1.1, 0.24); toast({ icon: 'atom', title: 'CROSSED WITH A ' + animal.name.toUpperCase(), body: animal.desc }); });
   GAME.on('company', ({ c }) => { toast({ icon: c.logo, title: c.name, body: 'Filed and signed.' }); });
   GAME.on('rain', () => { snd.sprinkle(); });
   GAME.on('boss', () => { questSig = ''; });
@@ -8642,45 +9049,110 @@
   });
   GAME.on('region', ({ r }) => { toast({ icon: r.moon ? 'atom' : 'city', title: r.name.toUpperCase(), body: r.moon ? 'The rocket is away.' : 'Open for business.' }); });
   GAME.on('branch', ({ r, n }) => { floatText('+1 BRANCH', innerWidth / 2 - 40, 120, 'gold', 'house'); });
-  GAME.on('secret', ({ s }) => { snd.grand(); toast({ icon: s.icon, title: 'SECRET: ' + s.name.toUpperCase(), body: s.desc, long: true }); });
-  GAME.on('age', ({ a }) => { snd.grand(); ageFx = { t: performance.now(), a }; toast({ icon: a.icon, title: 'THE ' + a.name.toUpperCase(), body: a.blurb, long: true }); renderToolbelt(); });
-  GAME.on('cooked', ({ recipe, x, y }) => { puff(x, y, '#fff8ec', 6, 24, 20); floatWorld(RECIPE_BY_ID[recipe].name.toUpperCase(), x, y - 10, 'green', 'pan'); snd.clink(); });
+  GAME.on('secret', ({ s }) => { snd.grand(); flash('#fff8ec', 0.12, 0.24); shake(1, 0.24); toast({ icon: s.icon, title: 'SECRET: ' + s.name.toUpperCase(), body: s.desc, long: true }); });
+  GAME.on('age', ({ a }) => {
+    snd.grand(); ageFx = { t: performance.now(), a };
+    const cx = cam().x + W.view.w / 2, cy = cam().y + W.view.h / 2;
+    ring(cx, cy, a.hue || 'rgba(255,255,255,1)', 260, 0.9, 2);
+    twinkles(cx, cy, 20, a.hue || '#fff8ec', 120);
+    flash(a.hue || '#fff8ec', 0.22, 0.5); shake(2.6, 0.6); holdFrame(0.11); toast({ icon: a.icon, title: 'THE ' + a.name.toUpperCase(), body: a.blurb, long: true }); renderToolbelt(); });
+  GAME.on('cooked', ({ recipe, x, y }) => { puff(x, y, '#fff8ec', 6, 24, 20); smoke(x, y - 4, 4, 'rgba(255,250,240,1)', 20); twinkles(x, y - 6, 3, '#ffd23f', 8); floatWorld(RECIPE_BY_ID[recipe].name.toUpperCase(), x, y - 10, 'green', 'pan'); snd.clink(); });
   GAME.on('dine', ({ x, y, v }) => { floatWorld('+' + GAME.fmt(v), x, y - 12, 'gold', 'coin'); snd.coin(); });
   GAME.on('ticket', ({ x, y, v }) => { floatWorld('+' + GAME.fmt(v), x, y - 12, 'gold', 'ticket'); snd.clink(); });
   GAME.on('bus', ({ n }) => { snd.engine(); });
   GAME.on('roast', ({ ch }) => { toast({ icon: 'pan', title: 'INTO THE POT', body: SPECIES[ch.sp].name + ' is the dish of the day.' }); });
   GAME.on('exhibit', ({ ch }) => { snd.sparkle(); });
-  GAME.on('fossil', ({ x, y }) => { puff(x, y, '#e0cb98', 8, 30, 20); floatWorld('A FOSSIL', x, y - 14, 'gold', 'fossil'); snd.sparkle(); });
+  GAME.on('fossil', ({ x, y }) => { puff(x, y, '#e0cb98', 8, 30, 20); shards(x, y, 5, '#c9b07a', 50); twinkles(x, y - 4, 5, '#fff8ec', 12); floatWorld('A FOSSIL', x, y - 14, 'gold', 'fossil'); snd.sparkle(); });
   GAME.on('tmstart', () => { snd.engine(); });
-  GAME.on('tmdone', ({ x, y }) => { snd.grand(); puff(x, y, '#9fe8ff', 18, 60, 40); floatWorld('FROM THE PAST', x, y - 20, 'gold', 'dino'); });
-  GAME.on('rankup', ({ ch, rank }) => { floatWorld(RANKS[rank].n.toUpperCase(), ch.x + 10, ch.y - 12, 'gold', 'medal'); heart(ch.x + 10, ch.y - 6, 2); snd.sparkle(); });
+  GAME.on('tmdone', ({ x, y }) => { snd.grand(); puff(x, y, '#9fe8ff', 18, 60, 40); ring(x, y, 'rgba(159,232,255,1)', 60, 0.5, 2); beam(x, y, '#9fe8ff', 70, 1); flash('#d8f4ff', 0.18, 0.3); shake(2, 0.4); floatWorld('FROM THE PAST', x, y - 20, 'gold', 'dino'); });
+  GAME.on('rankup', ({ ch, rank }) => { floatWorld(RANKS[rank].n.toUpperCase(), ch.x + 10, ch.y - 12, 'gold', 'medal'); heart(ch.x + 10, ch.y - 6, 2); twinkles(ch.x + 10, ch.y, 7, '#ffd23f', 15); beam(ch.x + 10, ch.y + 12, '#ffd23f', 36, 0.7); snd.sparkle(); });
   GAME.on('moonegg', () => { snd.sparkle(); toast({ icon: 'moon', title: 'MOON EGG', body: 'Something came down by the Lab. Hatch it.' }); });
   GAME.on('rainend', () => { snd.sparkle(); });
   GAME.on('market', () => { if (!$('#modal-pedia').hidden && indexTab === 'ledger') GAME.mark('pedia'); });
   GAME.on('vehicle', ({ v }) => { snd.grand(); toast({ icon: 'truck', title: v.name.toUpperCase(), body: v.cap + ' eggs' }); });
   GAME.on('route', ({ city }) => { snd.grand(); toast({ icon: 'city', title: city.name.toUpperCase(), body: 'pays x' + city.mult.toFixed(2) }); });
-  GAME.on('grown', ({ ch }) => { puff(ch.x + 10, ch.y + 6, '#fff8ec', 8, 30, 26); heart(ch.x + 10, ch.y - 4, 2); snd.sparkle(); bornFx.set(ch.id, performance.now()); });
-  GAME.on('harvest', ({ c, r, crop, n }) => {
-    puff(c * 16 + 8, r * 16 + 6, crop.col, 10, 40, 30);
+  GAME.on('grown', ({ ch }) => { puff(ch.x + 10, ch.y + 6, '#fff8ec', 8, 30, 26); heart(ch.x + 10, ch.y - 4, 2); twinkles(ch.x + 10, ch.y, 6, '#fff8ec', 13); ring(ch.x + 10, ch.y + 12, 'rgba(255,255,255,1)', 20, 0.3); snd.sparkle(); bornFx.set(ch.id, performance.now()); });
+  GAME.on('harvest', ({ c, r, crop, id, n }) => {
+    const hx = c * 16 + 8, hy = r * 16 + 6;
+    puff(hx, hy, crop.col, 10, 40, 30);
+    shards(hx, hy, 5, crop.col, 60); twinkles(hx, hy - 4, 4, '#fff8ec', 10);
+    groundDust(hx, hy + 8, 4, '#a07444');
+    popNum(hx, hy - 14, '+' + n, '#7fc24f');
+    if (id) fly(SPR.cropSprite(id, Math.max(1, (CROPS[id].stages || 3) - 1), 7, 1), hx, hy - 2, { life: 0.42, s1: 1.6, vy: -66 });
     floatWorld('+' + n + ' FEED', c * 16 + 8, r * 16 - 6, 'green', 'seed');
     snd.scoop();
   });
-  GAME.on('ripe', ({ c, r }) => { puff(c * 16 + 8, r * 16 + 2, '#fff8ec', 4, 20, 20); });
-  GAME.on('plant', ({ c, r }) => { puff(c * 16 + 8, r * 16 + 10, '#8a5e2a', 5, 26, 14); snd.plop(); });
-  GAME.on('water', ({ c, r }) => { puff(c * 16 + 8, r * 16 + 8, '#7fc4e8', 6, 28, 18); });
-  GAME.on('till', ({ c, r }) => { puff(c * 16 + 8, r * 16 + 8, '#a07444', 8, 34, 16); terrainTouched(c * 16 + 8, r * 16 + 8, c * 16 + 8, r * 16 + 8, 20); });
+  GAME.on('ripe', ({ c, r }) => { puff(c * 16 + 8, r * 16 + 2, '#fff8ec', 4, 20, 20); glint(c * 16 + 8, r * 16, '#fff8ec', 3); });
+  GAME.on('plant', ({ c, r }) => { puff(c * 16 + 8, r * 16 + 10, '#8a5e2a', 5, 26, 14); groundDust(c * 16 + 8, r * 16 + 12, 4, '#a07444'); snd.plop(); });
+  GAME.on('water', ({ c, r }) => { puff(c * 16 + 8, r * 16 + 8, '#7fc4e8', 6, 28, 18); bubbles(c * 16 + 8, r * 16 + 8, 3, '#aee7ff'); ring(c * 16 + 8, r * 16 + 10, 'rgba(150,215,255,1)', 14, 0.3); });
+  GAME.on('till', ({ c, r }) => { puff(c * 16 + 8, r * 16 + 8, '#a07444', 8, 34, 16); groundDust(c * 16 + 8, r * 16 + 10, 6, '#a07444'); shards(c * 16 + 8, r * 16 + 8, 3, '#7a5432', 40); terrainTouched(c * 16 + 8, r * 16 + 8, c * 16 + 8, r * 16 + 8, 20); });
   GAME.on('graduate', ({ sp }) => {
     toast({ sprite: cloneCanvas(SPR.chickenSprite(sp, 2, false)), title: sp.name + ' GRADUATED', body: 'She joins the lab team. Feathers dropped!' });
   });
-  GAME.on('feedeat', ({ x, y }) => puff(x, y, '#f2c94c', 4, 18, 14));
+  GAME.on('feedeat', ({ x, y }) => { puff(x, y, '#f2c94c', 4, 18, 14); heart(x, y - 6, 1); });
   GAME.on('land', () => { GAME.mark('ground'); });
   GAME.on('paint', ({ x0, y0, x1, y1, radius }) => { terrainTouched(x0, y0, x1, y1, radius); });
-  GAME.on('polish', ({ x, y }) => { puff(x, y - 4, '#fff8ec', 3, 16, 12); });
+  GAME.on('polish', ({ x, y }) => { puff(x, y - 4, '#fff8ec', 3, 16, 12); glint(x, y - 6, '#ffffff', 3); });
   GAME.on('grade', ({ x, y, tier }) => {
     puff(x, y - 6, TIERS[tier].c, 6, 26, 20);
+    twinkles(x, y - 6, 5, TIERS[tier].c, 11); glint(x, y - 8, '#ffffff', 4);
     floatWorld('+1 TIER', x, y - 12, 'green', 'star');
     snd.sparkle();
   });
+
+  /* ============================================================
+     AMBIENT EFFECTS
+     The plant is never still: chimneys smoke, the cannery boils,
+     dynamos throw sparks, mills dust the air, and rain lands in
+     little splashes. All of it is emitted at a metered rate so the
+     particle array never runs away with itself.
+     ============================================================ */
+  let ambT = 0;
+  function drawAmbientFx(now, dt) {
+    if (!GAME.setting('particles')) return;
+    ambT += dt;
+    if (ambT < 0.14) return;
+    const step = ambT; ambT = 0;
+    const cx = cam().x, cy = cam().y, vw = W.view.w, vh = W.view.h;
+    const near = (x, y) => x > cx - 20 && x < cx + vw + 20 && y > cy - 30 && y < cy + vh + 20;
+    const each = (store, fn) => {
+      const keys = Object.keys(store);
+      for (let i = 0; i < keys.length; i++) {
+        const [c, r] = keys[i].split(',').map(Number);
+        fn(c * 16, r * 16, store[keys[i]], keys[i]);
+      }
+    };
+    /* chimneys: mills and kitchens run all day */
+    each(S().mills, (x, y) => { if (near(x, y) && Math.random() < step * 3) smoke(x + 22, y - 4, 1, 'rgba(214,210,204,1)', 16); });
+    each(S().kitchens, (x, y) => { if (near(x, y) && Math.random() < step * 2.4) smoke(x + 8, y - 6, 1, 'rgba(240,236,228,1)', 18); });
+    /* the cannery only bubbles while something is in the pot */
+    each(S().canneries, (x, y, cn) => {
+      if (!near(x, y) || !cn.cook) return;
+      if (Math.random() < step * 5) bubbles(x + 16, y + 4, 1, '#cfe8f5');
+      if (Math.random() < step * 2) smoke(x + 16, y - 4, 1, 'rgba(255,252,244,1)', 20);
+    });
+    /* dynamos arc */
+    each(S().dynamos, (x, y) => { if (near(x, y) && Math.random() < step * 4) sparks(x + 8, y + 2, 2, '#9fe8ff', 60); });
+    /* graders and polishers throw a glint as they work */
+    each(S().polishers, (x, y) => { if (near(x, y) && Math.random() < step * 1.4) glint(x + 8 + ((Math.random() * 10) | 0), y + 2, '#ffffff', 3); });
+    /* the gene lab hums */
+    each(S().genelabs, (x, y) => { if (near(x, y) && Math.random() < step * 2) sparks(x + 16, y - 2, 1, '#ff8ac0', 40); });
+    /* rain lands */
+    if (GAME.weather.rain) {
+      for (let i = 0; i < 3; i++) {
+        if (Math.random() > step * 6) continue;
+        const rx = cx + Math.random() * vw, ry = cy + Math.random() * vh;
+        P({ type: 'ring', x: rx, y: ry, vx: 0, vy: 0, g: 0, t: 0, life: 0.24, col: 'rgba(200,230,255,1)', r1: 5, th: 1 });
+      }
+    }
+    /* the basket pulls motes in toward the cursor while you sweep */
+    if (ptr.down && ptr.inside && S().tool === 'basket' && Math.random() < step * 8) {
+      const a = Math.random() * Math.PI * 2, R = GAME.scoopR();
+      P({ type: 'px', x: ptr.x + Math.cos(a) * R, y: ptr.y + Math.sin(a) * R * 0.7,
+        vx: -Math.cos(a) * R * 1.8, vy: -Math.sin(a) * R * 1.3, g: 0, t: 0, life: 0.5,
+        col: 'rgba(255,248,236,1)', s: 1 });
+    }
+  }
 
   /* ============================================================
      THE SHUTTER
@@ -8724,7 +9196,9 @@
      through this and nothing else. */
   const UI = {
     $, S, W, snd, mkIcon, cloneCanvas, floatText, floatWorld, toast, openModal, closeModals, setInspect, refreshInspect,
-    puff, heart, coinBurst, worldToScreen, cam, paintCloud,
+    puff, heart, coinBurst, shellBurst, sparks, smoke, feathers, twinkles, shards,
+    ring, glint, groundDust, bubbles, beam, popNum, impact, shake, flash, fly, holdFrame,
+    worldToScreen, cam, paintCloud,
     showTitle, hideTitle, startIntro, openCompany, reloadWorld, renderToolbelt, renderPalette, renderHire,
     introNext, introSkip, shutter: startShutter, shuttering,
     cameraFeed, buildingThumb, statRow, statBlock, traitChips, crewCard, applicantCard, noticeBoard, botBench,
@@ -8769,7 +9243,11 @@
         dt = 0.016;
       }
       dt = Math.min(dt, 0.1);
+      realDt = dt;
+      /* a held frame: the world stops for a beat so a hit lands */
+      if (hold > 0) { hold = Math.max(0, hold - dt); dt = 0; }
       sprinkleCd = Math.max(0, sprinkleCd - dt);
+      tickRolls(realDt);
       GAME.tick(dt);
       magnet(dt);
       let pdx = 0, pdy = 0;

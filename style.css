@@ -2055,7 +2055,7 @@ body{
   box-shadow:inset 0 2px 0 var(--plate-lit), inset 0 -2px 0 var(--plate-dark), 0 3px 0 var(--shadow);
 }
 .desk-btn small{ color:var(--ink); letter-spacing:0; }
-.desk-btn.locked, .tool-btn.locked{ background:#a9a7a1; filter:none; opacity:.75; }
+.desk-btn.locked, .tool-btn.locked{ background:#b6b4ae; filter:none; opacity:1; }
 .desk-btn.locked small{ color:#6d7076; }
 .tool-btn.active{
   background:linear-gradient(180deg,#ffd27a 0 44%,#ffb32e 44%);
@@ -2300,3 +2300,166 @@ body{
 .veh-card.locked{ opacity:1; }
 .veh-card.locked canvas{ filter:grayscale(1) brightness(.62) contrast(1.25); }
 .veh-card.locked b, .veh-card.locked span, .veh-card.locked em{ color:var(--ink-soft); }
+
+/* ============================================================
+   THE FINISH
+   Everything above builds the interface; this makes it feel like
+   machinery. Keys travel when you press them, panels slam into
+   place, plates catch a highlight along the top edge, bars run a
+   sheen while they fill, and anything that just changed value
+   punches once. All of it steps rather than eases, so it reads
+   pixel-cut rather than web-smooth. Motion is dropped entirely for
+   anyone who asked for less of it.
+   ============================================================ */
+:root{
+  --pop:cubic-bezier(.3,1.8,.5,1);
+  --edge-lit:inset 0 3px 0 rgba(255,255,255,.42);
+  --edge-dark:inset 0 -3px 0 rgba(20,23,26,.28);
+}
+
+/* ---- every plate catches the light along its top edge ---- */
+.btn, .desk-btn, .tool-btn, .pal-btn, .pal-tab, .tab-btn, .pill, .modal-panel,
+.veh-card, .crew-card, .food-card, .stat-block{
+  box-shadow:var(--lift), var(--edge-lit), var(--edge-dark);
+}
+.btn-tiny{ box-shadow:2px 2px 0 var(--shadow), var(--edge-lit); }
+
+/* ---- keys travel: 2px in, shadow gone, the highlight flips ---- */
+.btn:active:not(:disabled), .desk-btn:active:not(:disabled),
+.tool-btn:active:not(:disabled), .pal-btn:active:not(:disabled),
+.pal-tab:active, .tab-btn:active{
+  transform:translate(3px,3px);
+  box-shadow:inset 0 3px 0 rgba(20,23,26,.34), inset 0 -2px 0 rgba(255,255,255,.14);
+  filter:brightness(.94);
+}
+/* ---- and lift a touch under the cursor ---- */
+.btn:hover:not(:disabled), .pal-btn:hover:not(:disabled){
+  transform:translate(-1px,-1px);
+  box-shadow:5px 5px 0 var(--shadow), var(--edge-lit), var(--edge-dark);
+}
+/* ---- locked out reads as a plate that has been crossed off, but the
+   icon under the hatching stays legible: you should be able to see what
+   you have not unlocked yet ---- */
+.btn:disabled{
+  opacity:1; filter:grayscale(.7) brightness(.78);
+  background-image:repeating-linear-gradient(45deg, rgba(20,23,26,.16) 0 3px, transparent 3px 7px);
+  box-shadow:var(--lift);
+}
+.desk-btn:disabled, .tool-btn:disabled, .pal-btn:disabled{
+  opacity:1; filter:grayscale(.9);
+  background-image:repeating-linear-gradient(45deg, rgba(20,23,26,.14) 0 3px, transparent 3px 7px);
+  box-shadow:var(--lift), var(--edge-lit);
+}
+.desk-btn:disabled canvas, .tool-btn:disabled canvas, .pal-btn:disabled canvas{ opacity:.8; }
+
+/* ---- the rail keys: a real key on a real board ---- */
+#siderail .desk-btn, #siderail .tool-btn{ transition:transform .08s steps(2,end), filter .08s steps(2,end); }
+#siderail .desk-btn:active:not(:disabled), #siderail .tool-btn:active:not(:disabled){
+  transform:translateY(2px) scale(.97);
+}
+/* the tool in your hand is unmistakable: pressed in, amber-ringed,
+   with a lit strip along the bottom of the key */
+#siderail .tool-btn, #toolbelt .tool-btn, .desk-btn{ position:relative; }
+#siderail .tool-btn.active, #toolbelt .tool-btn.active{
+  box-shadow:0 0 0 3px var(--gold), 0 1px 0 var(--shadow), inset 0 3px 0 rgba(20,23,26,.3);
+  filter:brightness(1.08);
+}
+#siderail .tool-btn.active::after, #toolbelt .tool-btn.active::after{
+  content:''; position:absolute; left:3px; right:3px; bottom:2px; height:3px; background:var(--gold);
+}
+/* locked keys are crossed off rather than merely dimmed */
+#siderail .tool-btn.locked, #toolbelt .tool-btn.locked, .desk-btn.locked{
+  background-image:repeating-linear-gradient(45deg, rgba(20,23,26,.18) 0 3px, transparent 3px 7px);
+}
+
+/* ---- a panel arrives: the shutter drops it in, then it settles ---- */
+.modal:not([hidden]) > .modal-panel{ animation:panelIn .18s steps(4,end); }
+@keyframes panelIn{
+  0%{ transform:translateY(-14px) scale(.965); opacity:0; }
+  60%{ transform:translateY(2px) scale(1.008); opacity:1; }
+  100%{ transform:none; opacity:1; }
+}
+.modal:not([hidden]){ animation:dimIn .14s steps(3,end); }
+@keyframes dimIn{ from{ background:rgba(46,28,14,0); } }
+
+/* ---- a value that just changed punches once ---- */
+.pill b.pop, .stat-val.pop, .res-val.pop{ animation:valuePop .22s steps(3,end); display:inline-block; }
+@keyframes valuePop{
+  0%{ transform:translateY(-3px) scale(1.22); color:#fff8ec; }
+  55%{ transform:translateY(0) scale(1.06); }
+  100%{ transform:none; }
+}
+/* while a counter is still rolling it sits in amber */
+.pill b.rolling{ color:var(--gold-dark); }
+
+/* ---- progress bars run a sheen while they fill ---- */
+.bar, .obj u, .prog, .fill-bar{ position:relative; overflow:hidden; }
+.bar > i::after, .obj u::after{
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(100deg, transparent 30%, rgba(255,255,255,.5) 50%, transparent 70%);
+  background-size:200% 100%;
+  animation:sheen 1.6s linear infinite;
+}
+@keyframes sheen{ from{ background-position:120% 0; } to{ background-position:-60% 0; } }
+
+/* ---- hazard tape crawls, very slowly, so the plant looks live ---- */
+.hazard-strip, .modal-head::after{ background-size:24px 24px; }
+.hazard-strip{ animation:tapeCrawl 3.2s linear infinite; }
+@keyframes tapeCrawl{ to{ background-position:24px 0; } }
+
+/* ---- cards lift and square up under the cursor ---- */
+.veh-card, .crew-card, .food-card, .cos-card, .qb-row{
+  transition:transform .08s steps(2,end), box-shadow .08s steps(2,end), filter .08s steps(2,end);
+}
+.veh-card:hover, .crew-card:hover, .food-card:hover, .cos-card:hover{
+  transform:translate(-2px,-2px); box-shadow:6px 6px 0 var(--shadow), var(--edge-lit);
+  filter:brightness(1.04);
+}
+.qb-row:hover{ transform:translateX(3px); }
+
+/* ---- scrollbars, cut from the same plate ---- */
+.modal-panel *::-webkit-scrollbar{ width:12px; height:12px; }
+.modal-panel *::-webkit-scrollbar-track{ background:var(--panel2); border:3px solid var(--ink); }
+.modal-panel *::-webkit-scrollbar-thumb{ background:var(--gold); border:3px solid var(--ink); }
+.modal-panel *::-webkit-scrollbar-thumb:hover{ background:#ffc95e; }
+.modal-panel *{ scrollbar-color:var(--gold) var(--panel2); scrollbar-width:thin; }
+
+/* ---- the stage frame gets a machined bevel ---- */
+#stage-wrap{ box-shadow:var(--lift), inset 0 0 0 2px rgba(255,255,255,.10); }
+
+/* ---- the readout: one lit strip of instruments ---- */
+.hud-bar, #res-float{ text-shadow:0 2px 0 rgba(20,23,26,.5); }
+
+/* ---- and none of it moves for anyone who asked it not to ---- */
+@media (prefers-reduced-motion:reduce){
+  .modal:not([hidden]) > .modal-panel, .modal:not([hidden]),
+  .pill b.pop, .hazard-strip, .bar > i::after, .obj u::after{ animation:none !important; }
+  .btn, .desk-btn, .tool-btn, .pal-btn, .veh-card, .crew-card, .food-card, .cos-card, .qb-row{ transition:none !important; }
+}
+
+/* ---- a gauge at its limit blinks amber, the way a real one would ---- */
+.pill.full{ animation:warnBlink 1.1s steps(1,end) infinite; }
+@keyframes warnBlink{ 0%,60%{ filter:none; } 61%,100%{ filter:brightness(1.35) saturate(1.3); } }
+
+/* ---- the readout is a lit instrument strip ---- */
+.hud-bar{ position:relative; }
+.hud-bar::after{
+  content:''; position:absolute; left:0; right:0; top:0; height:2px;
+  background:linear-gradient(90deg, transparent, rgba(255,179,46,.55), transparent);
+  pointer-events:none;
+}
+
+/* ---- an objective ticks over with a stamp, not a swap ---- */
+.obj.done .obj-box{ animation:stamp .2s var(--pop); }
+@keyframes stamp{ 0%{ transform:scale(1.7) rotate(-12deg); } 100%{ transform:none; } }
+
+/* ---- what you can afford glows; what you cannot sits flat ---- */
+.btn-green:not(:disabled){ box-shadow:var(--lift), var(--edge-lit), 0 0 0 1px rgba(143,209,79,.6); }
+
+@media (prefers-reduced-motion:reduce){
+  .pill.full, .obj.done .obj-box{ animation:none !important; }
+}
+
+/* ---- helper copy has to be readable: the HR side panel sits on a light
+   plate, so its intro line was set for a dark one ---- */
+#hr-side .pedia-intro{ color:var(--ink-soft); }

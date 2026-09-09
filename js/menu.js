@@ -182,8 +182,10 @@ window.MENU = (() => {
       if (swing !== props.swing) {
         props.swing = swing;
         if (swing === 1 && props.fall <= 0) {
-          props.chops++; props.shake = 0.3;
-          for (let i = 0; i < 7; i++) parts.push({ x: tx + 8 * k, y: baseY - 24 * k, vx: (Math.random() - 0.5) * 70, vy: -34 - Math.random() * 34, t: 0, life: 0.9, col: i % 2 ? '#7fbf4f' : '#e0bd82' });
+          props.chops++; props.shake = 0.34;
+          for (let i = 0; i < 10; i++) parts.push({ x: tx + 8 * k, y: baseY - 24 * k, vx: (Math.random() - 0.5) * 90, vy: -34 - Math.random() * 44, t: 0, life: 0.9, col: i % 2 ? '#7fbf4f' : '#e0bd82', s: i % 3 ? 2 : 3 });
+          for (let i = 0; i < 5; i++) parts.push({ type: 'spark', x: tx + 8 * k, y: baseY - 24 * k, vx: (Math.random() - 0.5) * 150, vy: -60 - Math.random() * 60, g: 300, drag: 2, t: 0, life: 0.3, col: '#fff8ec' });
+          parts.push({ type: 'ring', x: tx + 8 * k, y: baseY - 22 * k, vx: 0, vy: 0, g: 0, t: 0, life: 0.3, col: '#fff8ec', r1: 22 });
         }
       }
       props.shake = Math.max(0, props.shake - dt);
@@ -211,7 +213,12 @@ window.MENU = (() => {
       const swing = Math.floor(actT * 3.1) % 2;
       if (swing !== props.swing) {
         props.swing = swing;
-        if (swing === 1) for (let i = 0; i < 6; i++) parts.push({ x: fx + 6 * k, y: baseY - prog * fh, vx: (Math.random() - 0.5) * 90, vy: -44 - Math.random() * 30, t: 0, life: 0.5, col: i % 2 ? '#ffb32e' : '#fff8ec' });
+        if (swing === 1) {
+          for (let i = 0; i < 8; i++) parts.push({ type: 'spark', x: fx + 6 * k, y: baseY - prog * fh, vx: (Math.random() - 0.5) * 170, vy: -60 - Math.random() * 70, g: 320, drag: 2.2, t: 0, life: 0.32, col: i % 2 ? '#ffb32e' : '#fff8ec' });
+          for (let i = 0; i < 5; i++) parts.push({ x: fx + Math.random() * fw, y: baseY - 2, vx: (Math.random() - 0.5) * 90, vy: -14 - Math.random() * 14, g: 60, drag: 3, t: 0, life: 0.45, col: '#c9a878' });
+          parts.push({ type: 'ring', x: fx + 6 * k, y: baseY - prog * fh, vx: 0, vy: 0, g: 0, t: 0, life: 0.26, col: '#ffb32e', r1: 16 });
+          props.shake = 0.14;
+        }
       }
       const h = Math.round(fh * prog);
       g.fillStyle = '#14171a'; g.fillRect(fx - 1, baseY - h - 1, fw + 2, h + 1);
@@ -238,7 +245,10 @@ window.MENU = (() => {
           if (c.x < reach) {
             c.flying = true; c.vx = 120 + Math.random() * 50; c.vy = -150; c.rot = 0;
             props.punched++; props.flash = 0.26;
-            for (let i = 0; i < 9; i++) parts.push({ x: c.x, y: baseY - 12 * k, vx: (Math.random() - 0.5) * 100, vy: -36 - Math.random() * 46, t: 0, life: 0.7, col: i % 2 ? '#ffb32e' : '#fff8ec' });
+            for (let i = 0; i < 14; i++) parts.push({ x: c.x, y: baseY - 12 * k, vx: (Math.random() - 0.5) * 130, vy: -36 - Math.random() * 56, t: 0, life: 0.9, col: i % 3 ? '#fff8ec' : '#ffb32e', g: 60, drag: 1.4, s: i % 2 ? 2 : 1 });
+            for (let i = 0; i < 7; i++) parts.push({ type: 'spark', x: c.x, y: baseY - 12 * k, vx: (Math.random() - 0.5) * 220, vy: -50 - Math.random() * 90, g: 340, drag: 2.4, t: 0, life: 0.28, col: '#ffffff' });
+            parts.push({ type: 'ring', x: c.x, y: baseY - 12 * k, vx: 0, vy: 0, g: 0, t: 0, life: 0.34, col: '#ffffff', r1: 34 });
+            for (let i = 0; i < 5; i++) parts.push({ type: 'star', x: c.x + (Math.random() - 0.5) * 30, y: baseY - 14 * k + (Math.random() - 0.5) * 20, vx: 0, vy: -8, g: 0, t: 0, life: 0.5, col: '#ffb32e', s: 3 });
           }
         }
         if (c.flying) {
@@ -321,7 +331,33 @@ window.MENU = (() => {
     coins = coins.filter(c => (c.t += dt) < 3 && c.y < floorY);
     coins.forEach(c => { c.y += c.v * dt; g.fillStyle = '#b87c10'; g.fillRect(Math.round(c.x), Math.round(c.y), 3, 3); g.fillStyle = '#ffb32e'; g.fillRect(Math.round(c.x), Math.round(c.y), 2, 2); });
     parts = parts.filter(p => (p.t += dt) < p.life);
-    parts.forEach(p => { p.vy += 130 * dt; p.x += p.vx * dt; p.y += p.vy * dt; g.globalAlpha = 1 - p.t / p.life; g.fillStyle = p.col; g.fillRect(Math.round(p.x), Math.round(p.y), 2, 2); g.globalAlpha = 1; });
+    parts.forEach(p => {
+      p.vy += (p.g === undefined ? 130 : p.g) * dt;
+      if (p.drag) { const d = Math.max(0, 1 - p.drag * dt); p.vx *= d; p.vy *= d; }
+      const px0 = p.x, py0 = p.y;
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      const f = p.t / p.life;
+      g.globalAlpha = Math.max(0, 1 - f * f);
+      g.fillStyle = p.col;
+      if (p.type === 'ring') {
+        const r = 2 + Math.pow(f, 0.6) * p.r1;
+        g.globalAlpha = Math.max(0, 1 - f);
+        const st = Math.max(12, Math.round(r * 1.6));
+        for (let i = 0; i < st; i++) { const a = (i / st) * Math.PI * 2; g.fillRect(Math.round(p.x + Math.cos(a) * r), Math.round(p.y + Math.sin(a) * r * 0.5), 1, 1); }
+      } else if (p.type === 'spark') {
+        g.fillRect(Math.round(p.x), Math.round(p.y), 1, 1);
+        g.globalAlpha *= 0.55; g.fillRect(Math.round(px0), Math.round(py0), 1, 1);
+      } else if (p.type === 'star') {
+        const sz = Math.max(1, Math.round(Math.sin(Math.min(1, f * 1.2) * Math.PI) * (p.s || 3)));
+        g.fillRect(Math.round(p.x) - sz, Math.round(p.y), sz * 2 + 1, 1);
+        g.fillRect(Math.round(p.x), Math.round(p.y) - sz, 1, sz * 2 + 1);
+      } else if (p.type === 'smoke') {
+        const sz = Math.max(1, Math.round((p.s || 2) + f * 6));
+        g.globalAlpha *= 0.55;
+        g.fillRect(Math.round(p.x) - (sz >> 1), Math.round(p.y) - (sz >> 1), sz, sz);
+      } else g.fillRect(Math.round(p.x), Math.round(p.y), p.s || 2, p.s || 2);
+      g.globalAlpha = 1;
+    });
 
     /* the sign over the works */
     const kk = SPR.textW('INF EGG CO.', 3) < TW - 24 ? 3 : 2;
