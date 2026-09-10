@@ -2472,13 +2472,13 @@
   function drawBoss(now) {
     const b = GAME.boss();
     if (!b || !S().company.done) return;
-    if (ctx === mainCtx && (b.x + 30 < cam().x || b.x - 10 > cam().x + W.view.w || b.y + 34 < cam().y || b.y - 40 > cam().y + W.view.h)) return;
+    if (ctx === mainCtx && (b.x + 40 < cam().x || b.x - 14 > cam().x + W.view.w || b.y + 44 < cam().y || b.y - 52 > cam().y + W.view.h)) return;
     const pose = bossPose(b, now);
     const spr = SPR.raccoonSprite(pose, 1, S().wardrobe);
     const walking = b.state === 'walk';
     const bob = walking ? 0 : Math.sin(now / 620 + 1) * 0.6;
-    const hop = pose === 'cheer' ? Math.abs(Math.sin(now / 190)) * 3 : 0;
-    SPR.shadowEll(ctx, b.x + 10, b.y + 24.5, 8 - hop * 0.4, 1.5, 0.28);
+    const hop = pose === 'cheer' ? Math.abs(Math.sin(now / 190)) * 4 : 0;
+    SPR.shadowEll(ctx, b.x + 14, b.y + 34.5, 11 - hop * 0.4, 2, 0.3);
     ctx.save();
     if (b.dir === 1) {
       ctx.translate(Math.round(b.x) + spr.width, Math.round(b.y - SPR.RAC_OFF + bob - hop));
@@ -2487,11 +2487,11 @@
     } else ctx.drawImage(spr, Math.round(b.x), Math.round(b.y - SPR.RAC_OFF + bob - hop));
     ctx.restore();
     /* dust off his heels while he walks */
-    if (walking && b.frame && GAME.setting('particles') && Math.floor(now / 120) % 2) { ctx.fillStyle = 'rgba(200,180,140,.55)'; ctx.fillRect(Math.round(b.x + (b.dir === 1 ? 2 : 14)), Math.round(b.y + 23), 3, 1); }
-    if (b.line && ctx === mainCtx) drawSay(b.line, b.x + 10, b.y - 8 - hop, 34);
+    if (walking && b.frame && GAME.setting('particles') && Math.floor(now / 120) % 2) { ctx.fillStyle = 'rgba(200,180,140,.55)'; ctx.fillRect(Math.round(b.x + (b.dir === 1 ? 3 : 20)), Math.round(b.y + 32), 4, 1); }
+    if (b.line && ctx === mainCtx) drawSay(b.line, b.x + 14, b.y - 10 - hop, 34);
     else if (pose === 'read') {
       /* leafing through the ledger */
-      if (Math.floor(now / 500) % 2) { ctx.fillStyle = '#fff8ec'; ctx.fillRect(Math.round(b.x + 6), Math.round(b.y + 6), 2, 1); }
+      if (Math.floor(now / 500) % 2) { ctx.fillStyle = '#fff8ec'; ctx.fillRect(Math.round(b.x + 9), Math.round(b.y + 22), 3, 1); }
     }
   }
 
@@ -4207,7 +4207,7 @@
     /* his portrait, framed like a staff photo */
     const face = document.createElement('div');
     face.className = 'qd-face';
-    face.appendChild(cloneCanvas(SPR.raccoonSprite(cheering ? 'cheer' : 'boss', 1, S().wardrobe), 3));
+    face.appendChild(cloneCanvas(SPR.raccoonSprite(cheering ? 'cheer' : 'boss', 1, S().wardrobe), 2));
     box.appendChild(face);
     const body = document.createElement('div');
     body.className = 'qd-body';
@@ -4485,7 +4485,7 @@
     const BARB = Math.max(BAR, sc.lines.length * lineH + 10);
     const stage = { y: BAR, h: TH - BAR - BARB };
     const gy = Math.round(stage.y + stage.h * 0.78);     /* the ground line */
-    const K = TW >= 620 ? 4 : 3;
+    const K = TW >= 620 ? 3 : 2;
 
     tctx.fillStyle = '#07080b'; tctx.fillRect(0, 0, TW, TH);
 
@@ -4801,10 +4801,11 @@
   });
   document.addEventListener('pointerup', () => { if (sigDown) { sigDown = false; sigLast = null; snd.plop(); } });
 
-  /* The form is a certificate of incorporation on ruled paper: the founder's
-     photo, the particulars on dotted lines, the mark and the colours, a
-     specimen of the sign, and a line at the foot that has to be signed
-     before the company exists. */
+  /* The form is one sheet with three things on it and nothing else: the
+     name, the mark and colours, and a line to sign. Everything the
+     registry used to ask for - the founder, the date, the form number,
+     the specimen caption - is gone; what is left is set big enough to
+     read across the room. */
   function renderCompanyForm() {
     const host = companyHost;
     if (!host) return;
@@ -4812,88 +4813,69 @@
     host.innerHTML = '';
     const paper = document.createElement('div');
     paper.className = 'cf-paper';
-    const lh = document.createElement('div');
-    lh.className = 'cf-letterhead';
-    const l1 = document.createElement('small'); l1.textContent = 'CLUCKTON VALLEY - REGISTRY OF COMPANIES'; lh.appendChild(l1);
-    const l2 = document.createElement('b'); l2.textContent = companyInIntro ? 'CERTIFICATE OF INCORPORATION' : 'AMENDED PARTICULARS'; lh.appendChild(l2);
-    const l3 = document.createElement('i'); l3.textContent = 'FORM 7B - ONE EGG COMPANY'; lh.appendChild(l3);
-    paper.appendChild(lh);
+
+    const head = document.createElement('div');
+    head.className = 'cf-head';
+    const h = document.createElement('b');
+    h.textContent = companyInIntro ? 'NAME YOUR COMPANY' : 'CHANGE THE NAME';
+    head.appendChild(h);
+    paper.appendChild(head);
     const stamp = document.createElement('div');
     stamp.className = 'stamp amber'; stamp.textContent = 'UNSIGNED';
     paper.appendChild(stamp);
 
-    const body = document.createElement('div');
-    body.className = 'cf-body';
-    const photo = document.createElement('div');
-    photo.className = 'cf-photo';
-    photo.appendChild(cloneCanvas(SPR.raccoonSprite('boss', 1, S().wardrobe), 3));
-    body.appendChild(photo);
-    const fields = document.createElement('div');
-    fields.className = 'cf-fields';
-    const line = (label, node) => {
-      const row = document.createElement('label');
-      row.className = 'cf-line' + (node.classList && node.classList.contains('cf-grid') ? ' pick' : '');
-      const i = document.createElement('i'); i.textContent = label; row.appendChild(i);
-      row.appendChild(node);
-      return row;
-    };
-    const txt = t => { const sp = document.createElement('span'); sp.textContent = t; return sp; };
-    fields.appendChild(line('FOUNDER', txt('A RACCOON')));
-    fields.appendChild(line('FILED', txt('DAY ' + S().day + ', AT THE FARM GATE')));
+    /* one: the name, on a line of its own, as big as the sheet allows */
+    const nameBox = document.createElement('div');
+    nameBox.className = 'cf-block';
     const inp = document.createElement('input');
-    inp.type = 'text'; inp.maxLength = 16; inp.id = 'company-name'; inp.value = d.name; inp.autocomplete = 'off'; inp.spellcheck = false;
-    inp.placeholder = 'INF EGG CO.';
-    fields.appendChild(line('NAME', inp));
+    inp.type = 'text'; inp.maxLength = 16; inp.id = 'company-name'; inp.value = d.name;
+    inp.autocomplete = 'off'; inp.spellcheck = false; inp.placeholder = 'INF EGG CO.';
+    nameBox.appendChild(inp);
+    paper.appendChild(nameBox);
+
+    /* two: the mark */
+    const markBox = document.createElement('div');
+    markBox.className = 'cf-block';
+    const ml = document.createElement('i'); ml.textContent = 'MARK'; markBox.appendChild(ml);
     const grid = document.createElement('div'); grid.className = 'cf-grid marks';
     LOGOS.forEach(lg => {
-      const b = document.createElement('button');
-      b.className = 'cf-pick' + (d.logo === lg ? ' active' : '');
-      b.dataset.act = 'company-logo'; b.dataset.logo = lg; b.type = 'button';
-      b.appendChild(mkIcon(lg, 3));
-      grid.appendChild(b);
+      const bt = document.createElement('button');
+      bt.className = 'cf-pick' + (d.logo === lg ? ' active' : '');
+      bt.dataset.act = 'company-logo'; bt.dataset.logo = lg; bt.type = 'button';
+      bt.appendChild(mkIcon(lg, 3));
+      grid.appendChild(bt);
     });
-    fields.appendChild(line('MARK', grid));
-    [['col1', 'PAINT'], ['col2', 'TRIM']].forEach(([k, label]) => {
-      const g2 = document.createElement('div'); g2.className = 'cf-grid swatches';
-      BRAND_COLS.forEach(col => {
-        const b = document.createElement('button');
-        b.className = 'cf-pick swatch' + (d[k] === col ? ' active' : '');
-        b.dataset.act = 'company-' + k; b.dataset.col = col; b.type = 'button';
-        b.style.background = col;
-        g2.appendChild(b);
-      });
-      fields.appendChild(line(label, g2));
+    markBox.appendChild(grid);
+
+    /* three: the colours, picked as pairs so there is one row not two */
+    const colBox = document.createElement('div');
+    colBox.className = 'cf-block';
+    const cl = document.createElement('i'); cl.textContent = 'COLOURS'; colBox.appendChild(cl);
+    const cg = document.createElement('div'); cg.className = 'cf-grid pairs';
+    BRAND_PAIRS.forEach(([c1, c2]) => {
+      const bt = document.createElement('button');
+      bt.className = 'cf-pick pair' + (d.col1 === c1 && d.col2 === c2 ? ' active' : '');
+      bt.dataset.act = 'company-pair'; bt.dataset.c1 = c1; bt.dataset.c2 = c2; bt.type = 'button';
+      const a1 = document.createElement('span'); a1.style.background = c1;
+      const a2 = document.createElement('span'); a2.style.background = c2;
+      bt.appendChild(a1); bt.appendChild(a2);
+      cg.appendChild(bt);
     });
-    body.appendChild(fields);
+    colBox.appendChild(cg);
+    const two = document.createElement('div');
+    two.className = 'cf-two';
+    two.appendChild(markBox); two.appendChild(colBox);
+    paper.appendChild(two);
 
-    /* the sheet runs in two columns so nothing has to wrap and the whole
-       form is on screen at once: particulars down the left, the specimen
-       and the pen down the right */
-    const cols = document.createElement('div');
-    cols.className = 'cf-cols';
-    const left = document.createElement('div');
-    left.className = 'cf-left';
-    left.appendChild(body);
-    cols.appendChild(left);
-    const right = document.createElement('div');
-    right.className = 'cf-right';
-
+    /* the sign itself, so you can see what you have made */
     const spec = document.createElement('div');
     spec.className = 'cf-specimen';
-    const sl = document.createElement('small'); sl.textContent = 'SPECIMEN OF THE SIGN'; spec.appendChild(sl);
     spec.appendChild(brandPreview(d));
-    right.appendChild(spec);
+    paper.appendChild(spec);
 
-    /* the line to sign */
+    /* and the line */
     const sign = document.createElement('div');
     sign.className = 'cf-sign';
-    const shead = document.createElement('div');
-    shead.className = 'cf-shead';
-    const sh = document.createElement('small'); sh.textContent = 'SIGNED BY THE FOUNDER'; shead.appendChild(sh);
-    const clear = document.createElement('button');
-    clear.className = 'btn btn-tiny'; clear.type = 'button'; clear.dataset.act = 'company-sigclear'; clear.textContent = 'CLEAR';
-    shead.appendChild(clear);
-    sign.appendChild(shead);
     const padWrap = document.createElement('div');
     padWrap.className = 'cf-pad';
     const pad = document.createElement('canvas');
@@ -4902,18 +4884,15 @@
     const baseline = document.createElement('u'); padWrap.appendChild(baseline);
     const ghost = document.createElement('em'); ghost.textContent = 'SIGN HERE'; padWrap.appendChild(ghost);
     sign.appendChild(padWrap);
-    right.appendChild(sign);
-    cols.appendChild(right);
-    paper.appendChild(cols);
-
-    const foot = document.createElement('div');
-    foot.className = 'cf-foot';
-    const note = document.createElement('small'); foot.appendChild(note);
+    const clear = document.createElement('button');
+    clear.className = 'btn btn-tiny'; clear.type = 'button'; clear.dataset.act = 'company-sigclear'; clear.textContent = 'CLEAR';
+    sign.appendChild(clear);
     const save = document.createElement('button');
-    save.className = 'btn'; save.dataset.act = 'company-save'; save.type = 'button';
+    save.className = 'btn btn-green'; save.dataset.act = 'company-save'; save.type = 'button';
     save.textContent = companyInIntro ? 'FILE IT' : 'RE-FILE';
-    foot.appendChild(save);
-    paper.appendChild(foot);
+    sign.appendChild(save);
+    paper.appendChild(sign);
+
     host.appendChild(paper);
     /* an existing signature comes back onto the line; a new company starts blank */
     sigPts = Array.isArray(d.sig) ? d.sig.map(p => [p[0], p[1]]) : [];
@@ -8252,8 +8231,8 @@
       if (S().tool === 'inspect') { setInspect({ kind: 'boss' }); return true; }
       GAME.bossTap();
       snd.pet();
-      heart(boss.x + 10, boss.y - 6, 1);
-      twinkles(boss.x + 10, boss.y + 6, 5, '#fff8ec', 12);
+      heart(boss.x + 14, boss.y - 8, 1);
+      twinkles(boss.x + 14, boss.y + 10, 6, '#fff8ec', 16);
       shake(0.5, 0.12);
       questSig = '';
       return true;
@@ -8859,6 +8838,7 @@
       case 'company-logo': { companyDraft.logo = btn.dataset.logo; renderCompanyForm(); snd.plop(); break; }
       case 'company-col1': { companyDraft.col1 = btn.dataset.col; renderCompanyForm(); snd.plop(); break; }
       case 'company-col2': { companyDraft.col2 = btn.dataset.col; renderCompanyForm(); snd.plop(); break; }
+      case 'company-pair': { companyDraft.col1 = btn.dataset.c1; companyDraft.col2 = btn.dataset.c2; renderCompanyForm(); snd.plop(); break; }
       case 'company-save': { saveCompany(); break; }
       case 'company-sigclear': { sigPts = []; redrawPad(); snd.plop(); break; }
       case 'intro-next': { introNext(); break; }
@@ -8968,10 +8948,10 @@
   GAME.on('quest', ({ q }) => {
     snd.grand(); questSig = '';
     const b = GAME.boss();
-    if (b) { twinkles(b.x + 10, b.y + 4, 10, '#ffd23f', 22); coinBurst(b.x + 10, b.y - 2, 8); beam(b.x + 10, b.y + 20, '#ffd23f', 60, 0.8); }
+    if (b) { twinkles(b.x + 14, b.y + 8, 10, '#ffd23f', 26); coinBurst(b.x + 14, b.y - 4, 8); beam(b.x + 14, b.y + 30, '#ffd23f', 70, 0.8); }
     flash('#ffe9a8', 0.14, 0.22); shake(1.4, 0.3); holdFrame(0.07);
   });
-  GAME.on('questready', ({ q }) => { snd.sparkle(); const b = GAME.boss(); if (b) { heart(b.x + 10, b.y - 6, 3); twinkles(b.x + 10, b.y, 6, '#ffd23f', 16); } floatText('QUEST READY: ' + q.name.toUpperCase(), innerWidth / 2 - 90, 90, 'gold', 'quest'); });
+  GAME.on('questready', ({ q }) => { snd.sparkle(); const b = GAME.boss(); if (b) { heart(b.x + 14, b.y - 8, 3); twinkles(b.x + 14, b.y + 4, 6, '#ffd23f', 18); } floatText('QUEST READY: ' + q.name.toUpperCase(), innerWidth / 2 - 90, 90, 'gold', 'quest'); });
   GAME.on('limo', ({ state, x, y }) => {
     if (state === 'here') {
       snd.engine(); floatWorld('A DELIVERY', x + 20, y - 18, 'gold', 'star');

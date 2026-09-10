@@ -2463,3 +2463,159 @@ body{
 /* ---- helper copy has to be readable: the HR side panel sits on a light
    plate, so its intro line was set for a dark one ---- */
 #hr-side .pedia-intro{ color:var(--ink-soft); }
+
+/* ============================================================
+   THE CERTIFICATE, CUT DOWN
+   It used to be a registry form: a letterhead in three lines, the
+   founder, the date, a form number, labelled particulars, a captioned
+   specimen and a footnote. It is now one sheet with three things on
+   it - the name, the mark, the colours - the sign it will make, and a
+   line to sign. Everything left is set big enough to read at a glance.
+   ============================================================ */
+.cf-paper{ padding:22px 26px 24px !important; }
+.cf-paper::after{ display:none; }
+.cf-head{ border-bottom:4px solid var(--ink); padding-bottom:10px; margin-bottom:18px; }
+.cf-head b{
+  display:block; font-family:var(--font-px); font-size:var(--fs-head);
+  letter-spacing:3px; line-height:1;
+}
+.cf-block{ margin-bottom:18px; }
+.cf-block > i{
+  display:block; font-style:normal; font-family:var(--font-px);
+  font-size:var(--fs-tiny); letter-spacing:3px; color:var(--ink-soft); margin-bottom:8px;
+}
+/* the name: the biggest thing on the sheet */
+.cf-block > input{
+  display:block; width:100%; box-sizing:border-box;
+  font-family:var(--font-px); font-size:var(--fs-head); letter-spacing:2px;
+  text-transform:uppercase; text-align:center;
+  padding:12px 10px; background:rgba(255,214,63,.10);
+  border:0; border-bottom:4px solid var(--ink); outline:none; color:var(--ink);
+}
+.cf-block > input:focus{ background:rgba(255,214,63,.22); border-bottom-color:var(--pink-dark); }
+.cf-block > input::placeholder{ color:rgba(20,23,26,.28); }
+/* the pickers: bigger targets, no labels on the swatches */
+.cf-grid{ gap:8px; }
+.cf-pick{ width:48px; height:48px; }
+.cf-pick.pair{ width:48px; height:48px; padding:0; display:flex; flex-direction:column; overflow:hidden; }
+.cf-pick.pair span{ display:block; flex:1; }
+.cf-pick.pair span:last-child{ flex:0 0 34%; }
+.cf-pick.active{ outline:4px solid var(--pink-dark); }
+/* the sign as it will be made */
+.cf-specimen{ justify-content:center; margin:0 0 18px !important; }
+/* the line, the clear key and FILE IT all on one row */
+.cf-sign{
+  display:flex; align-items:center; gap:14px; margin-top:0;
+  border-top:4px solid var(--ink); padding-top:16px; flex-wrap:wrap;
+}
+.cf-pad{ flex:1 1 240px; min-width:200px; max-width:none; }
+.cf-sign .btn{ font-size:var(--fs-mid); padding:12px 18px; }
+.cf-sign .btn.btn-tiny{ font-size:var(--fs-tiny); padding:10px 12px; }
+.cf-paper .stamp{ right:22px; top:20px; font-size:var(--fs-tiny); }
+@media (max-width:760px){
+  .cf-paper{ padding:14px 14px 16px !important; }
+  .cf-head b{ font-size:var(--fs-mid); }
+  .cf-block > input{ font-size:var(--fs-mid); }
+  .cf-pick, .cf-pick.pair{ width:40px; height:40px; }
+}
+
+/* the livery swatches need a size of their own inside the flex column,
+   and the line to sign has to leave room for FILE IT under it */
+.cf-pick.pair span{ display:block; width:100%; flex:1 1 auto; min-height:0; }
+.cf-pick.pair span:last-child{ flex:0 0 16px; }
+.cf-pad{ flex:1 1 240px; min-width:180px; max-width:none; }
+#sig-pad{ max-width:none; aspect-ratio:auto; height:74px; }
+.cf-pad::after{ bottom:10px; }
+.cf-pad u{ left:26px; right:12px; bottom:16px; }
+.cf-sign{ align-items:center; }
+.cf-sign .btn{ align-self:center; }
+
+/* the mark and the colours sit side by side, so the sheet fits the screen
+   with the line to sign and FILE IT still on it */
+.cf-two{ display:flex; gap:22px; align-items:flex-start; margin-bottom:14px; flex-wrap:wrap; }
+.cf-two .cf-block{ flex:1 1 220px; margin-bottom:0; }
+.cf-head{ padding-bottom:8px; margin-bottom:14px; }
+.cf-block{ margin-bottom:14px; }
+.cf-block > input{ padding:9px 10px; }
+.cf-pick{ width:42px; height:42px; }
+.cf-pick.pair{ width:42px; height:42px; }
+.cf-pick.pair span:last-child{ flex:0 0 13px; }
+.cf-specimen{ margin:0 0 14px !important; }
+.cf-specimen canvas{ max-height:64px; width:auto; }
+#sig-pad{ height:64px; }
+.cf-sign{ padding-top:12px; }
+
+/* the pad, CLEAR and FILE IT belong on one row: left to wrap, each took a
+   line of its own and the stretched flex lines blew the pad up to 240px */
+.cf-sign{ flex-wrap:nowrap; align-content:center; }
+.cf-pad{ flex:1 1 auto; min-width:0; max-width:none; height:68px; }
+.cf-sign .btn{ flex:none; }
+@media (max-width:620px){
+  .cf-sign{ flex-wrap:wrap; }
+  .cf-pad{ flex:1 1 100%; }
+}
+/* an earlier pass stacked this row; it is a row again */
+.cf-sign{ flex-direction:row; align-items:center; }
+
+/* ============================================================
+   THE WORK-ORDER BOARD, BIGGER AND FILED
+   It used to list all forty-seven orders down one column, most of
+   them greyed out and reading NOT YET ISSUED. It is a filing
+   cabinet now: five department drawers, one open at a time,
+   showing only the orders that have actually been issued and a
+   line saying how many are still to come. Everything on it is a
+   step bigger, because it is the screen you read most.
+   ============================================================ */
+#modal-quests .modal-panel{ width:min(1180px, 100%); }
+.qb-wrap{ grid-template-columns:340px minmax(0,1fr); gap:20px; }
+.qb-list{ gap:0; max-height:64vh; }
+
+/* a drawer front */
+.qb-dept{
+  display:flex; align-items:center; gap:10px; width:100%; text-align:left;
+  font-family:var(--font-px); font-size:var(--fs-mid); letter-spacing:2px;
+  padding:12px 12px; margin-top:8px;
+  background:var(--panel2); color:var(--ink);
+  border:var(--bw) solid var(--ink); box-shadow:var(--lift), var(--edge-lit);
+}
+.qb-dept:first-child{ margin-top:0; }
+.qb-dept u{ text-decoration:none; font-size:var(--fs-mid); width:14px; flex:none; color:var(--ink-soft); }
+.qb-dept b{ flex:1; min-width:0; font-weight:normal; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.qb-dept small{ font-family:var(--font-px); font-size:var(--fs-tiny); color:var(--ink-soft); letter-spacing:1px; flex:none; }
+.qb-dept small.hot{ color:#fff; background:var(--pink-dark); padding:4px 6px; }
+.qb-dept.open{ background:var(--ink); color:#f0eee8; box-shadow:none; transform:translate(2px,2px); }
+.qb-dept.open u, .qb-dept.open small{ color:#c9ced6; }
+.qb-dept:hover:not(.open){ filter:brightness(1.06); }
+
+/* what is inside it */
+.qb-drawer{
+  display:flex; flex-direction:column; gap:5px;
+  padding:10px 10px 12px; margin:0 0 2px;
+  background:rgba(20,23,26,.07);
+  border:var(--bw) solid var(--ink); border-top:0;
+}
+.qb-row{ padding:11px 10px; gap:10px; }
+.qb-row b{ font-size:var(--fs-mid); }
+.qb-row small{ font-size:var(--fs-tiny); }
+.qb-row .td-no{ font-size:var(--fs-tiny); padding:4px 5px; }
+.qb-rest{
+  font-family:var(--font-px); font-size:var(--fs-tiny); letter-spacing:1px;
+  color:var(--ink-soft); text-align:center; padding:9px 4px 3px;
+  border-top:3px dotted rgba(20,23,26,.22); margin-top:4px;
+}
+
+/* the order on the right, a size up */
+.qb-detail{ padding:18px; gap:14px; }
+.qb-order b{ font-size:var(--fs-head); }
+.qb-title b{ font-size:var(--fs-head); }
+.qb-title span{ font-size:var(--fs-body); }
+.qb-objs .obj{ font-size:var(--fs-mid); }
+.qb-objs .obj u{ flex:0 0 120px; height:12px; }
+.qb-objs .obj-box{ width:14px; height:14px; }
+.qb-where span, .qb-reward span{ font-size:var(--fs-mid); }
+.qb-foot .btn{ font-size:var(--fs-mid); padding:12px 16px; }
+.qb-all{ font-size:var(--fs-mid); padding:12px 18px; }
+@media (max-width:900px){
+  .qb-wrap{ grid-template-columns:minmax(0,1fr); }
+  .qb-list{ max-height:34vh; }
+}

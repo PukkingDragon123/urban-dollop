@@ -20,7 +20,7 @@ window.MENU = (() => {
   let cv = null, g = null, TW = 384, TH = 208;
   let phase = 'attract';
   let clock = 0;
-  const K = () => (TW >= 620 ? 3 : TW >= 420 ? 2 : 2);
+  const K = () => (TW >= 560 ? 4 : TW >= 360 ? 3 : 2);
 
   /* ---- the act ---- */
   let actI = 0, actT = 0, props = null;
@@ -44,7 +44,7 @@ window.MENU = (() => {
     props = { chops: 0, swing: -1, fall: 0, shake: 0, punched: 0, flash: 0, chicks: [] };
     warden = null;
     if (MENU_ACTS[actI].id === 'punch')
-      props.chicks = [0, 1, 2].map(i => ({ x: TW + 40 + i * 52, sp: SPECIES[(i * 9 + 3) % 24], hop: i * 1.3, y: 0 }));
+      props.chicks = [0, 1, 2].map(i => ({ x: TW + 40 + i * 60, sp: SPECIES[(i * 9 + 3) % 24], hop: i * 1.3, y: 0 }));
   }
   function nextAct() { actI = (actI + 1) % MENU_ACTS.length; actT = 0; resetAct(); }
 
@@ -89,95 +89,416 @@ window.MENU = (() => {
     return w;
   }
 
-  /* ================= ATTRACT ================= */
+  /* ================= ATTRACT =================
+     A theatre, not a title card. Back to front: a dusk sky with
+     searchlights raking it and the company blimp drifting over; three
+     parallax layers of city and works; a proscenium arch with bulbs
+     down the pillars, a scalloped valance and curtains tied back; a
+     painted backdrop flat that slides in for each act; three coloured
+     spotlights that converge on the founder and sweep on the beat,
+     with dust in the beams; a boarded stage with footlight cans
+     throwing pools up at him and his reflection in the varnish; and
+     an audience of hens along the front bobbing in time, with the
+     odd camera flash. The marquee hangs over the whole thing with
+     chasing bulbs round it. Everything moves to one beat clock.
+     ================= */
+  const BPM = 124;
+  let searchL = [{ a: -0.9, v: 0.13 }, { a: -2.1, v: -0.1 }];
+  let blimp = { x: -80, y: 30, v: 9 };
+  let crowd = null;
+  let flashCam = 0, actFlash = 0, lastActI = -1;
+  let backdropSlide = 1;
+
+  function beatOf() { return clock * BPM / 60; }
+  function beatPulse() { const f = beatOf() % 1; return Math.max(0, 1 - f * 2.6); }
+
+  function makeCrowd() {
+    const n = Math.max(8, Math.round(TW / 26));
+    crowd = Array.from({ length: n }, (_, i) => ({
+      x: (i + 0.5) * (TW / n) + (Math.random() - 0.5) * 8,
+      sp: SPECIES[(i * 7 + 2) % Math.min(30, SPECIES.length)],
+      ph: Math.random() * 6, off: (i % 3) * 0.33, cam: Math.random() < 0.22,
+      z: 0.7 + Math.random() * 0.5,
+    }));
+  }
+
+  /* a bulb: lit, half lit, or dark, with a halo when it is on */
+  function bulb(x, y, on, col) {
+    if (on) {
+      g.fillStyle = 'rgba(255,226,150,.18)';
+      g.fillRect(x - 2, y - 1, 6, 4); g.fillRect(x - 1, y - 2, 4, 6);
+    }
+    g.fillStyle = '#14171a'; g.fillRect(x - 1, y - 1, 4, 4);
+    g.fillStyle = on ? (col || '#fff3c4') : '#6a5f3a';
+    g.fillRect(x, y, 2, 2);
+  }
+
+  /* a soft cone of light, dithered so it stays pixel art */
+  function lightCone(x0, y0, x1, y1, half, alpha, col) {
+    const len = Math.max(1, y1 - y0);
+    for (let i = 0; i < len; i++) {
+      const f = i / len;
+      const cx = x0 + (x1 - x0) * f;
+      const w = 1 + half * f;
+      const a = alpha * (1 - f * 0.72);
+      g.fillStyle = 'rgba(' + col + ',' + a.toFixed(3) + ')';
+      const l = Math.round(cx - w), r = Math.round(cx + w);
+      if ((i & 1) === 0) g.fillRect(l, y0 + i, r - l, 1);
+      else for (let x = l + 1; x < r; x += 2) g.fillRect(x, y0 + i, 1, 1);
+    }
+  }
+
   function drawAttract(dt, now) {
     if (!props) resetAct();
+    if (!crowd) makeCrowd();
     actT += dt;
     if (actT > MENU_ACTS[actI].secs) nextAct();
     const act = MENU_ACTS[actI], k = K();
+    if (actI !== lastActI) { lastActI = actI; actFlash = 0.3; backdropSlide = 0; }
+    actFlash = Math.max(0, actFlash - dt);
+    backdropSlide = Math.min(1, backdropSlide + dt * 3.4);
+    const bp = beatPulse();
 
-    /* a dusk that has had a chimney put through it */
-    const bands = ['#12142c', '#191c3c', '#23234e', '#33285c', '#4d2f66', '#6e3a66',
-                   '#8f4a5e', '#b45f4c', '#d4813f', '#e8a83f'];
-    const per = (TH * 0.74) / bands.length;
+    /* ---------- 1. the sky ---------- */
+    const bands = ['#0d0f22', '#141731', '#1c1c40', '#2a2150', '#3f2a5e', '#5c3363',
+                   '#7f4260', '#a4544f', '#c4703f', '#dd9440', '#f0b850'];
+    const per = (TH * 0.80) / bands.length;
     for (let y = 0; y < TH; y++) {
       const f = y / per, i = Math.min(bands.length - 1, Math.floor(f));
       g.fillStyle = bands[i]; g.fillRect(0, y, TW, 1);
-      if (i < bands.length - 1 && f - i > 0.62) { g.fillStyle = bands[i + 1]; for (let x = y % 2; x < TW; x += 2) g.fillRect(x, y, 1, 1); }
+      if (i < bands.length - 1 && f - i > 0.58) { g.fillStyle = bands[i + 1]; for (let x = y % 2; x < TW; x += 2) g.fillRect(x, y, 1, 1); }
     }
-    for (let i = 0; i < 70; i++) {
-      if (Math.floor(now / 420 + i) % 11 === 0) continue;
-      g.fillStyle = i % 4 ? 'rgba(255,255,255,.66)' : 'rgba(255,226,170,.9)';
-      g.fillRect((i * 97) % TW, (i * 53) % Math.round(TH * 0.46), 1, 1);
+    for (let i = 0; i < 90; i++) {
+      if (Math.floor(now / 420 + i) % 13 === 0) continue;
+      g.fillStyle = i % 5 ? 'rgba(255,255,255,.6)' : 'rgba(255,226,170,.9)';
+      g.fillRect((i * 97) % TW, (i * 53) % Math.round(TH * 0.44), 1, 1);
     }
-    /* the moon, low and full */
-    const mx = TW - 62, my = 44;
+    /* the moon with a halo */
+    const mx = TW - Math.round(TW * 0.062) - 58, my = Math.round(TH * 0.15);
+    g.fillStyle = 'rgba(255,243,208,.10)';
+    for (let r = 22; r > 12; r -= 3) for (let dy = -r; dy <= r; dy += 2) { const hf = Math.round(Math.sqrt(Math.max(0, r * r - dy * dy))); g.fillRect(mx + 10 - hf, my + 10 + dy, hf * 2, 1); }
     g.fillStyle = '#fff3d0';
     g.fillRect(mx, my, 20, 20); g.fillRect(mx - 3, my + 5, 26, 10); g.fillRect(mx + 5, my - 3, 10, 26);
     g.fillStyle = '#e8dcb8'; g.fillRect(mx + 11, my + 6, 5, 5); g.fillRect(mx + 4, my + 13, 3, 3); g.fillRect(mx + 14, my + 15, 2, 2);
 
-    /* money weather */
-    if (bills.length < 16) bills.push({ x: Math.random() * TW, y: -8, v: 11 + Math.random() * 15, ph: Math.random() * 6 });
-    bills.forEach(b => {
-      b.y += b.v * dt; b.ph += dt * 3;
-      if (b.y > TH) { b.y = -8; b.x = Math.random() * TW; }
-      const bx = Math.round(b.x + Math.sin(b.ph) * 9), by = Math.round(b.y);
-      g.fillStyle = '#2f6b28'; g.fillRect(bx, by, 9, 5);
-      g.fillStyle = '#7fc24f'; g.fillRect(bx + 1, by + 1, 7, 3);
-      g.fillStyle = '#d8f0a8'; g.fillRect(bx + 3, by + 2, 3, 1);
+    const floorY = Math.max(Math.round(TH * 0.60), TH - 52);
+    const FB = TH - floorY;
+
+    /* ---------- 2. searchlights raking the sky ---------- */
+    searchL.forEach((s, i) => {
+      s.a += s.v * dt;
+      if (s.a < -2.5 || s.a > -0.6) s.v *= -1;
+      const bx = i ? TW - 30 : 30, by = floorY - 10;
+      const L = TH * 1.3;
+      g.save();
+      g.translate(bx, by); g.rotate(s.a);
+      for (let d = 0; d < L; d += 2) {
+        const w = 2 + d * 0.055, a = 0.13 * (1 - d / L);
+        g.fillStyle = 'rgba(255,240,200,' + a.toFixed(3) + ')';
+        g.fillRect(Math.round(-w), d, Math.round(w * 2), 2);
+      }
+      g.restore();
+      bulb(bx - 1, by - 2, true);
     });
 
-    /* the works: hills, then a row of chimneys, then the stage */
-    const floorY = Math.max(Math.round(TH * 0.52), TH - 44);
-    const FB = TH - floorY;
-    [{ c: '#2e2242', r: '#3d2f54', b: 34, a: 11, s: 47 }, { c: '#231a34', r: '#31254a', b: 17, a: 8, s: 31 }]
-      .forEach((L, li) => { for (let x = 0; x < TW; x++) { const h = Math.round(L.b + FB + Math.sin(x / L.s + li) * L.a + Math.sin(x / 11 + li * 2) * 3); g.fillStyle = L.c; g.fillRect(x, TH - h, 1, h); g.fillStyle = L.r; g.fillRect(x, TH - h, 1, 2); } });
-    const nF = Math.max(3, Math.round(TW / 110));
-    for (let i = 0; i < nF; i++) {
-      const fx = 22 + i * Math.round((TW - 40) / nF), fh = 30 + (i % 3) * 12, fb = floorY - 22, fw = 30;
-      g.fillStyle = '#181229'; g.fillRect(fx, fb - fh, fw, fh);
-      g.fillStyle = '#221a36'; g.fillRect(fx, fb - fh, fw, 2);
-      g.fillStyle = '#181229'; g.fillRect(fx + fw - 9, fb - fh - 16, 6, 16);
-      for (let wy = 4; wy < fh - 6; wy += 8) for (let wx = 3; wx < fw - 5; wx += 8) {
-        g.fillStyle = (Math.floor(now / 1500) + wx + wy + i) % 4 ? '#ffb32e' : '#2c2444';
-        g.fillRect(fx + wx, fb - fh + wy, 4, 4);
-      }
-      for (let s2 = 0; s2 < 3; s2++) {
-        const p = ((now / 1500 + s2 * 0.33 + i * 0.21) % 1);
-        g.fillStyle = 'rgba(190,190,205,' + (0.45 - p * 0.4).toFixed(2) + ')';
-        g.fillRect(fx + fw - 8 + Math.round(Math.sin(now / 460 + s2) * 3), Math.round(fb - fh - 18 - p * 26), 5 - Math.floor(p * 3), 3);
-      }
-    }
-    /* the stage: boards, a hazard lip and footlights */
-    g.fillStyle = '#1b1f24'; g.fillRect(0, floorY, TW, TH - floorY);
-    g.fillStyle = '#2b3138'; for (let x = 0; x < TW; x += 11) g.fillRect(x, floorY + 4, 1, TH - floorY - 4);
-    for (let x = 0; x < TW; x += 12) { g.fillStyle = '#ffb32e'; g.fillRect(x, floorY, 6, 3); g.fillStyle = '#14171a'; g.fillRect(x + 6, floorY, 6, 3); }
-    for (let x = 14; x < TW; x += 44) {
-      g.fillStyle = 'rgba(255,226,150,.09)'; g.fillRect(x - 12, floorY - 66, 26, 66);
-      g.fillStyle = '#ffb32e'; g.fillRect(x, floorY + 4, 3, 2);
+    /* ---------- 3. the blimp ---------- */
+    blimp.x += blimp.v * dt;
+    if (blimp.x > TW + 90) { blimp.x = -90; blimp.y = 22 + Math.random() * 30; }
+    {
+      const bx = Math.round(blimp.x), by = Math.round(blimp.y + Math.sin(now / 1400) * 2);
+      g.fillStyle = '#14171a'; g.fillRect(bx - 1, by - 1, 46, 16);
+      g.fillStyle = '#5a4a6e'; g.fillRect(bx, by, 44, 14);
+      g.fillStyle = '#7a6690'; g.fillRect(bx + 2, by + 1, 40, 4);
+      g.fillStyle = '#3c3050'; g.fillRect(bx, by + 11, 44, 3);
+      g.fillStyle = '#14171a'; g.fillRect(bx + 17, by + 14, 10, 4);
+      g.fillStyle = '#2b2b36'; g.fillRect(bx + 18, by + 15, 8, 2);
+      g.fillStyle = '#ffb32e'; g.fillRect(bx + 38, by + 3, 5, 8);
+      const logo = SPR.iconSprite(S().company.logo || 'egg', 1);
+      g.drawImage(logo, bx + 16, by + 2);
+      for (let i = 0; i < 4; i++) bulb(bx + 6 + i * 9, by + 12, (Math.floor(beatOf() * 2) + i) % 4 !== 0);
+      hits.push({ id: 'blimp', x: bx, y: by, w: 46, h: 20 });
     }
 
-    const rx = Math.round(TW * 0.30), baseY = floorY + 3;
+    /* ---------- 4. three parallax layers of city, hills and works ---------- */
+    const drift = now / 1000;
+    /* far towers */
+    for (let i = 0; i < 26; i++) {
+      const w = 9 + (i % 4) * 5;
+      const x = Math.round(((i * 61 - drift * 2) % (TW + 80)) - 40);
+      const h = 22 + (i * 37) % 40;
+      g.fillStyle = '#1d1936'; g.fillRect(x, floorY - 16 - h, w, h + 16);
+      for (let wy = 4; wy < h - 2; wy += 7) for (let wx = 2; wx < w - 3; wx += 5) {
+        if ((i + wx + wy) % 3) continue;
+        g.fillStyle = 'rgba(255,179,46,.5)'; g.fillRect(x + wx, floorY - 16 - h + wy, 2, 3);
+      }
+    }
+    /* hills */
+    [{ c: '#251c3c', r: '#33264e', b: 30, a: 10, s: 47 }, { c: '#1c142c', r: '#281e3e', b: 15, a: 7, s: 31 }]
+      .forEach((L, li) => { for (let x = 0; x < TW; x++) { const h = Math.round(L.b + FB + Math.sin(x / L.s + li) * L.a + Math.sin(x / 11 + li * 2) * 3); g.fillStyle = L.c; g.fillRect(x, TH - h, 1, h); g.fillStyle = L.r; g.fillRect(x, TH - h, 1, 2); } });
+    /* the works: chimneys, a gasometer and a water tower */
+    const nF = Math.max(3, Math.round(TW / 96));
+    for (let i = 0; i < nF; i++) {
+      const fx = 16 + i * Math.round((TW - 30) / nF), fh = 34 + (i % 3) * 14, fb = floorY - 14, fw = 28;
+      g.fillStyle = '#141026'; g.fillRect(fx, fb - fh, fw, fh);
+      g.fillStyle = '#1e1832'; g.fillRect(fx, fb - fh, fw, 2);
+      g.fillStyle = '#141026'; g.fillRect(fx + fw - 9, fb - fh - 20, 6, 20);
+      g.fillStyle = '#ffb32e'; g.fillRect(fx + fw - 9, fb - fh - 20, 6, 1);
+      for (let wy = 5; wy < fh - 6; wy += 8) for (let wx = 3; wx < fw - 5; wx += 8) {
+        g.fillStyle = (Math.floor(now / 1500) + wx + wy + i) % 4 ? '#ffb32e' : '#241c3c';
+        g.fillRect(fx + wx, fb - fh + wy, 4, 4);
+      }
+      for (let s2 = 0; s2 < 4; s2++) {
+        const p = ((now / 1500 + s2 * 0.25 + i * 0.21) % 1);
+        g.fillStyle = 'rgba(190,190,205,' + (0.42 - p * 0.38).toFixed(2) + ')';
+        g.fillRect(fx + fw - 8 + Math.round(Math.sin(now / 460 + s2) * 4), Math.round(fb - fh - 22 - p * 30), 5 - Math.floor(p * 3), 3);
+      }
+    }
+    {
+      const gx = Math.round(TW * 0.80), gb = floorY - 14, gr = 15;
+      g.fillStyle = '#141026';
+      for (let dy = -gr; dy <= 0; dy++) { const hf = Math.round(Math.sqrt(Math.max(0, gr * gr - dy * dy))); g.fillRect(gx - hf, gb + dy - 8, hf * 2, 1); }
+      g.fillRect(gx - gr, gb - 8, gr * 2, 8);
+      for (let y = gb - 6; y < gb; y += 3) { g.fillStyle = '#221a36'; g.fillRect(gx - gr, y, gr * 2, 1); }
+    }
+
+    /* ---------- 5. the backdrop flat for this act: it stands on the
+       boards and only comes half way up, so the sky, the city and the
+       blimp all stay visible over the top of it ---------- */
+    const bdH = Math.round((floorY - TH * 0.15) * 0.52), bdY = floorY - bdH;
+    const slide = 1 - Math.pow(1 - backdropSlide, 3);
+    g.save();
+    g.globalAlpha = slide * 0.92;
+    const bdx = Math.round((1 - slide) * -TW * 0.3);
+    if (act.id === 'chop') {
+      for (let i = 0; i < 10; i++) {
+        const tx = bdx + 6 + i * Math.round(TW / 10), th = bdH * (0.72 + (i % 3) * 0.12);
+        g.fillStyle = '#14261c'; g.fillRect(tx, floorY - th, 10, th);
+        g.fillStyle = '#1d3a26';
+        for (let t = 0; t < 3; t++) { const w = 22 - t * 5; g.fillRect(Math.round(tx + 5 - w / 2), floorY - th - 6 + t * 8, w, 9); }
+      }
+    } else if (act.id === 'build') {
+      for (let i = 0; i < 8; i++) {
+        const sx = bdx + 4 + i * Math.round(TW / 8), sh = bdH * (0.55 + (i % 4) * 0.14);
+        g.fillStyle = '#2a1b24'; g.fillRect(sx, floorY - sh, 30, sh);
+        g.fillStyle = '#37232e'; g.fillRect(sx, floorY - sh, 30, 2);
+        for (let wy = 6; wy < sh - 6; wy += 9) for (let wx = 4; wx < 26; wx += 9) { g.fillStyle = 'rgba(255,179,46,.22)'; g.fillRect(sx + wx, floorY - sh + wy, 4, 4); }
+      }
+    } else if (act.id === 'dance') {
+      /* pallets of cash stacked against the back wall */
+      for (let r = 0; r < 5; r++) for (let cc = 0; cc < Math.ceil(TW / 30); cc++) {
+        const sx = bdx + cc * 30 + (r % 2) * 8, sy = floorY - 12 - r * 13;
+        if (sy < bdY) continue;
+        g.fillStyle = '#0c2010'; g.fillRect(sx, sy, 24, 11);
+        g.fillStyle = '#143018'; g.fillRect(sx + 1, sy + 1, 22, 5);
+        g.fillStyle = '#1d4422'; g.fillRect(sx + 9, sy + 2, 6, 2);
+      }
+    } else {
+      /* a coop wall, wire and all */
+      g.fillStyle = '#2b2016'; g.fillRect(bdx, bdY, TW, bdH);
+      g.fillStyle = '#3a2c1d';
+      for (let y = bdY; y < floorY; y += 8) g.fillRect(bdx, Math.round(y), TW, 2);
+      g.fillStyle = 'rgba(200,206,214,.16)';
+      for (let x = bdx; x < TW; x += 8) g.fillRect(x, bdY, 1, bdH);
+      g.fillStyle = '#14171a'; g.fillRect(bdx, bdY, TW, 2);
+    }
+    g.restore();
+
+    /* ---------- 6. spotlights from the top of the arch ---------- */
+    const rx = Math.round(TW * 0.34), baseY = floorY + 3;
+    const spotCols = ['255,236,180', '255,190,120', '190,215,255'];
+    for (let i = 0; i < 3; i++) {
+      const sway = Math.sin(beatOf() * Math.PI / 2 + i * 2.1) * 26;
+      const originX = Math.round(TW * (0.18 + i * 0.32));
+      lightCone(originX, Math.round(TH * 0.12), rx + 14 * k + sway, baseY, 26 + i * 6, 0.16 + bp * 0.05, spotCols[i]);
+    }
+    /* dust in the beams */
+    for (let i = 0; i < 26; i++) {
+      const t = (now / 2600 + i * 0.077) % 1;
+      const x = rx + 14 * k + Math.sin(i * 2.3 + now / 3000) * 46;
+      const y = TH * 0.14 + t * (baseY - TH * 0.14);
+      g.fillStyle = 'rgba(255,246,220,' + (0.35 * (1 - t)).toFixed(2) + ')';
+      g.fillRect(Math.round(x), Math.round(y), 1, 1);
+    }
+
+    /* ---------- 7. the stage: boards, hazard lip, footlight pools ---------- */
+    g.fillStyle = '#20242b'; g.fillRect(0, floorY, TW, TH - floorY);
+    g.fillStyle = '#2b3138'; for (let x = 0; x < TW; x += 13) g.fillRect(x, floorY + 5, 1, TH - floorY - 5);
+    g.fillStyle = 'rgba(255,226,150,.05)'; g.fillRect(0, floorY, TW, 6);
+    for (let x = 0; x < TW; x += 12) { g.fillStyle = '#ffb32e'; g.fillRect(x, floorY, 6, 3); g.fillStyle = '#14171a'; g.fillRect(x + 6, floorY, 6, 3); }
+    /* footlight cans along the lip, throwing up the wall of light */
+    const fl = Math.max(4, Math.round(TW / 52));
+    for (let i = 0; i < fl; i++) {
+      const lx = Math.round((i + 0.5) * (TW / fl));
+      const on = (Math.floor(beatOf()) + i) % 5 !== 0;
+      g.fillStyle = 'rgba(255,226,150,' + (on ? 0.10 : 0.03) + ')';
+      for (let dy = 0; dy < 54; dy++) { const w = 3 + dy * 0.5; if (dy & 1) continue; g.fillRect(Math.round(lx - w), floorY - dy, Math.round(w * 2), 1); }
+      g.fillStyle = '#14171a'; g.fillRect(lx - 4, floorY + 3, 8, 5);
+      g.fillStyle = on ? '#ffe89a' : '#7a6a3a'; g.fillRect(lx - 3, floorY + 4, 6, 2);
+    }
+
+    /* ---------- 8. the act ---------- */
     const wardrobe = S().wardrobe;
     const put = (pose, x, y) => {
       const spr = SPR.raccoonSprite(pose, k, wardrobe);
-      SPR.shadowEll(g, x + 10 * k, y + 1, 9 * k, 2, 0.4);
+      SPR.shadowEll(g, x + 14 * k, y + 1, 12 * k, 2, 0.42);
+      /* his reflection in the varnish, squashed and faint */
+      g.save();
+      g.globalAlpha = 0.16;
+      g.translate(Math.round(x) - (spr.ox || 0) * k, Math.round(y) + 1);
+      g.scale(1, -0.34);
+      g.drawImage(spr, 0, 0);
+      g.restore();
+      g.globalAlpha = 1;
       g.drawImage(spr, Math.round(x) - (spr.ox || 0) * k, Math.round(y) - spr.height);
     };
+    drawAct(act, dt, now, k, rx, baseY, floorY, put);
 
+    /* ---------- 9. the Warden, the loose hens, the particles ---------- */
+    drawWardenBit(dt, k, baseY);
+    drawHens(dt, k, baseY);
+    drawMenuParts(dt, floorY);
+
+    /* ---------- 10. the audience along the front ---------- */
+    flashCam = Math.max(0, flashCam - dt);
+    if (Math.random() < dt * 1.6) flashCam = 0.12;
+    {
+      /* heads and shoulders over the stage lip, like an orchestra pit:
+         a dark row with the footlights catching the top of each head
+         and a bright dot for every eye watching him */
+      const ck = Math.max(2, k - 1);
+      const dark = '#0e0c18', rim = 'rgba(255,206,130,.40)';
+      crowd.forEach(c => {
+        const bob = Math.round(Math.abs(Math.sin(beatOf() * Math.PI + c.off * 6)) * 2 * ck);
+        const sw = 13 * ck, sh = 5 * ck;
+        const sx = Math.round(c.x - sw / 2), sy = TH - sh + ck - bob;
+        /* shoulders */
+        g.fillStyle = dark;
+        g.fillRect(sx, sy + ck, sw, sh);
+        g.fillRect(sx + ck, sy, sw - 2 * ck, sh);
+        g.fillStyle = rim; g.fillRect(sx + ck, sy, sw - 2 * ck, 1);
+        /* head, turned toward the stage */
+        const hw = 5 * ck, hh = 4 * ck;
+        const hx = sx + Math.round(sw * 0.52), hy = sy - hh + ck;
+        g.fillStyle = dark;
+        g.fillRect(hx, hy + 1, hw, hh); g.fillRect(hx + 1, hy, hw - 2, hh);
+        g.fillStyle = rim; g.fillRect(hx + 1, hy, hw - 2, 1);
+        /* comb, wattle and beak */
+        g.fillStyle = '#6e1a24';
+        g.fillRect(hx + 1, hy - ck, ck, ck); g.fillRect(hx + 1 + ck, hy - 2 * ck, ck, 2 * ck); g.fillRect(hx + 1 + 2 * ck, hy - ck, ck, ck);
+        g.fillStyle = '#8a5410'; g.fillRect(hx + hw, hy + 2 * ck, ck, ck);
+        /* an eye catching the footlights */
+        g.fillStyle = 'rgba(255,236,180,.85)'; g.fillRect(hx + hw - 2 * ck, hy + ck, ck, ck);
+        if (c.cam && flashCam > 0 && ((c.ph * 7) | 0) % 3 === 0) {
+          g.fillStyle = 'rgba(255,255,255,.95)'; g.fillRect(hx + ck, hy - 5 * ck, 3, 3);
+          g.fillStyle = 'rgba(255,255,255,.22)'; g.fillRect(hx - 3, hy - 8 * ck, 14, 14);
+        }
+      });
+    }
+
+    /* ---------- 11. the proscenium: pillars, valance, curtains ---------- */
+    const PW = Math.max(14, Math.round(TW * 0.062));
+    const VH = Math.round(TH * 0.11);
+    /* curtains, tied back */
+    for (let side = 0; side < 2; side++) {
+      const x0 = side ? TW - PW : 0;
+      for (let x = 0; x < PW; x++) {
+        const f = side ? 1 - x / PW : x / PW;
+        const fold = Math.sin(f * 9) * 0.5 + 0.5;
+        g.fillStyle = fold > 0.6 ? '#7d1626' : fold > 0.3 ? '#5e0f1c' : '#400a14';
+        g.fillRect(x0 + x, 0, 1, TH);
+      }
+      /* the tie-back sash and its tassel */
+      const ty = Math.round(TH * 0.52);
+      g.fillStyle = '#ffb32e'; g.fillRect(x0, ty, PW, 3);
+      g.fillStyle = '#b87c10'; g.fillRect(x0, ty + 3, PW, 1);
+      const tx = side ? TW - 5 : 2;
+      g.fillStyle = '#ffb32e'; g.fillRect(tx, ty + 4, 3, 7);
+      g.fillStyle = '#b87c10'; g.fillRect(tx, ty + 10, 3, 2);
+      /* bulbs set into the pillar itself */
+      const bx = side ? TW - Math.round(PW / 2) - 1 : Math.round(PW / 2) - 1;
+      for (let y = VH + 10; y < TH - 8; y += 16) bulb(bx, y, (Math.floor(beatOf() * 2) + (y / 16 | 0)) % 3 !== 0);
+    }
+    /* the valance: a scalloped pelmet with bulbs under it */
+    for (let x = 0; x < TW; x++) {
+      const scallop = Math.round(Math.abs(Math.sin(x / 9)) * 6);
+      const h = VH - 4 + scallop;
+      const fold = Math.sin(x / 5) * 0.5 + 0.5;
+      g.fillStyle = fold > 0.6 ? '#7d1626' : fold > 0.3 ? '#5e0f1c' : '#400a14';
+      g.fillRect(x, 0, 1, h);
+      g.fillStyle = '#ffb32e'; g.fillRect(x, h, 1, 2);
+    }
+    for (let x = 8; x < TW - 6; x += 14) bulb(x, VH + 5 + Math.round(Math.abs(Math.sin(x / 9)) * 6), (Math.floor(beatOf() * 2) + (x / 14 | 0)) % 4 !== 0);
+
+    /* ---------- 12. the marquee ---------- */
+    const title = 'INF EGG CO.';
+    const kk = SPR.textW(title, 3) < TW - PW * 2 - 40 ? 3 : 2;
+    const tw = SPR.textW(title, kk);
+    const mW = tw + 34, mH = kk * 8 + 20;
+    const mX = Math.round(TW / 2 - mW / 2), mY = Math.round(VH * 0.42);
+    g.fillStyle = 'rgba(255,179,46,' + (0.10 + bp * 0.06).toFixed(2) + ')';
+    g.fillRect(mX - 8, mY - 6, mW + 16, mH + 14);
+    g.fillStyle = '#14171a'; g.fillRect(mX - 3, mY - 3, mW + 6, mH + 6);
+    g.fillStyle = '#241a20'; g.fillRect(mX, mY, mW, mH);
+    g.fillStyle = '#33242c'; g.fillRect(mX, mY, mW, 2);
+    SPR.drawTitle(g, title, Math.round(TW / 2 - tw / 2), mY + 6, '#ffb32e', '#14171a', kk);
+    const sub = 'EGG PRODUCTION DIVISION';
+    SPR.drawTiny(g, sub, Math.round(TW / 2 - SPR.tinyW(sub, 1) / 2), mY + kk * 8 + 9, '#e8b25a', 1, '#14171a');
+    /* bulbs chasing round the board */
+    let bi = 0;
+    const chase = Math.floor(beatOf() * 4);
+    for (let x = mX + 4; x < mX + mW - 2; x += 9) { bulb(x, mY - 5, (chase + bi++) % 3 !== 0); }
+    for (let x = mX + 4; x < mX + mW - 2; x += 9) { bulb(x, mY + mH + 1, (chase + bi++) % 3 !== 0); }
+    for (let y = mY + 4; y < mY + mH - 2; y += 9) { bulb(mX - 5, y, (chase + bi++) % 3 !== 0); bulb(mX + mW + 1, y, (chase + bi++) % 3 !== 0); }
+
+    /* what he is singing, on a plate under the marquee */
+    const shown = act.line.slice(0, Math.floor(actT * 26));
+    if (shown) stencil(shown, TW / 2, mY + mH + 10, '#f0eee8', 1);
+
+    /* ---------- 13. front of house ---------- */
+    if (Math.floor(now / 620) % 2) {
+      const c2 = 'CLICK ANYWHERE TO START';
+      const w2 = SPR.textW(c2, 1);
+      g.fillStyle = '#ffb32e'; g.fillRect(Math.round(TW / 2 - w2 / 2) - 9, TH - 24, w2 + 18, 12);
+      g.fillStyle = '#14171a'; g.fillRect(Math.round(TW / 2 - w2 / 2) - 7, TH - 22, w2 + 14, 8);
+      SPR.drawText(g, c2, Math.round(TW / 2 - w2 / 2), TH - 21, '#ffb32e', 1);
+    }
+    if (hensFound) SPR.drawTiny(g, 'HENS BOTHERED ' + hensFound, PW + 6, TH - 12, '#e8b25a', 1, '#14171a');
+    /* the settings key, reachable from the front door too */
+    {
+      const gx = TW - PW - 24, gy = TH - 26;
+      plate(gx, gy, 18, 18, { fill: '#c4c2bb', rivets: true });
+      g.drawImage(SPR.iconSprite('gear', 1), gx + 4, gy + 4);
+      hits.push({ id: 'gear', x: gx - 2, y: gy - 2, w: 22, h: 22 });
+    }
+    /* the light change between acts */
+    if (actFlash > 0) {
+      g.fillStyle = 'rgba(255,246,220,' + (actFlash * 0.5).toFixed(2) + ')';
+      g.fillRect(0, 0, TW, TH);
+    }
+  }
+
+  /* ---- the four acts, staged on the boards ---- */
+  function drawAct(act, dt, now, k, rx, baseY, floorY, put) {
     if (act.id === 'dance') {
       const beat = Math.floor(now / 240) % 2;
       const hop = Math.abs(Math.sin(now / 240)) * 4 * k;
       for (let s2 = 0; s2 < 2; s2++) {
-        const sx = rx + (s2 ? 27 * k : -23 * k), n = 5 + s2 * 2;
-        for (let i = 0; i < n; i++) { g.fillStyle = '#2f6b28'; g.fillRect(sx, baseY - 4 * k - i * 3 * k, 12 * k, 3 * k); g.fillStyle = '#7fc24f'; g.fillRect(sx + k, baseY - 4 * k - i * 3 * k, 10 * k, k); }
-        g.fillStyle = '#ffb32e'; g.fillRect(sx + 4 * k, baseY - 4 * k - n * 3 * k, 4 * k, 2 * k);
+        const sx = rx + (s2 ? 34 * k : -30 * k), n = 5 + s2 * 2;
+        for (let i = 0; i < n; i++) {
+          const by2 = baseY - 4 * k - i * 3 * k;
+          g.fillStyle = '#14171a'; g.fillRect(sx - 1, by2 - 1, 12 * k + 2, 3 * k + 1);
+          g.fillStyle = '#1d4a1f'; g.fillRect(sx, by2, 12 * k, 3 * k);
+          g.fillStyle = '#2f6b28'; g.fillRect(sx, by2, 12 * k, k);
+          g.fillStyle = '#e8dcc0'; g.fillRect(sx, by2 + 2 * k, 12 * k, 1);
+          g.fillStyle = '#ffb32e'; g.fillRect(sx + 4 * k, by2 + k, 4 * k, 1);
+        }
+        g.fillStyle = '#b87c10'; g.fillRect(sx + 3 * k, baseY - 4 * k - n * 3 * k - k, 6 * k, k);
       }
       put(beat ? 'guitar1' : 'guitar0', rx, baseY - hop);
-      if (Math.random() < dt * 7) notes.push({ x: rx + 24 * k, y: baseY - 19 * k, t: 0, ph: Math.random() * 6 });
+      if (Math.random() < dt * 7) notes.push({ x: rx + 30 * k, y: baseY - 26 * k, t: 0, ph: Math.random() * 6 });
       if (Math.random() < dt * 9) coins.push({ x: rx - 40 * k + Math.random() * 80 * k, y: floorY - 74, v: 34 + Math.random() * 40, t: 0 });
     } else if (act.id === 'chop') {
-      const tx = rx + 36 * k;
+      const tx = rx + 48 * k;
       const swing = Math.floor(actT * 2.3) % 2;
       if (swing !== props.swing) {
         props.swing = swing;
@@ -190,7 +511,7 @@ window.MENU = (() => {
       }
       props.shake = Math.max(0, props.shake - dt);
       if (props.chops >= 4) props.fall = Math.min(1, props.fall + dt * 1.5);
-      const tree = SPR.decoSprite('tree', k, 77);
+      const tree = SPR.decoSprite('tree', k + 1, 77);
       g.save();
       g.translate(Math.round(tx) + (props.shake > 0 ? Math.round(Math.sin(now / 28) * 2) : 0), baseY);
       g.rotate(props.fall * props.fall * 1.4);
@@ -208,7 +529,7 @@ window.MENU = (() => {
       }
       put(swing ? 'chop1' : 'chop0', rx, baseY);
     } else if (act.id === 'build') {
-      const fx = rx + 34 * k, fw = 42 * k, fh = 48 * k;
+      const fx = rx + 44 * k, fw = 44 * k, fh = Math.min(58 * k, Math.round(floorY - TH * 0.30));
       const prog = Math.min(1, actT / (act.secs - 0.7));
       const swing = Math.floor(actT * 3.1) % 2;
       if (swing !== props.swing) {
@@ -237,7 +558,7 @@ window.MENU = (() => {
       }
       put(swing ? 'hammer1' : 'hammer0', rx, baseY);
     } else {
-      const reach = rx + 27 * k;
+      const reach = rx + 36 * k;
       props.flash = Math.max(0, props.flash - dt);
       props.chicks.forEach(c => {
         if (!c.flying) {
@@ -253,14 +574,14 @@ window.MENU = (() => {
         }
         if (c.flying) {
           c.x += c.vx * dt; c.y += c.vy * dt; c.vy += 170 * dt; c.rot += dt * 9;
-          const cs = SPR.chickenSprite(c.sp, k, false);
+          const cs = SPR.chickenSprite(c.sp, Math.max(2, k - 1), false);
           g.save(); g.translate(Math.round(c.x), Math.round(baseY - 14 * k + c.y)); g.rotate(c.rot);
           g.drawImage(cs, -cs.width / 2, -cs.height / 2); g.restore();
           for (let i = 0; i < 3; i++) { const a = c.rot * 2 + i * 2.1; g.fillStyle = '#ffb32e'; g.fillRect(Math.round(c.x + Math.cos(a) * 11 * k), Math.round(baseY - 14 * k + c.y + Math.sin(a) * 6 * k - 8 * k), 2, 2); }
         } else if (c.x < TW + 40) {
           const hp = Math.abs(Math.sin(c.hop)) * 2 * k;
-          SPR.shadowEll(g, c.x + 10 * k, baseY + 1, 6 * k, 1.5, 0.34);
-          const cs = SPR.chickenSprite(c.sp, k, false);
+          SPR.shadowEll(g, c.x + 8 * k, baseY + 1, 5 * k, 1.5, 0.34);
+          const cs = SPR.chickenSprite(c.sp, Math.max(2, k - 1), false);
           g.save(); g.translate(Math.round(c.x) + cs.width, Math.round(baseY - hp)); g.scale(-1, 1); g.drawImage(cs, 0, -cs.height); g.restore();
         }
       });
@@ -273,7 +594,10 @@ window.MENU = (() => {
       const wind = Math.floor(actT * 4) % 3 === 0 && props.flash <= 0;
       put(props.flash > 0.13 ? 'punch1' : wind ? 'punch0' : 'stand', rx, baseY);
     }
+  }
 
+  /* ---- the Warden, once a tree is down: he wags, then sulks off ---- */
+  function drawWardenBit(dt, k, baseY) {
     /* the Warden, once a tree is down: he wags, then sulks off */
     if (warden) {
       warden.t += dt;
@@ -295,7 +619,11 @@ window.MENU = (() => {
       }
       if (warden.t > 6) warden = null;
     }
+  }
 
+  /* ---- the hens that wandered in - click one and it is off ---- */
+  function drawHens(dt, k0, baseY) {
+    const k = Math.max(2, k0 - 1);
     /* the hens that wandered in - click one and it is off */
     if (Math.random() < dt * 0.5) spawnHen();
     for (let i = hens.length - 1; i >= 0; i--) {
@@ -320,7 +648,10 @@ window.MENU = (() => {
       g.restore();
       hits.push({ id: 'hen', ref: h, x: h.x - 2, y: baseY - cs.height - 4, w: cs.width + 4, h: cs.height + 6 });
     }
+  }
 
+  /* ---- the stage's own particles ---- */
+  function drawMenuParts(dt, floorY) {
     /* particles */
     notes = notes.filter(n => (n.t += dt) < 1.6);
     notes.forEach(n => {
@@ -358,29 +689,6 @@ window.MENU = (() => {
       } else g.fillRect(Math.round(p.x), Math.round(p.y), p.s || 2, p.s || 2);
       g.globalAlpha = 1;
     });
-
-    /* the sign over the works */
-    const kk = SPR.textW('INF EGG CO.', 3) < TW - 24 ? 3 : 2;
-    const title = 'INF EGG CO.';
-    SPR.drawTitle(g, title, Math.round(TW / 2 - SPR.textW(title, kk) / 2), 12, '#ffb32e', '#14171a', kk);
-    const sub = 'EGG PRODUCTION DIVISION';
-    SPR.drawTiny(g, sub, Math.round(TW / 2 - SPR.tinyW(sub, 1) / 2), 14 + kk * 8 + 4, '#e8b25a', 1, '#14171a');
-    /* what he is singing */
-    const shown = act.line.slice(0, Math.floor(actT * 24));
-    if (shown) stencil(shown, TW / 2, 14 + kk * 8 + 13, '#f0eee8', 1);
-    /* the one instruction */
-    if (Math.floor(now / 620) % 2) {
-      const c2 = 'CLICK ANYWHERE TO START';
-      const w2 = SPR.textW(c2, 1);
-      g.fillStyle = '#ffb32e'; g.fillRect(Math.round(TW / 2 - w2 / 2) - 9, TH - 22, w2 + 18, 12);
-      g.fillStyle = '#14171a'; g.fillRect(Math.round(TW / 2 - w2 / 2) - 7, TH - 20, w2 + 14, 8);
-      SPR.drawText(g, c2, Math.round(TW / 2 - w2 / 2), TH - 19, '#ffb32e', 1);
-    }
-    /* the tally, once you have bothered a hen */
-    if (hensFound) {
-      const t3 = 'HENS BOTHERED ' + hensFound;
-      SPR.drawTiny(g, t3, 6, TH - 12, '#e8b25a', 1, '#14171a');
-    }
   }
 
   /* ================= BASKET ================= */
@@ -419,15 +727,50 @@ window.MENU = (() => {
   const EGG_W = [2, 4, 6, 6, 8, 8, 8, 8, 8, 8, 6, 4];
   function drawBasket(dt, now) {
     const k = K();
-    /* a cold room, a bench, one lamp */
+    /* the hatchery store room: boarded walls, a shelf of trays, a
+       grading chart nailed up, and one work lamp over the crate */
     g.fillStyle = '#171b21'; g.fillRect(0, 0, TW, TH);
     for (let y = 0; y < TH; y += 8) for (let x = ((y / 8) % 2) * 8; x < TW; x += 16) { g.fillStyle = 'rgba(255,255,255,.014)'; g.fillRect(x, y, 8, 8); }
     const benchY = bench();
+    /* the wall: horizontal boards with the odd nail */
+    for (let y = 0; y < benchY; y += 13) {
+      g.fillStyle = 'rgba(255,255,255,.026)'; g.fillRect(0, y, TW, 11);
+      g.fillStyle = 'rgba(12,14,18,.5)'; g.fillRect(0, y + 11, TW, 2);
+      for (let x = 9; x < TW; x += 61) { g.fillStyle = '#4a5058'; g.fillRect(x, y + 4, 2, 2); }
+    }
+    /* a shelf of stacked egg trays, high on the left */
+    {
+      const shY = Math.round(benchY * 0.30), shX = 14, shW = Math.round(TW * 0.22);
+      g.fillStyle = '#14171a'; g.fillRect(shX - 2, shY, shW + 4, 5);
+      g.fillStyle = '#5e4426'; g.fillRect(shX, shY + 1, shW, 3);
+      for (let i = 0; i < 5; i++) {
+        const ty = shY - 4 - i * 4, tw2 = shW - 10;
+        g.fillStyle = '#14171a'; g.fillRect(shX + 4, ty, tw2, 4);
+        g.fillStyle = '#a8783f'; g.fillRect(shX + 5, ty + 1, tw2 - 2, 2);
+        g.fillStyle = '#c9a35f'; for (let x = shX + 6; x < shX + tw2 + 3; x += 4) g.fillRect(x, ty + 1, 2, 1);
+      }
+    }
+    /* the grading chart, nailed up on the right */
+    {
+      const pw = Math.round(TW * 0.17), ph = Math.round(benchY * 0.34);
+      const px2 = TW - pw - 16, py2 = Math.round(benchY * 0.16);
+      g.fillStyle = '#14171a'; g.fillRect(px2 - 2, py2 - 2, pw + 4, ph + 4);
+      g.fillStyle = '#e8dcc0'; g.fillRect(px2, py2, pw, ph);
+      g.fillStyle = '#c9bb9a'; g.fillRect(px2, py2, pw, 2);
+      SPR.drawTiny(g, 'GRADES', px2 + 4, py2 + 4, '#5e4426', 1);
+      for (let i = 0; i < 4; i++) {
+        const ey = py2 + 12 + i * Math.max(9, Math.round((ph - 16) / 4));
+        if (ey + 8 > py2 + ph) break;
+        g.drawImage(SPR.eggSprite(i * 2, 1), px2 + 5, ey);
+        SPR.drawTiny(g, ['A', 'AA', 'AAA', '?'][i], px2 + 18, ey + 2, '#5e4426', 1);
+      }
+      g.fillStyle = '#8f9298'; g.fillRect(px2 + 2, py2 + 2, 2, 2); g.fillRect(px2 + pw - 4, py2 + 2, 2, 2);
+    }
     /* lamp cone over the basket */
     const cx = TW / 2;
     for (let i = 0; i < 34; i++) {
       const p = i / 34;
-      g.fillStyle = 'rgba(255,214,140,' + (0.055 * (1 - p)).toFixed(3) + ')';
+      g.fillStyle = 'rgba(255,214,140,' + (0.11 * (1 - p * 0.75)).toFixed(3) + ')';
       const half = 12 + p * 90;
       g.fillRect(Math.round(cx - half), Math.round(p * benchY), Math.round(half * 2), Math.ceil(benchY / 34) + 1);
     }
@@ -445,6 +788,7 @@ window.MENU = (() => {
     g.fillStyle = '#8a5e2a'; g.fillRect(bx, by + 6, bw, bh - 4);
     for (let i = 0; i < bw; i += 9) { g.fillStyle = '#a8783f'; g.fillRect(bx + i, by + 6, 4, bh - 4); }
     g.fillStyle = '#6b4620'; g.fillRect(bx, by + 6, bw, 2); g.fillRect(bx, by + bh, bw, 2);
+    SPR.drawTiny(g, 'INF EGG CO. - HATCHERY', bx + 6, by + bh - 8, 'rgba(60,40,18,.75)', 1);
     /* straw over the rim, drawn behind and in front of the eggs */
     const straw = (front) => {
       const rnd = SPR.mulberry(front ? 9 : 31);
@@ -628,6 +972,7 @@ window.MENU = (() => {
     if (TW !== W.view.w || TH !== W.view.h) {
       TW = W.view.w; TH = W.view.h; cv.width = TW; cv.height = TH;
       g.imageSmoothingEnabled = false;
+      crowd = null;
       if (phase === 'basket') layoutSlots();
     }
     clock += dt;
@@ -670,6 +1015,16 @@ window.MENU = (() => {
       }
       const w2 = hitAt(p.x, p.y, 'warden');
       if (w2) { warden.said++; warden.t = 0.4; UI.snd.plop(); return; }
+      if (hitAt(p.x, p.y, 'gear')) { UI.snd.build(); MENU.openSettings(); return; }
+      if (hitAt(p.x, p.y, 'blimp')) {
+        UI.snd.engine();
+        for (let i = 0; i < 14; i++) parts.push({ x: p.x, y: p.y, vx: (Math.random() - 0.5) * 120, vy: -30 - Math.random() * 60, t: 0, life: 1.1, col: i % 2 ? '#ffb32e' : '#fff8ec', s: 2 });
+        return;
+      }
+      /* a handful of confetti where you tapped, then the shutter */
+      for (let i = 0; i < 22; i++) parts.push({ x: p.x, y: p.y, vx: (Math.random() - 0.5) * 190, vy: -60 - Math.random() * 110, g: 200, drag: 1.1, t: 0, life: 1.1,
+        col: ['#ffb32e', '#fff8ec', '#7fc24f', '#e0432c', '#7fd7ff'][i % 5], s: i % 3 ? 2 : 3 });
+      parts.push({ type: 'ring', x: p.x, y: p.y, vx: 0, vy: 0, g: 0, t: 0, life: 0.4, col: '#ffb32e', r1: 40 });
       startWipe('basket');
       return;
     }

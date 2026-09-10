@@ -3157,50 +3157,64 @@ const SPR = (() => {
 
   /* ============================================================
      THE RACCOON - who inherited the farm and means to get rich.
-     Drawn properly: a bandit mask with a pale blaze up the middle,
-     a snout, ears with pink inside, and a fat ringed tail hanging
-     down behind him. A 20 x 22 body on a canvas with six rows of
-     headroom for a hat, dressed from a wardrobe record
-     { hat, suit, glasses, acc } and posed. The wide poses (dancing,
-     chopping, hammering, punching, the guitar) get a 32-wide canvas
-     and report where the body sits on it as .ox, so a caller can
-     keep the feet where they were.
+     A 28 x 34 body on a canvas with nine rows of headroom for a
+     hat: four rows of ear, a pale blaze up the forehead, a black
+     bandit mask that flares at the eyes and points down the cheeks,
+     four-pixel eyes with pupils that both look the way he is
+     facing, a snout with a nose and a small grin, and a fat
+     five-ringed tail hanging down behind him. Dressed from a
+     wardrobe record { hat, suit, glasses, acc } and posed. The
+     wide poses (dancing, chopping, hammering, punching, the
+     guitar) get a 44-wide canvas and report where the body sits on
+     it as .ox, so a caller can keep the feet where they were.
      ============================================================ */
   const RACCOON_ROWS = [
-    '.....oddo.....oddo..',
-    '.....odpo.....opdo..',
-    '.....odpgooooogpdo..',
-    '.....odgGGGWGGGgdo..',
-    '.....odgGGGWGGGgdo..',
-    '.....ogkkkkkkkkkgo..',
-    '.....okwwwkkkwwwko..',
-    '.....okweekkkweeko..',
-    '.....ogkkkkkkkkkgo..',
-    '......oggWWWWWggo...',
-    '.......ogWnnnWgo....',
-    '........oodddoo.....',
-    '.ooo..ogggggggggo...',
-    'oTTToogggggggggggo..',
-    'oTTToogggggggggggo..',
-    'otttoogggggggggggo..',
-    'otttoogggggggggggo..',
-    'oTTTToogggggggggo...',
-    'oTTTTo.ogggo.ogggo..',
-    'otttto.ogggo.ogggo..',
-    'otttto.oSSSo.osssso.',
-    '.oooo..ooooo.oooooo.',
+    '.........oo.......oo........',
+    '........odpo.....opdo.......',
+    '........odpo.....opdo.......',
+    '.......oddpgooooogpddo......',
+    '.......odgGGGGGGGGGgdo......',
+    '.......odgGGGGGGGGGgdo......',
+    '.......oddgGGGGGGGgddo......',
+    '.......odgkkkkkkkkkgdo......',
+    '.......okkkkkkkkkkkkko......',
+    '.......okkwwwkkkwwwkko......',
+    '.......okkwwwkkkwwwkko......',
+    '.......okkweekkkweekko......',
+    '.......odkkkkkkkkkkkdo......',
+    '.......oogkkWWWWWkkgoo......',
+    '.........ogWWWWWWWgo........',
+    '..........oWWnnnWWo.........',
+    '...........oWnWnWo..........',
+    '...........odddddo..........',
+    '...ooo..ogggggggggggo.......',
+    '..oTTToogggggggggggggo......',
+    '.oTTTToogggggggggggggo......',
+    '.ottTtoogggggggggggggo......',
+    'otttTtoogggggggggggggo......',
+    'oTTtTtoogggggggggggggo......',
+    'oTTTTtoogggggggggggggo......',
+    'ottTTtoogggggggggggggo......',
+    'otttTtoogggggggggggggo......',
+    'oTTtTto.ogggggggggggo.......',
+    'oTTTTto..ogggo..ogggo.......',
+    'ottTTto..ogggo..ogggo.......',
+    '.ottTto..ogggo..ogggo.......',
+    '.oTTTo..oSSSSo.ossssso......',
+    '..oooo..oSSSSo.ossssso......',
+    '........oooooo.ooooooo......',
   ];
   const RACCOON_PAL = {
     o: '#17141d',   /* outline                */  d: '#5b6270',   /* fur, in shade      */
     g: '#828a97',   /* fur                    */  G: '#bfc6cf',   /* fur, lit           */
-    W: '#e9eef4',   /* brow blaze and snout   */  k: '#2d2736',   /* the mask           */
-    e: '#0e0c12',   /* pupil                  */
-    w: '#ffffff',   /* eye                    */  n: '#100e14',   /* nose and mouth     */
-    p: '#cf7f8f',   /* inside an ear          */  t: '#3f444e',   /* tail, dark ring    */
-    T: '#b0b7c2',   /* tail, pale ring        */  s: '#241f2c',   /* near shoe          */
-    S: '#39333f',   /* far shoe               */
+    W: '#e9eef4',   /* blaze and snout        */  k: '#2d2736',   /* the mask           */
+    w: '#ffffff',   /* eye                    */  e: '#0e0c12',   /* pupil              */
+    n: '#100e14',   /* nose and mouth         */  p: '#cf7f8f',   /* inside an ear      */
+    t: '#3a4048',   /* tail, dark ring        */  T: '#a2aab6',   /* tail, pale ring    */
+    s: '#241f2c',   /* near shoe              */  S: '#39333f',   /* far shoe           */
   };
-  const RAC_OFF = 6;                       /* rows of headroom above the ears */
+  const RAC_OFF = 9;                       /* rows of headroom above the ears */
+  const RAC_W = 28, RAC_H = 34, RAC_MID = 14;
   const WIDE_POSES = ['dance0', 'dance1', 'dance2', 'guitar0', 'guitar1', 'chop0', 'chop1', 'hammer0', 'hammer1', 'punch0', 'punch1'];
   function outfitOf(w) {
     const o = Object.assign({}, (typeof WARDROBE_DEFAULT !== 'undefined' ? WARDROBE_DEFAULT : {}), w || {});
@@ -3210,12 +3224,12 @@ const SPR = (() => {
   function raccoonSprite(pose, scale, wardrobe) {
     pose = pose || 'stand';
     const of = outfitOf(wardrobe);
-    const key = 'racc3_' + pose + '_' + scale + '_' + of.hat + of.suit.id + of.glasses + of.acc;
+    const key = 'racc4_' + pose + '_' + scale + '_' + of.hat + of.suit.id + of.glasses + of.acc;
     if (cache.has(key)) return cache.get(key);
     const k = scale || 1;
     const wide = WIDE_POSES.includes(pose);
-    const ox = wide ? 6 : 0;
-    const c = newCanvas((wide ? 32 : 20) * k, (22 + RAC_OFF) * k);
+    const ox = wide ? 8 : 0;
+    const c = newCanvas((wide ? 44 : 28) * k, (RAC_H + RAC_OFF) * k);
     c.ox = ox;
     const ctx = c.getContext('2d');
     const R = (x, y, w, h, col) => { if (!col) return; ctx.fillStyle = col; ctx.fillRect((x + ox) * k, (y + RAC_OFF) * k, w * k, h * k); };
@@ -3226,171 +3240,228 @@ const SPR = (() => {
     const suitLit = lighten(suitCol, 0.28), suitDk = darken(suitCol, 0.38), suitMid = lighten(suitCol, 0.12);
     const green = of.suit.id === 'suit_green';
     const paw = green ? '#3fa85f' : G;
-    const cuff = '#cfd6de';
+    const pawLit = lighten(paw, 0.3);
+    const cuff = '#e6ebf1';
     const dancing = pose.startsWith('dance') || pose.startsWith('guitar');
     const striding = pose === 'walk0' || pose === 'walk1';
 
     /* ---- the animal underneath ---- */
     drawGrid(ctx, RACCOON_ROWS, RACCOON_PAL, ox * k, RAC_OFF * k, k);
-    if (pose === 'blink') {                      /* eyes shut for a beat */
-      R(7, 6, 3, 2, P.k); R(13, 6, 3, 2, P.k);
-      R(7, 7, 3, 1, '#574c70'); R(13, 7, 3, 1, '#574c70');
+    /* a glint in each eye, top-left, the way an eye catches the sky */
+    R(10, 9, 1, 1, '#ffffff'); R(17, 9, 1, 1, '#ffffff');
+    if (pose === 'blink') {                     /* eyes shut for a beat */
+      R(10, 9, 3, 3, P.k); R(16, 9, 3, 3, P.k);
+      R(10, 10, 3, 1, '#5b5170'); R(16, 10, 3, 1, '#5b5170');
     }
-    if (pose === 'cheer' || dancing) {           /* a proper grin once he is winning */
-      R(9, 10, 5, 1, P.n); R(10, 11, 3, 1, P.n); R(9, 10, 1, 1, '#ffffff');
+    if (pose === 'cheer' || dancing) {          /* a proper grin once he is winning */
+      R(12, 16, 5, 1, P.n); R(13, 17, 3, 1, P.n); R(12, 16, 1, 1, '#ffffff');
     }
 
     /* ---- legs ---- */
     if (dancing) {
-      CLR(6, 18, 13, 4);
-      const lift = pose === 'dance1' || pose === 'guitar1' ? 1 : 0;
-      R(5, 18 - lift, 5, 2, O); R(6, 18 - lift, 3, 1, g);
-      R(4, 20 - lift, 5, 2, O); R(5, 20 - lift, 3, 1, P.S);
-      R(14, 18 + (lift ? 0 : -1), 5, 2, O); R(15, 18 + (lift ? 0 : -1), 3, 1, g);
-      R(14, 20 + (lift ? 0 : -1), 6, 2, O); R(15, 20 + (lift ? 0 : -1), 4, 1, P.s);
+      CLR(7, 28, 16, 6);
+      const lift = pose === 'dance1' || pose === 'guitar1' ? 2 : 0;
+      /* far leg kicked back, near leg planted - swapped on the off beat */
+      R(6, 28 - lift, 6, 3, O); R(7, 28 - lift, 4, 2, g);
+      R(4, 31 - lift, 7, 3, O); R(5, 31 - lift, 5, 2, P.S);
+      R(17, 27 + lift, 6, 4, O); R(18, 27 + lift, 4, 3, g);
+      R(17, 31 + lift, 8, 3, O); R(18, 31 + lift, 6, 2, P.s);
     } else if (pose === 'walk1') {
-      CLR(6, 18, 14, 4);                        /* near leg swung forward */
-      R(7, 18, 4, 2, O); R(8, 18, 2, 1, g); R(5, 20, 5, 2, O); R(6, 20, 3, 1, P.S);
-      R(13, 18, 5, 2, O); R(14, 18, 3, 1, g); R(15, 20, 5, 2, O); R(16, 20, 3, 1, P.s);
+      CLR(7, 28, 18, 6);                        /* near leg swung forward */
+      R(9, 28, 5, 3, O); R(10, 28, 3, 2, g); R(6, 31, 7, 3, O); R(7, 31, 5, 2, P.S);
+      R(16, 28, 5, 3, O); R(17, 28, 3, 2, g); R(18, 31, 7, 3, O); R(19, 31, 5, 2, P.s);
     } else if (pose === 'walk0') {
-      CLR(6, 18, 14, 4);                        /* legs crossing under him */
-      R(9, 18, 4, 2, O); R(10, 18, 2, 1, g); R(9, 20, 5, 2, O); R(10, 20, 3, 1, P.S);
-      R(12, 18, 5, 2, O); R(13, 18, 3, 1, g); R(12, 20, 6, 2, O); R(13, 20, 4, 1, P.s);
+      CLR(7, 28, 18, 6);                        /* legs crossing under him */
+      R(11, 28, 5, 3, O); R(12, 28, 3, 2, g); R(11, 31, 7, 3, O); R(12, 31, 5, 2, P.S);
+      R(15, 28, 5, 3, O); R(16, 28, 3, 2, g); R(15, 31, 7, 3, O); R(16, 31, 5, 2, P.s);
     } else {
-      R(14, 20, 3, 1, '#554e60'); R(8, 20, 2, 1, '#403a4c');   /* a glint along each shoe */
+      R(17, 31, 4, 1, '#5a5366'); R(9, 31, 3, 1, '#443e50');   /* a glint along each shoe */
     }
 
     /* ---- the suit ---- */
-    R(7, 12, 9, 1, suitCol); R(6, 13, 11, 4, suitCol); R(7, 17, 9, 1, suitDk);
-    R(7, 12, 9, 1, suitLit);                                   /* light across the shoulders */
-    R(6, 13, 1, 4, suitMid); R(16, 13, 1, 4, suitDk);          /* far edge lit, near edge in shade */
-    R(10, 12, 3, 5, '#fff8ec');                                /* the shirt */
-    R(10, 12, 1, 5, '#ded5c2');                                /* a fold down the shirt */
-    R(9, 12, 1, 1, suitLit); R(13, 12, 1, 1, suitLit);         /* lapel points */
-    R(9, 13, 1, 2, suitDk); R(13, 13, 1, 2, suitDk);
-    R(11, 12, 1, 1, darken(trim, 0.4));                        /* the knot */
-    R(11, 13, 1, 3, trim); R(10, 16, 3, 1, trim); R(11, 16, 1, 1, lighten(trim, 0.32));
-    R(7, 15, 1, 1, green ? '#fff8ec' : trim);                  /* pocket square */
-    R(14, 14, 1, 1, suitLit); R(15, 16, 1, 1, suitLit);
-    R(8, 17, 7, 1, '#171420'); R(11, 17, 1, 1, '#ffd23f');     /* belt and buckle */
+    R(9, 18, 11, 1, suitCol); R(8, 19, 13, 8, suitCol); R(9, 27, 11, 1, suitDk);
+    R(9, 18, 11, 1, suitLit);                                  /* light across the shoulders */
+    R(8, 19, 1, 8, suitMid); R(20, 19, 1, 8, suitDk);          /* far edge lit, near edge shaded */
+    R(12, 18, 5, 1, '#fff8ec'); R(13, 19, 3, 8, '#fff8ec');    /* the shirt, a V of white */
+    R(13, 19, 1, 8, '#ded5c2');                                /* a fold down the shirt */
+    R(11, 18, 1, 1, suitLit); R(17, 18, 1, 1, suitLit);        /* lapel points */
+    R(12, 19, 1, 3, suitDk); R(16, 19, 1, 3, suitDk);
+    R(11, 19, 1, 1, suitLit); R(17, 19, 1, 1, suitLit);
+    R(14, 18, 1, 1, darken(trim, 0.4));                        /* the knot */
+    R(14, 19, 1, 6, trim); R(13, 25, 3, 1, trim); R(13, 26, 3, 1, darken(trim, 0.2));
+    R(14, 19, 1, 1, lighten(trim, 0.35)); R(14, 25, 1, 1, lighten(trim, 0.3));
+    R(10, 22, 2, 1, green ? '#fff8ec' : trim); R(10, 21, 2, 1, darken(green ? '#fff8ec' : trim, 0.3));
+    R(18, 21, 1, 1, suitLit); R(18, 24, 1, 1, suitLit);        /* two buttons */
+    R(9, 27, 11, 1, '#171420'); R(14, 27, 2, 1, '#ffd23f');    /* belt and buckle */
     if (!dancing && !striding) {
-      R(8, 18, 3, 2, darken(suitCol, 0.55)); R(14, 18, 3, 2, darken(suitCol, 0.42));
-      R(8, 18, 3, 1, darken(suitCol, 0.68)); R(14, 18, 3, 1, darken(suitCol, 0.52));
+      R(10, 28, 4, 3, darken(suitCol, 0.55)); R(17, 28, 4, 3, darken(suitCol, 0.42));
+      R(10, 28, 4, 1, darken(suitCol, 0.68)); R(17, 28, 4, 1, darken(suitCol, 0.52));
     }
 
-    /* ---- arms: a sleeve, a white cuff, a paw ---- */
+    /* ---- arms: a sleeve, a cuff, a paw with three fingers ---- */
     const arm = (x, y, h) => {
-      R(x, y, 3, h, O);
-      R(x + 1, y, 1, h - 2, suitCol); R(x + 1, y, 1, 1, suitLit);
-      R(x + 1, y + h - 3, 1, 1, cuff);
-      R(x, y + h - 2, 3, 2, O); R(x + 1, y + h - 2, 1, 1, paw);
+      R(x, y, 4, h, O);
+      R(x + 1, y, 2, h - 3, suitCol); R(x + 1, y, 2, 1, suitLit);
+      R(x + 1, y + h - 4, 2, 1, cuff);
+      R(x, y + h - 3, 4, 3, O); R(x + 1, y + h - 3, 2, 2, paw); R(x + 1, y + h - 3, 1, 1, pawLit);
+      R(x + 1, y + h - 1, 1, 1, darken(paw, 0.25)); R(x + 3, y + h - 2, 1, 1, darken(paw, 0.25));
     };
-    const fist = (x, y) => { R(x, y, 3, 3, O); R(x + 1, y + 1, 1, 1, paw); R(x + 1, y, 1, 1, lighten(paw, 0.3)); };
+    const fist = (x, y) => {
+      R(x, y, 4, 4, O); R(x + 1, y + 1, 2, 2, paw); R(x + 1, y + 1, 1, 1, pawLit);
+      R(x + 2, y + 2, 1, 1, darken(paw, 0.3));
+    };
     if (pose === 'cheer') {
-      R(5, 7, 2, 6, O); R(5, 8, 1, 4, suitCol); R(5, 11, 1, 1, cuff);
-      R(16, 7, 2, 6, O); R(16, 8, 1, 4, suitCol); R(16, 11, 1, 1, cuff);
-      fist(4, 5); fist(16, 5);
+      R(7, 10, 3, 9, O); R(8, 11, 1, 6, suitCol); R(8, 16, 1, 1, cuff);
+      R(19, 10, 3, 9, O); R(20, 11, 1, 6, suitCol); R(20, 16, 1, 1, cuff);
+      fist(6, 6); fist(19, 6);
     } else if (pose === 'read') {
-      R(5, 13, 13, 7, O); R(6, 14, 11, 5, '#fff8ec');
-      R(7, 15, 8, 1, '#b8b0a0'); R(7, 17, 6, 1, '#b8b0a0'); R(11, 14, 1, 5, '#d8d0bc');
-      R(4, 15, 2, 4, O); R(5, 16, 1, 2, paw); R(17, 15, 2, 4, O); R(17, 16, 1, 2, paw);
+      R(6, 19, 17, 10, O); R(7, 20, 15, 8, '#fff8ec');
+      R(9, 21, 11, 1, '#b8b0a0'); R(9, 24, 8, 1, '#b8b0a0'); R(9, 26, 6, 1, '#b8b0a0');
+      R(14, 20, 1, 8, '#d8d0bc');
+      R(5, 21, 3, 5, O); R(6, 22, 1, 3, paw); R(22, 21, 3, 5, O); R(22, 22, 1, 3, paw);
     } else if (pose === 'dance0') {
-      R(3, 9, 2, 5, O); R(3, 10, 1, 3, suitCol); R(3, 12, 1, 1, cuff); fist(2, 7); arm(15, 13, 5);
+      R(4, 13, 3, 8, O); R(5, 14, 1, 5, suitCol); R(5, 18, 1, 1, cuff); fist(3, 10); arm(18, 19, 8);
     } else if (pose === 'dance1') {
-      R(3, 8, 2, 5, O); R(3, 9, 1, 3, suitCol); fist(2, 6);
-      R(18, 8, 2, 5, O); R(18, 9, 1, 3, suitCol); fist(18, 6);
+      R(4, 11, 3, 8, O); R(5, 12, 1, 5, suitCol); fist(3, 8);
+      R(22, 11, 3, 8, O); R(22, 12, 1, 5, suitCol); fist(22, 8);
     } else if (pose === 'dance2') {
-      arm(4, 13, 5); R(18, 9, 2, 5, O); R(18, 10, 1, 3, suitCol); R(18, 12, 1, 1, cuff); fist(18, 7);
+      arm(7, 19, 8); R(22, 12, 3, 8, O); R(22, 13, 1, 5, suitCol); R(22, 17, 1, 1, cuff); fist(22, 9);
     } else if (pose.startsWith('guitar')) {
       /* a red flying-V slung across him, one paw on the neck, one strumming */
-      const strum = pose === 'guitar1' ? 1 : 0;
-      R(3, 11, 14, 1, '#5e4426');
-      R(9, 13, 9, 6, O); R(10, 14, 7, 4, '#c9302f'); R(16, 13, 6, 3, O); R(16, 14, 5, 1, '#c9302f');
-      R(10, 14, 7, 1, '#ff6b5a'); R(12, 16, 3, 1, '#ffd23f'); R(13, 15, 1, 3, '#2e2216');
-      R(-3, 7, 13, 2, O); R(-2, 8, 11, 1, '#5e3d18'); for (let i = 0; i < 5; i++) R(-2 + i * 2, 7, 1, 1, '#c9ced6');
-      R(-5, 6, 3, 4, O); R(-4, 7, 1, 2, '#c9302f');
-      R(4, 9, 2, 5, O); R(4, 10, 1, 3, suitCol); R(2, 6, 3, 3, O); R(3, 7, 1, 1, paw);   /* neck hand */
-      R(16, 12 + strum, 2, 4, O); R(16, 13 + strum, 1, 2, suitCol); R(14, 15 + strum, 3, 2, O); R(15, 15 + strum, 1, 1, paw);
+      const strum = pose === 'guitar1' ? 2 : 0;
+      R(4, 17, 18, 2, '#5e4426'); R(4, 17, 18, 1, '#8a6a3c');            /* the strap */
+      R(12, 20, 13, 9, O); R(13, 21, 11, 7, '#c9302f'); R(13, 21, 11, 2, '#ff6b5a');
+      R(22, 20, 8, 5, O); R(22, 21, 7, 2, '#c9302f');                    /* the far wing */
+      R(16, 24, 5, 2, '#ffd23f'); R(18, 22, 1, 5, '#2e2216');
+      R(-4, 12, 18, 3, O); R(-3, 13, 16, 1, '#5e3d18');                  /* the neck */
+      for (let i = 0; i < 6; i++) R(-3 + i * 3, 12, 1, 1, '#c9ced6');
+      R(-7, 10, 4, 6, O); R(-6, 11, 2, 3, '#c9302f');                    /* the head stock */
+      R(6, 14, 3, 7, O); R(7, 15, 1, 4, suitCol); R(4, 10, 4, 4, O); R(5, 11, 2, 2, paw);
+      R(21, 18 + strum, 3, 6, O); R(21, 19 + strum, 1, 3, suitCol);
+      R(18, 23 + strum, 4, 3, O); R(19, 23 + strum, 2, 2, paw);
     } else if (pose === 'chop0') {
-      R(15, 5, 2, 8, O); R(15, 6, 1, 6, suitCol); R(15, 11, 1, 1, cuff); fist(15, 3);
-      R(17, -2, 1, 7, '#8a5e2a'); R(16, -2, 1, 1, O); R(14, -6, 5, 4, O); R(15, -5, 3, 2, '#c9ced6'); R(15, -5, 3, 1, '#eef2f6');
-      arm(4, 13, 5);
+      /* axe raised behind the head */
+      R(19, 7, 3, 13, O); R(20, 8, 1, 10, suitCol); R(20, 17, 1, 1, cuff); fist(19, 4);
+      R(22, -5, 2, 11, '#8a5e2a'); R(22, -5, 1, 11, '#a8783f');
+      R(18, -10, 7, 6, O); R(19, -9, 5, 4, '#c9ced6'); R(19, -9, 5, 2, '#eef2f6'); R(19, -5, 5, 1, '#8a8f98');
+      arm(7, 19, 8);
     } else if (pose === 'chop1') {
-      R(15, 12, 2, 4, O); R(15, 13, 1, 2, suitCol); fist(16, 14);
-      R(18, 15, 6, 1, '#8a5e2a'); R(23, 13, 4, 5, O); R(24, 14, 2, 3, '#c9ced6'); R(24, 14, 1, 3, '#eef2f6');
-      arm(4, 12, 5);
+      /* axe swung down and out to the right */
+      R(19, 18, 3, 6, O); R(20, 19, 1, 3, suitCol); fist(21, 21);
+      R(24, 23, 8, 2, '#8a5e2a'); R(24, 23, 8, 1, '#a8783f');
+      R(31, 20, 6, 7, O); R(32, 21, 4, 5, '#c9ced6'); R(32, 21, 4, 2, '#eef2f6');
+      arm(7, 18, 8);
     } else if (pose === 'hammer0') {
-      R(15, 5, 2, 8, O); R(15, 6, 1, 6, suitCol); R(15, 11, 1, 1, cuff); fist(15, 3);
-      R(17, -1, 1, 6, '#8a5e2a'); R(14, -4, 7, 3, O); R(15, -3, 5, 1, '#a8adb8');
-      arm(4, 13, 5);
+      R(19, 7, 3, 13, O); R(20, 8, 1, 10, suitCol); R(20, 17, 1, 1, cuff); fist(19, 4);
+      R(22, -4, 2, 10, '#8a5e2a'); R(22, -4, 1, 10, '#a8783f');
+      R(18, -8, 9, 5, O); R(19, -7, 7, 3, '#a8adb8'); R(19, -7, 7, 1, '#ccd2da');
+      arm(7, 19, 8);
     } else if (pose === 'hammer1') {
-      R(15, 12, 2, 4, O); R(15, 13, 1, 2, suitCol); fist(16, 14);
-      R(18, 16, 5, 1, '#8a5e2a'); R(21, 14, 4, 5, O); R(22, 15, 2, 3, '#a8adb8');
-      arm(4, 12, 5);
+      R(19, 18, 3, 6, O); R(20, 19, 1, 3, suitCol); fist(21, 21);
+      R(24, 24, 7, 2, '#8a5e2a'); R(24, 24, 7, 1, '#a8783f');
+      R(30, 21, 6, 7, O); R(31, 22, 4, 5, '#a8adb8'); R(31, 22, 4, 2, '#ccd2da');
+      arm(7, 18, 8);
     } else if (pose === 'punch0') {
-      R(4, 10, 2, 4, O); R(4, 11, 1, 2, suitCol); fist(1, 9);
-      arm(15, 13, 5);
+      /* wound up: fist pulled back past the ear */
+      R(5, 15, 3, 6, O); R(6, 16, 1, 3, suitCol); fist(1, 13);
+      arm(18, 19, 8);
     } else if (pose === 'punch1') {
-      R(15, 12, 10, 2, O); R(15, 13, 9, 1, suitCol); R(21, 12, 1, 1, cuff); fist(24, 11);
-      R(21, 11, 4, 1, '#fff8ec'); R(19, 15, 3, 1, 'rgba(255,255,255,.45)');
-      arm(4, 13, 5);
+      /* the punch: an arm straight out to the right, a fist at the end */
+      R(19, 18, 14, 3, O); R(19, 19, 12, 2, suitCol); R(28, 19, 1, 2, cuff); fist(32, 17);
+      R(28, 17, 6, 1, '#fff8ec'); R(28, 22, 5, 1, 'rgba(255,255,255,.45)');
+      R(24, 16, 3, 1, 'rgba(255,255,255,.3)'); R(24, 23, 3, 1, 'rgba(255,255,255,.3)');
+      arm(5, 19, 8);
     } else {
       /* standing, walking, boss: arms down, something in the near paw */
-      arm(4, 13, 5);
-      if (of.acc === 'acc_coin') { R(15, 12, 3, 5, O); R(16, 13, 1, 3, suitCol); R(16, 9, 2, 1, O); R(15, 10, 4, 2, O); R(16, 12, 2, 1, O); R(16, 10, 2, 2, '#ffd23f'); R(16, 10, 1, 1, '#fff3c4'); }
-      else if (of.acc === 'acc_egg') { R(15, 12, 3, 5, O); R(16, 13, 1, 3, suitCol); R(15, 9, 4, 5, O); R(16, 10, 2, 3, '#ffd23f'); R(16, 10, 1, 1, '#fff3c4'); }
-      else if (of.acc === 'acc_cane') { arm(15, 13, 5); R(18, 11, 1, 10, '#5e3d18'); R(17, 10, 3, 1, '#ffd23f'); }
-      else if (of.acc === 'acc_axe') { arm(15, 12, 5); R(18, 8, 1, 10, '#8a5e2a'); R(16, 7, 4, 3, O); R(17, 8, 2, 1, '#c9ced6'); }
-      else if (of.acc === 'acc_guitar') { R(3, 11, 14, 1, '#5e4426'); R(9, 14, 9, 5, O); R(10, 15, 7, 3, '#c9302f'); R(10, 15, 7, 1, '#ff6b5a'); R(13, 15, 1, 3, '#2e2216'); R(0, 9, 11, 2, O); R(1, 10, 9, 1, '#5e3d18'); arm(15, 12, 5); }
-      else arm(15, 13, 5);
+      arm(7, 19, 8);
+      if (of.acc === 'acc_coin' || of.acc === 'acc_egg') {
+        /* the arm bends up and he holds it out where you can see it */
+        const egg = of.acc === 'acc_egg';
+        R(19, 20, 4, 5, O); R(20, 21, 2, 3, suitCol);            /* upper arm */
+        R(19, 15, 4, 6, O); R(20, 16, 2, 3, suitCol); R(20, 19, 2, 1, cuff);
+        R(19, 13, 4, 3, O); R(20, 13, 2, 2, paw); R(20, 13, 1, 1, pawLit);
+        if (egg) {
+          R(20, 8, 3, 1, O); R(19, 9, 5, 4, O);
+          R(20, 9, 3, 4, '#fff3d0'); R(20, 9, 1, 2, '#ffffff'); R(22, 11, 1, 1, '#d8cdb0');
+        } else {
+          R(20, 9, 3, 1, O); R(19, 10, 5, 3, O);
+          R(20, 10, 3, 2, '#ffd23f'); R(20, 10, 1, 1, '#fff3c4'); R(22, 11, 1, 1, '#c99a10');
+        }
+      } else if (of.acc === 'acc_cane') {
+        arm(18, 19, 8); R(23, 16, 2, 17, '#5e3d18'); R(23, 16, 1, 17, '#7a5024');
+        R(21, 14, 5, 2, '#ffd23f'); R(21, 14, 5, 1, '#fff3c4');
+      } else if (of.acc === 'acc_axe') {
+        arm(18, 18, 8); R(23, 10, 2, 19, '#8a5e2a'); R(23, 10, 1, 19, '#a8783f');
+        R(21, 8, 6, 4, O); R(22, 9, 4, 2, '#c9ced6'); R(22, 9, 4, 1, '#eef2f6');
+      } else if (of.acc === 'acc_guitar') {
+        R(4, 17, 18, 2, '#5e4426');
+        R(12, 21, 13, 8, O); R(13, 22, 11, 6, '#c9302f'); R(13, 22, 11, 2, '#ff6b5a');
+        R(18, 23, 1, 5, '#2e2216'); R(16, 25, 5, 1, '#ffd23f');
+        R(0, 14, 14, 3, O); R(1, 15, 12, 1, '#5e3d18');
+        arm(18, 18, 8);
+      } else arm(18, 19, 8);
     }
 
-    /* ---- glasses over the eyes (rows 5-8, lenses at x6-9 and x13-16) ---- */
+    /* ---- glasses over the eyes (rows 8-12, lenses at x9-12 and x16-19) ---- */
     if (of.glasses === 'gl_round') {
       const fr = '#c9a35f', li = '#f0dcac';
-      [6, 12].forEach(x => {
-        R(x, 5, 5, 1, fr); R(x, 8, 5, 1, fr); R(x, 6, 1, 2, fr); R(x + 4, 6, 1, 2, fr);
-        R(x + 1, 6, 3, 2, 'rgba(190,225,245,.30)'); R(x + 1, 6, 1, 1, li);
+      [9, 15].forEach(x => {
+        R(x, 8, 5, 1, fr); R(x, 12, 5, 1, fr); R(x, 9, 1, 3, fr); R(x + 4, 9, 1, 3, fr);
+        R(x + 1, 9, 3, 3, 'rgba(190,225,245,.30)'); R(x + 1, 9, 2, 1, li);
       });
-      R(11, 6, 1, 1, fr); R(5, 6, 1, 1, fr); R(17, 6, 1, 1, fr);
+      R(14, 10, 1, 1, fr); R(8, 10, 1, 1, fr); R(20, 10, 1, 1, fr);
     } else if (of.glasses === 'gl_star') {
-      [5, 11].forEach(x => {
-        R(x, 4, 6, 5, '#7fe8ff'); R(x + 1, 5, 4, 3, '#3fa7d6');
-        CLR(x, 4, 1, 1); CLR(x + 5, 4, 1, 1); CLR(x, 8, 1, 1); CLR(x + 5, 8, 1, 1);
-        R(x + 1, 5, 1, 1, '#ffffff'); R(x + 4, 7, 1, 1, '#c9f4ff');
+      [7, 14].forEach(x => {
+        R(x, 7, 8, 7, '#7fe8ff'); R(x + 1, 8, 6, 5, '#3fa7d6');
+        CLR(x, 7, 2, 1); CLR(x, 7, 1, 2); CLR(x + 6, 7, 2, 1); CLR(x + 7, 7, 1, 2);
+        CLR(x, 13, 2, 1); CLR(x, 12, 1, 2); CLR(x + 6, 13, 2, 1); CLR(x + 7, 12, 1, 2);
+        R(x + 1, 8, 2, 2, '#ffffff'); R(x + 5, 11, 2, 2, '#c9f4ff');
       });
-      R(4, 4, 1, 1, '#ffffff'); R(18, 3, 1, 1, '#ffffff');
+      R(6, 6, 1, 1, '#ffffff'); R(23, 5, 1, 1, '#ffffff'); R(24, 9, 1, 1, '#ffffff');
     } else if (of.glasses === 'gl_shades') {
-      R(5, 5, 6, 3, '#14141c'); R(11, 5, 6, 3, '#14141c'); R(10, 6, 2, 1, '#14141c');
-      R(6, 5, 2, 1, '#5a5a6a'); R(12, 5, 2, 1, '#5a5a6a'); R(9, 7, 1, 1, '#3a3a48'); R(15, 7, 1, 1, '#3a3a48');
+      R(7, 8, 8, 5, '#14141c'); R(14, 8, 8, 5, '#14141c'); R(13, 10, 3, 1, '#14141c');
+      R(8, 8, 3, 1, '#5a5a6a'); R(15, 8, 3, 1, '#5a5a6a');
+      R(12, 11, 2, 1, '#3a3a48'); R(19, 11, 2, 1, '#3a3a48');
     }
 
-    /* ---- the hat: a brim on rows 1-2, a crown above, ear tips still showing ---- */
+    /* ---- the hat: a brim on rows 1-3, a crown above, ear tips still showing ---- */
     const H = of.hat;
     if (H === 'hat_top') {
-      R(6, 1, 11, 2, O); R(7, 1, 9, 1, '#2e2216');
-      R(7, -4, 9, 6, O); R(8, -3, 7, 5, '#2e2216'); R(8, -3, 1, 5, '#443a44'); R(8, 0, 7, 1, trim); R(9, -3, 4, 1, '#57484a');
+      R(8, 1, 13, 3, O); R(9, 1, 11, 2, '#2e2216'); R(9, 1, 11, 1, '#453b3a');
+      R(10, -7, 9, 9, O); R(11, -6, 7, 8, '#2e2216'); R(11, -6, 2, 8, '#453b3a');
+      R(11, -1, 7, 2, trim); R(11, -1, 7, 1, lighten(trim, 0.3));
+      R(12, -6, 4, 1, '#57484a');
     } else if (H === 'hat_cap') {
-      R(6, 0, 11, 3, O); R(7, 0, 9, 2, suitCol); R(7, 0, 9, 1, suitLit); R(15, 2, 5, 1, O); R(15, 1, 4, 1, suitDk); R(11, 0, 1, 2, trim);
+      R(9, 0, 12, 4, O); R(10, 0, 10, 3, suitCol); R(10, 0, 10, 1, suitLit);
+      R(19, 3, 7, 2, O); R(19, 2, 6, 1, suitDk); R(14, 0, 2, 3, trim);
     } else if (H === 'hat_straw') {
-      R(3, 2, 16, 1, O); R(4, 2, 14, 1, '#e0bd82'); R(7, -1, 9, 3, O); R(8, -1, 7, 3, '#e0bd82'); R(8, -1, 7, 1, '#f2dcb0'); R(8, 1, 7, 1, '#c9a35f');
+      R(4, 3, 21, 2, O); R(5, 3, 19, 1, '#e0bd82');
+      R(10, -1, 10, 4, O); R(11, -1, 8, 4, '#e0bd82'); R(11, -1, 8, 1, '#f2dcb0'); R(11, 2, 8, 1, '#c9a35f');
     } else if (H === 'hat_crown') {
-      R(7, -2, 9, 4, O); R(8, -1, 7, 3, '#ffd23f'); R(8, -1, 7, 1, '#fff3c4');
-      R(7, -4, 2, 2, O); R(10, -4, 2, 2, O); R(13, -4, 2, 2, O); R(8, -4, 1, 2, '#ffd23f'); R(11, -4, 1, 2, '#ffd23f'); R(13, -4, 1, 2, '#ffd23f');
-      R(9, 0, 1, 1, '#e8542f'); R(11, 0, 1, 1, '#3fa7d6'); R(13, 0, 1, 1, '#4fc46a');
+      R(9, -3, 12, 6, O); R(10, -2, 10, 4, '#ffd23f'); R(10, -2, 10, 2, '#fff3c4');
+      [9, 13, 17].forEach(x => { R(x, -6, 3, 3, O); R(x + 1, -6, 1, 3, '#ffd23f'); });
+      R(11, 1, 2, 1, '#e8542f'); R(14, 1, 2, 1, '#3fa7d6'); R(17, 1, 2, 1, '#4fc46a');
     } else if (H === 'hat_beanie') {
-      R(6, -1, 11, 3, O); R(7, -1, 9, 2, '#6a7ac9'); R(7, -1, 9, 1, '#8f9ee0'); R(7, 1, 9, 1, '#4a5a9e'); R(10, -3, 2, 2, '#fff8ec');
+      R(9, -2, 12, 5, O); R(10, -2, 10, 3, '#6a7ac9'); R(10, -2, 10, 1, '#8f9ee0');
+      R(10, 1, 10, 2, '#4a5a9e'); R(13, -5, 3, 3, '#fff8ec');
     } else if (H === 'hat_wizard') {
       const wc = '#4a3a9e';
-      R(10, -6, 2, 1, O); R(9, -5, 4, 1, O); R(10, -5, 2, 1, wc); R(8, -4, 6, 1, O); R(9, -4, 4, 1, wc);
-      R(7, -3, 8, 1, O); R(8, -3, 6, 1, wc); R(6, -2, 11, 3, O); R(7, -2, 9, 3, wc); R(4, 1, 15, 1, O); R(5, 1, 13, 1, wc);
-      R(10, -3, 1, 1, '#ffd23f'); R(12, 0, 1, 1, '#ffd23f'); R(7, 0, 1, 1, '#8f7fe0');
+      R(13, -9, 3, 2, O); R(12, -7, 5, 2, O); R(13, -7, 3, 1, wc);
+      R(11, -5, 7, 2, O); R(12, -5, 5, 1, wc);
+      R(10, -3, 9, 2, O); R(11, -3, 7, 1, wc);
+      R(9, -1, 12, 4, O); R(10, -1, 10, 3, wc); R(6, 2, 17, 2, O); R(7, 2, 15, 1, wc);
+      R(13, -5, 1, 1, '#ffd23f'); R(16, -1, 1, 1, '#ffd23f'); R(11, 1, 1, 1, '#8f7fe0');
     } else if (H === 'hat_cowboy') {
-      R(2, 2, 18, 1, O); R(3, 2, 16, 1, '#a8783f'); R(7, -2, 9, 4, O); R(8, -1, 7, 3, '#a8783f'); R(8, -1, 7, 1, '#c9924f'); R(8, 1, 7, 1, '#3a2a16'); R(10, -2, 3, 1, '#a8783f');
+      R(3, 3, 23, 2, O); R(4, 3, 21, 1, '#a8783f');
+      R(9, -3, 12, 6, O); R(10, -2, 10, 5, '#a8783f'); R(10, -2, 10, 2, '#c9924f');
+      R(10, 2, 10, 1, '#3a2a16'); R(13, -4, 4, 1, '#a8783f');
     } else if (H === 'hat_halo') {
-      R(6, -4, 11, 1, '#ffd23f'); R(5, -3, 1, 1, '#ffd23f'); R(17, -3, 1, 1, '#ffd23f'); R(6, -2, 11, 1, '#ffd23f'); R(7, -3, 9, 1, '#fff3c4');
+      R(9, -6, 12, 2, '#ffd23f'); R(8, -5, 1, 2, '#ffd23f'); R(21, -5, 1, 2, '#ffd23f');
+      R(9, -3, 12, 2, '#ffd23f'); R(11, -5, 8, 1, '#fff3c4');
     } else if (H === 'hat_chef') {
-      R(6, 0, 11, 2, O); R(7, 0, 9, 2, '#e8dcc0'); R(5, -4, 13, 4, O); R(6, -3, 11, 3, '#fff8ec'); R(6, -3, 11, 1, '#ffffff'); R(9, -4, 5, 1, '#fff8ec');
+      R(9, 0, 12, 3, O); R(10, 0, 10, 2, '#e8dcc0');
+      R(7, -6, 16, 6, O); R(8, -5, 14, 5, '#fff8ec'); R(8, -5, 14, 2, '#ffffff');
+      R(12, -7, 6, 1, '#fff8ec'); R(10, -8, 4, 2, '#fff8ec'); R(16, -8, 5, 2, '#fff8ec');
     }
     cache.set(key, c);
     return c;

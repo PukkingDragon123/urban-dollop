@@ -13,6 +13,7 @@ window.QUESTS_UI = (() => {
   let sig = '', collapsed = false, sel = null, boardSig = '';
 
   const orderNo = q => 'WO-' + String(QUESTS.indexOf(q) + 1).padStart(3, '0');
+  let openDept = null;
   const DEPT = { 'THE FARM': 'HUSBANDRY', 'THE BUSINESS': 'OPERATIONS', 'THE COMPANY': 'EXPANSION',
                  'THE EMPIRE': 'OVERSEAS', 'THE STARS': 'SPECIAL PROJECTS' };
   function rewardChips(q, into) {
@@ -126,6 +127,8 @@ window.QUESTS_UI = (() => {
       const cq = GAME.currentQuest();
       sel = cq ? cq.id : QUESTS[0].id;
     }
+    const cur = QUEST_BY_ID[sel];
+    if (cur) openDept = cur.chapter;
     boardSig = '';
     render();
     UI.openModal('#modal-quests');
@@ -134,7 +137,7 @@ window.QUESTS_UI = (() => {
     const box = $('#quests-body');
     if (!box) return;
     const claimed = QUESTS.filter(GAME.questDone).length;
-    const s2 = sel + '|' + QUESTS.map(q => GAME.questState(q) + GAME.questProgress(q).join('/')).join('');
+    const s2 = sel + '|' + openDept + '|' + QUESTS.map(q => GAME.questState(q) + GAME.questProgress(q).join('/')).join('');
     if (s2 === boardSig) return;
     boardSig = s2;
     $('#quests-sub').textContent = claimed + ' / ' + QUESTS.length + ' SIGNED OFF  -  ' +
@@ -143,37 +146,68 @@ window.QUESTS_UI = (() => {
     const wrap = document.createElement('div');
     wrap.className = 'qb-wrap';
 
-    /* the file: orders by department */
+    /* The file: five department drawers, one open at a time. The board
+       used to list all forty-seven orders at once, most of them reading
+       NOT YET ISSUED; now a drawer shows only what has actually been
+       issued, and says how many are still to come. */
     const list = document.createElement('div');
     list.className = 'qb-list';
-    let chapter = null;
+    const byDept = [];
     QUESTS.forEach((q, i) => {
-      if (q.chapter !== chapter) {
-        chapter = q.chapter;
-        const h = document.createElement('div');
-        h.className = 'qb-chapter';
-        h.textContent = DEPT[chapter] || chapter;
-        list.appendChild(h);
+      let d = byDept.find(x => x.chapter === q.chapter);
+      if (!d) { d = { chapter: q.chapter, rows: [] }; byDept.push(d); }
+      d.rows.push({ q, i, st: GAME.questState(q) });
+    });
+    if (!openDept || !byDept.some(d => d.chapter === openDept)) {
+      const cur = QUEST_BY_ID[sel];
+      openDept = cur ? cur.chapter : byDept[0].chapter;
+    }
+    byDept.forEach(d => {
+      const issued = d.rows.filter(r => r.st !== 'later');
+      const later = d.rows.length - issued.length;
+      const ready = d.rows.filter(r => r.st === 'ready').length;
+      const closed = d.rows.filter(r => r.st === 'claimed').length;
+      const isOpen = d.chapter === openDept;
+      const h = document.createElement('button');
+      h.className = 'qb-dept' + (isOpen ? ' open' : '') + (ready ? ' hot' : '');
+      h.dataset.act = 'quest-dept';
+      h.dataset.dept = d.chapter;
+      const arrow = document.createElement('u'); arrow.textContent = isOpen ? '-' : '+'; h.appendChild(arrow);
+      const nm = document.createElement('b'); nm.textContent = DEPT[d.chapter] || d.chapter; h.appendChild(nm);
+      const cnt = document.createElement('small');
+      cnt.textContent = ready ? ready + ' TO SIGN' : closed + '/' + d.rows.length;
+      if (ready) cnt.className = 'hot';
+      h.appendChild(cnt);
+      list.appendChild(h);
+      if (!isOpen) return;
+      const drawer = document.createElement('div');
+      drawer.className = 'qb-drawer';
+      issued.forEach(({ q, i, st }) => {
+        const row = document.createElement('button');
+        row.className = 'qb-row ' + st + (q.id === sel ? ' sel' : '');
+        row.dataset.act = 'quest-sel';
+        row.dataset.id = q.id;
+        const no = document.createElement('u');
+        no.className = 'td-no';
+        no.textContent = String(i + 1).padStart(3, '0');
+        row.appendChild(no);
+        const nm2 = document.createElement('b');
+        nm2.textContent = q.name.toUpperCase();
+        row.appendChild(nm2);
+        const tag = document.createElement('small');
+        if (st === 'claimed') tag.textContent = 'CLOSED';
+        else if (st === 'ready') { tag.textContent = 'SIGN'; tag.className = 'hot'; }
+        else { const [c, n] = GAME.questProgress(q); tag.textContent = c + '/' + n; }
+        row.appendChild(tag);
+        drawer.appendChild(row);
+      });
+      if (later) {
+        const rest = document.createElement('div');
+        rest.className = 'qb-rest';
+        rest.textContent = later + (later === 1 ? ' MORE ORDER TO COME' : ' MORE ORDERS TO COME');
+        drawer.appendChild(rest);
       }
-      const st = GAME.questState(q);
-      const row = document.createElement('button');
-      row.className = 'qb-row ' + st + (q.id === sel ? ' sel' : '');
-      row.dataset.act = 'quest-sel';
-      row.dataset.id = q.id;
-      const no = document.createElement('u');
-      no.className = 'td-no';
-      no.textContent = String(i + 1).padStart(3, '0');
-      row.appendChild(no);
-      const nm = document.createElement('b');
-      nm.textContent = st === 'later' ? 'NOT YET ISSUED' : q.name.toUpperCase();
-      row.appendChild(nm);
-      const tag = document.createElement('small');
-      if (st === 'claimed') tag.textContent = 'CLOSED';
-      else if (st === 'ready') { tag.textContent = 'SIGN'; tag.className = 'hot'; }
-      else if (st === 'active') { const [c, n] = GAME.questProgress(q); tag.textContent = c + '/' + n; }
-      else tag.textContent = '-';
-      row.appendChild(tag);
-      list.appendChild(row);
+      list.appendChild(drawer);
     });
     wrap.appendChild(list);
 
@@ -283,7 +317,8 @@ window.QUESTS_UI = (() => {
       switch (btn.dataset.act) {
         case 'todo-toggle': collapsed = !collapsed; sig = ''; UI.snd.plop(); break;
         case 'quest-focus': if (ev.target.closest('.td-claim')) return; open(btn.dataset.id); UI.snd.build(); break;
-        case 'quest-sel': sel = btn.dataset.id; boardSig = ''; render(); UI.snd.plop(); break;
+        case 'quest-sel': { sel = btn.dataset.id; const qq = QUEST_BY_ID[sel]; if (qq) openDept = qq.chapter; boardSig = ''; render(); UI.snd.plop(); break; }
+        case 'quest-dept': openDept = openDept === btn.dataset.dept ? null : btn.dataset.dept; boardSig = ''; render(); UI.snd.plop(); break;
         case 'claim-quest': {
           if (GAME.claimQuest(btn.dataset.id)) {
             UI.snd.grand();

@@ -426,6 +426,14 @@ const COMPANY_DEFAULT = { name:'INF EGG CO.', logo:'egg', col1:'#e8542f', col2:'
 const LOGOS = ['egg', 'chick', 'star', 'crown', 'sparkle', 'heart', 'bolt', 'clover', 'gear', 'truck', 'flame', 'atom'];
 const BRAND_COLS = ['#e8542f', '#f0a422', '#ffd23f', '#6ab04c', '#3fa7d6', '#2f5f9e', '#b06ee0', '#ff5f9e',
                     '#fff8ec', '#2e2216', '#8a5e2a', '#4fb8a8'];
+/* the paint and trim are picked together: one row of liveries instead of
+   two rows of swatches, because nobody wants to choose twice */
+const BRAND_PAIRS = [
+  ['#e8542f', '#ffd23f'],  ['#f0a422', '#2e2216'],  ['#ffd23f', '#e8542f'],
+  ['#6ab04c', '#fff8ec'],  ['#3fa7d6', '#ffd23f'],  ['#2f5f9e', '#fff8ec'],
+  ['#b06ee0', '#ffd23f'],  ['#ff5f9e', '#fff8ec'],  ['#fff8ec', '#e8542f'],
+  ['#2e2216', '#ffd23f'],  ['#8a5e2a', '#e0bd82'],  ['#4fb8a8', '#2e2216'],
+];
 
 /* rival egg companies whose shares you can hold, once the market opens */
 const STOCKS = [

@@ -3614,7 +3614,7 @@ const GAME = (() => {
     const b = S.boss;
     const dx = b.tx - b.x, dy = b.ty - b.y, d = Math.hypot(dx, dy);
     if (d < 3) return true;
-    const sp = 26 * groundSpeed(b.x + 10, b.y + 20) * dt;
+    const sp = 26 * groundSpeed(b.x + 14, b.y + 30) * dt;
     b.dir = dx > 0 ? 1 : -1;
     let nx = b.x + dx / d * Math.min(d, sp), ny = b.y + dy / d * Math.min(d, sp);
     if (inPond(nx + 10, ny + 22) || !inOwned(nx + 10, ny + 22)) { nx = b.x; ny = b.y; b.t = Math.min(b.t, 0.2); }
@@ -3670,7 +3670,7 @@ const GAME = (() => {
       born.age = 1; born.fed = 1; born.raised = 1e9; born.food = 1;
       findSecret('tophat');
       note('hat', 'A ' + sp.name + ' climbed out of the founder\'s hat.', sp.id);
-      emit('hatchick', { x: b.x + 10, y: b.y - 8, sp });
+      emit('hatchick', { x: b.x + 14, y: b.y - 10, sp });
       bossSay('That is not mine. I have never seen that hen before.', 7, 'cheer');
       return currentQuest();
     }
@@ -3680,7 +3680,7 @@ const GAME = (() => {
   function bossAt(x, y) {
     const b = S.boss;
     if (!b || !S.company.done) return null;
-    return (x > b.x - 2 && x < b.x + 22 && y > b.y - 8 && y < b.y + 26) ? b : null;
+    return (x > b.x - 2 && x < b.x + 30 && y > b.y - 10 && y < b.y + 36) ? b : null;
   }
 
   /* ---------- master tick ---------- */
@@ -3940,7 +3940,7 @@ const GAME = (() => {
       S.market = Object.assign({ t: 0, px: {}, hist: {}, held: {} }, S.market || {});
       S.boss = Object.assign(freshState().boss, S.boss || {});
       S.boss.line = null; S.boss.lineT = 0; S.boss.state = 'idle'; S.boss.t = 2; S.boss.said = null;
-      if (!inOwned(S.boss.x + 10, S.boss.y + 22)) { S.boss.x = WORLD.mama.x + 34; S.boss.y = WORLD.mama.y + 4; }
+      if (!inOwned(S.boss.x + 14, S.boss.y + 32)) { S.boss.x = WORLD.mama.x + 34; S.boss.y = WORLD.mama.y + 4; }
       Object.values(S.billboards).forEach(b => { if (typeof b.art !== 'string') b.art = null; });
       S.stats = Object.assign(freshState().stats, S.stats || {});
       Object.values(S.sites).forEach(st => { if (typeof st.t !== 'number') st.t = 0; });
