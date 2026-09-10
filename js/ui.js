@@ -1969,6 +1969,124 @@
     if (!t.n && Math.floor(now / 600) % 2) SPR.drawTiny(ctx, '!', x + 6, y - 1, '#c43a2a', 1, '#ffffff');
   }
 
+  /* ---------- bugs on the ground ----------
+     Two frames each, flipped on the crawl, with a shadow under them
+     and a shine on anything the hens have not found yet. A bug that
+     is about to burrow flashes, so you get a moment to grab it. */
+  function drawBug(b, now) {
+    const B = BUGS[b.kind] || BUGS.worm;
+    if (b.x + 12 < cam().x || b.x - 12 > cam().x + W.view.w || b.y + 12 < cam().y || b.y - 12 > cam().y + W.view.h) return;
+    const fr = Math.floor(now / (b.kind === 'snail' ? 420 : b.kind === 'cricket' ? 130 : 220)) % 2;
+    const spr = SPR.bugSprite(b.kind, fr, 1);
+    const hop = b.kind === 'cricket' && b.hop > 0 ? Math.round(Math.sin((1 - b.hop / 0.42) * Math.PI) * 5) : 0;
+    SPR.shadowEll(ctx, b.x, b.y + 3, 4 + (hop ? -1 : 0), 1.5, 0.24);
+    const fade = b.t > 22 && Math.floor(now / 160) % 2;
+    ctx.save();
+    if (fade) ctx.globalAlpha = 0.55;
+    if (b.dir > 0) {
+      ctx.translate(Math.round(b.x + 5), Math.round(b.y - 3 - hop));
+      ctx.scale(-1, 1);
+      ctx.drawImage(spr, 0, 0);
+    } else ctx.drawImage(spr, Math.round(b.x - 5), Math.round(b.y - 3 - hop));
+    ctx.restore();
+    /* a glint so a fresh one catches the eye in long grass */
+    if (b.t < 2.5 && Math.floor(now / 200) % 2) {
+      ctx.fillStyle = '#fff8ec';
+      ctx.fillRect(Math.round(b.x + 4), Math.round(b.y - 6), 1, 1);
+    }
+  }
+
+  /* the spade: a hole, a shower of earth, and whatever was under it */
+  let digAt2 = 0;
+  function digHere(x, y) {
+    const now = performance.now();
+    if (now - digAt2 < 170) return;
+    digAt2 = now;
+    const found = GAME.digAt(x, y);
+    if (found === null) { snd.error(); floatWorld('NOT YOUR LAND', x, y - 12, 'pink'); return; }
+    snd.build();
+    dirt(x, y, 8);
+    groundDust(x, y + 2, 5, '#a07444');
+    puff(x, y, '#8a5e2a', 5, 26, 16);
+    prints(x - 1, y + 1, 'paw', 1);
+    shake(0.5, 0.12);
+    GAME.mark('hud');
+    if (found.length) {
+      const B = BUGS[found[0].kind];
+      snd.plop();
+      twinkles(x, y - 4, 5, '#fff8ec', 12);
+      wordPop(x, y - 16, found.length > 1 ? 'TWO!' : B.name.toUpperCase(), B.col);
+      faceSet('wow', 1200);
+    } else if (Math.random() < 0.4) floatWorld('NOTHING', x, y - 12);
+  }
+
+  /* ---------- the compost heap ----------
+     A steaming heap of muck behind three boards, with the odd bug
+     already crawling out of it. It gets darker and taller as it
+     works, and the flies over it are drawn as ambient particles. */
+  function drawCompost(c, r, h, now) {
+    const x = c * 16, y = r * 16;
+    groundShade(x + 1, y + 13, 14, 2, 0.24);
+    /* the boards it is heaped against */
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 1, y + 7, 14, 8);
+    ctx.fillStyle = '#8a5e2a'; ctx.fillRect(x + 1, y + 7, 14, 1);
+    ctx.fillStyle = '#6e4a20'; ctx.fillRect(x + 2, y + 8, 12, 6);
+    for (let i = 0; i < 3; i++) { ctx.fillStyle = i % 2 ? '#7a5230' : '#6e4a20'; ctx.fillRect(x + 2, y + 8 + i * 2, 12, 2); }
+    /* the heap: a mound of dark muck with straw and peel in it */
+    ctx.fillStyle = '#2f2416'; ctx.fillRect(x + 2, y + 5, 12, 3);
+    ctx.fillStyle = '#3f3018'; ctx.fillRect(x + 3, y + 4, 10, 4);
+    ctx.fillStyle = '#4a3a1e'; ctx.fillRect(x + 4, y + 3, 8, 3);
+    ctx.fillStyle = '#5a4622'; ctx.fillRect(x + 5, y + 3, 5, 1);
+    const rnd = SPR.mulberry(900 + c * 31 + r * 7);
+    for (let i = 0; i < 7; i++) {
+      const bx = x + 3 + Math.floor(rnd() * 10), by = y + 3 + Math.floor(rnd() * 5);
+      ctx.fillStyle = ['#c9a03c', '#7ab648', '#e8c458', '#a8783f'][i % 4];
+      ctx.fillRect(bx, by, 1, 1);
+    }
+    /* it steams gently, on its own clock */
+    const t = Math.floor(now / 220 + c) % 4;
+    ctx.fillStyle = 'rgba(190,186,170,.34)';
+    ctx.fillRect(x + 6 + (t % 2), y + 1 - Math.floor(t / 2), 2, 1);
+    ctx.fillRect(x + 9 - (t % 2), y - Math.floor(t / 2), 1, 1);
+  }
+
+  /* ---------- the worm farm ----------
+     Two tiles of stacked crates on a frame, lids ajar, with a tap and
+     a bucket at one end and a card on the front counting the jar. */
+  function drawWormfarm(c, r, w, now) {
+    const x = c * 16, y = r * 16;
+    groundShade(x + 1, y + 13, 30, 2, 0.26);
+    /* the frame */
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 1, y + 3, 30, 12);
+    /* three stacked crates */
+    for (let i = 0; i < 3; i++) {
+      const cy = y + 11 - i * 4;
+      ctx.fillStyle = '#8a5e2a'; ctx.fillRect(x + 2 + i, cy, 26 - i * 2, 4);
+      ctx.fillStyle = '#c9924f'; ctx.fillRect(x + 3 + i, cy, 24 - i * 2, 3);
+      ctx.fillStyle = '#a8783f'; ctx.fillRect(x + 3 + i, cy + 2, 24 - i * 2, 1);
+      ctx.fillStyle = '#6e4a20';
+      for (let j = 0; j < 6; j++) ctx.fillRect(x + 5 + i + j * 4, cy, 1, 3);
+      /* the lid of the top crate sits ajar, with soil showing */
+      if (i === 2) {
+        ctx.fillStyle = '#4a3418'; ctx.fillRect(x + 5, cy - 1, 20, 1);
+        ctx.fillStyle = '#e8b96f'; ctx.fillRect(x + 4, cy - 2, 18, 1);
+      }
+    }
+    /* a tap and a bucket of worm tea at the right */
+    ctx.fillStyle = '#5a626e'; ctx.fillRect(x + 28, y + 9, 3, 1); ctx.fillRect(x + 29, y + 10, 1, 2);
+    ctx.fillStyle = '#8a9099'; ctx.fillRect(x + 27, y + 12, 5, 3);
+    ctx.fillStyle = '#3f5a2a'; ctx.fillRect(x + 28, y + 13, 3, 1);
+    if (Math.floor(now / 700) % 3 === 0) { ctx.fillStyle = '#7a8f4a'; ctx.fillRect(x + 29, y + 11, 1, 1); }
+    /* the card on the front: how many are in the jar */
+    ctx.fillStyle = '#e8dcc0'; ctx.fillRect(x + 6, y + 5, 11, 5);
+    ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 6, y + 5, 11, 1);
+    SPR.drawTiny(ctx, String(Math.min(999, GAME.jarCount())), x + 7, y + 6, '#3a2a16', 1);
+    /* a worm looking over the edge of the top crate */
+    if (Math.floor(now / 500) % 2) {
+      ctx.fillStyle = '#e0918f'; ctx.fillRect(x + 20, y + 2, 2, 1); ctx.fillRect(x + 21, y + 1, 1, 1);
+    }
+  }
+
   /* a stone well with a bucket on a beam */
   function drawWell(c, r, w, now) {
     const x = c * 16, y = r * 16;
@@ -3322,8 +3440,8 @@
       }
     }
     if (tool === 'basket') {
-      const b = SPR.basketSprite(Math.min(S().basket.length, 5), 1);
-      ctx.drawImage(b, Math.round(x - 7), Math.round(y - 3 + (ptr.down ? 2 : 0)));
+      const b = SPR.basketSprite(Math.min(S().basket.length, 4), 1);
+      ctx.drawImage(b, Math.round(x - 8), Math.round(y - 2 + (ptr.down ? 2 : 0)));
     } else if (tool === 'feed') {
       ctx.drawImage(SPR.feedbagSprite(1), Math.round(x - 6), Math.round(y - 4));
     } else if (tool === 'farm') {
@@ -3388,9 +3506,14 @@
       ctx.drawImage(h, -6, -8);
       ctx.restore();
     }
-    const hand = SPR.uiSprite(ptr.down || held ? 'handGrab' : 'handPoint', 1);
-    const hy = (ptr.down ? y - hand.height + 4 : y - hand.height + 2) - (held ? 6 : 0);
-    ctx.drawImage(hand, Math.round(x - 6), Math.round(hy));
+    /* the paw, over whatever it is holding: the fist closes on the drag
+       and its last rows overlap the basket handle, so it reads as a grip
+       rather than a hand hovering above a basket */
+    const grabbing = ptr.down || held;
+    const hand = SPR.uiSprite(grabbing ? 'handGrab' : 'handPoint', 1);
+    const hy = (tool === 'basket' ? y - hand.height - 1 + (ptr.down ? 2 : 0)
+                                  : y - hand.height + (grabbing ? 4 : 2)) - (held ? 6 : 0);
+    ctx.drawImage(hand, Math.round(x - 5), Math.round(hy));
   }
 
   function drawGhost(now) {
@@ -3753,6 +3876,8 @@
     for (const k of Object.keys(S().dynamos)) { const [c, r] = k.split(',').map(Number); drawDynamo(c, r, S().dynamos[k], now); }
     for (const k of Object.keys(S().hatchers)) { const [c, r] = k.split(',').map(Number); drawHatchery(c, r, S().hatchers[k], now); }
     for (const k of Object.keys(S().troughs)) { const [c, r] = k.split(',').map(Number); drawTrough(c, r, S().troughs[k], now); }
+    for (const k of Object.keys(S().composts)) { const [c, r] = k.split(',').map(Number); drawCompost(c, r, S().composts[k], now); }
+    for (const k of Object.keys(S().wormfarms)) { const [c, r] = k.split(',').map(Number); drawWormfarm(c, r, S().wormfarms[k], now); }
     for (const k of Object.keys(S().wells)) { const [c, r] = k.split(',').map(Number); drawWell(c, r, S().wells[k], now); }
     for (const k of Object.keys(S().sprinklers)) { const [c, r] = k.split(',').map(Number); drawSprinkler(c, r, S().sprinklers[k], now); }
     for (const k of Object.keys(S().boards)) { const [c, r] = k.split(',').map(Number); drawBoard(c, r, S().boards[k], now); }
@@ -3807,6 +3932,7 @@
     S().fossils.forEach(f => drawFossil(f, now));
     S().eggs.forEach(e => drawEgg(e, now));
     S().plumes.forEach(pl => drawPlume(pl, now));
+    GAME.bugs.forEach(b => drawBug(b, now));
     drawMama(now);
     S().chickens.forEach(ch => drawChicken(ch, now));
     S().staff.forEach(w => drawStaff(w, now));
@@ -4039,6 +4165,11 @@
         e.x += dx * pull; e.y += dy * pull;
       }
     }
+    /* the basket takes bugs as well as eggs, and they go in the jar */
+    for (let i = GAME.bugs.length - 1; i >= 0; i--) {
+      const b = GAME.bugs[i];
+      if (Math.hypot(ptr.x - b.x, ptr.y - b.y) < R * 0.8) GAME.catchBug(b);
+    }
     for (let i = S().plumes.length - 1; i >= 0; i--) {
       const pl = S().plumes[i];
       if (Math.hypot(ptr.x - pl.x, ptr.y - pl.y) < R * 0.8) {
@@ -4062,6 +4193,7 @@
     coins: $('#r-coins'), feathers: $('#r-feathers'), feed: $('#r-feed'), feedPill: $('#pill-feed'),
     cap: $('#r-cap'), capPill: $('#pill-cap'), agePill: $('#pill-age'),
     food: $('#r-food'), foodPill: $('#pill-food'), sky: $('#r-sky'), skyPill: $('#pill-sky'),
+    bugs: $('#r-bugs'), bugPill: $('#pill-bugs'),
     cursorChip: $('#cursor-chip'),
     toolbelt: $('#toolbelt'), deskbar: $('#deskbar'),
     palette: $('#build-palette'), farmPalette: $('#farm-palette'),
@@ -4069,6 +4201,8 @@
   /* prepend pixel icons to the resource pills once */
   (function seedPills() {
     const cp = $('#pill-coins'), fp = $('#pill-feathers'), hp = $('#pill-cap'), fd = $('#pill-feed'), pp = $('#pill-food');
+    const bg = $('#pill-bugs');
+    if (bg) bg.insertBefore(mkIcon('bowl', 2), bg.firstChild);
     cp.insertBefore(mkIcon('coin', 2), cp.firstChild);
     fp.insertBefore(mkIcon('feather', 2), fp.firstChild);
     hp.insertBefore(mkIcon('chick', 2), hp.firstChild);
@@ -4086,10 +4220,10 @@
     el.cursorChip.style.top = (ev.clientY + 12) + 'px';
   });
 
-  const TOOL_ICON = { hand: 'hand', basket: 'basket', feed: 'bowl', farm: 'hoe', build: 'hammer', inspect: 'magnify' };
-  const TOOL_LABEL = { hand: 'HAND', basket: 'BASKET', feed: 'FEED', farm: 'FARM', build: 'BUILD', inspect: 'LOOK' };
+  const TOOL_ICON = { hand: 'hand', basket: 'basket', feed: 'bowl', farm: 'hoe', dig: 'spade', build: 'hammer', inspect: 'magnify' };
+  const TOOL_LABEL = { hand: 'HAND', basket: 'BASKET', feed: 'FEED', farm: 'FARM', dig: 'DIG', build: 'BUILD', inspect: 'LOOK' };
   /* the research that hands you each tool; the rack shows a padlock until then */
-  const TOOL_UNLOCK = { feed: 'feedtool', farm: 'hoe', build: 'buildtool' };
+  const TOOL_UNLOCK = { feed: 'feedtool', farm: 'hoe', dig: 'spade', build: 'buildtool' };
   let farmSel = 't:soil', farmSec = 'ground', palSec = 'ranch';
   /* ------------------------------------------------------------
      THE DESK BAR
@@ -4157,7 +4291,7 @@
 
   function renderToolbelt() {
     el.toolbelt.innerHTML = '';
-    ['hand', 'basket', 'feed', 'farm', 'build', 'inspect'].forEach((id, i) => {
+    ['hand', 'basket', 'feed', 'farm', 'dig', 'build', 'inspect'].forEach((id, i) => {
       const b = document.createElement('button');
       const open = GAME.toolOpen(id);
       b.className = 'tool-btn' + (S().tool === id ? ' active' : '') + (open ? '' : ' locked');
@@ -4168,6 +4302,7 @@
         basket: 'Basket - sweep up eggs and feathers',
         feed: 'Feed - scatter pellets from the barn; chicks grow, hens lay faster',
         farm: 'Farm - till, plant, water and harvest',
+        dig: 'Dig - turn the soil over for worms and grubs. Hens will run one down',
         build: 'Build - place machines and buildings',
         inspect: 'Inspect - tap anything for its stats',
       }[id];
@@ -4557,6 +4692,12 @@
       set(el.food, GAME.fmt(GAME.pantryTotal()));
       const canPantry = GAME.lvl('hoe') > 0;
       if (el.foodPill.hidden !== !canPantry) el.foodPill.hidden = !canPantry;
+    }
+    if (el.bugs) {
+      /* the jar only appears once you own a spade */
+      const canDig = GAME.lvl('spade') > 0;
+      if (el.bugPill.hidden !== !canDig) el.bugPill.hidden = !canDig;
+      if (canDig) set(el.bugs, GAME.fmt(GAME.jarCount()));
     }
     if (el.sky) {
       const w = GAME.weather, ph = GAME.dayPhase();
@@ -6979,6 +7120,20 @@
       return;
     }
 
+    if (kind === 'bug') {
+      const b = inspect.ref;
+      const B = BUGS[b.kind] || BUGS.worm;
+      if (GAME.bugs.indexOf(b) === -1) { setInspect({ kind: 'farm' }); return; }
+      ipanel.appendChild(ipHead(cloneCanvas(SPR.bugSprite(b.kind, 0, 1), 3), B.name, 'in the grass'));
+      const p = document.createElement('p');
+      p.className = 'ip-note';
+      p.textContent = B.desc + ' Worth ' + Math.round(B.food * 100) + '% of a bird\u2019s appetite, and she lays twice as fast for ' + B.buff + ' seconds after.';
+      ipanel.appendChild(p);
+      ipanel.appendChild(ipRow('sells for', () => GAME.fmt(B.value)));
+      ipanel.appendChild(ipRow('burrows in', () => GAME.fmtTime(Math.max(0, 26 - b.t))));
+      ipanel.appendChild(ipRow('in the jar', () => GAME.jarCount() + ' bugs'));
+      return;
+    }
     if (kind === 'warden') {
       const w = GAME.warden();
       if (!w) { setInspect({ kind: 'farm' }); return; }
@@ -8638,7 +8793,17 @@
   }
 
   function tapWorld(x, y) {
-    /* the drone first: it is the thing the game just asked you to tap */
+    /* a bug on the ground: the spade digs, the hand picks up, and LOOK
+       reads it. It comes before everything else because a worm sitting
+       on a building or at the founder's feet is still the thing you
+       were aiming at. */
+    const bug = GAME.bugAt(x, y);
+    if (bug) {
+      if (S().tool === 'inspect') { setInspect({ kind: 'bug', ref: bug }); snd.plop(); return true; }
+      if (S().tool !== 'build' && S().tool !== 'dig' && GAME.catchBug(bug)) return true;
+    }
+    if (S().tool === 'dig') { digHere(x, y); return true; }
+    /* the drone next: it is the thing the game just asked you to tap */
     const dr = GAME.droneAt(x, y);
     if (dr) {
       GAME.tapDrone();
@@ -9074,8 +9239,9 @@
     if (ev.key === '2') setTool('basket');
     if (ev.key === '3') setTool('feed');
     if (ev.key === '4') setTool('farm');
-    if (ev.key === '5') setTool('build');
-    if (ev.key === '6') setTool('inspect');
+    if (ev.key === '5') setTool('dig');
+    if (ev.key === '6') setTool('build');
+    if (ev.key === '7') setTool('inspect');
   });
   window.addEventListener('keyup', ev => { keys[ev.key.toLowerCase()] = false; });
 
@@ -9128,6 +9294,7 @@
       case 'title': GAME.save(); showTitle(); $('#menu-pop').hidden = true; break;
       case 'open-quests': { if (window.QUESTS_UI) QUESTS_UI.open(); snd.build(); break; }
       case 'open-food': { if (window.FOODUI) FOODUI.open(btn.dataset.tab); snd.build(); break; }
+      case 'open-bugs': { if (window.FOODUI) FOODUI.open('bugs'); snd.build(); break; }
       case 'open-garage': { if (window.GARAGE) GARAGE.open(); snd.build(); break; }
       case 'open-wmap': { if (window.WMAP) WMAP.open(); snd.build(); break; }
       case 'open-hr': { if (window.HR) HR.open(); snd.build(); break; }
@@ -9592,6 +9759,35 @@
   GAME.on('till', ({ c, r }) => { puff(c * 16 + 8, r * 16 + 8, '#a07444', 6, 34, 16); groundDust(c * 16 + 8, r * 16 + 10, 6, '#a07444'); dirt(c * 16 + 8, r * 16 + 9, 7); terrainTouched(c * 16 + 8, r * 16 + 8, c * 16 + 8, r * 16 + 8, 20); });
   GAME.on('graduate', ({ sp }) => {
     toast({ sprite: cloneCanvas(SPR.chickenSprite(sp, 2, false)), title: sp.name + ' GRADUATED', body: 'She joins the lab team. Feathers dropped!' });
+  });
+  /* ---- bugs ---- */
+  GAME.on('bugup', ({ bug, x, y }) => {
+    if (!GAME.setting('particles')) return;
+    dirt(x, y, 3); groundDust(x, y + 1, 2, '#a07444');
+  });
+  GAME.on('bugdown', ({ x, y }) => { dirt(x, y, 2); });
+  GAME.on('bugcatch', ({ bug }) => {
+    const B = BUGS[bug.kind] || BUGS.worm;
+    snd.plop();
+    puff(bug.x, bug.y - 2, B.col, 4, 20, 18);
+    glint(bug.x, bug.y - 4, '#fff8ec', 3);
+    floatWorld('+1 ' + B.name.toUpperCase(), bug.x, bug.y - 12, 'green', 'bowl');
+    GAME.mark('hud');
+  });
+  GAME.on('bugeat', ({ ch, bug, x, y }) => {
+    const B = BUGS[bug.kind] || BUGS.worm;
+    snd.plop();
+    puff(x, y + 6, B.col, 6, 24, 18);
+    heart(x, y - 4, 1);
+    twinkles(x, y, 4, '#fff8ec', 12);
+    floatWorld('YUM', x, y - 14, 'green');
+  });
+  GAME.on('bugscatter', ({ n }) => { snd.sprinkle(); floatText('SCATTERED ' + n + ' BUGS', innerWidth / 2 - 70, 96, 'green', 'bowl'); });
+  GAME.on('bugsold', ({ v }) => { snd.coin(); floatText('+' + GAME.fmt(v), innerWidth / 2 - 30, 96, 'gold', 'coin'); });
+  GAME.on('bugfarm', () => { GAME.mark('hud'); });
+  GAME.on('firstbug', ({ bug }) => {
+    toast({ icon: 'bowl', title: 'A ' + (BUGS[bug.kind] || BUGS.worm).name.toUpperCase(),
+      body: 'Best feed there is. Leave it out and a hen will run it down, or pick it up for the jar.', long: true });
   });
   GAME.on('feedeat', ({ x, y }) => { puff(x, y, '#f2c94c', 3, 18, 14); grain(x, y + 8, 5); heart(x, y - 6, 1); });
   GAME.on('land', ({ plot }) => {

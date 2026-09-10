@@ -57,7 +57,10 @@ const GAME = (() => {
       barns: {}, troughs: {}, wells: {}, sprinklers: {}, mills: {}, coops: {}, boards: {}, hqs: {},
       beehives: {}, genelabs: {}, billboards: {}, kitchens: {}, parks: {}, timemachines: {},
       hrs: {}, canneries: {},   /* the HR Office and the Cannery */
+      composts: {}, wormfarms: {},  /* where the bugs come from */
       warden: null,          /* the small orange objection, when a tree comes down */
+      bugs: [],              /* what is crawling about {id,kind,x,y,dir,state,t,ph,hop} */
+      bugjar: {},            /* bug kind -> how many are in the jar */
       pantry: {},            /* produce id -> count, what harvests leave besides feed */
       goods: {},             /* goods id -> count, what the Cannery makes */
       premiumT: 0,           /* seconds of super feed left in the scatter */
@@ -354,6 +357,8 @@ const GAME = (() => {
     two(S.timemachines, 'timemachine');
     two(S.hrs, 'hr');
     two(S.canneries, 'cannery');
+    Object.keys(S.composts).forEach(k => occ[k] = { type: 'compost', k });
+    box(S.wormfarms, 'wormfarm', 2, 1);
     /* a site holds its footprint until the movers are done */
     Object.keys(S.sites).forEach(k => {
       const s = S.sites[k];
@@ -683,6 +688,201 @@ const GAME = (() => {
     if (f.n <= 0) S.feed.splice(S.feed.indexOf(f), 1);
   }
 
+  /* ============================================================
+     BUGS
+     Worms, grubs, beetles, crickets and snails. They come up when
+     you dig, when it rains, and out of a compost heap on their own.
+     A loose bug crawls about until something eats it or it burrows
+     back down; a hen will drop what she is doing and run one down,
+     and it is worth several pellets to her. What you catch by hand
+     goes in the jar, and the jar can be scattered over the flock.
+     ============================================================ */
+  let bugId = 1;
+  const BUG_LIFE = 26;                       /* seconds above ground */
+  function bugsOn() { return true; }
+  function pickBugKind(deep) {
+    /* the spade turns up commoner things near the surface */
+    let roll = Math.random() * BUG_FIND_TOTAL;
+    for (const k of BUG_KEYS) {
+      roll -= BUGS[k].find * (deep ? 1 : (BUGS[k].find > 20 ? 1.4 : 0.7));
+      if (roll <= 0) return k;
+    }
+    return 'worm';
+  }
+  function spawnBug(kind, x, y) {
+    if (S.bugs.length > 40) return null;
+    const b = { id: bugId++, kind: kind || pickBugKind(false), x, y,
+      dir: Math.random() < 0.5 ? -1 : 1, state: 'up', t: 0, ph: Math.random() * 6, hop: 0 };
+    S.bugs.push(b);
+    emit('bugup', { bug: b, x, y });
+    return b;
+  }
+  /* the spade: turn over a patch and see what is in it */
+  function digAt(x, y) {
+    if (!inOwned(x, y) || inPond(x, y)) return null;
+    S.stats.dug = (S.stats.dug || 0) + 1;
+    const tk = key(Math.floor(x / 16), Math.floor(y / 16));
+    const soil = !!S.soil[tk];                       /* turned earth is richer */
+    const compost = nearCompost(x, y);
+    let n = 0;
+    const chance = (soil ? 0.62 : 0.34) + (compost ? 0.3 : 0) + 0.06 * lvl('wormfarm');
+    if (Math.random() < chance) n = 1;
+    if (n && Math.random() < (soil ? 0.3 : 0.12) + (compost ? 0.2 : 0)) n = 2;
+    const found = [];
+    for (let i = 0; i < n; i++) {
+      const b = spawnBug(pickBugKind(soil || compost), x + (i ? 6 : 0) - 3, y + (i ? 3 : 0));
+      if (b) found.push(b);
+    }
+    emit('dig', { x, y, found, soil });
+    if (found.length && !S.tut.bug) { S.tut.bug = 1; emit('firstbug', { bug: found[0] }); }
+    return found;
+  }
+  function nearCompost(x, y) {
+    for (const k of Object.keys(S.composts)) {
+      const [c, r] = k.split(',').map(Number);
+      if (Math.abs(c * 16 + 8 - x) < 40 && Math.abs(r * 16 + 8 - y) < 40) return true;
+    }
+    return false;
+  }
+  function bugAt(x, y) {
+    for (let i = S.bugs.length - 1; i >= 0; i--) {
+      const b = S.bugs[i];
+      if (Math.abs(b.x - x) < 7 && Math.abs(b.y - y) < 6) return b;
+    }
+    return null;
+  }
+  /* pick one up: into the jar, and the hens lose their lunch */
+  function catchBug(b) {
+    const i = S.bugs.indexOf(b);
+    if (i === -1) return false;
+    S.bugs.splice(i, 1);
+    S.bugjar[b.kind] = (S.bugjar[b.kind] || 0) + 1;
+    S.stats.bugsCaught = (S.stats.bugsCaught || 0) + 1;
+    S.chickens.forEach(ch => { if (ch.target === b) { ch.target = null; ch.state = 'idle'; ch.t = 0.4; } });
+    emit('bugcatch', { bug: b });
+    return true;
+  }
+  function jarCount() { return BUG_KEYS.reduce((t, k) => t + (S.bugjar[k] || 0), 0); }
+  function jarValue() { return BUG_KEYS.reduce((t, k) => t + (S.bugjar[k] || 0) * BUGS[k].value, 0); }
+  /* tip a handful out over the flock */
+  function scatterBugs(n) {
+    let left = Math.min(n || 6, jarCount());
+    if (!left) return 0;
+    let out = 0;
+    const flock = S.chickens.length ? S.chickens : null;
+    while (left > 0) {
+      const kind = BUG_KEYS.find(k => (S.bugjar[k] || 0) > 0);
+      if (!kind) break;
+      const host = flock ? flock[(Math.random() * flock.length) | 0] : null;
+      const x = host ? host.x + 10 + (Math.random() * 40 - 20) : WORLD.mama.x + (Math.random() * 40 - 20);
+      const y = host ? host.y + 14 + (Math.random() * 24 - 12) : WORLD.mama.y + 20;
+      if (!inOwned(x, y) || inPond(x, y)) { left--; continue; }
+      S.bugjar[kind]--;
+      if (S.bugjar[kind] <= 0) delete S.bugjar[kind];
+      spawnBug(kind, x, y);
+      out++; left--;
+    }
+    if (out) emit('bugscatter', { n: out });
+    return out;
+  }
+  /* sell the jar to the roadside trade */
+  function sellJar() {
+    const v = jarValue();
+    if (!v) return 0;
+    S.bugjar = {};
+    earn(v);
+    emit('bugsold', { v });
+    return v;
+  }
+  function nearestBug(x, y, R) {
+    let best = null, bd = R * R;
+    for (const b of S.bugs) {
+      if (b.state === 'down') continue;
+      const d = (b.x - x) * (b.x - x) + (b.y - y) * (b.y - y);
+      if (d < bd) { best = b; bd = d; }
+    }
+    return best;
+  }
+  /* a hen catches one: a full belly and a spell of laying twice as fast */
+  function eatBug(ch, b) {
+    const B = BUGS[b.kind] || BUGS.worm;
+    const i = S.bugs.indexOf(b);
+    if (i !== -1) S.bugs.splice(i, 1);
+    ch.eat = 1.1;
+    if (isChick(ch)) {
+      ch.fed = Math.min(1, (ch.fed || 0) + 3 / growPellets());
+      ch.food = 1;
+      ch.raised = (ch.raised || 0) + 6;
+    } else {
+      ch.food = 1;
+      ch.buffT = Math.max(ch.buffT || 0, B.buff * (1 + 0.5 * lvl('feedplus')));
+    }
+    S.stats.bugsEaten = (S.stats.bugsEaten || 0) + 1;
+    emit('bugeat', { ch, bug: b, x: ch.x + 10, y: ch.y + 8 });
+    if (S.stats.bugsEaten === 1) note('bugeat', 'A hen ran down her first worm. Bugs beat pellets every time.', SPECIES[ch.sp]);
+    return true;
+  }
+  function tickBugs(dt) {
+    /* compost heaps breed their own, and the worm farm fills the jar */
+    for (const k of Object.keys(S.composts)) {
+      const h = S.composts[k];
+      h.t = (h.t || 0) + dt;
+      const every = 26 / storeyMult(k);
+      if (h.t > every) {
+        h.t = 0;
+        const [c, r] = k.split(',').map(Number);
+        if (S.bugs.length < 16) spawnBug(pickBugKind(true), c * 16 + 8 + (Math.random() * 20 - 10), r * 16 + 14 + (Math.random() * 12 - 6));
+      }
+    }
+    for (const k of Object.keys(S.wormfarms)) {
+      const w = S.wormfarms[k];
+      w.t = (w.t || 0) + dt;
+      const every = 9 / storeyMult(k);
+      if (w.t > every) {
+        w.t = 0;
+        if (jarCount() < 90) {
+          const kind = Math.random() < 0.72 ? 'worm' : pickBugKind(true);
+          S.bugjar[kind] = (S.bugjar[kind] || 0) + 1;
+          emit('bugfarm', { kind, c: k });
+        }
+      }
+    }
+    /* rain brings worms up all over the ranch */
+    if (S.weather.rain && S.bugs.length < 14 && Math.random() < dt * 0.5) {
+      const p = PLOTS.find(pl => S.plots[pl.id]);
+      if (p) {
+        const x = p.tc * 16 + 8 + Math.random() * (PLOT_W * 16 - 16);
+        const y = p.tr * 16 + 8 + Math.random() * (PLOT_H * 16 - 16);
+        if (inOwned(x, y) && !inPond(x, y)) spawnBug('worm', x, y);
+      }
+    }
+    for (let i = S.bugs.length - 1; i >= 0; i--) {
+      const b = S.bugs[i];
+      const B = BUGS[b.kind] || BUGS.worm;
+      b.t += dt;
+      b.ph += dt * (b.kind === 'cricket' ? 9 : 4);
+      if (b.t > BUG_LIFE) {                    /* gone back down */
+        S.bugs.splice(i, 1);
+        emit('bugdown', { bug: b, x: b.x, y: b.y });
+        continue;
+      }
+      /* crickets hop, everything else crawls */
+      if (b.kind === 'cricket') {
+        b.hop = Math.max(0, (b.hop || 0) - dt);
+        if (b.hop <= 0 && Math.random() < dt * 1.2) { b.hop = 0.42; b.dir = Math.random() < 0.5 ? -1 : 1; }
+        if (b.hop > 0) {
+          const nx = b.x + b.dir * 46 * dt;
+          if (inOwned(nx, b.y) && !inPond(nx, b.y)) b.x = nx; else b.dir *= -1;
+        }
+      } else {
+        const sp = b.kind === 'snail' ? 2.5 : b.kind === 'beetle' ? 11 : 5;
+        const nx = b.x + b.dir * sp * dt;
+        const ny = b.y + Math.sin(b.ph * 0.5) * 3 * dt;
+        if (inOwned(nx, ny) && !inPond(nx, ny)) { b.x = nx; b.y = ny; } else b.dir *= -1;
+      }
+    }
+  }
+
   function tickChicken(ch, dt) {
     ch.t -= dt;
     ch.petCd = Math.max(0, ch.petCd - dt);
@@ -708,6 +908,30 @@ const GAME = (() => {
     if (!chick && gene(ch, 'plume')) {
       ch.shed = (ch.shed || 0) + dt;
       if (ch.shed > 150 / gene(ch, 'plume')) { ch.shed = 0; dropPlumes(ch.x + 10, ch.y + 10, 1); }
+    }
+    /* a bug beats anything in a trough: she will cross the yard for one,
+       and the chicks are keenest of all */
+    if (S.bugs.length && ch.state !== 'chase' && (chick || ch.food < 0.92 || ch.buffT <= 0)) {
+      const bug = nearestBug(ch.x + 10, ch.y + 12, chick ? 130 : 96);
+      if (bug) { ch.state = 'chase'; ch.target = bug; ch.t = 7; }
+    }
+    if (ch.state === 'chase') {
+      const b = ch.target;
+      if (!b || S.bugs.indexOf(b) === -1) { ch.state = 'idle'; ch.t = 0.4; ch.target = null; }
+      else {
+        const dx = b.x - (ch.x + 10), dy = b.y - (ch.y + 14);
+        const d = Math.hypot(dx, dy) || 1;
+        if (d < 7) { eatBug(ch, b); ch.state = 'peck'; ch.t = 0.9; ch.target = null; }
+        else {
+          ch.dir = dx > 0 ? 1 : -1;
+          /* a chase is a run, not a stroll */
+          const sp = 34 + (chick ? 6 : 0);
+          const nx = ch.x + (dx / d) * sp * dt, ny = ch.y + (dy / d) * sp * dt;
+          if (inOwned(nx + 10, ny + 12) && !inPond(nx + 10, ny + 12) && !isFence(nx + 10, ny + 16) && ny < WORLD.roadY - 24) { ch.x = nx; ch.y = ny; }
+          else { ch.state = 'idle'; ch.t = 0.6; ch.target = null; }
+        }
+        return;
+      }
     }
     /* seek feed: the hungry and the little ones look further */
     const keen = chick || ch.food < 0.5;
@@ -2330,7 +2554,7 @@ const GAME = (() => {
 
   /* ---------- building ---------- */
   /* the whole tool rack: which tools research has handed you */
-  const TOOL_NEEDS = { feed: 'feedtool', farm: 'hoe', build: 'buildtool' };
+  const TOOL_NEEDS = { feed: 'feedtool', farm: 'hoe', dig: 'spade', build: 'buildtool' };
   function toolOpen(t) { const n = TOOL_NEEDS[t]; return !n || lvl(n) > 0; }
 
   /* ---------- quests: several at once, each a to-do list, claimed by hand ----------
@@ -2972,7 +3196,7 @@ const GAME = (() => {
   ];
   function siteTime(type) { return ECON.siteBase + Math.sqrt(BUILDS[type].base) / 3; }
   function siteFor(k) { return S.sites[k] || null; }
-  const STOREY_OK = ['incubator', 'coop', 'barn', 'staffhut', 'silo', 'hq', 'mill', 'well', 'sprinkler', 'beehive', 'trough', 'hatchery', 'lovenest', 'kitchen', 'park', 'timemachine', 'cannery', 'hr'];
+  const STOREY_OK = ['incubator', 'coop', 'barn', 'staffhut', 'silo', 'hq', 'mill', 'well', 'sprinkler', 'beehive', 'trough', 'hatchery', 'lovenest', 'kitchen', 'park', 'timemachine', 'cannery', 'hr', 'compost', 'wormfarm'];
   function storeyMult(k) { return S.storeys && S.storeys[k] ? ECON.storeyMult : 1; }
   function storeyCost(type) { return Math.round(BUILDS[type].base * ECON.storeyCost); }
   function canStorey(k) {
@@ -3103,6 +3327,8 @@ const GAME = (() => {
     else if (type === 'timemachine') S.timemachines[k] = { on: false, t: 0, T: 0, made: 0 };
     else if (type === 'hr') S.hrs[k] = { built: Date.now() };
     else if (type === 'cannery') S.canneries[k] = { recipe: 'flour', cook: null, made: 0 };
+    else if (type === 'compost') S.composts[k] = { t: 0 };
+    else if (type === 'wormfarm') S.wormfarms[k] = { t: 0 };
   }
   function build(type, c, r, dir) {
     const cost = buildCost(type, S.built[type]);
@@ -3210,6 +3436,10 @@ const GAME = (() => {
       delete S.hrs[k]; S.built.hr = Math.max(0, S.built.hr - 1);
     } else if (o.type === 'cannery') {
       delete S.canneries[k]; S.built.cannery = Math.max(0, S.built.cannery - 1);
+    } else if (o.type === 'compost') {
+      delete S.composts[k]; S.built.compost = Math.max(0, S.built.compost - 1);
+    } else if (o.type === 'wormfarm') {
+      delete S.wormfarms[k]; S.built.wormfarm = Math.max(0, S.built.wormfarm - 1);
     }
     S.coins += BUILDS[o.type].refund;
     S.eggs.forEach(e => { if (e.suck === k) e.suck = null; });
@@ -3739,6 +3969,7 @@ const GAME = (() => {
   /* ---------- master tick ---------- */
   function tick(dt) {
     tickMama(dt);
+    tickBugs(dt);
     S.chickens.forEach(ch => tickChicken(ch, dt));
     tickEggs(dt);
     tickVacs(dt);
@@ -3954,8 +4185,11 @@ const GAME = (() => {
       ['huts', 'silos', 'blowers', 'sorters', 'fences', 'hatchers', 'splitters', 'loaders',
        'barns', 'troughs', 'wells', 'sprinklers', 'mills', 'coops', 'boards', 'hqs', 'soil',
        'paint', 'deco', 'polishers', 'graders', 'dynamos', 'beehives', 'genelabs', 'sites', 'storeys', 'quests', 'billboards',
-       'kitchens', 'parks', 'timemachines', 'secrets', 'cooked', 'hrs', 'canneries', 'pantry', 'goods', 'factories', 'ach', 'cosOwned'].forEach(m => { if (!S[m]) S[m] = {}; });
+       'kitchens', 'parks', 'timemachines', 'secrets', 'cooked', 'hrs', 'canneries', 'pantry', 'goods', 'factories', 'ach', 'cosOwned',
+       'composts', 'wormfarms', 'bugjar'].forEach(m => { if (!S[m]) S[m] = {}; });
       if (!Array.isArray(S.presents)) S.presents = [];
+      /* bugs never survive a reload: they burrow while you are away */
+      S.bugs = [];
       if (!Array.isArray(S.limoQueue)) S.limoQueue = [];
       if (!S.tut || typeof S.tut !== 'object') S.tut = {};
       S.limo = null; S.drone = null; S.drone = null;
@@ -4100,6 +4334,8 @@ const GAME = (() => {
     orderAt, orderSpots, giveEgg, basketToOrder, maxOrders, orderWait,
     billboardPull, billboardArt, setBillboardArt,
     boss, bossSay, bossTap, bossAt, bossGo,
+    digAt, bugAt, catchBug, spawnBug, scatterBugs, sellJar, jarCount, jarValue, nearestBug,
+    get bugs() { return S.bugs; }, get bugjar() { return S.bugjar; },
     warden, wardenLine, wardenAt, tapWarden,
     siteFor, storeyMult, canStorey, addStorey, storeyCost, finishSites: () => Object.keys(S.sites).forEach(finishSite),
     cropSpeed, cropTimeLeft, beeBoost,

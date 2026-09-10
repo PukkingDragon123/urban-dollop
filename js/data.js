@@ -357,6 +357,10 @@ const BUILDS = {
                desc:'Drives every belt and machine around it a good deal faster.', needs:'dynamo' },
   hq:        { name:'Logistics HQ', sec:'crew', w:3, h:2, base:400, growth:2.2, refund:160,
                desc:'A dispatch office with a wall map. Every trip runs 10% faster with one on the ranch.', needs:'logistics' },
+  compost:   { name:'Compost Heap', sec:'farm', w:1, h:1, base:90, growth:1.5, refund:35,
+               desc:'A steaming heap of muck. Bugs breed in it and crawl out for the hens to chase.', needs:'compost' },
+  wormfarm:  { name:'Worm Farm', sec:'farm', w:2, h:1, base:600, growth:1.7, refund:240,
+               desc:'Stacked crates of worms. Fills the bug jar by itself, and a full jar feeds the whole flock.', needs:'wormfarm' },
   beehive:   { name:'Beehive', sec:'farm', w:1, h:1, base:220, growth:1.5, refund:90,
                desc:'Bees pollinate every crop nearby so it grows faster, and drip honey you can sell.', needs:'beehive' },
   genelab:   { name:'Gene Lab', sec:'ranch', w:2, h:2, base:1500, growth:2.0, refund:600,
@@ -380,6 +384,29 @@ const BUILDS = {
   fence:     { name:'Fence',     sec:'ranch', w:1, h:1, base:10, growth:1, refund:5,
                desc:'Chickens will not cross it. Pen them where you want them.', needs:'belts' },
 };
+
+/* ------------------------------------------------------------
+   BUGS - what lives in the soil. Dig them up with the spade,
+   pick them up by hand, or let a hen find one herself: a bug is
+   the best thing a chicken can eat, worth several pellets of
+   feed and a spell of laying twice as fast.
+   `find` weights what the spade turns up; the rarer the bug the
+   more it fills a bird and the more the jar is worth.
+   ------------------------------------------------------------ */
+const BUGS = {
+  worm:    { name:'Earthworm', icon:'worm',   col:'#e0918f', dark:'#a8666c', find:34, food:0.22, buff:14, value:2,
+             desc:'Comes up on its own in the rain. A hen will cross a field for one.' },
+  grub:    { name:'Fat Grub',  icon:'grub',   col:'#f2e2b8', dark:'#c9b184', find:24, food:0.34, buff:20, value:4,
+             desc:'Curled up under the turf, doing nothing useful. Now it is protein.' },
+  beetle:  { name:'Beetle',    icon:'beetle', col:'#5f7f52', dark:'#37502f', find:20, food:0.28, buff:16, value:5,
+             desc:'Shiny, indignant, and quicker than it looks.' },
+  cricket: { name:'Cricket',   col:'#8fb36a', icon:'cricket', dark:'#5f7f3f', find:15, food:0.26, buff:22, value:7,
+             desc:'Hops twice as far as it walks. The chicks love the chase.' },
+  snail:   { name:'Snail',     icon:'snail',  col:'#d9b877', dark:'#8a6a3a', find:7,  food:0.4,  buff:26, value:11,
+             desc:'Carries its own house, in no hurry whatsoever.' },
+};
+const BUG_KEYS = Object.keys(BUGS);
+const BUG_FIND_TOTAL = BUG_KEYS.reduce((t, k) => t + BUGS[k].find, 0);
 
 /* ------------------------------------------------------------
    BILLBOARDS - a poster is a grid of fat pixels, each cell an
@@ -926,6 +953,9 @@ const SKILLS = [
   U('strawberries','farm', 3, 'wheat',     'Strawberry Seed','heart',   14,  'Unlock strawberries: sweet, and they fruit again'),
   U('sprinkler',  'farm', 3, 'bumper',     'Sprinklers',     'spiral',  30,  'Unlock the Sprinkler: keeps a circle watered'),
   U('coopbuild',  'farm', 3, 'trough',     'The Coop',       'house',   40,  'Unlock the Coop: chicks near it grow twice as fast'),
+  U('spade',      'farm', 2, 'farming',    'The Spade',      'spade',   10,  'Unlock the DIG tool: turn the soil over for worms and grubs, the finest feed there is'),
+  U('compost',    'farm', 3, 'spade',      'Compost Heap',   'compost', 26,  'Unlock the Compost Heap: it breeds bugs of its own all day long'),
+  U('wormfarm',   'farm', 4, 'compost',    'Worm Farm',      'worm',    70,  'Unlock the Worm Farm: crates of worms into the jar, no digging needed'),
   U('sunflowers', 'farm', 4, 'corn',       'Sunflower Seed', 'sparkle', 45,  'Unlock sunflowers: the richest feed'),
   U('chilis',     'farm', 4, 'corn',       'Chili Seed',     'flame',   40,  'Unlock chilis: a hot, heavy harvest'),
   U('well',       'farm', 4, 'sprinkler',  'The Well',       'spiral',  90,  'Unlock the Well: a wide watered circle'),

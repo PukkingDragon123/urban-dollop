@@ -2034,21 +2034,46 @@ const SPR = (() => {
     return c;
   }
 
-  /* ---------- hand & tools (drawn in-world) ---------- */
+  /* ---------- the cursor paw (drawn in-world) ----------
+     Two states, both eleven pixels wide so they line up with each
+     other: a pointing paw and a closed fist. The old pair had ragged
+     rows - twelve characters on some lines, eleven on others - which
+     sheared the fingers off and left it reading as a blob.
+     -------------------------------------------------------------- */
   const UI_TPL = {
     handPoint: {
       pal: { O: '#2e2216', W: '#fff8ee', w: '#e8d8c4', S: '#c9b8a4', C: '#5fa8e8', c: '#2f5f9e' },
       rows: [
-        '..CCCCCCCC..', '..cCCCCCCc..', '.OWWWWWWWWO.', 'OWWWWWWWwSO',
-        'OWWWWWWWwSO', 'OWWWWWWwwSO', '.OWWWWWwSO..', '..OOOWWSOO..',
-        '....OWwO....', '....OWwO....', '....OWSO....', '.....OO.....',
+        '...OO......',
+        '..OWWO.....',
+        '..OWWO.....',
+        '..OWWO.....',
+        '..OWWOOO...',
+        '..OWWWWWOO.',
+        '.OOWWWWWWWO',
+        'OWWWWWWWWwO',
+        'OWWWWWWWWwO',
+        'OWWWWWWWwSO',
+        'OWWWWWWWwSO',
+        '.OCCCCCCCSO',
+        '.OcccccccO.',
+        '..OOOOOOO..',
       ],
     },
     handGrab: {
       pal: { O: '#2e2216', W: '#fff8ee', w: '#e8d8c4', S: '#c9b8a4', C: '#5fa8e8', c: '#2f5f9e' },
       rows: [
-        '..CCCCCCCC..', '..cCCCCCCc..', '.OWWWWWWWWO.', 'OWWWWWWWwSO',
-        'OWWwWWwWwSO', 'OWWWWWWWwSO', '.OWWWWWwSO..', '..OOOOOOO...',
+        '...OOOO....',
+        '..OWWWWOO..',
+        '.OWWwWWwWO.',
+        'OWWWWWWWWWO',
+        'OWWwWWwWWwO',
+        'OWWWWWWWWwO',
+        'OWWWWWWWwSO',
+        '.OWWWWWwSO.',
+        '.OCCCCCCCO.',
+        '.OcccccccO.',
+        '..OOOOOOO..',
       ],
     },
   };
@@ -2064,38 +2089,65 @@ const SPR = (() => {
     return c;
   }
 
-  /* basket held by the hand — drawn procedurally with contents */
+  /* ---------- the basket, held by the cursor paw ----------
+     Sixteen by thirteen: a bowed handle, a rim that overhangs the body,
+     a woven wall with stakes and two courses of weave, and whatever is
+     in it peeking over the rim. Drawn a pixel at a time rather than out
+     of the mask helper, because at this size the silhouette is the whole
+     job - the old one read as a bucket.
+     ------------------------------------------------------------------ */
   function basketSprite(fill, scale) {
-    const key = 'bskt_' + fill + '_' + scale;
+    const key = 'bskt2_' + fill + '_' + scale;
     if (cache.has(key)) return cache.get(key);
     const k = scale || 1;
-    const c = newCanvas(14 * k, 11 * k);
+    const c = newCanvas(16 * k, 13 * k);
     const ctx = c.getContext('2d');
-    /* handle */
-    ctx.fillStyle = '#7a5230';
-    ctx.fillRect(3 * k, 0, k, 3 * k); ctx.fillRect(10 * k, 0, k, 3 * k);
-    ctx.fillRect(4 * k, 0, 6 * k, k);
-    /* eggs inside (behind rim) */
-    for (let i = 0; i < Math.min(fill, 5); i++) {
-      ctx.fillStyle = '#fff8ee';
-      ctx.fillRect((2 + i * 2) * k, 3 * k, 2 * k, 3 * k);
-      ctx.fillStyle = '#e8dcc8';
-      ctx.fillRect((2 + i * 2) * k, 5 * k, 2 * k, k);
+    const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
+    const OUT = '#4a3018', CANE = '#c9924f', CANE_L = '#e8b96f', CANE_D = '#8a5e2a', CANE_X = '#a8783f';
+
+    /* ---- handle: a bow over the top, lit along its inside ---- */
+    R(6, 0, 4, 1, OUT);
+    R(4, 1, 2, 1, OUT); R(10, 1, 2, 1, OUT);
+    R(3, 2, 1, 2, OUT); R(12, 2, 1, 2, OUT);
+    R(6, 1, 4, 1, CANE_X);
+    R(5, 2, 1, 1, CANE_X); R(10, 2, 1, 1, CANE_X);
+    R(4, 3, 1, 2, CANE_D); R(11, 3, 1, 2, CANE_D);
+
+    /* ---- what is in it, sitting behind the rim ---- */
+    for (let i = 0; i < Math.min(fill, 4); i++) {
+      const ex = 3 + i * 3, ey = 4 - (i % 2);
+      R(ex, ey, 2, 1, '#fff8ee');
+      R(ex - 1, ey + 1, 4, 2, '#fff8ee');
+      R(ex + 2, ey + 1, 1, 2, '#e2d3b6');
+      R(ex - 1, ey + 1, 1, 1, '#ffffff');
     }
-    /* woven body */
-    const m = newMask(14, 11);
-    for (let y = 4; y < 10; y++) {
-      const inset = y > 7 ? y - 7 : 0;
-      for (let x = 1 + inset; x < 13 - inset; x++) mSet(m, x, y, 1);
-    }
-    renderMask(ctx, m, k, 0, 0, { base: '#c9924f', light: '#e8b96f', dark: '#8a5e2a', out: '#4a3018' }, 3, {});
-    /* weave lines */
-    ctx.fillStyle = '#8a5e2a';
-    for (let x = 2; x < 12; x += 2) ctx.fillRect(x * k, 6 * k, k, k);
-    for (let x = 3; x < 11; x += 2) ctx.fillRect(x * k, 8 * k, k, k);
-    /* rim */
-    ctx.fillStyle = '#4a3018'; ctx.fillRect(0, 3 * k, 14 * k, k);
-    ctx.fillStyle = '#e8b96f'; ctx.fillRect(k, 4 * k, 12 * k, k);
+
+    /* ---- rim: overhangs the wall on both sides ---- */
+    R(0, 6, 16, 1, OUT);
+    R(1, 5, 14, 1, OUT);
+    R(2, 5, 12, 1, CANE_L);
+    R(1, 6, 14, 1, CANE);
+    R(1, 6, 3, 1, CANE_L);
+    R(12, 6, 3, 1, CANE_D);
+
+    /* ---- wall: tapering, with stakes and two courses of weave ---- */
+    const wall = [[1, 14], [1, 14], [2, 12], [2, 12], [3, 10]];
+    wall.forEach(([x0, w], i) => {
+      const y = 7 + i;
+      R(x0 - 1, y, 1, 1, OUT); R(x0 + w, y, 1, 1, OUT);
+      R(x0, y, w, 1, i > 2 ? CANE_D : CANE);
+      R(x0, y, 2, 1, CANE_X);
+    });
+    R(4, 12, 8, 1, OUT);
+    R(3, 11, 1, 1, OUT); R(12, 11, 1, 1, OUT);
+    /* the weave: upright stakes crossed by two courses */
+    for (let x = 2; x < 14; x += 3) { R(x, 7, 1, 5, CANE_X); }
+    R(2, 8, 12, 1, CANE_D);
+    R(3, 10, 10, 1, CANE_D);
+    /* a highlight down the left of the wall, shade down the right */
+    R(1, 7, 1, 2, CANE_L);
+    R(13, 7, 1, 2, '#6e4a20');
+
     cache.set(key, c);
     return c;
   }
@@ -3236,41 +3288,41 @@ const SPR = (() => {
      it as .ox, so a caller can keep the feet where they were.
      ============================================================ */
   const RACCOON_ROWS = [
-    '.........oo.......oo........',
-    '........odpo.....opdo.......',
-    '........odpo.....opdo.......',
-    '.......oddpgooooogpddo......',
+    '......ooo...........ooo.....',
+    '.....odppo.........oppdo....',
+    '.....odppo.........oppdo....',
+    '.....oddpgggooooogggpddo....',
     '.......odgGGGGGGGGGgdo......',
     '.......odgGGGGGGGGGgdo......',
     '.......oddgGGGGGGGgddo......',
     '.......odkkkkkkkkkkkdo......',
     '.......okkkkkkkkkkkkko......',
-    '.......okkwwkkkkkwwkko......',
-    '.......okwwwwkkkwwwwko......',
-    '.......okweewkkkweewko......',
-    '.......okkwwkkkkkwwkko......',
-    '.......odkkkkkkkkkkkdo......',
+    '.......odGGGGGGGGGGGdo......',
+    '.......odGeeGGGGGeeGdo......',
+    '.......odGeeGGGGGeeGdo......',
+    '.......odGGcGGGGGcGGdo......',
+    '.......odGGGGGGGGGGGdo......',
     '.......oogkkWWWWWkkgoo......',
     '.........ogcWWWWWcgo........',
     '...........oWnnnWo..........',
     '...........onnWnno..........',
-    '...ooo..ogggggggggggo.......',
-    '..oTTToogggggggggggggo......',
+    '.ooo....ogggggggggggo.......',
+    'oTTTo..ogggggggggggggo......',
+    'oTTTo..ogggggggggggggo......',
+    'otttto.ogggggggggggggo......',
+    '.ottttoogggggggggggggo......',
     '.oTTTToogggggggggggggo......',
-    '.ottTtoogggggggggggggo......',
-    'otttTtoogggggggggggggo......',
-    'oTTtTtoogggggggggggggo......',
-    'oTTTTtoogggggggggggggo......',
-    'ottTTtoogggggggggggggo......',
-    'otttTtoogggggggggggggo......',
-    'oTTtTto.ogggggggggggo.......',
-    'oTTTTto..ogggo..ogggo.......',
-    'ottTTto..ogggo..ogggo.......',
-    '.ottTto..ogggo..ogggo.......',
-    '.oTTTo..oSSSSo.ossssso......',
-    '..oooo..oSSSSo.ossssso......',
+    '..oTTTTogggggggggggggo......',
+    '..ottttogggggggggggggo......',
+    '...otttogggggggggggggo......',
+    '...oTTToogggggggggggo.......',
+    '....oooo.ogggo..ogggo.......',
+    '.........ogggo..ogggo.......',
+    '.........ogggo..ogggo.......',
+    '........oSSSSo.ossssso......',
+    '........oSSSSo.ossssso......',
     '........oooooo.ooooooo......',
-  ];
+];
   const RACCOON_PAL = {
     o: '#17141d',   /* outline                */  d: '#5b6270',   /* fur, in shade      */
     g: '#828a97',   /* fur                    */  G: '#bfc6cf',   /* fur, lit           */
@@ -3330,18 +3382,15 @@ const SPR = (() => {
        can ask for any of them by name. ---- */
     const EX = expr || DEFAULT_EXPR[pose] || 'happy';
     if (EX !== 'happy') {
-      const K_ = P.k, W_ = P.W, N_ = P.n, WH_ = '#ffffff', LID = '#5b5170';
+      const K_ = P.k, W_ = P.W, N_ = P.n, E_ = P.e, FUR = P.G, BROW = P.o;
       const eyes = (l, r) => { l(9); r === undefined ? l(16) : r(16); };
-      const box = x => R(x, 9, 4, 4, K_);
-      /* the eye itself: a round white bead, corners clipped back to the
-         mask, with its pupil low in it. dx/dy walk the pupil about, and
-         a bead with no pupil at all is what surprise looks like. */
-      const bead = (x, dx, dy, bare) => {
-        box(x);
-        R(x + 1, 9, 2, 1, WH_);
-        R(x, 10, 4, 2, WH_);
-        R(x + 1, 12, 2, 1, WH_);
-        if (!bare) R(x + 1 + (dx || 0), 11 + (dy || 0), 2, 1, P.e);
+      /* the eye area: four by four of lit fur at rows 9-12, with a two by
+         two black dot low and inward in it. Wiping the box back to fur
+         first is what lets every expression draw over the default face. */
+      const wipe = x => { R(x, 9, 4, 4, FUR); R(x + (x < 14 ? 2 : 1), 12, 1, 1, P.c); };
+      const dot = (x, dx, dy, w, h) => {
+        wipe(x);
+        R(x + 1 + (dx || 0), 10 + (dy || 0), w || 2, h || 2, E_);
       };
       const mouth = kind => {
         /* the base mouth is a smile with the corners turned up; every
@@ -3355,41 +3404,44 @@ const SPR = (() => {
         else if (kind === 'teeth') { R(11, 17, 7, 1, N_); R(12, 17, 5, 1, '#fff8ec'); R(14, 17, 1, 1, N_); }
       };
       switch (EX) {
-        case 'blink':                       /* eyes shut, curved happily */
-          eyes(x => { box(x); R(x, 10, 1, 1, LID); R(x + 1, 11, 2, 1, LID); R(x + 3, 10, 1, 1, LID); });
+        case 'blink':                        /* both eyes shut: a lash line, curved happily */
+          eyes(x => { wipe(x); R(x, 11, 4, 1, E_); R(x, 10, 1, 1, E_); R(x + 3, 10, 1, 1, E_); });
           break;
-        case 'grin':                        /* squeezed shut with pleasure */
-          eyes(x => { box(x); R(x, 11, 1, 1, WH_); R(x + 1, 10, 2, 1, WH_); R(x + 3, 11, 1, 1, WH_); });
+        case 'grin':                         /* squeezed shut, curved up */
+          eyes(x => { wipe(x); R(x + 1, 10, 2, 1, E_); R(x, 11, 1, 1, E_); R(x + 3, 11, 1, 1, E_); });
           mouth('grin');
           break;
-        case 'wow':                         /* startled: the bead swells, pupil shrunk to a speck */
-          eyes(x => { bead(x, 0, 0, true); R(x, 11, 4, 1, WH_); R(x + 1, 10, 1, 1, P.e); });
-          R(9, 8, 4, 1, P.G); R(16, 8, 4, 1, P.G);
+        case 'wow':                          /* the dots blow wide open */
+          eyes(x => dot(x, 0, -1, 3, 4));
+          R(9, 8, 4, 1, FUR); R(16, 8, 4, 1, FUR);
           mouth('o');
           break;
-        case 'angry':                        /* brows slanted in, pupils shoved together */
-          bead(9, 1); bead(16, -1);
-          R(9, 7, 2, 1, P.o); R(11, 8, 2, 1, P.o); R(12, 9, 1, 1, P.o);
-          R(19, 7, 2, 1, P.o); R(17, 8, 2, 1, P.o); R(16, 9, 1, 1, P.o);
+        case 'angry':                        /* dots shoved inward under slanted brows */
+          dot(9, 1); dot(16, -1);
+          R(9, 8, 3, 1, BROW); R(11, 9, 2, 1, BROW); R(12, 10, 1, 1, BROW);
+          R(18, 8, 3, 1, BROW); R(17, 9, 2, 1, BROW); R(16, 10, 1, 1, BROW);
           mouth('teeth');
           break;
-        case 'determined':                   /* brows level and heavy, pupils up under them */
-          bead(9, 0, -1); bead(16, 0, -1);
-          R(9, 8, 4, 1, P.o); R(16, 8, 4, 1, P.o);
+        case 'determined':                   /* level brows, dots up under them */
+          dot(9, 0, 0); dot(16, 0, 0);
+          R(9, 8, 4, 1, BROW); R(16, 8, 4, 1, BROW);
+          R(10, 9, 3, 1, BROW); R(16, 9, 3, 1, BROW);
           mouth('flat');
           break;
-        case 'smug':                         /* one bead half shut behind its lid */
-          box(16); R(16, 11, 4, 1, WH_); R(17, 11, 2, 1, P.e); R(16, 10, 4, 1, LID);
+        case 'smug':                         /* one eye shut, the other narrowed */
+          wipe(16); R(16, 11, 4, 1, E_);
+          R(10, 11, 2, 1, E_);
           mouth('smirk');
           break;
-        case 'sad':                          /* pupils fallen to the bottom of the bead */
-          bead(9, 0, 1); bead(16, 0, 1);
-          R(11, 8, 2, 1, P.d); R(16, 8, 2, 1, P.d);
+        case 'sad':                          /* dots pushed down, brows up on the inside */
+          dot(9, 0, 2, 2, 1); dot(16, 0, 2, 2, 1);
+          R(11, 8, 2, 1, BROW); R(10, 9, 1, 1, BROW);
+          R(18, 8, 2, 1, BROW); R(19, 9, 1, 1, BROW);
           mouth('frown');
           break;
-        case 'love':                         /* a heart in each eye */
+        case 'love':                         /* a heart where each eye was */
           eyes(x => {
-            R(x, 9, 4, 4, K_);
+            wipe(x);
             R(x, 10, 1, 2, '#ff5f9e'); R(x + 3, 10, 1, 2, '#ff5f9e');
             R(x + 1, 9, 1, 1, '#ff5f9e'); R(x + 2, 9, 1, 1, '#ff5f9e');
             R(x + 1, 10, 2, 2, '#ff5f9e'); R(x + 1, 12, 2, 1, '#ff5f9e');
@@ -3399,15 +3451,15 @@ const SPR = (() => {
           break;
         case 'dizzy':                        /* crossed out */
           eyes(x => {
-            R(x, 9, 4, 4, K_);
-            R(x, 9, 1, 1, WH_); R(x + 1, 10, 1, 1, WH_); R(x + 2, 11, 1, 1, WH_); R(x + 3, 12, 1, 1, WH_);
-            R(x + 3, 9, 1, 1, WH_); R(x + 2, 10, 1, 1, WH_); R(x + 1, 11, 1, 1, WH_); R(x, 12, 1, 1, WH_);
+            wipe(x);
+            R(x, 9, 1, 1, E_); R(x + 1, 10, 1, 1, E_); R(x + 2, 11, 1, 1, E_); R(x + 3, 12, 1, 1, E_);
+            R(x + 3, 9, 1, 1, E_); R(x + 2, 10, 1, 1, E_); R(x + 1, 11, 1, 1, E_); R(x, 12, 1, 1, E_);
           });
           mouth('open');
           break;
         case 'money':                        /* coins where his eyes were */
           eyes(x => {
-            R(x, 9, 4, 4, K_);
+            wipe(x);
             R(x + 1, 9, 2, 1, '#ffd23f'); R(x, 10, 4, 2, '#ffd23f'); R(x + 1, 12, 2, 1, '#ffd23f');
             R(x + 1, 10, 2, 2, '#b87c10'); R(x + 1, 10, 1, 1, '#fff3c4');
           });
@@ -3716,6 +3768,11 @@ const SPR = (() => {
       '...ooooo......', '..obbbbbo.....', '.obwwbbbbo....', 'obwbbbbbbbo...', 'obbbbbbbbbo...',
       'obbbbbbbbbo...', 'obbbbbbbbbo...', '.obbbbbbbo....', '..obbbbboo....', '...oooooono...',
       '........onno..', '.........onno.', '..........onno', '...........oo.'],
+    /* the spade: a short handle, a shoulder to put your boot on, a blade */
+    spade: [
+      '.....oooo.....', '.....oNNo.....', '.....oNNo.....', '.....oNNo.....', '...oooNNooo...',
+      '...oNNNNNNo...', '....oNNNNo....', '....omWWmo....', '...omWWWWmo...', '...omWWWWmo...',
+      '...omWWWWmo...', '....omWWmo....', '.....oomoo....', '......oo......'],
   };
   const TOOL_PAL = Object.assign({}, IP, { S: '#c9b8a4', N: '#7a5230', n: '#c9924f', s: '#f2e2c8', W: '#d8dde6', m: '#a8adb8' });
   function toolIconSprite(name, scale) {
@@ -3725,6 +3782,96 @@ const SPR = (() => {
     const k = scale || 1;
     const c = newCanvas(14 * k, 14 * k);
     drawGrid(c.getContext('2d'), rows, TOOL_PAL, 0, 0, k);
+    cache.set(key, c);
+    return c;
+  }
+
+  /* ============================================================
+     BUGS
+     Five things that live in the soil, each ten by seven, each with
+     two frames so it moves: a worm that ripples along, a grub that
+     bunches and stretches, a beetle whose legs paddle, a cricket
+     mid-hop, and a snail that gets there eventually. Lit from the
+     upper left like everything else, with a dark underside so it
+     sits on the ground rather than floating over it.
+     ============================================================ */
+  function bugSprite(kind, frame, scale) {
+    const key = 'bug_' + kind + '_' + frame + '_' + scale;
+    if (cache.has(key)) return cache.get(key);
+    const k = scale || 1;
+    const B = (typeof BUGS !== 'undefined' && BUGS[kind]) || { col: '#e0918f', dark: '#a8666c' };
+    const c = newCanvas(10 * k, 7 * k);
+    const ctx = c.getContext('2d');
+    const R = (x, y, w, h, col) => { if (!col) return; ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
+    const col = B.col, dk = B.dark, lit = lighten(col, 0.34), OUT = '#241a10';
+    const f = frame ? 1 : 0;
+
+    if (kind === 'worm') {
+      /* a ripple runs along it: the humps swap ends between frames */
+      const hump = f ? [1, 0, 1, 0, 1] : [0, 1, 0, 1, 0];
+      for (let i = 0; i < 5; i++) {
+        const x = 1 + i * 2, y = 3 - hump[i];
+        R(x, y - 1, 2, 1, OUT);
+        R(x, y, 2, 2, i % 2 ? col : lit);
+        R(x, y + 2, 2, 1, dk);
+      }
+      R(1, 2 - hump[0], 1, 1, lit);
+      R(9, 3 - hump[4], 1, 1, dk);
+    } else if (kind === 'grub') {
+      /* a fat curl: it bunches up tight in one frame and opens in the other */
+      const open = f ? 1 : 0;
+      R(2, 1, 5, 1, OUT);
+      R(1, 2, 7, 1, OUT);
+      R(1, 2, 6, 1, lit);
+      R(1, 3, 3, 2, col); R(1, 3, 1, 2, lit);
+      R(4, 3 + open, 4, 1, col);
+      R(3, 5, 4 + open, 1, col);
+      R(3, 5, 4 + open, 1, dk);
+      R(0, 3, 1, 2, OUT); R(2, 6, 4 + open, 1, OUT);
+      R(4, 4 + open, 4, 1, OUT);
+      R(2, 3, 1, 1, dk); R(2, 5, 1, 1, lighten(col, 0.5));      /* segments */
+      R(6 + open, 5, 1, 1, '#3a2a1a');                          /* the head end */
+    } else if (kind === 'beetle') {
+      /* a domed shell with a seam, and six legs that paddle */
+      R(2, 1, 6, 1, OUT); R(1, 2, 8, 3, OUT);
+      R(2, 2, 6, 2, col); R(2, 2, 6, 1, lit); R(2, 4, 6, 1, dk);
+      R(4, 1, 2, 4, darken(col, 0.5));                          /* the seam */
+      R(1, 1, 2, 1, OUT); R(8, 1, 1, 1, OUT);
+      R(0, f ? 2 : 3, 1, 1, OUT); R(9, f ? 3 : 2, 1, 1, OUT);
+      R(1, 5, 1, 1, OUT); R(4, 5, 1, 1, OUT); R(7, 5, 1, 1, OUT);
+      R(f ? 2 : 3, 6, 1, 1, OUT); R(f ? 7 : 6, 6, 1, 1, OUT);
+      R(3, 0, 1, 1, OUT); R(6, 0, 1, 1, OUT);                   /* antennae */
+    } else if (kind === 'cricket') {
+      /* a wedge body with a hunched back leg: cocked to jump in one
+         frame, kicked out straight in the other */
+      R(3, 2, 4, 1, OUT);
+      R(2, 3, 6, 1, OUT);
+      R(3, 2, 4, 1, lit);
+      R(2, 3, 6, 1, col);
+      R(2, 4, 6, 1, dk);
+      R(1, 4, 1, 1, OUT); R(2, 5, 6, 1, OUT);
+      R(7, 2, 2, 2, darken(col, 0.35));                         /* the head */
+      R(8, 2, 1, 1, OUT);
+      R(9, f ? 0 : 1, 1, 1, OUT); R(8, 1, 1, 1, OUT);           /* antenna */
+      if (f) {                                                  /* mid-hop */
+        R(1, 1, 2, 1, OUT); R(0, 2, 1, 2, OUT);
+        R(3, 6, 1, 1, OUT); R(6, 6, 1, 1, OUT);
+      } else {                                                  /* coiled */
+        R(1, 2, 1, 2, OUT); R(0, 4, 2, 1, OUT);
+        R(3, 6, 2, 1, OUT); R(6, 6, 1, 1, OUT);
+      }
+      R(4, 3, 1, 1, lighten(col, 0.5));
+    } else {
+      /* snail: a shell with a spiral, a foot, and two eye stalks */
+      R(1, 4, 8, 1, OUT); R(2, 5, 6, 1, OUT);
+      R(2, 4, 6, 1, lighten(col, 0.5));
+      R(2, 1, 5, 1, OUT); R(1, 2, 7, 2, OUT);
+      R(2, 2, 5, 2, col); R(2, 2, 5, 1, lit);
+      R(4, 2, 2, 1, dk); R(3, 3, 3, 1, dk);                     /* the spiral */
+      R(5, 3, 1, 1, lighten(col, 0.4));
+      R(8, 3, 1, 2, lighten(col, 0.5));                         /* the head */
+      R(9, f ? 1 : 2, 1, 1, OUT); R(8, f ? 2 : 3, 1, 1, OUT);   /* eye stalk */
+    }
     cache.set(key, c);
     return c;
   }
@@ -4161,7 +4308,7 @@ const SPR = (() => {
     drawBezel, drawScanlines, drawPips, drawBox, TERM, drawHex, hexHit, hexRows, drawCube,
     carSprite, raccoonSprite, furnitureSprite, RAC_OFF, outfitOf,
     toolIconSprite, produceSprite, goodsSprite, presentSprite, posterSprite, shadowEll, drawBar,
-    droneSprite, chuteSprite,
+    droneSprite, chuteSprite, bugSprite,
     wardenSprite, WARD_OFF,
     newMask, mRect, mCircle, renderMask, mulberry, newCanvas,
     darken, lighten, warm, cool, lum, px, CELL, ICONS,

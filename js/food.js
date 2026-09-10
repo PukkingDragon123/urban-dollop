@@ -51,14 +51,14 @@ window.FOODUI = (() => {
     const box = $('#food-body');
     if (!box) return;
     const st = S();
-    const s2 = tab + '|' + JSON.stringify(st.pantry) + JSON.stringify(st.goods) + Object.keys(st.canneries).map(k => st.canneries[k].recipe + (st.canneries[k].cook ? Math.round(st.canneries[k].cook.t) : '')).join() + '|' + Math.floor(st.premiumT);
+    const s2 = tab + '|' + JSON.stringify(st.pantry) + JSON.stringify(st.goods) + JSON.stringify(st.bugjar) + Object.keys(st.canneries).map(k => st.canneries[k].recipe + (st.canneries[k].cook ? Math.round(st.canneries[k].cook.t) : '')).join() + '|' + Math.floor(st.premiumT);
     if (s2 === sig) return;
     sig = s2;
     $('#food-sub').textContent = GAME.pantryTotal() + ' ITEMS' + (st.premiumT > 0 ? '  -  SUPER FEED FOR ' + GAME.fmtTime(st.premiumT) : '') + (GAME.hasCannery() ? '' : '  -  NO CANNERY YET');
     box.innerHTML = '';
     const tabs = document.createElement('div');
     tabs.className = 'food-tabs';
-    [['produce', 'PRODUCE', 'seed'], ['goods', 'GOODS', 'crate'], ['cannery', 'THE CANNERY', 'gear']].forEach(([id, name, icon]) => {
+    [['produce', 'PRODUCE', 'seed'], ['bugs', 'THE BUG JAR', 'bowl'], ['goods', 'GOODS', 'crate'], ['cannery', 'THE CANNERY', 'gear']].forEach(([id, name, icon]) => {
       const b = document.createElement('button');
       b.className = 'tab-btn' + (tab === id ? ' active' : '');
       b.dataset.act = 'food-tab'; b.dataset.tab = id;
@@ -80,6 +80,45 @@ window.FOODUI = (() => {
         grid.appendChild(card(id, SPR.produceSprite(id, 1), P.name, n, Math.round(P.val * (1 + 0.15 * GAME.lvl('value'))),
           [{ label: 'SELL 1', data: { act: 'sell-produce', id, n: 1 }, disabled: n < 1 },
            { label: 'SELL ALL', data: { act: 'sell-produce', id, n: 0 }, disabled: n < 1, cls: n ? 'btn-green' : '' }]));
+      });
+    } else if (tab === 'bugs') {
+      const intro = document.createElement('p');
+      intro.className = 'pedia-intro';
+      intro.textContent = GAME.jarCount()
+        ? 'Dug up, picked up or farmed. Tip a handful over the flock and watch them run, or sell the jar to the bait trade.'
+        : 'Empty. Install The Spade in the Lab (FARM lane), then dig anywhere on your land - turned soil is best.';
+      box.appendChild(intro);
+      /* the jar itself, and what you can do with the whole thing */
+      const jar = document.createElement('div');
+      jar.className = 'food-card' + (GAME.jarCount() ? '' : ' empty');
+      const jtop = document.createElement('div');
+      jtop.className = 'fc-top';
+      jtop.appendChild(UI.cloneCanvas(SPR.bugSprite('worm', 0, 1), 4));
+      const jmid = document.createElement('div');
+      const jn = document.createElement('b'); jn.textContent = 'THE JAR'; jmid.appendChild(jn);
+      const jc = document.createElement('span'); jc.textContent = GAME.jarCount() + ' BUGS  -  WORTH ' + GAME.fmt(GAME.jarValue()); jmid.appendChild(jc);
+      jtop.appendChild(jmid);
+      jar.appendChild(jtop);
+      const jrow = document.createElement('div');
+      jrow.className = 'fc-btns';
+      [['SCATTER A HANDFUL', 'scatter-bugs', GAME.jarCount() < 1, 'btn-green'], ['SELL THE JAR', 'sell-jar', GAME.jarCount() < 1, '']].forEach(([label, act, dis, cls]) => {
+        const b = document.createElement('button');
+        b.className = 'btn' + (cls ? ' ' + cls : '');
+        b.dataset.act = act;
+        b.disabled = dis;
+        b.textContent = label;
+        jrow.appendChild(b);
+      });
+      jar.appendChild(jrow);
+      grid.appendChild(jar);
+      BUG_KEYS.forEach(id => {
+        const n = st.bugjar[id] || 0, B = BUGS[id];
+        const c = card(id, SPR.bugSprite(id, 0, 1), B.name, n, B.value,
+          [{ label: 'SELL 1', data: { act: 'sell-bug', id, n: 1 }, disabled: n < 1 },
+           { label: 'SCATTER 1', data: { act: 'scatter-bug', id }, disabled: n < 1, cls: n ? 'btn-green' : '' }]);
+        const d = document.createElement('p'); d.className = 'fc-desc'; d.textContent = B.desc;
+        c.insertBefore(d, c.lastChild);
+        grid.appendChild(c);
       });
     } else if (tab === 'goods') {
       const intro = document.createElement('p');
@@ -160,6 +199,38 @@ window.FOODUI = (() => {
           sig = ''; render(); break;
         }
         case 'use-goods': { if (GAME.useGoods(btn.dataset.id)) { UI.snd.sparkle(); UI.floatText('SUPER FEED IN THE BARN', ev.clientX - 60, ev.clientY - 30, 'green', 'seed'); } else UI.snd.error(); sig = ''; render(); break; }
+        case 'scatter-bugs': {
+          const n = GAME.scatterBugs(6);
+          if (n) { UI.snd.sprinkle(); UI.closeModals(); } else UI.snd.error();
+          sig = ''; render(); break;
+        }
+        case 'scatter-bug': {
+          const kind = btn.dataset.id;
+          if ((S().bugjar[kind] || 0) > 0) {
+            S().bugjar[kind]--;
+            if (S().bugjar[kind] <= 0) delete S().bugjar[kind];
+            const flock = S().chickens;
+            const host = flock.length ? flock[(Math.random() * flock.length) | 0] : null;
+            GAME.spawnBug(kind, host ? host.x + 10 + (Math.random() * 30 - 15) : UI.W.mama.x, host ? host.y + 16 : UI.W.mama.y + 20);
+            UI.snd.plop(); UI.closeModals();
+          } else UI.snd.error();
+          sig = ''; render(); break;
+        }
+        case 'sell-jar': {
+          const got = GAME.sellJar();
+          if (got) { UI.snd.coin(); UI.floatText('+' + GAME.fmt(got), ev.clientX - 20, ev.clientY - 30, 'gold', 'coin'); } else UI.snd.error();
+          sig = ''; render(); break;
+        }
+        case 'sell-bug': {
+          const kind = btn.dataset.id;
+          if ((S().bugjar[kind] || 0) > 0) {
+            S().bugjar[kind]--;
+            if (S().bugjar[kind] <= 0) delete S().bugjar[kind];
+            GAME.earn(BUGS[kind].value);
+            UI.snd.coin(); UI.floatText('+' + GAME.fmt(BUGS[kind].value), ev.clientX - 20, ev.clientY - 30, 'gold', 'coin');
+          } else UI.snd.error();
+          sig = ''; render(); break;
+        }
         case 'set-cannery': { if (GAME.setAllCanneries(btn.dataset.id)) UI.snd.build(); else UI.snd.error(); sig = ''; render(); UI.refreshInspect(); break; }
       }
     });
