@@ -2278,65 +2278,105 @@ const SPR = (() => {
      and a hat. Three tones of shading on every curve so they read
      as round rather than flat.
      ============================================================ */
+  /* ---------------------------------------------------------------
+     THE ROBOTS
+     A hovering barrel with a glass face, drawn to the same rules as
+     everything else on the farm: light from the upper left, a lit
+     rim along the top of every surface, a dark sill under it, and
+     the outline carried right round the silhouette so it reads at
+     one world pixel to a pixel. 18 by 24, the top five rows kept
+     clear for a hat.
+
+     What makes one bot different from another is data, not code:
+     BOTS gives it a shell colour, a trim, a visor colour, a hat and
+     a face, and it picks up the tool of its trade in its right claw.
+     --------------------------------------------------------------- */
   function botSprite(role, frame, scale) {
-    const key = 'bot3_' + role + '_' + frame + '_' + scale;
+    const key = 'bot4_' + role + '_' + frame + '_' + scale;
     if (cache.has(key)) return cache.get(key);
     const k = scale || 1;
     const B = BOTS[role] || BOTS.hand;
-    /* 24 rows, not 21: the top five belong to the hat, so caps, straw
-       brims, bows and antennae have somewhere to sit instead of being
-       shaved off by the edge of the canvas */
     const c = newCanvas(18 * k, 24 * k);
     const ctx = c.getContext('2d');
     const R = (x, y, w, h, col) => { if (!col) return; ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
-    const OUT = '#2a2018';
+    const OUT = '#221a26';
     const sh = B.shell;
-    const lite = lighten(sh, 0.42), mid = sh, shade = darken(sh, 0.20), deep = darken(sh, 0.40);
-    const bob = frame ? 0 : 1;
+    const lite = lighten(sh, 0.46), mid = sh, shade = darken(sh, 0.22), deep = darken(sh, 0.44);
     const T = B.trim, V = B.visor;
+    const GLASS = '#121820', GLASS_HI = '#1e2833';
+    const bob = frame ? 0 : 1;            /* the whole machine rides up and down */
+    const hy = 4 + bob;                   /* top row of the head */
+    const by = 12 + bob;                  /* top row of the barrel: high enough
+                                             that the skirt clears its own glow,
+                                             which is what reads as hovering */
 
-    /* ---- hover puff, drawn under everything ---- */
-    const puff = frame ? 0 : 1;
-    R(5, 22 + bob - puff, 8, 1, 'rgba(150,215,255,.5)');
-    R(3, 23 + bob - puff, 12, 1, 'rgba(150,215,255,.28)');
-    R(6 + puff * 2, 21 + bob, 2, 1, 'rgba(200,240,255,.7)');
-    R(10 - puff * 2, 21 + bob, 2, 1, 'rgba(200,240,255,.7)');
+    /* a rounded 12-wide silhouette, nine or eight rows tall: the two
+       shapes this robot is made of, so both get the same soft corners */
+    const dome = (y0, rows, col) => {
+      const inset = [2, 1, 0, 0, 0, 0, 0, 1, 2];
+      for (let i = 0; i < rows; i++) {
+        const n = inset[i < 4 ? i : i >= rows - 2 ? 9 - (rows - i) : 4];
+        R(3 + n, y0 + i, 12 - n * 2, 1, col);
+      }
+    };
 
-    /* ---- belly: a round barrel ---- */
-    const by = 12 + bob;
-    R(4, by - 1, 10, 1, OUT);
-    R(3, by, 12, 1, OUT);
-    R(2, by + 1, 14, 6, OUT);
-    R(3, by + 7, 12, 1, OUT);
-    R(4, by + 8, 10, 1, OUT);
-    R(4, by, 8, 1, lite);
-    R(3, by + 1, 12, 6, mid);
-    R(4, by + 1, 5, 3, lite);            /* upper-left gloss */
-    R(3, by + 5, 12, 2, shade);
-    R(12, by + 1, 3, 6, shade);
-    R(13, by + 2, 2, 4, deep);
-    R(4, by + 7, 10, 1, deep);
-    /* a seam round the middle */
-    R(3, by + 4, 12, 1, darken(sh, 0.10));
-    /* job badge, lit */
-    R(6, by + 2, 6, 4, '#1d2229');
+    /* ---- hover: a bright core under the skirt, a wash below it and a
+       shimmer on the ground, the jets alternating with the frame ---- */
+    const jet = frame ? 1 : 0;
+    R(6 + jet, 21, 6 - jet * 2, 1, 'rgba(206,242,255,.72)');
+    R(4, 22, 10, 1, 'rgba(150,215,255,.30)');
+    R(3, 23, 12, 1, 'rgba(150,215,255,.14)');
+    R(4 + jet * 8, 21, 2, 1, 'rgba(255,255,255,.45)');
+
+    /* ---- the barrel ---- */
+    dome(by, 8, OUT);
+    /* one pixel in from the outline, shaded top to bottom */
+    R(5, by + 1, 8, 1, lite);
+    R(4, by + 2, 10, 1, lite);
+    R(4, by + 3, 10, 3, mid);
+    R(4, by + 6, 10, 1, shade);
+    R(6, by + 7, 6, 1, deep);
+    R(4, by + 2, 3, 3, lighten(sh, 0.62));      /* gloss, upper left */
+    R(11, by + 2, 3, 4, shade);                 /* the turn away from the light */
+    R(12, by + 3, 2, 3, deep);
+    R(4, by + 4, 10, 1, darken(sh, 0.12));      /* the seam round the middle */
+    /* the skirt: a dark vent ring under the barrel with three louvres */
+    R(5, by + 8, 8, 1, OUT);
+    R(6, by + 8, 6, 1, darken(sh, 0.55));
+    R(6, by + 8, 1, 1, deep); R(8, by + 8, 1, 1, deep); R(10, by + 8, 1, 1, deep);
+    /* rivets down both flanks */
+    [by + 2, by + 5].forEach(ry => { R(4, ry, 1, 1, lighten(sh, 0.7)); R(13, ry, 1, 1, darken(sh, 0.3)); });
+
+    /* ---- chest panel: a lit readout and three status pips ---- */
+    R(6, by + 2, 6, 4, '#1b2028');
+    R(6, by + 2, 6, 1, '#0f1319');
     R(7, by + 3, 4, 2, V);
-    R(7, by + 3, 2, 1, lighten(V, 0.5));
-    R(6, by + 2, 6, 1, deep);
-    if (frame) R(11, by + 3, 1, 1, T);
+    R(7, by + 3, 3, 1, lighten(V, 0.55));
+    if (frame) R(10, by + 4, 1, 1, lighten(V, 0.8));
+    for (let i = 0; i < 3; i++) {
+      const on = i <= (frame ? 2 : 1);
+      R(6 + i * 2, by + 6, 1, 1, on ? T : darken(T, 0.55));
+    }
 
-    /* ---- arms, swinging, each holding something ---- */
+    /* ---- arms: two columns of limb inside their own outline, a lit
+       shoulder at the top and two fingers at the bottom. Narrow on
+       purpose: a three-wide arm reads as a slab bolted to the side. ---- */
+    const arm = (side, dy) => {
+      const x0 = side < 0 ? 0 : 15;            /* the three columns it owns */
+      const fx = side < 0 ? 1 : 15;            /* the two it fills */
+      R(x0, by + 1 + dy, 3, 6, OUT);
+      R(fx, by + 2 + dy, 2, 1, side < 0 ? lite : mid);
+      R(fx, by + 3 + dy, 2, 2, mid);
+      R(side < 0 ? 1 : 16, by + 3 + dy, 1, 2, shade);
+      R(fx, by + 5 + dy, 2, 1, shade);
+      R(x0, by + 6 + dy, 1, 1, deep);          /* two fingers */
+      R(x0 + 2, by + 6 + dy, 1, 1, deep);
+    };
     const la = frame ? 0 : 1, ra = frame ? 1 : 0;
-    R(0, by + 1 + la, 3, 4, OUT);
-    R(1, by + 1 + la, 2, 3, mid);
-    R(1, by + 1 + la, 1, 1, lite);
-    R(1, by + 4 + la, 2, 1, deep);
-    R(15, by + 1 + ra, 3, 4, OUT);
-    R(15, by + 1 + ra, 2, 3, mid);
-    R(15, by + 1 + ra, 1, 1, lite);
-    R(15, by + 4 + ra, 2, 1, deep);
-    /* the tool of the trade in the right hand, big enough to read at 1x */
-    const tx = 15, ty = by + 5 + ra;
+    arm(-1, la); arm(1, ra);
+
+    /* the tool of the trade in the right claw, big enough to read at 1x */
+    const tx = 15, ty = by + 7 + ra;      /* held in the right claw */
     if (role === 'hand') {                                   /* an egg */
       R(tx + 1, ty, 1, 1, '#fff8ee');
       R(tx, ty + 1, 3, 2, '#fff8ee');
@@ -2370,75 +2410,81 @@ const SPR = (() => {
       R(tx, ty + 3, 1, 1, '#ff8f5f');
     }
 
-    /* ---- head: a wide dome ---- */
-    const hy = 5 + bob;
-    R(5, hy - 1, 8, 1, OUT);
-    R(4, hy, 10, 1, OUT);
-    R(3, hy + 1, 12, 6, OUT);
-    R(4, hy + 7, 10, 1, OUT);
-    R(5, hy, 8, 1, lite);
-    R(4, hy + 1, 10, 6, mid);
-    R(5, hy + 1, 5, 2, lite);
-    R(4, hy + 6, 10, 1, shade);
-    R(12, hy + 1, 2, 6, shade);
-    /* ears / bolts */
-    R(2, hy + 3, 2, 3, OUT); R(2, hy + 3, 1, 2, shade);
-    R(14, hy + 3, 2, 3, OUT); R(14, hy + 3, 1, 2, shade);
-    /* a little collar, so the head reads apart from the belly */
-    R(4, hy + 8, 10, 1, darken(T, 0.25));
-    R(5, hy + 8, 8, 1, T);
-    R(6, hy + 8, 5, 1, lighten(T, 0.35));
+    /* ---- the head, sitting on a trim collar ---- */
+    R(5, by - 1, 8, 1, darken(T, 0.3));
+    R(6, by - 1, 6, 1, T);
+    R(7, by - 1, 4, 1, lighten(T, 0.4));
+    dome(hy, 9, OUT);
+    R(6, hy + 1, 6, 1, lite);
+    R(5, hy + 2, 8, 1, lite);
+    R(4, hy + 3, 10, 4, mid);
+    R(5, hy + 7, 8, 1, shade);
+    R(4, hy + 3, 3, 2, lighten(sh, 0.62));      /* the same gloss as the barrel */
+    R(11, hy + 4, 3, 3, shade);
+    R(12, hy + 5, 2, 2, deep);
+    R(6, hy + 8, 6, 1, deep);
+    /* ear pods, and a rivet in each */
+    R(1, hy + 4, 2, 3, OUT); R(2, hy + 4, 1, 2, mid); R(2, hy + 4, 1, 1, lite);
+    R(15, hy + 4, 2, 3, OUT); R(15, hy + 4, 1, 2, shade); R(15, hy + 6, 1, 1, deep);
 
-    /* ---- visor: wraps round the face ---- */
-    R(4, hy + 2, 10, 4, '#161b21');
-    R(4, hy + 2, 10, 1, '#242b34');
-    /* eyes, per personality */
-    const eyeL = 5, eyeR = 10, ey = hy + 3;
-    const blink = frame && (role === 'keeper' || role === 'feeder');
-    const eye = (x, kind) => {
-      if (kind === 'shut') { R(x, ey + 1, 3, 1, V); return; }
-      if (kind === 'wide') { R(x, ey - 1, 3, 3, V); R(x, ey - 1, 1, 1, '#ffffff'); return; }
-      if (kind === 'cross') { R(x, ey, 1, 1, V); R(x + 2, ey, 1, 1, V); R(x + 1, ey + 1, 1, 1, V); R(x, ey + 2, 1, 1, V); R(x + 2, ey + 2, 1, 1, V); return; }
+    /* ---- the glass: a wrapped visor with a scan line rolling down it,
+       two dot eyes and a specular sweep across the top left ---- */
+    R(5, hy + 3, 8, 1, GLASS_HI);
+    R(4, hy + 4, 10, 2, GLASS);
+    R(5, hy + 6, 8, 1, GLASS);
+    R(4, hy + 4, 10, 1, GLASS_HI);
+    R(5, hy + 3 + (frame ? 2 : 0), 8, 1, 'rgba(255,255,255,.07)');
+    /* the eyes: round dots that glow, the same shape the founder wears */
+    const eyeL = 6, eyeR = 10, ey = hy + 4;
+    const dot = (x, kind) => {
+      if (kind === 'shut') { R(x, ey + 1, 2, 1, V); R(x - 1, ey + 1, 1, 1, darken(V, 0.3)); R(x + 2, ey + 1, 1, 1, darken(V, 0.3)); return; }
+      if (kind === 'wide') { R(x - 1, ey, 4, 1, V); R(x - 1, ey + 1, 4, 1, V); R(x, ey - 1, 2, 1, V); R(x, ey + 2, 2, 1, V); R(x, ey, 1, 1, '#ffffff'); return; }
+      if (kind === 'cross') { R(x, ey, 1, 1, V); R(x + 1, ey + 1, 1, 1, V); R(x + 1, ey, 1, 1, darken(V, 0.4)); R(x, ey + 1, 1, 1, darken(V, 0.4)); return; }
       if (kind === 'heart') { R(x, ey, 1, 1, V); R(x + 2, ey, 1, 1, V); R(x, ey + 1, 3, 1, V); R(x + 1, ey + 2, 1, 1, V); return; }
-      R(x, ey, 3, 2, V); R(x, ey, 1, 1, '#ffffff');
+      R(x, ey, 2, 2, V); R(x, ey, 1, 1, '#ffffff'); R(x + 1, ey + 1, 1, 1, darken(V, 0.25));
     };
-    if (blink) { eye(eyeL, 'shut'); eye(eyeR, 'shut'); }
-    else if (B.face === 'wink') { eye(eyeL, 'wide'); eye(eyeR, 'shut'); }
-    else if (B.face === 'stern') { eye(eyeL, 'cross'); eye(eyeR, 'cross'); }
-    else if (B.face === 'love') { eye(eyeL, 'heart'); eye(eyeR, 'heart'); }
-    else if (B.face === 'grin') { eye(eyeL, 'wide'); eye(eyeR, 'wide'); }
-    else { eye(eyeL, ''); eye(eyeR, ''); }
-    /* a sweep of reflection across the glass */
-    R(4, hy + 2, 2, 1, 'rgba(255,255,255,.30)');
-    R(6, hy + 2, 1, 1, 'rgba(255,255,255,.16)');
-    /* mouth speaker grille and cheeks */
-    if (B.face !== 'stern') { R(7, hy + 6, 4, 1, deep); R(8, hy + 7, 2, 1, deep); }
-    else { R(7, hy + 6, 4, 1, deep); }
-    R(3, hy + 5, 1, 1, '#ff9fb0'); R(14, hy + 5, 1, 1, '#ff9fb0');
+    const blink = frame && (role === 'keeper' || role === 'feeder');
+    if (blink) { dot(eyeL, 'shut'); dot(eyeR, 'shut'); }
+    else if (B.face === 'wink') { dot(eyeL, 'wide'); dot(eyeR, 'shut'); }
+    else if (B.face === 'stern') { dot(eyeL, 'cross'); dot(eyeR, 'cross'); }
+    else if (B.face === 'love') { dot(eyeL, 'heart'); dot(eyeR, 'heart'); }
+    else if (B.face === 'grin') { dot(eyeL, 'wide'); dot(eyeR, 'wide'); }
+    else { dot(eyeL, ''); dot(eyeR, ''); }
+    R(5, hy + 3, 2, 1, 'rgba(255,255,255,.34)');
+    R(7, hy + 3, 1, 1, 'rgba(255,255,255,.16)');
+    /* a speaker grille under the glass, and a light in each cheek */
+    if (B.face === 'stern') R(7, hy + 7, 4, 1, deep);
+    else { R(7, hy + 7, 4, 1, deep); R(8, hy + 8, 2, 1, deep); }
+    R(3, hy + 6, 1, 1, '#ff9fb0'); R(14, hy + 6, 1, 1, '#ff9fb0');
 
     /* ---- hats ---- */
     if (B.hat === 'cap') {
-      R(4, hy - 2, 10, 1, OUT); R(4, hy - 1, 10, 1, T);
-      R(5, hy - 3, 8, 1, OUT); R(5, hy - 2, 8, 1, lighten(T, 0.3));
-      R(14, hy - 1, 4, 1, darken(T, 0.2)); R(14, hy, 3, 1, OUT);
+      R(4, hy - 1, 10, 1, OUT); R(4, hy, 10, 1, T);
+      R(5, hy - 2, 8, 1, OUT); R(5, hy - 1, 8, 1, lighten(T, 0.3));
+      R(14, hy, 4, 1, darken(T, 0.2)); R(14, hy + 1, 3, 1, OUT);
+      R(6, hy - 1, 3, 1, lighten(T, 0.55));
     } else if (B.hat === 'straw') {
-      R(6, hy - 3, 6, 1, '#f2dcb0'); R(5, hy - 2, 8, 1, '#e0bd82');
-      R(1, hy - 1, 16, 1, '#e0bd82'); R(2, hy, 14, 1, '#c9a35f');
-      R(6, hy - 2, 3, 1, '#fff3d6');
+      R(6, hy - 2, 6, 1, '#f2dcb0'); R(5, hy - 1, 8, 1, '#e0bd82');
+      R(1, hy, 16, 1, '#e0bd82'); R(2, hy + 1, 14, 1, '#c9a35f');
+      R(6, hy - 1, 3, 1, '#fff3d6');
+      R(1, hy, 3, 1, '#c9a35f'); R(14, hy, 3, 1, '#c9a35f');
     } else if (B.hat === 'bow') {
-      R(3, hy - 3, 3, 3, T); R(12, hy - 3, 3, 3, T);
-      R(3, hy - 3, 3, 1, lighten(T, 0.35)); R(12, hy - 3, 3, 1, lighten(T, 0.35));
-      R(6, hy - 2, 6, 2, darken(T, 0.22)); R(8, hy - 3, 2, 1, darken(T, 0.3));
+      R(3, hy - 2, 3, 3, T); R(12, hy - 2, 3, 3, T);
+      R(3, hy - 2, 3, 1, lighten(T, 0.35)); R(12, hy - 2, 3, 1, lighten(T, 0.35));
+      R(6, hy - 1, 6, 2, darken(T, 0.22)); R(8, hy - 2, 2, 1, darken(T, 0.3));
+      R(8, hy, 2, 1, lighten(T, 0.2));
     } else if (B.hat === 'bolt') {
-      R(8, hy - 3, 2, 3, '#8a9099'); R(8, hy - 3, 1, 3, '#c9ced6');
-      R(6, hy - 5, 6, 2, frame ? '#ffd23f' : '#5fe8ff');
-      R(7, hy - 6, 4, 1, frame ? '#fff3b0' : '#c2f6ff');
-      R(5, hy - 5, 1, 1, frame ? '#ffd23f' : '#5fe8ff');
-      R(12, hy - 5, 1, 1, frame ? '#ffd23f' : '#5fe8ff');
+      R(8, hy - 2, 2, 3, '#8a9099'); R(8, hy - 2, 1, 3, '#c9ced6');
+      R(6, hy - 4, 6, 2, frame ? '#ffd23f' : '#5fe8ff');
+      R(7, hy - 5, 4, 1, frame ? '#fff3b0' : '#c2f6ff');
+      R(5, hy - 4, 1, 1, frame ? '#ffd23f' : '#5fe8ff');
+      R(12, hy - 4, 1, 1, frame ? '#ffd23f' : '#5fe8ff');
     } else {
-      R(8, hy - 4, 2, 4, '#8a9099'); R(8, hy - 4, 1, 4, '#c9ced6');
-      R(7, hy - 6, 4, 2, OUT);
-      R(8, hy - 5, 2, 1, frame ? T : V);
+      /* no hat: an aerial with a bulb that blinks */
+      R(8, hy - 3, 2, 4, '#8a9099'); R(8, hy - 3, 1, 4, '#c9ced6');
+      R(7, hy - 5, 4, 2, OUT);
+      R(8, hy - 5, 2, 1, frame ? T : lighten(T, 0.6));
+      R(8, hy - 4, 2, 1, frame ? darken(T, 0.2) : T);
     }
     cache.set(key, c);
     return c;
@@ -3199,10 +3245,10 @@ const SPR = (() => {
     '.......oddgGGGGGGGgddo......',
     '.......odkkkkkkkkkkkdo......',
     '.......okkkkkkkkkkkkko......',
+    '.......okkwwkkkkkwwkko......',
     '.......okwwwwkkkwwwwko......',
-    '.......okwwewkkkwwewko......',
     '.......okweewkkkweewko......',
-    '.......okwwwwkkkwwwwko......',
+    '.......okkwwkkkkkwwkko......',
     '.......odkkkkkkkkkkkdo......',
     '.......oogkkWWWWWkkgoo......',
     '.........ogcWWWWWcgo........',
@@ -3278,14 +3324,25 @@ const SPR = (() => {
     /* ---- the animal underneath ---- */
     drawGrid(ctx, RACCOON_ROWS, RACCOON_PAL, ox * k, RAC_OFF * k, k);
     /* ---- the face on top: one of eleven expressions, drawn over the
-       eyes (two 4x4 boxes at rows 9-12) and the mouth (rows 16-17).
-       Each pose has a default - he grins while he dances, scowls while
-       he punches - and a caller can ask for any of them by name. ---- */
+       eyes (two 4x4 boxes at rows 9-12, each holding a round bead with
+       a low pupil) and the mouth (rows 16-17). Each pose has a default -
+       he grins while he dances, scowls while he punches - and a caller
+       can ask for any of them by name. ---- */
     const EX = expr || DEFAULT_EXPR[pose] || 'happy';
     if (EX !== 'happy') {
       const K_ = P.k, W_ = P.W, N_ = P.n, WH_ = '#ffffff', LID = '#5b5170';
       const eyes = (l, r) => { l(9); r === undefined ? l(16) : r(16); };
       const box = x => R(x, 9, 4, 4, K_);
+      /* the eye itself: a round white bead, corners clipped back to the
+         mask, with its pupil low in it. dx/dy walk the pupil about, and
+         a bead with no pupil at all is what surprise looks like. */
+      const bead = (x, dx, dy, bare) => {
+        box(x);
+        R(x + 1, 9, 2, 1, WH_);
+        R(x, 10, 4, 2, WH_);
+        R(x + 1, 12, 2, 1, WH_);
+        if (!bare) R(x + 1 + (dx || 0), 11 + (dy || 0), 2, 1, P.e);
+      };
       const mouth = kind => {
         /* the base mouth is a smile with the corners turned up; every
            other shape is painted over the same two rows */
@@ -3305,28 +3362,28 @@ const SPR = (() => {
           eyes(x => { box(x); R(x, 11, 1, 1, WH_); R(x + 1, 10, 2, 1, WH_); R(x + 3, 11, 1, 1, WH_); });
           mouth('grin');
           break;
-        case 'wow':                         /* startled: tiny pupils, brows up */
-          eyes(x => { R(x, 9, 4, 4, WH_); R(x + 1, 10, 1, 1, P.e); R(x + 2, 11, 1, 1, P.e); });
+        case 'wow':                         /* startled: the bead swells, pupil shrunk to a speck */
+          eyes(x => { bead(x, 0, 0, true); R(x, 11, 4, 1, WH_); R(x + 1, 10, 1, 1, P.e); });
           R(9, 8, 4, 1, P.G); R(16, 8, 4, 1, P.G);
           mouth('o');
           break;
-        case 'angry':                        /* brows down over small eyes */
-          eyes(x => { box(x); R(x, 10, 4, 3, WH_); R(x + 1, 11, 2, 2, P.e); });
-          R(9, 9, 2, 1, P.o); R(11, 10, 2, 1, P.o);
-          R(17, 10, 2, 1, P.o); R(19, 9, 2, 1, P.o);
+        case 'angry':                        /* brows slanted in, pupils shoved together */
+          bead(9, 1); bead(16, -1);
+          R(9, 7, 2, 1, P.o); R(11, 8, 2, 1, P.o); R(12, 9, 1, 1, P.o);
+          R(19, 7, 2, 1, P.o); R(17, 8, 2, 1, P.o); R(16, 9, 1, 1, P.o);
           mouth('teeth');
           break;
-        case 'determined':                   /* brows level and low */
-          eyes(x => { box(x); R(x, 10, 4, 3, WH_); R(x + 1, 11, 2, 2, P.e); });
-          R(9, 9, 4, 1, P.o); R(16, 9, 4, 1, P.o);
+        case 'determined':                   /* brows level and heavy, pupils up under them */
+          bead(9, 0, -1); bead(16, 0, -1);
+          R(9, 8, 4, 1, P.o); R(16, 8, 4, 1, P.o);
           mouth('flat');
           break;
-        case 'smug':                         /* one eye half shut */
-          R(16, 9, 4, 2, K_); R(16, 10, 4, 1, LID);
+        case 'smug':                         /* one bead half shut behind its lid */
+          box(16); R(16, 11, 4, 1, WH_); R(17, 11, 2, 1, P.e); R(16, 10, 4, 1, LID);
           mouth('smirk');
           break;
-        case 'sad':                          /* pupils low, brows up inside */
-          eyes(x => { box(x); R(x, 10, 4, 3, WH_); R(x + 1, 11, 2, 2, P.e); });
+        case 'sad':                          /* pupils fallen to the bottom of the bead */
+          bead(9, 0, 1); bead(16, 0, 1);
           R(11, 8, 2, 1, P.d); R(16, 8, 2, 1, P.d);
           mouth('frown');
           break;

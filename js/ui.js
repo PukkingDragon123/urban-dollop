@@ -629,6 +629,24 @@
                   Math.max(x0, x1) + pad, Math.max(y0, y1) + pad + TERR_LIFT + 6);
   }
 
+  /* A shadow on the ground under something square. Everything on the
+     farm used to drop a flat strip of one alpha, which reads as a plank
+     lying behind it; this gives the strip a softer fringe, cuts its
+     corners and nudges the fringe a pixel right, because the light in
+     this valley comes from over your left shoulder. */
+  function groundShade(x, y, w, h, a) {
+    const A = a === undefined ? 0.26 : a;
+    x = Math.round(x); y = Math.round(y); w = Math.round(w); h = Math.round(h);
+    if (w < 4) { ctx.fillStyle = 'rgba(40,58,26,' + A + ')'; ctx.fillRect(x, y, w, h); return; }
+    ctx.fillStyle = 'rgba(40,58,26,' + A + ')';
+    ctx.fillRect(x + 1, y, w - 2, h);
+    ctx.fillStyle = 'rgba(40,58,26,' + (A * 0.6).toFixed(3) + ')';
+    ctx.fillRect(x, y + (h > 2 ? 1 : 0), 1, Math.max(1, h - (h > 2 ? 2 : 0)));
+    ctx.fillRect(x + w - 1, y + (h > 2 ? 1 : 0), 1, Math.max(1, h - (h > 2 ? 2 : 0)));
+    ctx.fillStyle = 'rgba(40,58,26,' + (A * 0.42).toFixed(3) + ')';
+    ctx.fillRect(x + 3, y + h, w - 3, 1);
+  }
+
   function shadow(g, cx, cy, r) {
     g.fillStyle = 'rgba(40,58,26,.20)';
     for (let y = -Math.round(r * 0.4); y <= r * 0.4; y++) {
@@ -982,6 +1000,90 @@
         ph: Math.random() * 6, wob: rnd(10, 22) });
     }
   }
+  /* ============================================================
+     FOOTPRINTS
+     Marks left on the ground rather than thrown into the air, so
+     they live in their own list and are drawn early - the founder
+     walks over his own tracks, not under them. They fade out over
+     several seconds and the list is capped, so a long walk round
+     the farm never piles up.
+     ============================================================ */
+  let decals = [];
+  const DCAP = 150;
+  function prints(x, y, kind, dir) {
+    if (!pOn()) return;
+    if (GAME.paintAt(x, y) === 'water') return;
+    decals.push({ x, y, kind: kind || 'paw', dir: dir || 1, t: 0, life: kind === 'claw' ? 4.5 : 7 });
+    if (decals.length > DCAP) decals.shift();
+  }
+  function drawDecals(dt) {
+    if (!decals.length) return;
+    decals = decals.filter(d => (d.t += dt) < d.life);
+    const cx = cam().x, cy = cam().y;
+    for (const d of decals) {
+      if (d.x + 4 < cx || d.x - 4 > cx + W.view.w || d.y + 4 < cy || d.y - 4 > cy + W.view.h) continue;
+      const f = d.t / d.life;
+      const a = Math.max(0, 1 - f * f);
+      const X = Math.round(d.x), Y = Math.round(d.y);
+      /* two tones: a pressed dark core with a pale lip along its top,
+         so the mark reads as a dent in the ground rather than a smudge
+         the same colour as the soil it is standing on */
+      const mark = (px, py, w, h) => {
+        ctx.globalAlpha = a * 0.16;
+        ctx.fillStyle = '#fff3d6';
+        ctx.fillRect(px, py - 1, w, 1);
+        ctx.globalAlpha = a * 0.52;
+        ctx.fillStyle = '#3a2a14';
+        ctx.fillRect(px, py, w, h);
+      };
+      if (d.kind === 'claw') {
+        /* a hen: three toes splayed forward, one spur behind */
+        mark(X, Y, 1, 1);
+        mark(X + d.dir, Y - 1, 1, 1);
+        mark(X + d.dir, Y + 1, 1, 1);
+        mark(X + d.dir * 2, Y, 1, 1);
+        mark(X - d.dir, Y, 1, 1);
+      } else {
+        /* the founder: a pad with three toes over it */
+        mark(X, Y, 3, 2);
+        mark(X, Y - 2, 1, 1);
+        mark(X + 2, Y - 2, 1, 1);
+        mark(X + 1, Y - 3, 1, 1);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /* --- straw: stalks that tumble end over end and settle slowly.
+     Thrown by anything that disturbs bedding: sweeping the nest, a
+     hen landing, the mill, a bale being loaded. --- */
+  function straw(x, y, n, col) {
+    if (!pOn()) return;
+    for (let i = 0; i < n; i++) {
+      P({ type: 'straw', x: x + rnd(-5, 5), y: y + rnd(-3, 3), vx: rnd(-22, 22), vy: rnd(-52, -16),
+        g: 54, drag: 1.1, t: 0, life: rnd(0.9, 1.7), col: col || pick(['#e8c458', '#f2dcb0', '#c9a03c', '#d9b96a']),
+        spin: rnd(-7, 7), len: 2 + ((Math.random() * 2) | 0) });
+    }
+  }
+  /* --- grain: rice, seed, feed. Hard little specks that arc out and
+     bounce once off the ground they were spilled on. --- */
+  function grain(x, y, n, col) {
+    if (!pOn()) return;
+    for (let i = 0; i < n; i++) {
+      P({ type: 'grain', x, y: y - 2, vx: rnd(-1, 1) * 62, vy: rnd(-72, -30),
+        g: 300, t: 0, life: rnd(0.6, 1.1), col: col || pick(['#fff3d6', '#f2dcb0', '#e8c458']),
+        floor: y + rnd(0, 3), bounce: 0 });
+    }
+  }
+  /* --- dirt: clods with a dark underside, off a hoe or a spade --- */
+  function dirt(x, y, n, col) {
+    if (!pOn()) return;
+    for (let i = 0; i < n; i++) {
+      P({ type: 'clod', x: x + rnd(-3, 3), y, vx: rnd(-1, 1) * 54, vy: rnd(-84, -34),
+        g: 300, t: 0, life: rnd(0.5, 0.95), col: col || pick(['#8a5e2a', '#a07444', '#6b4a2a']),
+        floor: y + rnd(0, 3), bounce: 0, s: 1 + ((Math.random() * 2) | 0) });
+    }
+  }
   /* --- a ring of twinkles: something good just happened --- */
   function twinkles(x, y, n, col, r) {
     if (!pOn()) return;
@@ -1114,6 +1216,14 @@
       if (p.drag) { const d = Math.max(0, 1 - p.drag * dt); p.vx *= d; p.vy *= d; }
       const ox = p.x, oy = p.y;
       p.x += p.vx * dt; p.y += p.vy * dt;
+      /* anything with a floor lands on it, loses most of its bounce and
+         skids to a stop, which is what makes spilled grain read as solid */
+      if (p.floor !== undefined && p.y > p.floor && p.vy > 0) {
+        p.y = p.floor;
+        p.bounce = (p.bounce || 0) + 1;
+        p.vy = p.bounce > 1 ? 0 : -p.vy * 0.34;
+        p.vx *= 0.45;
+      }
       const f = p.t / p.life;
       ctx.globalAlpha = Math.max(0, 1 - f * f);
       const X = Math.round(p.x), Y = Math.round(p.y);
@@ -1161,6 +1271,27 @@
           ctx.fillStyle = p.col;
           ctx.fillRect(X - s, Y, s * 2 + 1, 1);
           ctx.fillRect(X, Y - s, 1, s * 2 + 1);
+          break;
+        }
+        case 'straw': {
+          /* a stalk, tumbling: two or three pixels laid along its angle */
+          const a = p.t * p.spin;
+          const dx = Math.round(Math.cos(a)), dy = Math.round(Math.sin(a));
+          ctx.fillStyle = p.col;
+          for (let i = 0; i < p.len; i++) ctx.fillRect(X + dx * i, Y + dy * i, 1, 1);
+          break;
+        }
+        case 'grain': {
+          ctx.fillStyle = p.col;
+          ctx.fillRect(X, Y, 1, 1);
+          if (p.bounce) { ctx.globalAlpha *= 0.7; ctx.fillRect(X, Y + 1, 1, 1); }
+          break;
+        }
+        case 'clod': {
+          ctx.fillStyle = '#4a3418';
+          ctx.fillRect(X, Y, p.s + 1, p.s + 1);
+          ctx.fillStyle = p.col;
+          ctx.fillRect(X, Y, p.s, p.s);
           break;
         }
         case 'shard': {
@@ -1439,7 +1570,7 @@
     const x = c * 16, y = r * 16;
     const horiz = dir === 0 || dir === 2;
     /* shadow on the grass */
-    ctx.fillStyle = 'rgba(40,58,26,.22)'; ctx.fillRect(x + 1, y + 14, 15, 2);
+    groundShade(x + 1, y + 14, 15, 2, 0.22);
     /* chassis */
     ctx.fillStyle = '#6a7280'; ctx.fillRect(x, y, 16, 16);
     ctx.fillStyle = '#8e97a6'; ctx.fillRect(x, y, 16, 2);
@@ -1476,7 +1607,7 @@
     const x = c * 16, y = r * 16;
     const [dx, dy] = [[1, 0], [0, 1], [-1, 0], [0, -1]][v.dir];
     const sucking = S().eggs.some(e => e.suck === (c + ',' + r));
-    ctx.fillStyle = 'rgba(40,58,26,.25)'; ctx.fillRect(x + 2, y + 14, 12, 2);
+    groundShade(x + 2, y + 14, 12, 2, 0.25);
     /* treads */
     ctx.fillStyle = '#23262b'; ctx.fillRect(x + 1, y + 10, 14, 5);
     ctx.fillStyle = '#3a3f47';
@@ -1514,7 +1645,7 @@
   function drawIncubator(c, r, inc, now) {
     const x = c * 16, y = r * 16;
     const warm = inc.queue.length > 0;
-    ctx.fillStyle = 'rgba(40,58,26,.25)'; ctx.fillRect(x + 2, y + 29, 28, 3);
+    groundShade(x + 2, y + 29, 28, 3, 0.25);
     /* legs */
     ctx.fillStyle = '#4a3220'; ctx.fillRect(x + 3, y + 27, 4, 4); ctx.fillRect(x + 25, y + 27, 4, 4);
     /* main body: wood cabinet with panel lines */
@@ -1592,7 +1723,7 @@
   function drawHatchery(c, r, h, now) {
     const x = c * 16, y = r * 16;
     const busy = h.queue.length > 0;
-    ctx.fillStyle = 'rgba(40,58,26,.28)'; ctx.fillRect(x + 3, y + 44, 42, 4);
+    groundShade(x + 3, y + 44, 42, 4, 0.28);
     /* legs */
     ctx.fillStyle = '#4a3220'; ctx.fillRect(x + 4, y + 42, 5, 5); ctx.fillRect(x + 39, y + 42, 5, 5);
     /* cabinet */
@@ -1663,7 +1794,7 @@
   /* a Y junction that flips a paddle side to side */
   function drawSplitter(c, r, sp, now) {
     const x = c * 16, y = r * 16;
-    ctx.fillStyle = 'rgba(40,58,26,.22)'; ctx.fillRect(x + 1, y + 14, 15, 2);
+    groundShade(x + 1, y + 14, 15, 2, 0.22);
     ctx.fillStyle = '#3d434e'; ctx.fillRect(x, y, 16, 16);
     ctx.fillStyle = '#7e8794'; ctx.fillRect(x + 1, y + 1, 14, 14);
     ctx.fillStyle = '#a6aeba'; ctx.fillRect(x + 1, y + 1, 14, 3);
@@ -1688,7 +1819,7 @@
   /* ---- the polisher: a 1x1 buffing wheel that sits in a belt line ---- */
   function drawPolisher(c, r, po, now) {
     const x = c * 16, y = r * 16;
-    ctx.fillStyle = 'rgba(40,58,26,.24)'; ctx.fillRect(x + 3, y + 14, 10, 2);
+    groundShade(x + 3, y + 14, 10, 2, 0.24);
     ctx.fillStyle = '#2e3238'; ctx.fillRect(x + 1, y + 3, 14, 11);
     ctx.fillStyle = '#7f8894'; ctx.fillRect(x + 2, y + 4, 12, 9);
     ctx.fillStyle = '#a9b2bd'; ctx.fillRect(x + 2, y + 4, 12, 2);
@@ -1709,7 +1840,7 @@
   /* ---- the grader: a 2x1 line that lifts the odd egg a whole tier ---- */
   function drawGrader(c, r, g, now) {
     const x = c * 16, y = r * 16;
-    ctx.fillStyle = 'rgba(40,58,26,.24)'; ctx.fillRect(x + 3, y + 14, 26, 3);
+    groundShade(x + 3, y + 14, 26, 3, 0.24);
     ctx.fillStyle = '#2a2f36'; ctx.fillRect(x + 1, y + 2, 30, 12);
     ctx.fillStyle = '#8d949e'; ctx.fillRect(x + 2, y + 3, 28, 10);
     ctx.fillStyle = '#c2c9d2'; ctx.fillRect(x + 2, y + 3, 28, 2);
@@ -1730,7 +1861,7 @@
   /* ---- the dynamo: a 2x2 flywheel that drives everything nearby ---- */
   function drawDynamo(c, r, dy, now) {
     const x = c * 16, y = r * 16;
-    ctx.fillStyle = 'rgba(40,58,26,.26)'; ctx.fillRect(x + 3, y + 28, 26, 3);
+    groundShade(x + 3, y + 28, 26, 3, 0.26);
     /* housing */
     ctx.fillStyle = '#26292f'; ctx.fillRect(x + 2, y + 6, 28, 24);
     ctx.fillStyle = '#6f7885'; ctx.fillRect(x + 3, y + 7, 26, 22);
@@ -1765,7 +1896,7 @@
 
   function drawLoader(c, r, ld, now) {
     const x = c * 16, y = r * 16;
-    ctx.fillStyle = 'rgba(40,58,26,.24)'; ctx.fillRect(x + 2, y + 14, 28, 3);
+    groundShade(x + 2, y + 14, 28, 3, 0.24);
     /* legs */
     ctx.fillStyle = '#3d434e'; ctx.fillRect(x + 3, y + 11, 3, 5); ctx.fillRect(x + 26, y + 11, 3, 5);
     /* hopper body */
@@ -1793,7 +1924,7 @@
   /* a red feed barn with a hayloft door */
   function drawBarn(c, r, barn, now) {
     const x = c * 16, y = r * 16;
-    ctx.fillStyle = 'rgba(40,58,26,.25)'; ctx.fillRect(x + 2, y + 29, 28, 3);
+    groundShade(x + 2, y + 29, 28, 3, 0.25);
     ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 1, y + 10, 30, 20);
     ctx.fillStyle = '#c94a3a'; ctx.fillRect(x + 2, y + 11, 28, 18);
     ctx.fillStyle = '#e06a58'; ctx.fillRect(x + 2, y + 11, 28, 2);
@@ -1824,7 +1955,7 @@
   /* a wooden trough with pellets in it */
   function drawTrough(c, r, t, now) {
     const x = c * 16, y = r * 16;
-    ctx.fillStyle = 'rgba(40,58,26,.22)'; ctx.fillRect(x + 1, y + 14, 14, 2);
+    groundShade(x + 1, y + 14, 14, 2, 0.22);
     ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 1, y + 6, 14, 8);
     ctx.fillStyle = '#a8783f'; ctx.fillRect(x + 2, y + 7, 12, 6);
     ctx.fillStyle = '#c9a35f'; ctx.fillRect(x + 2, y + 7, 12, 1);
@@ -1841,7 +1972,7 @@
   /* a stone well with a bucket on a beam */
   function drawWell(c, r, w, now) {
     const x = c * 16, y = r * 16;
-    ctx.fillStyle = 'rgba(40,58,26,.25)'; ctx.fillRect(x + 1, y + 14, 14, 2);
+    groundShade(x + 1, y + 14, 14, 2, 0.25);
     ctx.fillStyle = '#3a3a4a'; ctx.fillRect(x + 1, y + 6, 14, 9);
     ctx.fillStyle = '#8a9099'; ctx.fillRect(x + 2, y + 7, 12, 7);
     ctx.fillStyle = '#b8c0cc'; ctx.fillRect(x + 2, y + 7, 12, 1);
@@ -1862,7 +1993,7 @@
   /* a sprinkler head on a pipe, spraying */
   function drawSprinkler(c, r, sp, now) {
     const x = c * 16, y = r * 16;
-    ctx.fillStyle = 'rgba(40,58,26,.2)'; ctx.fillRect(x + 4, y + 14, 8, 2);
+    groundShade(x + 4, y + 14, 8, 2, 0.2);
     ctx.fillStyle = '#3a3a4a'; ctx.fillRect(x + 7, y + 6, 2, 9);
     ctx.fillStyle = '#8a9099'; ctx.fillRect(x + 7, y + 6, 1, 9);
     ctx.fillStyle = '#23262b'; ctx.fillRect(x + 5, y + 4, 6, 3);
@@ -1879,7 +2010,7 @@
   /* a windmill: stone base, turning sails */
   function drawMill(c, r, m, now) {
     const x = c * 16, y = r * 16;
-    ctx.fillStyle = 'rgba(40,58,26,.25)'; ctx.fillRect(x + 4, y + 29, 24, 3);
+    groundShade(x + 4, y + 29, 24, 3, 0.25);
     ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 6, y + 8, 20, 22);
     ctx.fillStyle = '#e8e2d0'; ctx.fillRect(x + 7, y + 9, 18, 20);
     ctx.fillStyle = '#fff8ec'; ctx.fillRect(x + 7, y + 9, 18, 1);
@@ -1908,7 +2039,7 @@
   /* a coop: little house on stilts with a ramp */
   function drawCoop(c, r, cp, now) {
     const x = c * 16, y = r * 16;
-    ctx.fillStyle = 'rgba(40,58,26,.25)'; ctx.fillRect(x + 3, y + 29, 26, 3);
+    groundShade(x + 3, y + 29, 26, 3, 0.25);
     ctx.fillStyle = '#4a3220'; ctx.fillRect(x + 5, y + 22, 3, 7); ctx.fillRect(x + 24, y + 22, 3, 7);
     ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 2, y + 10, 28, 13);
     ctx.fillStyle = '#e0bd82'; ctx.fillRect(x + 3, y + 11, 26, 11);
@@ -1930,7 +2061,7 @@
   /* a beehive on legs, bees drifting round it */
   function drawBeehive(c, r, b, now) {
     const x = c * 16, y = r * 16;
-    ctx.fillStyle = 'rgba(40,58,26,.25)'; ctx.fillRect(x + 2, y + 14, 12, 2);
+    groundShade(x + 2, y + 14, 12, 2, 0.25);
     ctx.fillStyle = '#5e3d18'; ctx.fillRect(x + 3, y + 11, 2, 4); ctx.fillRect(x + 11, y + 11, 2, 4);
     ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 1, y + 3, 14, 9);
     ctx.fillStyle = '#f2e2c8'; ctx.fillRect(x + 2, y + 4, 12, 7);
@@ -1957,8 +2088,7 @@
   function drawBillboard(c, r, bb, now) {
     const x = c * 16, y = r * 16;
     const spr = SPR.billboardSprite(billArt(bb), 1, true);
-    ctx.fillStyle = 'rgba(40,58,26,.26)';
-    ctx.fillRect(x + 2, y + 30, 28, 3);
+    groundShade(x + 2, y + 30, 28, 3, 0.26);
     ctx.drawImage(spr, x - 1, y + 32 - spr.height);
     /* the lamps throw a little light back onto the poster */
     if (Math.floor(now / 900) % 7 === 0) {
@@ -1970,7 +2100,7 @@
   /* the Gene Lab: white tiles, a glass dome, a helix on the door */
   function drawGeneLab(c, r, gl, now) {
     const x = c * 16, y = r * 16;
-    ctx.fillStyle = 'rgba(40,58,26,.26)'; ctx.fillRect(x + 2, y + 30, 28, 3);
+    groundShade(x + 2, y + 30, 28, 3, 0.26);
     ctx.fillStyle = '#2e2a3a'; ctx.fillRect(x + 1, y + 8, 30, 23);
     ctx.fillStyle = '#e8ecf0'; ctx.fillRect(x + 2, y + 9, 28, 21);
     ctx.fillStyle = '#c9d0d8'; for (let i = 0; i < 5; i++) ctx.fillRect(x + 2, y + 9 + i * 4, 28, 1);
@@ -1993,7 +2123,7 @@
      something is on, and the dish of the day chalked on the board */
   function drawKitchen(c, r, kt, now) {
     const x = c * 16, y = r * 16;
-    ctx.fillStyle = 'rgba(40,58,26,.26)'; ctx.fillRect(x + 2, y + 30, 28, 3);
+    groundShade(x + 2, y + 30, 28, 3, 0.26);
     ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 1, y + 9, 30, 22);
     ctx.fillStyle = '#f2ece0'; ctx.fillRect(x + 2, y + 10, 28, 20);
     ctx.fillStyle = '#d8d0c0'; for (let i = 0; i < 5; i++) ctx.fillRect(x + 2, y + 13 + i * 4, 28, 1); for (let i = 0; i < 7; i++) ctx.fillRect(x + 2 + i * 4, y + 10, 1, 20);
@@ -2072,7 +2202,7 @@
   function drawTimeMachine(c, r, tm, now) {
     const x = c * 16, y = r * 16;
     const on = !!tm.on, spin = on ? Math.floor(now / 200) % 2 : 0;
-    ctx.fillStyle = 'rgba(40,58,26,.26)'; ctx.fillRect(x + 3, y + 30, 26, 3);
+    groundShade(x + 3, y + 30, 26, 3, 0.26);
     ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 3, y + 12, 26, 19);
     ctx.fillStyle = '#c98f3f'; ctx.fillRect(x + 4, y + 13, 24, 17);
     ctx.fillStyle = '#e0bd82'; ctx.fillRect(x + 4, y + 13, 24, 2); ctx.fillRect(x + 4, y + 13, 3, 17);
@@ -2102,7 +2232,7 @@
   /* a bone half out of the dirt */
   function drawFossil(f, now) {
     const spr = SPR.fossilSprite(f.seed, 1);
-    ctx.fillStyle = 'rgba(40,58,26,.26)'; ctx.fillRect(Math.round(f.x - 4), Math.round(f.y + 1), 9, 2);
+    groundShade(Math.round(f.x - 4), Math.round(f.y + 1), 9, 2, 0.26);
     ctx.drawImage(spr, Math.round(f.x - 4), Math.round(f.y - 6 + f.z));
     if (Math.floor(now / 400 + f.id) % 3 === 0) { ctx.fillStyle = '#fff8ec'; ctx.fillRect(Math.round(f.x + 4), Math.round(f.y - 8 + f.z), 1, 1); }
   }
@@ -2121,7 +2251,7 @@
     }
     const moving = v.state !== 'stay';
     const spr = SPR.personSprite(look, moving ? v.frame : 0, 1);
-    ctx.fillStyle = 'rgba(40,58,26,.26)'; ctx.fillRect(Math.round(v.x + 1), Math.round(v.y + spr.height - 2), 10, 2);
+    groundShade(Math.round(v.x + 1), Math.round(v.y + spr.height - 2), 10, 2, 0.26);
     ctx.save();
     if (v.dir === 1) { ctx.translate(Math.round(v.x) + spr.width, Math.round(v.y)); ctx.scale(-1, 1); ctx.drawImage(spr, 0, 0); }
     else ctx.drawImage(spr, Math.round(v.x), Math.round(v.y));
@@ -2197,7 +2327,7 @@
   /* traffic, the customers in the lay-by and the movers' van */
   function drawCar(kind, col, x, y, dir, frame) {
     const spr = SPR.carSprite(kind, col, frame, 1);
-    ctx.fillStyle = 'rgba(40,58,26,.28)'; ctx.fillRect(Math.round(x) + 2, Math.round(y) + spr.height - 2, spr.width - 4, 2);
+    groundShade(Math.round(x) + 2, Math.round(y) + spr.height - 2, spr.width - 4, 2, 0.28);
     ctx.save();
     if (dir === -1) { ctx.translate(Math.round(x) + spr.width, Math.round(y)); ctx.scale(-1, 1); ctx.drawImage(spr, 0, 0); }
     else ctx.drawImage(spr, Math.round(x), Math.round(y));
@@ -2264,7 +2394,7 @@
     m.crew.forEach(w => {
       if (w.state === 'van') return;
       const spr = SPR.personSprite(w.look, w.state === 'walk' ? w.frame : 0, 1);
-      ctx.fillStyle = 'rgba(40,58,26,.26)'; ctx.fillRect(Math.round(w.x + 1), Math.round(w.y + spr.height - 2), 10, 2);
+      groundShade(Math.round(w.x + 1), Math.round(w.y + spr.height - 2), 10, 2, 0.26);
       ctx.save();
       if (w.dir === 1) { ctx.translate(Math.round(w.x) + spr.width, Math.round(w.y)); ctx.scale(-1, 1); ctx.drawImage(spr, 0, 0); }
       else ctx.drawImage(spr, Math.round(w.x), Math.round(w.y));
@@ -2284,7 +2414,7 @@
   function drawBrand(now) {
     const st = W.stations.brand, co = S().company;
     const x = st.x, y = st.y;
-    ctx.fillStyle = 'rgba(40,58,26,.25)'; ctx.fillRect(x + 6, y + st.h - 2, st.w - 12, 2);
+    groundShade(x + 6, y + st.h - 2, st.w - 12, 2, 0.25);
     ctx.fillStyle = '#5e3d18'; ctx.fillRect(x + 6, y + 14, 3, st.h - 15); ctx.fillRect(x + st.w - 9, y + 14, 3, st.h - 15);
     ctx.fillStyle = '#2e2216'; ctx.fillRect(x, y, st.w, 16);
     ctx.fillStyle = co.col1; ctx.fillRect(x + 1, y + 1, st.w - 2, 14);
@@ -2299,7 +2429,7 @@
   /* the Logistics HQ: a dispatch office with a loading bay and a wall clock */
   function drawHQ(c, r, hq, now) {
     const x = c * 16, y = r * 16;
-    ctx.fillStyle = 'rgba(40,58,26,.26)'; ctx.fillRect(x + 3, y + 29, 42, 4);
+    groundShade(x + 3, y + 29, 42, 4, 0.26);
     /* body */
     ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 1, y + 8, 46, 24);
     ctx.fillStyle = '#e8e2d0'; ctx.fillRect(x + 2, y + 9, 44, 22);
@@ -2342,7 +2472,7 @@
   /* the noticeboard where flyers get pinned */
   function drawBoard(c, r, bd, now) {
     const x = c * 16, y = r * 16;
-    ctx.fillStyle = 'rgba(40,58,26,.25)'; ctx.fillRect(x + 2, y + 14, 12, 2);
+    groundShade(x + 2, y + 14, 12, 2, 0.25);
     ctx.fillStyle = '#5e3d18'; ctx.fillRect(x + 2, y + 8, 2, 7); ctx.fillRect(x + 12, y + 8, 2, 7);
     ctx.fillStyle = '#3a2a16'; ctx.fillRect(x, y, 16, 10);
     ctx.fillStyle = '#c9a35f'; ctx.fillRect(x + 1, y + 1, 14, 8);
@@ -2385,7 +2515,7 @@
 
   function drawFence(c, r, now) {
     const x = c * 16, y = r * 16;
-    ctx.fillStyle = 'rgba(40,58,26,.22)'; ctx.fillRect(x + 1, y + 13, 14, 2);
+    groundShade(x + 1, y + 13, 14, 2, 0.22);
     /* two posts and two rails */
     const post = px => {
       ctx.fillStyle = '#5e3d18'; ctx.fillRect(x + px, y + 1, 3, 13);
@@ -2400,7 +2530,7 @@
 
   function drawSorter(c, r, so, now) {
     const x = c * 16, y = r * 16;
-    ctx.fillStyle = 'rgba(40,58,26,.22)'; ctx.fillRect(x + 1, y + 14, 15, 2);
+    groundShade(x + 1, y + 14, 15, 2, 0.22);
     /* housing */
     ctx.fillStyle = '#3d434e'; ctx.fillRect(x, y, 16, 16);
     ctx.fillStyle = '#7e8794'; ctx.fillRect(x + 1, y + 1, 14, 14);
@@ -2431,7 +2561,7 @@
   function drawBlower(c, r, b, now) {
     const x = c * 16, y = r * 16;
     const [dx, dy] = [[1, 0], [0, 1], [-1, 0], [0, -1]][b.dir];
-    ctx.fillStyle = 'rgba(40,58,26,.22)'; ctx.fillRect(x + 2, y + 14, 12, 2);
+    groundShade(x + 2, y + 14, 12, 2, 0.22);
     /* stand */
     ctx.fillStyle = '#3d434e'; ctx.fillRect(x + 6, y + 11, 4, 4);
     ctx.fillStyle = '#23262b'; ctx.fillRect(x + 4, y + 14, 8, 2);
@@ -2457,7 +2587,7 @@
 
   function drawStaffHut(c, r, hut, now) {
     const x = c * 16, y = r * 16;
-    ctx.fillStyle = 'rgba(40,58,26,.26)'; ctx.fillRect(x + 2, y + 30, 28, 3);
+    groundShade(x + 2, y + 30, 28, 3, 0.26);
     /* walls */
     ctx.fillStyle = '#3a2a16'; ctx.fillRect(x + 1, y + 10, 30, 21);
     for (let i = 0; i < 5; i++) {
@@ -2495,7 +2625,7 @@
   function drawSilo(c, r, silo, now) {
     const x = c * 16, y = r * 16;
     const fill = silo.store.length / ECON.siloCap;
-    ctx.fillStyle = 'rgba(40,58,26,.26)'; ctx.fillRect(x + 3, y + 30, 26, 3);
+    groundShade(x + 3, y + 30, 26, 3, 0.26);
     /* concrete base */
     ctx.fillStyle = '#6e6a60'; ctx.fillRect(x + 2, y + 27, 28, 5);
     ctx.fillStyle = '#8a867a'; ctx.fillRect(x + 2, y + 27, 28, 2);
@@ -2582,7 +2712,7 @@
 
   function drawLoveNest(c, r, nest, now) {
     const x = c * 16, y = r * 16;
-    ctx.fillStyle = 'rgba(40,58,26,.25)'; ctx.fillRect(x + 3, y + 29, 26, 3);
+    groundShade(x + 3, y + 29, 26, 3, 0.25);
     /* arch posts with vines */
     ctx.fillStyle = '#7a5230'; ctx.fillRect(x + 2, y + 3, 3, 24); ctx.fillRect(x + 27, y + 3, 3, 24);
     ctx.fillStyle = '#a8783f'; ctx.fillRect(x + 2, y + 3, 1, 24); ctx.fillRect(x + 27, y + 3, 1, 24);
@@ -2714,6 +2844,7 @@
     if ((now % 4200) < 190) return 'blink';
     return 'boss';
   }
+  let bossPrint = { x: -999, y: -999, foot: 1 };
   function drawBoss(now) {
     const b = GAME.boss();
     if (!b || !S().company.done) return;
@@ -2733,6 +2864,15 @@
     ctx.restore();
     /* dust off his heels while he walks */
     if (walking && b.frame && GAME.setting('particles') && Math.floor(now / 120) % 2) { ctx.fillStyle = 'rgba(200,180,140,.55)'; ctx.fillRect(Math.round(b.x + (b.dir === 1 ? 3 : 20)), Math.round(b.y + 32), 4, 1); }
+    /* and a paw print every stride, left and right foot in turn */
+    if (walking && ctx === mainCtx) {
+      const d2 = Math.abs(b.x - bossPrint.x) + Math.abs(b.y - bossPrint.y);
+      if (d2 > 9) {
+        bossPrint.x = b.x; bossPrint.y = b.y; bossPrint.foot = -bossPrint.foot;
+        prints(b.x + 13 + bossPrint.foot * 3, b.y + 33, 'paw', b.dir === 1 ? -1 : 1);
+        if (Math.random() < 0.3) groundDust(b.x + 14, b.y + 33, 1, '#c9a878');
+      }
+    }
     if (b.line && ctx === mainCtx) drawSay(b.line, b.x + 14, b.y - 10 - hop, 34);
     else if (pose === 'read') {
       /* leafing through the ledger */
@@ -2770,7 +2910,7 @@
   /* ---------- stations ---------- */
   function drawLab(now) {
     const s = W.stations.lab, x = s.x, y = s.y;
-    ctx.fillStyle = 'rgba(40,58,26,.26)'; ctx.fillRect(x + 1, y + 30, 30, 3);
+    groundShade(x + 1, y + 30, 30, 3, 0.26);
     /* walls: vertical planks */
     ctx.fillStyle = '#3a2a16'; ctx.fillRect(x, y + 8, 30, 24);
     for (let i = 0; i < 10; i++) {
@@ -2834,7 +2974,7 @@
 
   function drawStand(now) {
     const s = W.stations.stand, x = s.x, y = s.y;
-    ctx.fillStyle = 'rgba(40,58,26,.25)'; ctx.fillRect(x + 2, y + 22, 13, 2);
+    groundShade(x + 2, y + 22, 13, 2, 0.25);
     /* lectern post + base */
     ctx.fillStyle = '#5e3d18'; ctx.fillRect(x + 6, y + 11, 4, 11);
     ctx.fillStyle = '#8a5e2a'; ctx.fillRect(x + 6, y + 11, 2, 11);
@@ -2916,7 +3056,7 @@
     const spr = SPR.vehicleSprite(v.id, moving ? Math.floor(now / 90) % 2 : 0, 1);
     const y = W.roadY + 26 - spr.height;
     const bounce = moving ? Math.round(Math.sin(now / 45) * 1) : 0;
-    ctx.fillStyle = 'rgba(40,58,26,.28)'; ctx.fillRect(x + 2, W.roadY + 23, spr.width - 4, 3);
+    groundShade(x + 2, W.roadY + 23, spr.width - 4, 3, 0.28);
     ctx.drawImage(spr, x, y + bounce);
     /* the load rides on top of whatever you drive */
     const n = Math.min(tr.load.length, v.id === 'bike' ? 4 : v.id === 'cart' ? 6 : 15);
@@ -2953,7 +3093,7 @@
   function drawDepot(now) {
     const st = W.stations.depot;
     const x = st.x, y = st.y;
-    ctx.fillStyle = 'rgba(40,58,26,.25)'; ctx.fillRect(x + 2, y + 24, 12, 2);
+    groundShade(x + 2, y + 24, 12, 2, 0.25);
     ctx.fillStyle = '#5e3d18'; ctx.fillRect(x + 7, y + 8, 3, 18);
     ctx.fillStyle = '#a8783f'; ctx.fillRect(x + 7, y + 8, 1, 18);
     /* two arrow boards pointing down the road, each cut to fit its word */
@@ -3118,8 +3258,7 @@
     /* the nest is stretched to fit a grandma this size: NEST_W wide,
        drawn in two passes so she sits down inside the rim */
     const NEST_W = 38, NEST_H = 13, nx = m.x + 1 - NEST_W / 2, ny = m.y + 3;
-    ctx.fillStyle = 'rgba(40,58,26,.24)';
-    ctx.fillRect(m.x - 17, m.y + 15, 36, 3);
+    groundShade(m.x - 17, m.y + 15, 36, 3, 0.24);
     ctx.save();
     ctx.beginPath();
     ctx.rect(nx, ny, NEST_W, 6);
@@ -3162,8 +3301,7 @@
     const x = ptr.x, y = ptr.y;
     const held = S().held;
     const tool = S().tool;
-    ctx.fillStyle = 'rgba(40,58,26,.18)';
-    ctx.fillRect(Math.round(x - 4), Math.round(y + 3), 9, 2);
+    groundShade(Math.round(x - 4), Math.round(y + 3), 9, 2, 0.18);
     if (held) {
       if (held.kind === 'chicken') {
         const spr = SPR.chickenSprite(SPECIES[held.ch.sp], 1, false);
@@ -3541,6 +3679,8 @@
     /* ---- everything you painted, blitted from its own layer ---- */
     if (terrDirty) rebuildTerrain();
     ctx.drawImage(terrCv, 0, -TERR_LIFT);
+    /* tracks, on the ground and under everything that made them */
+    drawDecals(dt);
     /* water catches the light */
     if (GAME.paintedCells()) {
       const t0 = Math.floor(now / 260);
@@ -3651,12 +3791,12 @@
 
     S().items.forEach(it => {
       const spr = it.rainbow ? SPR.eggSprite(it.tier, 1, true, Math.floor(now / 120) % 6) : SPR.eggSprite(it.tier, 1);
-      ctx.fillStyle = 'rgba(0,0,0,.2)';
-      ctx.fillRect(Math.round(it.x - 3), Math.round(it.y + 1), 6, 1);
+      SPR.shadowEll(ctx, it.x, it.y + 1, 4, 1.5, 0.22);
       ctx.drawImage(spr, Math.round(it.x - 5), Math.round(it.y - 9));
     });
     /* feed piles */
     S().feed.forEach(f => {
+      SPR.shadowEll(ctx, f.x + 1, f.y + 4, 4, 1.5, 0.2);
       ctx.fillStyle = '#e0a416';
       ctx.fillRect(Math.round(f.x), Math.round(f.y), 2, 2);
       ctx.fillRect(Math.round(f.x - 3), Math.round(f.y + 2), 2, 2);
@@ -3875,6 +4015,7 @@
           ring(e.x, e.y, 'rgba(255,255,255,1)', 14, 0.22);
           glint(e.x, e.y - 2, '#fff8ec', 3);
           sparks(e.x, e.y, 3, col, 50);
+          straw(e.x, e.y + 1, 2);            /* the bedding it was lying in */
           /* a run of them builds: every fifth says so and hits harder */
           const nowMs = performance.now();
           scoopCombo = nowMs - scoopAt < 700 ? scoopCombo + 1 : 1;
@@ -9198,6 +9339,8 @@
       }
     }
     if (egg.golden) puff(egg.x, egg.y - 6, '#ffd23f', 7, 32, 28);
+    /* it lands in the bedding */
+    straw(egg.x, egg.y + 1, mutated || egg.golden ? 5 : 2);
   });
   GAME.on('hatch', ({ births, x, y, rainbow }) => {
     snd.hatch();
@@ -9206,6 +9349,9 @@
     fresh.forEach(ch => bornFx.set(ch.id, performance.now()));
     births.forEach((b, i) => {
       spawnHatchFx(b.sp, x + i * 8, y, rainbow);
+      /* shell, down and bedding all go up together */
+      feathers(x + i * 8, y - 2, 4);
+      straw(x + i * 8, y + 2, 4);
       if (b.isNew) {
         toast({
           sprite: cloneCanvas(SPR.chickenSprite(b.sp, 2, false)),
@@ -9257,6 +9403,8 @@
     snd.engine();
     puff(W.truckHome.x - 4, W.roadY + 8, '#c9a35f', 9, 44, 16);
     smoke(W.truckHome.x - 6, W.roadY + 6, 5, 'rgba(190,186,180,1)', 16);
+    groundDust(W.truckHome.x - 2, W.roadY + 10, 8, '#c9a878');
+    straw(W.truckHome.x + 6, W.roadY + 4, 3);
     floatWorld('TO ' + to.name.toUpperCase(), W.truckHome.x + 20, W.roadY - 26, 'gold');
   });
   GAME.on('home', () => {
@@ -9370,6 +9518,7 @@
   GAME.on('site', ({ type, c, r, kind }) => { snd.build(); if (c !== undefined) floatWorld(kind === 'storey' ? 'MOVERS CALLED' : 'MOVERS CALLED', c * 16 + 16, r * 16 - 12, 'gold', 'hammer'); });
   GAME.on('movers', ({ state, x }) => { if (state === 'here') { snd.engine(); floatWorld('MOVERS', x + 20, W.roadY - 16, 'gold'); } else if (state === 'coming') snd.engine(); });
   GAME.on('built', ({ type, c, r, kind }) => {
+    if (c !== undefined) { dirt(c * 16 + 12, r * 16 + 15, 8); groundDust(c * 16 + 12, r * 16 + 16, 8, '#c9a878'); smoke(c * 16 + 12, r * 16 + 8, 3, 'rgba(210,200,180,1)', 16); }
     snd.grand();
     const b = BUILDS[type];
     const bx = c * 16 + b.w * 8, by = r * 16 + b.h * 8;
@@ -9438,14 +9587,21 @@
     snd.scoop();
   });
   GAME.on('ripe', ({ c, r }) => { puff(c * 16 + 8, r * 16 + 2, '#fff8ec', 4, 20, 20); glint(c * 16 + 8, r * 16, '#fff8ec', 3); });
-  GAME.on('plant', ({ c, r }) => { puff(c * 16 + 8, r * 16 + 10, '#8a5e2a', 5, 26, 14); groundDust(c * 16 + 8, r * 16 + 12, 4, '#a07444'); snd.plop(); });
+  GAME.on('plant', ({ c, r }) => { puff(c * 16 + 8, r * 16 + 10, '#8a5e2a', 4, 26, 14); grain(c * 16 + 8, r * 16 + 10, 6); dirt(c * 16 + 8, r * 16 + 10, 3); snd.plop(); });
   GAME.on('water', ({ c, r }) => { puff(c * 16 + 8, r * 16 + 8, '#7fc4e8', 6, 28, 18); bubbles(c * 16 + 8, r * 16 + 8, 3, '#aee7ff'); ring(c * 16 + 8, r * 16 + 10, 'rgba(150,215,255,1)', 14, 0.3); });
-  GAME.on('till', ({ c, r }) => { puff(c * 16 + 8, r * 16 + 8, '#a07444', 8, 34, 16); groundDust(c * 16 + 8, r * 16 + 10, 6, '#a07444'); shards(c * 16 + 8, r * 16 + 8, 3, '#7a5432', 40); terrainTouched(c * 16 + 8, r * 16 + 8, c * 16 + 8, r * 16 + 8, 20); });
+  GAME.on('till', ({ c, r }) => { puff(c * 16 + 8, r * 16 + 8, '#a07444', 6, 34, 16); groundDust(c * 16 + 8, r * 16 + 10, 6, '#a07444'); dirt(c * 16 + 8, r * 16 + 9, 7); terrainTouched(c * 16 + 8, r * 16 + 8, c * 16 + 8, r * 16 + 8, 20); });
   GAME.on('graduate', ({ sp }) => {
     toast({ sprite: cloneCanvas(SPR.chickenSprite(sp, 2, false)), title: sp.name + ' GRADUATED', body: 'She joins the lab team. Feathers dropped!' });
   });
-  GAME.on('feedeat', ({ x, y }) => { puff(x, y, '#f2c94c', 4, 18, 14); heart(x, y - 6, 1); });
-  GAME.on('land', () => { GAME.mark('ground'); });
+  GAME.on('feedeat', ({ x, y }) => { puff(x, y, '#f2c94c', 3, 18, 14); grain(x, y + 8, 5); heart(x, y - 6, 1); });
+  GAME.on('land', ({ plot }) => {
+    GAME.mark('ground');
+    /* the fence comes down along the boundary you just bought */
+    if (plot) for (let i = 0; i < 6; i++) {
+      const px = plot.tc * 16 + 8 + Math.random() * (PLOT_W * 16 - 16);
+      dirt(px, plot.tr * 16 + 8 + Math.random() * (PLOT_H * 16 - 16), 2);
+    }
+  });
   GAME.on('paint', ({ x0, y0, x1, y1, radius }) => { terrainTouched(x0, y0, x1, y1, radius); });
   GAME.on('polish', ({ x, y }) => { puff(x, y - 4, '#fff8ec', 3, 16, 12); glint(x, y - 6, '#ffffff', 3); });
   GAME.on('grade', ({ x, y, tier }) => {
@@ -9492,6 +9648,18 @@
     each(S().polishers, (x, y) => { if (near(x, y) && Math.random() < step * 1.4) glint(x + 8 + ((Math.random() * 10) | 0), y + 2, '#ffffff', 3); });
     /* the gene lab hums */
     each(S().genelabs, (x, y) => { if (near(x, y) && Math.random() < step * 2) sparks(x + 16, y - 2, 1, '#ff8ac0', 40); });
+    /* the birds leave tracks where they scratch about */
+    const chs = S().chickens;
+    for (let i = 0; i < chs.length; i++) {
+      const ch = chs[i];
+      if (!near(ch.x, ch.y) || Math.random() > step * 0.55) continue;
+      prints(ch.x + 10, ch.y + 17, 'claw', ch.dir === 1 ? 1 : -1);
+    }
+    /* bedding drifts about the coops, and the mill throws chaff */
+    each(S().coops, (x, y) => { if (near(x, y) && Math.random() < step * 0.9) straw(x + 8 + ((Math.random() * 16) | 0), y + 26, 1); });
+    each(S().mills, (x, y) => { if (near(x, y) && Math.random() < step * 1.6) straw(x + 6, y + 20, 1); });
+    /* a trough spills feed while the birds are at it */
+    each(S().troughs, (x, y) => { if (near(x, y) && Math.random() < step * 1.2) grain(x + 8 + ((Math.random() * 8) | 0), y + 13, 1); });
     /* rain lands */
     if (GAME.weather.rain) {
       for (let i = 0; i < 3; i++) {
@@ -9552,6 +9720,7 @@
   const UI = {
     $, S, W, snd, mkIcon, cloneCanvas, floatText, floatWorld, toast, openModal, closeModals, setInspect, refreshInspect,
     puff, heart, coinBurst, shellBurst, sparks, smoke, feathers, twinkles, shards,
+    straw, grain, dirt, prints,
     ring, glint, groundDust, bubbles, beam, popNum, impact, shake, flash, fly, holdFrame,
     zoomPunch, cineTo, cineOff, cineSay, cineOn, cineLocked,
     wordPop, starburst, speedLines, dizzy,
