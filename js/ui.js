@@ -2691,6 +2691,21 @@
      else on the payroll - top hat, tail, opinions. Whatever the
      current job is, he is standing next to it telling you about it.
      ============================================================ */
+  /* ---- his face follows the game, not just the pose ----
+     Anything that happens to him sets an expression for a few seconds;
+     otherwise it comes from where he is and how the money looks. */
+  let faceFx = { expr: null, until: 0 };
+  function faceSet(expr, ms) { faceFx = { expr, until: performance.now() + (ms || 2200) }; }
+  function bossExpr(b, now) {
+    if (faceFx.expr && now < faceFx.until) return faceFx.expr;
+    if (b.pose === 'cheer') return 'grin';
+    if (b.pose === 'read') return 'smug';
+    if ((now % 4200) < 190) return 'blink';
+    if (S().coins < 25) return 'sad';
+    if (S().coins > 250000) return 'money';
+    if (GAME.questReady && QUESTS.some(GAME.questReady)) return 'grin';
+    return null;                             /* the pose picks its own */
+  }
   function bossPose(b, now) {
     if (b.state === 'walk') return (b.frame ? 'walk1' : 'walk0');
     if (b.pose === 'cheer') return 'cheer';
@@ -2704,7 +2719,7 @@
     if (!b || !S().company.done) return;
     if (ctx === mainCtx && (b.x + 40 < cam().x || b.x - 14 > cam().x + W.view.w || b.y + 44 < cam().y || b.y - 52 > cam().y + W.view.h)) return;
     const pose = bossPose(b, now);
-    const spr = SPR.raccoonSprite(pose, 1, S().wardrobe);
+    const spr = SPR.raccoonSprite(pose, 1, S().wardrobe, bossExpr(b, now));
     const walking = b.state === 'walk';
     const bob = walking ? 0 : Math.sin(now / 620 + 1) * 0.6;
     const hop = pose === 'cheer' ? Math.abs(Math.sin(now / 190)) * 4 : 0;
@@ -4476,7 +4491,7 @@
     /* his portrait, framed like a staff photo */
     const face = document.createElement('div');
     face.className = 'qd-face';
-    face.appendChild(cloneCanvas(SPR.raccoonSprite(cheering ? 'cheer' : 'boss', 1, S().wardrobe), 2));
+    face.appendChild(cloneCanvas(SPR.raccoonSprite(cheering ? 'cheer' : 'boss', 1, S().wardrobe, cheering ? 'grin' : 'happy'), 2));
     box.appendChild(face);
     const body = document.createElement('div');
     body.className = 'qd-body';
@@ -8525,6 +8540,7 @@
       heart(boss.x + 14, boss.y - 8, 1);
       twinkles(boss.x + 14, boss.y + 10, 6, '#fff8ec', 16);
       shake(0.5, 0.12); dizzy(boss.x + 14, boss.y - 12, 3, '#ffd23f'); zoomPunch(0.03);
+      faceSet(S().stats.bossPets % 5 === 4 ? 'dizzy' : 'love', 1800);
       questSig = '';
       return true;
     }
@@ -8561,7 +8577,7 @@
         ring(x, y, 'rgba(255,210,63,1)', 90, 0.6, 2); ring(x, y, 'rgba(255,255,255,1)', 60, 0.45);
         beam(x, y, '#ffd23f', 80, 0.9); twinkles(x, y, 12, '#fff8ec', 34);
         flash('#ffe9a8', 0.16, 0.26); shake(1.8, 0.4); holdFrame(0.08); zoomPunch(0.12);
-        wordPop(x, y - 24, 'SOLD', '#ffd23f'); speedLines(x, y, 14, 'rgba(255,255,255,.85)', 50);
+        wordPop(x, y - 24, 'SOLD', '#ffd23f'); speedLines(x, y, 14, 'rgba(255,255,255,.85)', 50); faceSet('money', 3000);
         toast({ icon: 'house', title: 'NEW LAND', body: 'The fences come down. Room to grow!' });
         GAME.clampCam();
       } else {
@@ -9204,6 +9220,7 @@
     if (S().tut && !S().tut.hatch) {
       S().tut.hatch = 1;
       cineTo({ focus: { x, y: y - 6 }, zoom: 2.1, ease: 0.32, life: 3.0, lock: false, bars: true });
+      faceSet('wow', 3000);
       setTimeout(() => cineOff(), 2600);
       GAME.bossSay('There it is. That is an employee.', 6, 'cheer');
     }
@@ -9232,6 +9249,7 @@
     ring(W.truckHome.x + 26, W.truckHome.y + 6, 'rgba(255,210,63,1)', 30, 0.34);
     beam(W.truckHome.x + 26, W.truckHome.y, '#ffd23f', 44, 0.7);
     shake(Math.min(1.6, 0.5 + n * 0.05), 0.2);
+    faceSet('money', 2600);
     if (n >= 8) { wordPop(W.truckHome.x + 26, W.truckHome.y - 26, 'KA-CHING', '#ffd23f'); zoomPunch(0.05); }
     floatWorld('+' + GAME.fmt(pay), W.truckHome.x + 20, W.truckHome.y - 22, 'gold', 'coin');
   });
@@ -9251,6 +9269,7 @@
     const b = GAME.boss();
     if (b) { twinkles(b.x + 14, b.y + 8, 10, '#ffd23f', 26); coinBurst(b.x + 14, b.y - 4, 8); beam(b.x + 14, b.y + 30, '#ffd23f', 70, 0.8); }
     flash('#ffe9a8', 0.14, 0.22); shake(1.4, 0.3); holdFrame(0.07); zoomPunch(0.11);
+    faceSet('grin', 3000);
     if (b) { wordPop(b.x + 14, b.y - 26, 'SIGNED', '#7fd14f'); speedLines(b.x + 14, b.y, 12, 'rgba(255,255,255,.9)', 40); }
   });
   GAME.on('questready', ({ q }) => { snd.sparkle(); const b = GAME.boss(); if (b) { heart(b.x + 14, b.y - 8, 3); twinkles(b.x + 14, b.y + 4, 6, '#ffd23f', 18); } floatText('QUEST READY: ' + q.name.toUpperCase(), innerWidth / 2 - 90, 90, 'gold', 'quest'); });
@@ -9285,7 +9304,7 @@
     }
     if (state === 'released') {
       snd.plop(); zoomPunch(0.07); shake(0.7, 0.16);
-      GAME.bossSay(pickDroneLine(), 6, 'cheer');
+      GAME.bossSay(pickDroneLine(), 6, 'cheer'); faceSet('wow', 2200);
       sparks(d.x, d.y + 14, 6, '#ffd23f', 70);
       ring(d.x, d.y + 14, 'rgba(255,255,255,1)', 22, 0.3);
       if (droneCine && p) {
@@ -9347,7 +9366,7 @@
   GAME.on('settings', ({ k, v }) => { if (k === 'bigUI') document.body.classList.toggle('big-ui', !!v); });
   GAME.on('customer', ({ o }) => { snd.plop(); floatWorld(o.who + ': ' + o.n + ' EGGS', o.x + 14, o.y - 28, 'gold', 'doc'); });
   GAME.on('orderdone', ({ o }) => { snd.grand(); puff(o.x + 14, o.y, '#ffd23f', 10, 34, 26); coinBurst(o.x + 14, o.y - 2, 7); twinkles(o.x + 14, o.y, 6, '#ffd23f', 16); shake(0.9, 0.2); floatWorld('+' + GAME.fmt(o.pay), o.x + 14, o.y - 30, 'gold', 'coin'); });
-  GAME.on('ordermiss', ({ o }) => { snd.error(); puff(o.x + 14, o.y + 4, '#8a8f98', 6, 24, 14); smoke(o.x + 8, o.y + 6, 4, 'rgba(160,160,168,1)', 14); groundDust(o.x + 14, o.y + 12, 6); floatWorld('DROVE OFF', o.x + 14, o.y - 26, 'pink'); });
+  GAME.on('ordermiss', ({ o }) => { snd.error(); faceSet('sad', 2600); puff(o.x + 14, o.y + 4, '#8a8f98', 6, 24, 14); smoke(o.x + 8, o.y + 6, 4, 'rgba(160,160,168,1)', 14); groundDust(o.x + 14, o.y + 12, 6); floatWorld('DROVE OFF', o.x + 14, o.y - 26, 'pink'); });
   GAME.on('site', ({ type, c, r, kind }) => { snd.build(); if (c !== undefined) floatWorld(kind === 'storey' ? 'MOVERS CALLED' : 'MOVERS CALLED', c * 16 + 16, r * 16 - 12, 'gold', 'hammer'); });
   GAME.on('movers', ({ state, x }) => { if (state === 'here') { snd.engine(); floatWorld('MOVERS', x + 20, W.roadY - 16, 'gold'); } else if (state === 'coming') snd.engine(); });
   GAME.on('built', ({ type, c, r, kind }) => {
@@ -9380,7 +9399,7 @@
   });
   GAME.on('region', ({ r }) => { toast({ icon: r.moon ? 'atom' : 'city', title: r.name.toUpperCase(), body: r.moon ? 'The rocket is away.' : 'Open for business.' }); });
   GAME.on('branch', ({ r, n }) => { floatText('+1 BRANCH', innerWidth / 2 - 40, 120, 'gold', 'house'); });
-  GAME.on('secret', ({ s }) => { snd.grand(); flash('#fff8ec', 0.12, 0.24); shake(1, 0.24); toast({ icon: s.icon, title: 'SECRET: ' + s.name.toUpperCase(), body: s.desc, long: true }); });
+  GAME.on('secret', ({ s }) => { snd.grand(); faceSet('wow', 2600); flash('#fff8ec', 0.12, 0.24); shake(1, 0.24); toast({ icon: s.icon, title: 'SECRET: ' + s.name.toUpperCase(), body: s.desc, long: true }); });
   GAME.on('age', ({ a }) => {
     snd.grand(); ageFx = { t: performance.now(), a };
     const cx = cam().x + W.view.w / 2, cy = cam().y + W.view.h / 2;

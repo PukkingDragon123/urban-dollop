@@ -60,9 +60,13 @@ const SPR = (() => {
 
   /* ============================================================
      3x5 PIXEL FONT
+     Three columns cannot hold a diagonal, so 'M', 'H' and 'W' are
+     told apart by where their crossbar sits - top, middle, bottom.
+     Two full rows in a row read as a solid blob at sign size, which
+     is how 'WORK' used to come out as 'NORK'.
      ============================================================ */
   const FONT = {
-    A: ['###', '# #', '###', '# #', '# #'],
+    A: [' # ', '# #', '###', '# #', '# #'],
     B: ['## ', '# #', '## ', '# #', '## '],
     C: [' ##', '#  ', '#  ', '#  ', ' ##'],
     D: ['## ', '# #', '# #', '# #', '## '],
@@ -74,7 +78,7 @@ const SPR = (() => {
     J: ['  #', '  #', '  #', '# #', ' # '],
     K: ['# #', '# #', '## ', '# #', '# #'],
     L: ['#  ', '#  ', '#  ', '#  ', '###'],
-    M: ['# #', '###', '###', '# #', '# #'],
+    M: ['#...#', '##.##', '#.#.#', '#...#', '#...#'],
     N: ['## ', '# #', '# #', '# #', '# #'],
     O: [' # ', '# #', '# #', '# #', ' # '],
     P: ['## ', '# #', '## ', '#  ', '#  '],
@@ -84,7 +88,7 @@ const SPR = (() => {
     T: ['###', ' # ', ' # ', ' # ', ' # '],
     U: ['# #', '# #', '# #', '# #', ' ##'],
     V: ['# #', '# #', '# #', '# #', ' # '],
-    W: ['# #', '# #', '###', '###', '# #'],
+    W: ['#...#', '#...#', '#.#.#', '#.#.#', '.#.#.'],
     X: ['# #', '# #', ' # ', '# #', '# #'],
     Y: ['# #', '# #', ' # ', ' # ', ' # '],
     Z: ['###', '  #', ' # ', '#  ', '###'],
@@ -116,23 +120,38 @@ const SPR = (() => {
     '<': ['  #', ' # ', '#  ', ' # ', '  #'],
     ' ': ['   ', '   ', '   ', '   ', '   '],
   };
-  function tinyW(str, k) { k = k || 1; return str.length * 4 * k - k; }
+  /* nearly every letter is three cells wide, so the advance is four; the two
+     that carry a diagonal are drawn five wide and paid for at the cursor.
+     Everything that lays tiny text out measures it with tinyW, so a wider
+     glyph moves the whole line along rather than overlapping its neighbour. */
+  const tinyGlyphW = ch => { const g = FONT[ch]; return (g ? g[0].length : 3) + 1; };
+  function tinyW(str, k) {
+    k = k || 1;
+    str = String(str).toUpperCase();
+    let w = 0;
+    for (let i = 0; i < str.length; i++) w += tinyGlyphW(str[i]);
+    return w * k - k;
+  }
   function drawTiny(ctx, str, x, y, col, k, shadow) {
     k = k || 1;
     str = String(str).toUpperCase();
     if (shadow) {
       ctx.fillStyle = shadow;
+      let cx = 0;
       for (let i = 0; i < str.length; i++) {
-        const g = FONT[str[i]]; if (!g) continue;
-        for (let r = 0; r < 5; r++) for (let c = 0; c < 3; c++)
-          if (g[r][c] === '#') ctx.fillRect(x + (i * 4 + c) * k, y + (r + 1) * k, k, k);
+        const g = FONT[str[i]];
+        if (g) for (let r = 0; r < 5; r++) for (let c = 0; c < g[r].length; c++)
+          if (g[r][c] === '#') ctx.fillRect(x + (cx + c) * k, y + (r + 1) * k, k, k);
+        cx += tinyGlyphW(str[i]);
       }
     }
     ctx.fillStyle = col;
+    let cx = 0;
     for (let i = 0; i < str.length; i++) {
-      const g = FONT[str[i]]; if (!g) continue;
-      for (let r = 0; r < 5; r++) for (let c = 0; c < 3; c++)
-        if (g[r][c] === '#') ctx.fillRect(x + (i * 4 + c) * k, y + r * k, k, k);
+      const g = FONT[str[i]];
+      if (g) for (let r = 0; r < 5; r++) for (let c = 0; c < g[r].length; c++)
+        if (g[r][c] === '#') ctx.fillRect(x + (cx + c) * k, y + r * k, k, k);
+      cx += tinyGlyphW(str[i]);
     }
   }
 
@@ -162,7 +181,7 @@ const SPR = (() => {
     T: ['#####', '..#..', '..#..', '..#..', '..#..', '..#..'],
     U: ['#...#', '#...#', '#...#', '#...#', '#...#', '.###.'],
     V: ['#...#', '#...#', '#...#', '#...#', '.#.#.', '..#..'],
-    W: ['#...#', '#...#', '#...#', '#.#.#', '##.##', '#...#'],
+    W: ['#...#', '#...#', '#...#', '#.#.#', '#.#.#', '.#.#.'],
     X: ['#...#', '.#.#.', '..#..', '..#..', '.#.#.', '#...#'],
     Y: ['#...#', '.#.#.', '..#..', '..#..', '..#..', '..#..'],
     Z: ['#####', '....#', '...#.', '..#..', '.#...', '#####'],
@@ -1774,10 +1793,12 @@ const SPR = (() => {
     const rect = (x, y, w, h, i) => { for (let dy = 0; dy < h; dy++) for (let dx = 0; dx < w; dx++) set(x + dx, y + dy, i); };
     /* stamp a word in the tiny font, one glyph pixel to one cell */
     const txt = (str, x, y, i) => {
-      String(str).toUpperCase().split('').forEach((ch, n) => {
+      let cx = 0;
+      String(str).toUpperCase().split('').forEach(ch => {
         const g = FONT[ch];
-        if (!g) return;
-        for (let r = 0; r < 5; r++) for (let c = 0; c < 3; c++) if (g[r][c] === '#') set(x + n * 4 + c, y + r, i);
+        if (g) for (let r = 0; r < 5; r++) for (let c = 0; c < g[r].length; c++)
+          if (g[r][c] === '#') set(x + cx + c, y + r, i);
+        cx += (g ? g[0].length : 3) + 1;
       });
     };
     const disc = (cx, cy, r, i, squash) => {
@@ -3176,17 +3197,17 @@ const SPR = (() => {
     '.......odgGGGGGGGGGgdo......',
     '.......odgGGGGGGGGGgdo......',
     '.......oddgGGGGGGGgddo......',
-    '.......odgkkkkkkkkkgdo......',
+    '.......odkkkkkkkkkkkdo......',
     '.......okkkkkkkkkkkkko......',
-    '.......okkwwwkkkwwwkko......',
-    '.......okkwwwkkkwwwkko......',
-    '.......okkweekkkweekko......',
+    '.......okwwwwkkkwwwwko......',
+    '.......okwwewkkkwwewko......',
+    '.......okweewkkkweewko......',
+    '.......okwwwwkkkwwwwko......',
     '.......odkkkkkkkkkkkdo......',
     '.......oogkkWWWWWkkgoo......',
-    '.........ogWWWWWWWgo........',
-    '..........oWWnnnWWo.........',
-    '...........oWnWnWo..........',
-    '...........odddddo..........',
+    '.........ogcWWWWWcgo........',
+    '...........oWnnnWo..........',
+    '...........onnWnno..........',
     '...ooo..ogggggggggggo.......',
     '..oTTToogggggggggggggo......',
     '.oTTTToogggggggggggggo......',
@@ -3210,21 +3231,30 @@ const SPR = (() => {
     W: '#e9eef4',   /* blaze and snout        */  k: '#2d2736',   /* the mask           */
     w: '#ffffff',   /* eye                    */  e: '#0e0c12',   /* pupil              */
     n: '#100e14',   /* nose and mouth         */  p: '#cf7f8f',   /* inside an ear      */
+    c: '#e89aa8',   /* a rosy cheek           */
     t: '#3a4048',   /* tail, dark ring        */  T: '#a2aab6',   /* tail, pale ring    */
     s: '#241f2c',   /* near shoe              */  S: '#39333f',   /* far shoe           */
   };
   const RAC_OFF = 9;                       /* rows of headroom above the ears */
   const RAC_W = 28, RAC_H = 34, RAC_MID = 14;
+  /* what his face does in each pose unless a caller says otherwise */
+  const DEFAULT_EXPR = {
+    stand: 'happy', walk0: 'happy', walk1: 'happy', boss: 'smug', read: 'smug',
+    cheer: 'grin', blink: 'blink',
+    dance0: 'grin', dance1: 'grin', dance2: 'grin', guitar0: 'grin', guitar1: 'grin',
+    chop0: 'determined', chop1: 'determined', hammer0: 'determined', hammer1: 'determined',
+    punch0: 'angry', punch1: 'angry',
+  };
   const WIDE_POSES = ['dance0', 'dance1', 'dance2', 'guitar0', 'guitar1', 'chop0', 'chop1', 'hammer0', 'hammer1', 'punch0', 'punch1'];
   function outfitOf(w) {
     const o = Object.assign({}, (typeof WARDROBE_DEFAULT !== 'undefined' ? WARDROBE_DEFAULT : {}), w || {});
     const suit = (typeof COSMETIC_BY_ID !== 'undefined' && COSMETIC_BY_ID[o.suit]) || { col: '#2c2a36', trim: '#e8542f' };
     return { hat: o.hat || 'hat_top', suit, glasses: o.glasses || 'gl_none', acc: o.acc || 'acc_coin' };
   }
-  function raccoonSprite(pose, scale, wardrobe) {
+  function raccoonSprite(pose, scale, wardrobe, expr) {
     pose = pose || 'stand';
     const of = outfitOf(wardrobe);
-    const key = 'racc4_' + pose + '_' + scale + '_' + of.hat + of.suit.id + of.glasses + of.acc;
+    const key = 'racc5_' + pose + '|' + (expr || '') + '_' + scale + '_' + of.hat + of.suit.id + of.glasses + of.acc;
     if (cache.has(key)) return cache.get(key);
     const k = scale || 1;
     const wide = WIDE_POSES.includes(pose);
@@ -3247,14 +3277,86 @@ const SPR = (() => {
 
     /* ---- the animal underneath ---- */
     drawGrid(ctx, RACCOON_ROWS, RACCOON_PAL, ox * k, RAC_OFF * k, k);
-    /* a glint in each eye, top-left, the way an eye catches the sky */
-    R(10, 9, 1, 1, '#ffffff'); R(17, 9, 1, 1, '#ffffff');
-    if (pose === 'blink') {                     /* eyes shut for a beat */
-      R(10, 9, 3, 3, P.k); R(16, 9, 3, 3, P.k);
-      R(10, 10, 3, 1, '#5b5170'); R(16, 10, 3, 1, '#5b5170');
-    }
-    if (pose === 'cheer' || dancing) {          /* a proper grin once he is winning */
-      R(12, 16, 5, 1, P.n); R(13, 17, 3, 1, P.n); R(12, 16, 1, 1, '#ffffff');
+    /* ---- the face on top: one of eleven expressions, drawn over the
+       eyes (two 4x4 boxes at rows 9-12) and the mouth (rows 16-17).
+       Each pose has a default - he grins while he dances, scowls while
+       he punches - and a caller can ask for any of them by name. ---- */
+    const EX = expr || DEFAULT_EXPR[pose] || 'happy';
+    if (EX !== 'happy') {
+      const K_ = P.k, W_ = P.W, N_ = P.n, WH_ = '#ffffff', LID = '#5b5170';
+      const eyes = (l, r) => { l(9); r === undefined ? l(16) : r(16); };
+      const box = x => R(x, 9, 4, 4, K_);
+      const mouth = kind => {
+        /* the base mouth is a smile with the corners turned up; every
+           other shape is painted over the same two rows */
+        if (kind === 'grin') { R(12, 17, 5, 1, N_); R(13, 17, 3, 1, '#8a3a4a'); R(12, 16, 1, 1, N_); R(16, 16, 1, 1, N_); }
+        else if (kind === 'open') { R(12, 17, 5, 1, N_); R(13, 16, 3, 1, N_); R(13, 17, 3, 1, '#8a3a4a'); }
+        else if (kind === 'frown') { R(12, 17, 5, 1, W_); R(13, 17, 3, 1, N_); }
+        else if (kind === 'flat') { R(12, 17, 5, 1, N_); }
+        else if (kind === 'smirk') { R(12, 17, 5, 1, W_); R(14, 17, 3, 1, N_); R(16, 16, 1, 1, N_); }
+        else if (kind === 'o') { R(12, 17, 5, 1, W_); R(14, 17, 1, 1, N_); R(14, 16, 1, 1, N_); }
+        else if (kind === 'teeth') { R(11, 17, 7, 1, N_); R(12, 17, 5, 1, '#fff8ec'); R(14, 17, 1, 1, N_); }
+      };
+      switch (EX) {
+        case 'blink':                       /* eyes shut, curved happily */
+          eyes(x => { box(x); R(x, 10, 1, 1, LID); R(x + 1, 11, 2, 1, LID); R(x + 3, 10, 1, 1, LID); });
+          break;
+        case 'grin':                        /* squeezed shut with pleasure */
+          eyes(x => { box(x); R(x, 11, 1, 1, WH_); R(x + 1, 10, 2, 1, WH_); R(x + 3, 11, 1, 1, WH_); });
+          mouth('grin');
+          break;
+        case 'wow':                         /* startled: tiny pupils, brows up */
+          eyes(x => { R(x, 9, 4, 4, WH_); R(x + 1, 10, 1, 1, P.e); R(x + 2, 11, 1, 1, P.e); });
+          R(9, 8, 4, 1, P.G); R(16, 8, 4, 1, P.G);
+          mouth('o');
+          break;
+        case 'angry':                        /* brows down over small eyes */
+          eyes(x => { box(x); R(x, 10, 4, 3, WH_); R(x + 1, 11, 2, 2, P.e); });
+          R(9, 9, 2, 1, P.o); R(11, 10, 2, 1, P.o);
+          R(17, 10, 2, 1, P.o); R(19, 9, 2, 1, P.o);
+          mouth('teeth');
+          break;
+        case 'determined':                   /* brows level and low */
+          eyes(x => { box(x); R(x, 10, 4, 3, WH_); R(x + 1, 11, 2, 2, P.e); });
+          R(9, 9, 4, 1, P.o); R(16, 9, 4, 1, P.o);
+          mouth('flat');
+          break;
+        case 'smug':                         /* one eye half shut */
+          R(16, 9, 4, 2, K_); R(16, 10, 4, 1, LID);
+          mouth('smirk');
+          break;
+        case 'sad':                          /* pupils low, brows up inside */
+          eyes(x => { box(x); R(x, 10, 4, 3, WH_); R(x + 1, 11, 2, 2, P.e); });
+          R(11, 8, 2, 1, P.d); R(16, 8, 2, 1, P.d);
+          mouth('frown');
+          break;
+        case 'love':                         /* a heart in each eye */
+          eyes(x => {
+            R(x, 9, 4, 4, K_);
+            R(x, 10, 1, 2, '#ff5f9e'); R(x + 3, 10, 1, 2, '#ff5f9e');
+            R(x + 1, 9, 1, 1, '#ff5f9e'); R(x + 2, 9, 1, 1, '#ff5f9e');
+            R(x + 1, 10, 2, 2, '#ff5f9e'); R(x + 1, 12, 2, 1, '#ff5f9e');
+            R(x + 1, 10, 1, 1, '#ffb0d0');
+          });
+          mouth('grin');
+          break;
+        case 'dizzy':                        /* crossed out */
+          eyes(x => {
+            R(x, 9, 4, 4, K_);
+            R(x, 9, 1, 1, WH_); R(x + 1, 10, 1, 1, WH_); R(x + 2, 11, 1, 1, WH_); R(x + 3, 12, 1, 1, WH_);
+            R(x + 3, 9, 1, 1, WH_); R(x + 2, 10, 1, 1, WH_); R(x + 1, 11, 1, 1, WH_); R(x, 12, 1, 1, WH_);
+          });
+          mouth('open');
+          break;
+        case 'money':                        /* coins where his eyes were */
+          eyes(x => {
+            R(x, 9, 4, 4, K_);
+            R(x + 1, 9, 2, 1, '#ffd23f'); R(x, 10, 4, 2, '#ffd23f'); R(x + 1, 12, 2, 1, '#ffd23f');
+            R(x + 1, 10, 2, 2, '#b87c10'); R(x + 1, 10, 1, 1, '#fff3c4');
+          });
+          mouth('grin');
+          break;
+      }
     }
 
     /* ---- legs ---- */

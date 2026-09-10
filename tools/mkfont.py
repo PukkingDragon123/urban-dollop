@@ -152,10 +152,13 @@ def rects(top, rows, dilate=0):
         on = [c == '#' for c in row]
         at = lambda c: 0 <= c < len(on) and on[c]
         if dilate:
-            # Bold smears each stem one cell to the right, but never closes a
-            # one-cell counter: a gap with ink on both sides stays a gap, so
-            # 'm' and 'w' keep their strokes instead of going solid.
-            cells = [at(c) or (at(c - 1) and not at(c + 1)) for c in range(len(on) + dilate)]
+            # Bold smears every run one cell to the right, under one rule:
+            # never close a one-cell counter - a gap with ink on both sides
+            # stays a gap. Bars grow with the stems they meet, so the apex of
+            # 'A' still lands on its right stem. Letterforms that the smear
+            # cannot survive are listed in NO_DILATE instead.
+            cells = [at(c) or (at(c - 1) and not at(c + 1))
+                     for c in range(len(on) + dilate)]
         else:
             cells = on
         c = 0
@@ -220,6 +223,13 @@ def name_table(family, sub, ps):
         store += b
     return struct.pack('>HHH', 0, len(strings), 6 + 12 * len(strings)) + recs + store
 
+# 'W' and 'M' are the shapes six cells cannot hold in bold: two stems two
+# cells wide leave only two columns in the middle, so the inner strokes either
+# merge with a stem or jog a column and the letter reads as an 'N'. A slightly
+# lighter stroke beats an illegible one, so these keep the thin skeleton.
+NO_DILATE = set('WwMm')
+
+
 def build(weight, dilate, adv_cells, path_family='Eggworks'):
     chars = sorted(G)
     order = [None] + [' '] + chars                   # .notdef, space, then the drawings
@@ -234,7 +244,7 @@ def build(weight, dilate, adv_cells, path_family='Eggworks'):
             advance[i] = adv_cells * CELL
         else:
             top, rows = G[ch]
-            outlines[i] = rects(top, rows, dilate)
+            outlines[i] = rects(top, rows, 0 if ch in NO_DILATE else dilate)
             advance[i] = adv_cells * CELL
     nglyphs = len(order)
 
