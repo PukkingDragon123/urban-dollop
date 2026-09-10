@@ -2456,12 +2456,73 @@
     const list = GAME.cars.slice().sort((a, b) => a.y - b.y);
     list.forEach(c => {
       if (c.x + 50 < cam().x || c.x - 10 > cam().x + W.view.w) return;
-      const spr = drawCar(c.kind, c.col, c.x, c.y - 2, c.dir, Math.floor(now / 80 + c.id) % 2);
-      /* a puff of exhaust */
-      if (Math.floor(now / 160 + c.id) % 3 === 0) {
+      const rolling = c.state === 'drive' || c.state === 'go';
+      const spr = drawCar(c.kind, c.col, c.x, c.y - 2, c.dir, rolling ? Math.floor(now / 80 + c.id) % 2 : 0);
+      /* a puff of exhaust while it is moving, and brake lights while it is not */
+      if (rolling && Math.floor(now / 160 + c.id) % 3 === 0) {
         ctx.fillStyle = 'rgba(200,200,190,.5)';
         ctx.fillRect(Math.round(c.x + (c.dir === 1 ? -3 : spr.width + 1)), Math.round(c.y + spr.height - 6), 2, 2);
       }
+      if (c.state === 'slow' || c.state === 'stopped') {
+        ctx.fillStyle = '#ff4a2a';
+        ctx.fillRect(Math.round(c.x + (c.dir === 1 ? 1 : spr.width - 3)), Math.round(c.y + 4), 2, 2);
+      }
+      /* whoever got out of it, on their way to the fence and back */
+      const w = c.who;
+      if (w) {
+        const walking = w.state === 'out' || w.state === 'back';
+        const ps = SPR.personSprite(w.look, walking ? w.frame : 0, 1);
+        SPR.shadowEll(ctx, w.x + 6, w.y + ps.height - 1, 5.5, 1.5, 0.26);
+        ctx.save();
+        if (w.dir > 0) { ctx.translate(Math.round(w.x) + ps.width, Math.round(w.y)); ctx.scale(-1, 1); ctx.drawImage(ps, 0, 0); }
+        else ctx.drawImage(ps, Math.round(w.x), Math.round(w.y));
+        ctx.restore();
+        if (w.lineT > 0 && ctx === mainCtx) drawSay(w.line, w.x + 6, w.y - 4, 20);
+      }
+    });
+  }
+
+  /* ---------- passers-by ----------
+     Livestock, dog walkers and joggers along the verge and the far
+     footpath. A stopped one stares over the fence and says something
+     about the place. */
+  function drawPassers(now) {
+    GAME.passers.forEach(p => {
+      if (p.x + 40 < cam().x || p.x - 40 > cam().x + W.view.w) return;
+      if (p.y + 30 < cam().y || p.y - 30 > cam().y + W.view.h) return;
+      const walking = p.state === 'walk';
+      const draw = (spr, x, y, flip) => {
+        SPR.shadowEll(ctx, x + spr.width / 2, y + spr.height - 1, spr.width * 0.34, 1.5, 0.24);
+        ctx.save();
+        if (flip) { ctx.translate(Math.round(x) + spr.width, Math.round(y)); ctx.scale(-1, 1); ctx.drawImage(spr, 0, 0); }
+        else ctx.drawImage(spr, Math.round(x), Math.round(y));
+        ctx.restore();
+      };
+      /* the one in front */
+      const lead = p.def.person
+        ? SPR.personSprite(p.look, walking ? p.frame : 0, 1)
+        : SPR.critterSprite(p.def.critter, walking ? p.frame : 0, 1);
+      draw(lead, p.x, p.y - lead.height + 6, p.dir > 0);
+      /* whatever is trailing behind: a dog on a lead, a sheep, ducklings */
+      for (let i = 1; i <= p.pets; i++) {
+        const kind = p.def.pet || p.def.critter;
+        const spr = SPR.critterSprite(kind, walking ? (p.frame ^ (i & 1)) : 0, 1);
+        const bx = p.x - p.dir * (lead.width * 0.7 + i * (spr.width + 3));
+        const by = p.y - spr.height + 6 + (i % 2 ? 1 : 0);
+        draw(spr, bx, by, p.dir > 0);
+        /* the lead, for a dog walker: a dashed line between the two of
+           them, stepped by pixel count rather than walked to a target,
+           so an odd gap cannot run the loop off the end */
+        if (p.def.pet === 'dog' && i === 1) {
+          ctx.fillStyle = '#3a2a16';
+          const x0 = Math.round(p.x + (p.dir > 0 ? 2 : lead.width - 2));
+          const x1 = Math.round(bx + (p.dir > 0 ? spr.width : 0));
+          const n = Math.min(30, Math.abs(x1 - x0) >> 1);
+          const step = x1 > x0 ? 2 : -2;
+          for (let j = 0; j < n; j++) ctx.fillRect(x0 + j * step, Math.round(p.y - 6), 1, 1);
+        }
+      }
+      if (p.line && ctx === mainCtx) drawSay(p.line, p.x + 6, p.y - lead.height + 2, 18);
     });
   }
   function drawOrders(now) {
@@ -3942,6 +4003,7 @@
     drawTruck(now);
     drawFarSide(now);
     drawTraffic(now);
+    drawPassers(now);
     drawOrders(now);
     drawMovers(now);
     drawLimo(now);
@@ -7721,11 +7783,23 @@
     body.className = 'form-body';
     const photo = document.createElement('div');
     photo.className = 'form-photo';
-    photo.appendChild(cloneCanvas(SPR.personSprite(ap.look, 0, 3)));
+    photo.appendChild(cloneCanvas(SPR.staffSprite(ap, 0, 3)));
     body.appendChild(photo);
     const fields = document.createElement('div');
     fields.className = 'form-fields';
     fields.appendChild(formField('NAME', ap.name, 'wide'));
+    /* an animal applicant says what it is, and what it is good at */
+    if (ap.animal && CREW_ANIMAL_BY_ID[ap.animal]) {
+      const A = CREW_ANIMAL_BY_ID[ap.animal];
+      const sp = document.createElement('span');
+      sp.className = 'chip';
+      sp.appendChild(mkIcon('paw', 2));
+      sp.appendChild(document.createTextNode(A.name.toUpperCase()));
+      sp.appendChild(mkIcon(STATS[A.stat].icon, 2));
+      sp.appendChild(document.createTextNode('+2'));
+      sp.title = A.line + ' Naturally good at ' + STATS[A.stat].name + '.';
+      fields.appendChild(formField('SPECIES', sp));
+    }
     const rate = document.createElement('span');
     rate.className = 'chip';
     rate.appendChild(mkIcon('star', 2));
@@ -9761,6 +9835,10 @@
     toast({ sprite: cloneCanvas(SPR.chickenSprite(sp, 2, false)), title: sp.name + ' GRADUATED', body: 'She joins the lab team. Feathers dropped!' });
   });
   /* ---- bugs ---- */
+  /* ---- the road ---- */
+  GAME.on('pullover', ({ x, y }) => { snd.engine(); groundDust(x, y + 10, 5, '#c9a878'); });
+  GAME.on('pullaway', ({ x, y }) => { snd.engine(); groundDust(x, y + 10, 6, '#c9a878'); smoke(x, y + 6, 3, 'rgba(190,186,180,1)', 14); });
+  GAME.on('passerstop', ({ p }) => { if (!p.def.person && Math.random() < 0.5) snd.squawk(); });
   GAME.on('bugup', ({ bug, x, y }) => {
     if (!GAME.setting('particles')) return;
     dirt(x, y, 3); groundDust(x, y + 1, 2, '#a07444');

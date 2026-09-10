@@ -386,6 +386,84 @@ const BUILDS = {
 };
 
 /* ------------------------------------------------------------
+   THE ANIMAL CREW - not everyone who walks up the drive is a
+   person. Other species answer the posters too, drawn on the
+   founder's own frame at crew size, and each is naturally good
+   at one thing: it lands as a bonus on that stat when they roll.
+   ------------------------------------------------------------ */
+const CREW_ANIMALS = [
+  { id:'fox',     name:'Fox',     stat:'speed', line:'Quick on her feet and quicker with an excuse.' },
+  { id:'badger',  name:'Badger',  stat:'carry', line:'Digs like a machine, carries like two. Will not be hurried.' },
+  { id:'possum',  name:'Possum',  stat:'care',  line:'Gentle with the birds. Plays dead in a crisis.' },
+  { id:'cat',     name:'Cat',     stat:'tech',  line:'Sits on the warm machines until they behave.' },
+  { id:'otter',   name:'Otter',   stat:'grit',  line:'Never tires, never dry, always cheerful.' },
+  { id:'hare',    name:'Hare',    stat:'speed', line:'Covers the whole ranch before you have your boots on.' },
+  { id:'raccoon', name:'Raccoon', stat:'tech',  line:'One of the family. Watch the till.' },
+];
+const CREW_ANIMAL_BY_ID = Object.fromEntries(CREW_ANIMALS.map(a => [a.id, a]));
+/* animal hires get their own names */
+const ANIMAL_NAMES = ['BRUSH', 'BRAMBLE', 'PIP', 'NUTMEG', 'SORREL', 'BADGE', 'MOSS', 'CLOVER',
+                      'RUSTY', 'WILLOW', 'FLINT', 'HAZEL', 'TUFT', 'BURROW', 'SCRUFF', 'THISTLE',
+                      'ACORN', 'JUNIPER', 'SMUDGE', 'BRACKEN'];
+
+/* ------------------------------------------------------------
+   PASSERS-BY - the road is not only cars. Livestock gets loose,
+   people walk their dogs past the gate, and now and then someone
+   pulls over to gawp at the ranch and say something about it.
+   `critter` picks a four-legged sprite, `person` a procedural
+   human, and `pet` trails a second animal behind on a lead.
+   ------------------------------------------------------------ */
+const PASSERS = [
+  { id:'cow',     critter:'cow',   v:11, w:0.9, stop:0.5,  path:'verge', name:'A Loose Cow',
+    says:['MOO.', 'MOOOO.', 'MOO?'] },
+  { id:'sheep',   critter:'sheep', v:14, w:1.0, stop:0.35, path:'verge', name:'A Sheep',
+    says:['BAA.', 'BAAAA.', 'BAA. BAA.'] },
+  { id:'pig',     critter:'pig',   v:16, w:0.8, stop:0.4,  path:'verge', name:'A Pig',
+    says:['OINK.', 'SNRRRK.', 'OINK OINK.'] },
+  { id:'goat',    critter:'goat',  v:19, w:0.8, stop:0.45, path:'verge', name:'A Goat',
+    says:['BLEAT!', 'MEHHH.', 'IS THAT FENCE EDIBLE?'] },
+  { id:'ducks',   critter:'duck',  v:13, w:0.7, stop:0.25, path:'path', name:'Ducks', line:3,
+    says:['QUACK.', 'QUACK QUACK QUACK.', 'QUACK?'] },
+  { id:'walker',  person:true, pet:'dog', v:22, w:1.2, stop:0.4, path:'path', name:'A Dog Walker' },
+  { id:'shepherd',person:true, pet:'sheep', v:18, w:0.6, stop:0.3, path:'verge', name:'A Shepherd' },
+  { id:'jogger',  person:true, v:38, w:0.8, stop:0.12, path:'path', name:'A Jogger' },
+  { id:'stroll',  person:true, v:20, w:1.1, stop:0.55, path:'path', name:'A Passer-By' },
+];
+/* what the people say when they stop and stare over the fence; the
+   livestock have their own noises, up in PASSERS */
+const PASSER_LINES = [
+  'IS THAT A RACCOON IN A SUIT?',
+  'HE HAS A LOGO. A LOGO!',
+  'MY AUNT BUYS THESE EGGS.',
+  'SMELLS LIKE MONEY. AND HENS.',
+  'THAT ONE IS LOOKING AT ME.',
+  'ARE THE BROWN ONES DEARER?',
+  'I READ ABOUT THIS PLACE.',
+  'GOOD MORNING, CHICKENS.',
+  'MY DOG WANTS A WORD WITH THAT HEN.',
+  'IS THE FARM SHOP OPEN?',
+  'HOW MANY EGGS IS THAT, THEN?',
+  'THEY SAY HE STARTED WITH ONE HEN.',
+  'THAT IS A LOT OF FENCE.',
+  'I COULD DO THIS. I COULD.',
+  'THE DOG HAS NEVER SEEN A HEN IN A HAT.',
+  'IS HE HIRING? ASKING FOR ME.',
+];
+/* and what a driver says when they pull over for a look */
+const PULLOVER_LINES = [
+  'JUST A QUICK LOOK, LOVE.',
+  'THAT IS THE PLACE FROM THE RADIO.',
+  'SIX DOZEN, IF THEY HAVE THEM.',
+  'PULL IN, PULL IN - LOOK AT THE HENS!',
+  'IS HE HIRING, DO YOU RECKON?',
+  'I AM GOING TO BUY A HEN.',
+  'THAT RACCOON IS DOING BETTER THAN US.',
+  'TAKE A PHOTO. NOBODY WILL BELIEVE IT.',
+  'ARE WE STOPPING? WE ARE STOPPING.',
+  'IT WAS A FIELD LAST YEAR!',
+];
+
+/* ------------------------------------------------------------
    BUGS - what lives in the soil. Dig them up with the spade,
    pick them up by hand, or let a hen find one herself: a bug is
    the best thing a chicken can eat, worth several pellets of

@@ -2015,8 +2015,16 @@ const GAME = (() => {
       shirt: pick(SHIRTS, rnd), pants: pick(PANTS, rnd), boot: pick(BOOTS, rnd),
       hat: pick(HATS, rnd),
     };
+    /* a third of the applicants are not people at all: another species,
+       drawn on the founder's own frame, naturally good at one thing */
+    let animal = null;
+    if (rnd() < 0.34) {
+      const A = pick(CREW_ANIMALS, rnd);
+      animal = A.id;
+      st[A.stat] = Math.min(RECRUIT.statMax, st[A.stat] + 2);
+    }
     return {
-      id: nextId++, seed, name: rollName(rnd), st, traits, look,
+      id: nextId++, seed, name: animal ? pick(ANIMAL_NAMES, rnd) : rollName(rnd), st, traits, look, animal,
       wage: crewWage(st, traits), sign: crewSignCost(st, traits),
       t: RECRUIT.applicantLife,
     };
@@ -2146,7 +2154,7 @@ const GAME = (() => {
     S.applicants.splice(i, 1);
     const at = ap.x !== undefined ? { x: ap.x, y: ap.y } : hutSpawn();
     S.staff.push({
-      id: nextId++, role, name: ap.name, st: ap.st, traits: ap.traits, look: ap.look,
+      id: nextId++, role, name: ap.name, st: ap.st, traits: ap.traits, look: ap.look, animal: ap.animal || null,
       wage: ap.wage, x: at.x, y: at.y, dir: 1, frame: 0, anim: 0,
       state: 'idle', t: 0, carry: [], target: null, say: 0, energy: 1, jobs: 0,
     });
@@ -3074,15 +3082,127 @@ const GAME = (() => {
     if (carT <= 0 && cars.length < 4) {
       carT = ECON.carEvery * (0.5 + Math.random());
       const dir = Math.random() < 0.5 ? 1 : -1;
-      cars.push({ id: nextId++, kind: pickOne(CAR_KINDS), col: pickOne(CAR_COLS), dir,
-                  x: dir === 1 ? -70 : WORLD.W + 70, y: laneY(dir), v: 36 + Math.random() * 34 });
+      const c = { id: nextId++, kind: pickOne(CAR_KINDS), col: pickOne(CAR_COLS), dir,
+                  x: dir === 1 ? -70 : WORLD.W + 70, y: laneY(dir), v: 36 + Math.random() * 34,
+                  v0: 0, state: 'drive', who: null, t: 0 };
+      c.v0 = c.v;
+      /* one car in five pulls over for a gawp at the ranch, once the
+         company is a going concern and there is something to gawp at */
+      if (S.company.done && Math.random() < 0.22) {
+        const from = dir === 1 ? 120 : WORLD.W - 120;
+        c.pull = from + dir * (60 + Math.random() * (WORLD.W - 360));
+        c.pull = Math.max(90, Math.min(WORLD.W - 130, c.pull));
+      }
+      cars.push(c);
     }
     for (let i = cars.length - 1; i >= 0; i--) {
       const c = cars[i];
+      /* the pull-over: slow, stop on the verge, out for a look, back in */
+      if (c.pull !== undefined && c.state === 'drive' && (c.x - c.pull) * c.dir > -40) c.state = 'slow';
+      if (c.state === 'slow') {
+        c.v = Math.max(0, c.v - 90 * dt);
+        c.y += (laneY(c.dir) + (c.dir === 1 ? 8 : -8) - c.y) * Math.min(1, dt * 3);
+        if (c.v <= 0.5) {
+          c.state = 'stopped'; c.v = 0; c.t = 4.5 + Math.random() * 3;
+          const seed = Math.floor(Math.random() * 1e9);
+          const rnd = SPR.mulberry(seed);
+          c.who = { x: c.x + (c.dir === 1 ? 8 : 24), y: c.y - 2, dir: -c.dir, frame: 0, anim: 0,
+                    state: 'out', t: 0, seed,
+                    look: { skin: pick(SKINS, rnd), hair: pick(HAIRS, rnd), style: pick(HAIR_STYLES, rnd),
+                            shirt: pick(SHIRTS, rnd), pants: pick(PANTS, rnd), boot: pick(BOOTS, rnd),
+                            hat: pick(HATS, rnd) },
+                    line: pickOne(PULLOVER_LINES), lineT: 4 };
+          emit('pullover', { car: c, x: c.x + 16, y: c.y });
+        }
+      } else if (c.state === 'stopped') {
+        c.t -= dt;
+        const w = c.who;
+        if (w) {
+          w.lineT = Math.max(0, w.lineT - dt);
+          /* out of the car, up to the fence, a look, and back */
+          const goal = w.state === 'back' ? { x: c.x + 14, y: c.y - 2 } : { x: w.x, y: WORLD.roadY - 12 };
+          const dx = goal.x - w.x, dy = goal.y - w.y, d = Math.hypot(dx, dy);
+          if (d > 2) {
+            const sp = 26 * dt;
+            w.x += dx / d * Math.min(d, sp); w.y += dy / d * Math.min(d, sp);
+            w.dir = dx > 0 ? 1 : -1;
+            w.anim += sp;
+            if (w.anim > 5) { w.anim = 0; w.frame ^= 1; }
+          } else if (w.state === 'out') { w.state = 'look'; w.t = 2.4; w.frame = 0; }
+          else if (w.state === 'back') { c.who = null; c.t = Math.min(c.t, 0.6); }
+          if (w.state === 'look') { w.t -= dt; if (w.t <= 0) w.state = 'back'; }
+        }
+        if (c.t <= 0 && !c.who) { c.state = 'go'; c.pull = undefined; emit('pullaway', { car: c, x: c.x + 16, y: c.y }); }
+      } else if (c.state === 'go') {
+        c.v = Math.min(c.v0, c.v + 60 * dt);
+        c.y += (laneY(c.dir) - c.y) * Math.min(1, dt * 3);
+        if (c.v >= c.v0 - 1) c.state = 'drive';
+      }
       /* nobody drives through the car in front */
       const ahead = cars.find(o => o !== c && o.dir === c.dir && (o.x - c.x) * c.dir > 0 && (o.x - c.x) * c.dir < 44);
       c.x += c.dir * (ahead ? Math.min(c.v, ahead.v) : c.v) * dt;
       if (c.x < -120 || c.x > WORLD.W + 120) cars.splice(i, 1);
+    }
+    tickPassers(dt);
+  }
+
+  /* ---------- passers-by ----------
+     Livestock, dog walkers and joggers along the verge and the far
+     footpath. They live in a plain array like the cars, not in the
+     save: whoever was walking past while you were away has gone. */
+  const passers = [];
+  let passT = 8;
+  function passerY(path, dir) {
+    /* the verge is your side of the kerb; the path is over the road */
+    if (path === 'verge') return WORLD.roadY - 10 + (dir === 1 ? 3 : 0);
+    return WORLD.farY + 4 + (dir === 1 ? 4 : 0);
+  }
+  function tickPassers(dt) {
+    passT -= dt;
+    if (passT <= 0 && passers.length < 4) {
+      passT = 13 + Math.random() * 16;
+      /* weighted pick, so a cow in the road stays a surprise */
+      const tot = PASSERS.reduce((a, p) => a + p.w, 0);
+      let roll = Math.random() * tot, def = PASSERS[0];
+      for (const p of PASSERS) { roll -= p.w; if (roll <= 0) { def = p; break; } }
+      const dir = Math.random() < 0.5 ? 1 : -1;
+      const y = passerY(def.path, dir);
+      const seed = Math.floor(Math.random() * 1e9);
+      const rnd = SPR.mulberry(seed);
+      passers.push({ id: nextId++, def, dir, x: dir === 1 ? -30 : WORLD.W + 30, y,
+        v: def.v * (0.85 + Math.random() * 0.3), state: 'walk', t: 0, frame: 0, anim: 0,
+        seed, line: null, lineT: 0,
+        look: def.person ? { skin: pick(SKINS, rnd), hair: pick(HAIRS, rnd), style: pick(HAIR_STYLES, rnd),
+                             shirt: pick(SHIRTS, rnd), pants: pick(PANTS, rnd), boot: pick(BOOTS, rnd),
+                             hat: pick(HATS, rnd) } : null,
+        pets: def.line ? def.line - 1 : def.pet ? 1 : 0 });
+      emit('passer', { p: passers[passers.length - 1] });
+    }
+    for (let i = passers.length - 1; i >= 0; i--) {
+      const p = passers[i];
+      p.lineT = Math.max(0, p.lineT - dt);
+      if (!p.lineT) p.line = null;
+      if (p.state === 'walk') {
+        p.x += p.dir * p.v * dt;
+        p.anim += p.v * dt;
+        if (p.anim > 6) { p.anim = 0; p.frame ^= 1; }
+        /* a stop to stare over the fence, and something said about it.
+           Only one voice on the road at a time: two clouds over the
+           verge at once cover the field and read as noise. */
+        if (p.def.stop && !p.stopped && Math.random() < dt * 0.12
+            && p.x > 80 && p.x < WORLD.W - 120) {
+          const talking = passers.some(o => o !== p && o.lineT > 0)
+            || cars.some(c => c.who && c.who.lineT > 0);
+          p.stopped = true; p.state = 'stare'; p.t = 2 + Math.random() * 2.5;
+          if (!talking) { p.line = pickOne(p.def.says || PASSER_LINES); p.lineT = p.t; }
+          emit('passerstop', { p });
+        }
+      } else {
+        p.t -= dt;
+        p.frame = 0;
+        if (p.t <= 0) p.state = 'walk';
+      }
+      if (p.x < -60 || p.x > WORLD.W + 60) passers.splice(i, 1);
     }
   }
 
@@ -4335,6 +4455,7 @@ const GAME = (() => {
     billboardPull, billboardArt, setBillboardArt,
     boss, bossSay, bossTap, bossAt, bossGo,
     digAt, bugAt, catchBug, spawnBug, scatterBugs, sellJar, jarCount, jarValue, nearestBug,
+    get passers() { return passers; },
     get bugs() { return S.bugs; }, get bugjar() { return S.bugjar; },
     warden, wardenLine, wardenAt, tapWarden,
     siteFor, storeyMult, canStorey, addStorey, storeyCost, finishSites: () => Object.keys(S.sites).forEach(finishSite),
