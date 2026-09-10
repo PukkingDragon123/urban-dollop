@@ -219,6 +219,9 @@
      rather than fixed, so the stage fills whatever room there is and the
      page never has anything below the fold. */
   let SC = 3;
+  /* the render scale is SC multiplied by this; declared up here because
+     sizeStage() reads it on the very first pass */
+  let zoom = 1, punch = 0, punchV = 0;
   /* fit the stage to the window: take the room the rail leaves, pick a
      whole-number zoom so pixels stay square, and set the camera's view
      from that. Called on load and whenever the window changes. */
@@ -244,6 +247,7 @@
     cv.style.width = (vw * z) + 'px';
     cv.style.height = (vh * z) + 'px';
     ctx.imageSmoothingEnabled = false;
+    applyZoom();
     GAME.clampCam();
     if (onStageResize) onStageResize();
     return true;
@@ -792,6 +796,143 @@
   }
 
   /* ============================================================
+     THE CINEMATIC CAMERA
+     The world is drawn at SC screen pixels to a world pixel. Zoom
+     is just that scale multiplied - and because every piece of
+     culling, every hit test and worldToScreen all measure the
+     viewport out of W.view, keeping W.view in step with the zoom
+     makes the whole game agree about where things are without
+     touching any of them.
+
+     On top of that sits a little director: point the camera at
+     something, hold on it, drop letterbox bars in, put a prompt on
+     screen, and give the camera back when the beat is done. It can
+     also throw a punch - a quick shove of zoom about the centre of
+     the screen - for the moments that want one.
+     ============================================================ */
+  function applyZoom() {
+    W.view.w = cv.width / (SC * zoom);
+    W.view.h = cv.height / (SC * zoom);
+  }
+  /* change the zoom while holding a world point where it is on screen */
+  function setZoom(z, holdX, holdY) {
+    z = Math.max(0.6, Math.min(4, z));
+    if (Math.abs(z - zoom) < 0.0005) return;
+    const hx = holdX === undefined ? cam().x + W.view.w / 2 : holdX;
+    const hy = holdY === undefined ? cam().y + W.view.h / 2 : holdY;
+    zoom = z;
+    applyZoom();
+    cam().x = hx - W.view.w / 2;
+    cam().y = hy - W.view.h / 2;
+    GAME.clampCam();
+  }
+  /* a shove of zoom, for a hit that wants to be felt */
+  function zoomPunch(amount, speed) {
+    if (!GAME.setting('shake')) return;
+    punchV += (amount === undefined ? 0.09 : amount) * (speed || 1);
+  }
+
+  let cineBody = 0;
+  const cine = {
+    on: false, t: 0, life: 0, z: 1, ease: 0.06,
+    focus: null, prompt: null, bars: 0, barsWant: 0, lock: false, closing: false,
+  };
+  function cineOn() { return cine.on; }
+  function cineLocked() { return cine.on && cine.lock && !cine.closing; }
+  /* point the camera at something and hold there */
+  function cineTo(opts) {
+    const o = opts || {};
+    cine.on = true; cine.closing = false;
+    cine.t = 0; cine.life = o.life || 14;
+    cine.z = o.zoom || 2.2;
+    cine.ease = o.ease || 0.055;
+    cine.focus = o.focus || null;
+    cine.prompt = o.prompt || null;
+    cine.barsWant = o.bars === false ? 0 : 1;
+    cine.lock = o.lock !== false;
+  }
+  function cineSay(prompt) { cine.prompt = prompt; cine.t = 0; }
+  function cineOff() {
+    if (!cine.on) return;
+    cine.closing = true; cine.prompt = null; cine.barsWant = 0; cine.z = 1;
+  }
+  function tickCine(dt) {
+    /* the punch decays like a spring whether or not the director is up */
+    if (punchV || punch) {
+      punch += punchV;
+      punchV *= Math.pow(0.0009, dt);
+      punch *= Math.pow(0.0016, dt);
+      if (Math.abs(punch) < 0.002 && Math.abs(punchV) < 0.002) { punch = 0; punchV = 0; }
+    }
+    let want = 1;
+    if (cine.on) {
+      cine.t += dt;
+      want = cine.z;
+      const f = typeof cine.focus === 'function' ? cine.focus() : cine.focus;
+      if (f && !cine.closing) {
+        /* ease the camera onto it rather than snapping */
+        const k = Math.min(1, dt * 4.2);
+        const tx = f.x - W.view.w / 2, ty = f.y - W.view.h / 2;
+        cam().x += (tx - cam().x) * k;
+        cam().y += (ty - cam().y) * k;
+        GAME.clampCam();
+      }
+      cine.bars += (cine.barsWant - cine.bars) * Math.min(1, dt * 6);
+      if (!cineBody) { cineBody = 1; document.body.classList.add('cine-on'); }
+      if (cine.closing && Math.abs(zoom - 1) < 0.02 && cine.bars < 0.02) {
+        cine.on = false; cine.bars = 0; cine.focus = null; cine.prompt = null; cine.lock = false;
+        cineBody = 0; document.body.classList.remove('cine-on');
+      }
+      /* nothing is allowed to hold the camera for ever */
+      if (!cine.closing && cine.t > cine.life) cineOff();
+    }
+    const target = want * (1 + punch);
+    if (Math.abs(target - zoom) > 0.0008) {
+      const f = typeof cine.focus === 'function' ? cine.focus() : cine.focus;
+      const nz = zoom + (target - zoom) * Math.min(1, dt / Math.max(0.016, cine.ease));
+      if (cine.on && f && !cine.closing) setZoom(nz, f.x, f.y);
+      else setZoom(nz);
+    }
+  }
+  /* the bars and the line of instruction, over everything */
+  function drawCine(now) {
+    if (!cine.on || cine.bars <= 0.01) return;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const h = Math.round(cv.height * 0.085 * cine.bars);
+    ctx.fillStyle = '#0d1014';
+    ctx.fillRect(0, 0, cv.width, h);
+    ctx.fillRect(0, cv.height - h, cv.width, h);
+    ctx.fillStyle = 'rgba(255,179,46,.55)';
+    ctx.fillRect(0, h, cv.width, 2); ctx.fillRect(0, cv.height - h - 2, cv.width, 2);
+    /* a chevron bouncing over the thing it wants you to tap */
+    const f = typeof cine.focus === 'function' ? cine.focus() : cine.focus;
+    if (f && cine.prompt && cine.bars > 0.5) {
+      const RS = SC * zoom;
+      const ax = Math.round((f.x - cam().x) * RS);
+      const bounce = Math.round(Math.abs(Math.sin(now / 280)) * 5 * SC);
+      const ay = Math.round((f.y - cam().y) * RS) - 22 * SC - bounce;
+      const k = Math.max(2, SC - 1);
+      if (ay > h + 4) {
+        ctx.fillStyle = '#17141d';
+        for (let i = 0; i < 6; i++) ctx.fillRect(ax - (5 - i) * k, ay - k + i * k, (11 - i * 2) * k, k);
+        ctx.fillStyle = '#ffb32e';
+        for (let i = 0; i < 4; i++) ctx.fillRect(ax - (3 - i) * k, ay + i * k, (7 - i * 2) * k, k);
+      }
+    }
+    if (!cine.prompt || cine.bars < 0.6) return;
+    /* the instruction, on a lit plate at the foot of the frame */
+    const k = Math.max(2, SC - 1);
+    const tw = SPR.textW(cine.prompt, k);
+    const px = Math.round(cv.width / 2 - tw / 2), py = Math.round(cv.height - h + (h - k * 8) / 2);
+    const blink = Math.floor(now / 420) % 2;
+    ctx.fillStyle = blink ? '#ffb32e' : '#c98f1f';
+    ctx.fillRect(px - 8 * k, py - 3 * k, tw + 16 * k, k * 8 + 6 * k);
+    ctx.fillStyle = '#0d1014';
+    ctx.fillRect(px - 6 * k, py - 2 * k, tw + 12 * k, k * 8 + 4 * k);
+    SPR.drawText(ctx, cine.prompt, px, py, blink ? '#ffb32e' : '#e8a020', k);
+  }
+
+  /* ============================================================
      PARTICLES AND SCREEN FEEL
      One flat array of particles, each with a type that says how to
      draw it, plus three screen-wide effects (shake, flash, a hit
@@ -928,6 +1069,35 @@
         g: 220, t: 0, life: rnd(0.6, 1.0), col: '#ffd23f', ph: Math.random() * 6 });
     }
   }
+  /* --- a comic word burst: fat letters on a jagged plate, popped and gone --- */
+  function wordPop(x, y, txt, col) {
+    if (!pOn()) return;
+    P({ type: 'word', x, y, vx: 0, vy: -22, g: 0, drag: 2.4, t: 0, life: 0.85,
+      col: col || '#ffd23f', txt: String(txt).toUpperCase(), seed: Math.random() * 6 });
+  }
+  /* --- a jagged cartoon flash, the shape a comic puts behind a bang --- */
+  function starburst(x, y, col, r) {
+    if (!pOn()) return;
+    P({ type: 'burst', x, y, vx: 0, vy: 0, g: 0, t: 0, life: 0.3, col: col || '#fff8ec', r1: r || 26, seed: Math.random() * 6 });
+  }
+  /* --- speed lines rushing out of a point --- */
+  function speedLines(x, y, n, col, r) {
+    if (!pOn()) return;
+    for (let i = 0; i < (n || 10); i++) {
+      const a = (i / (n || 10)) * Math.PI * 2 + Math.random() * 0.3;
+      P({ type: 'streak', x, y, vx: 0, vy: 0, g: 0, t: 0, life: rnd(0.22, 0.4),
+        col: col || 'rgba(255,255,255,1)', ang: a, r0: (r || 14) * 0.5, r1: (r || 14) * rnd(1.4, 2.2) });
+    }
+  }
+  /* --- the stars that go round a head that has just been hit --- */
+  function dizzy(x, y, n, col) {
+    if (!pOn()) return;
+    for (let i = 0; i < (n || 3); i++) {
+      P({ type: 'dizzy', x, y, vx: 0, vy: -6, g: 0, t: 0, life: 1.1,
+        col: col || '#ffd23f', ph: (i / (n || 3)) * Math.PI * 2, rad: 10 + i });
+    }
+  }
+
   /* --- the all-purpose hit: a ring, a spray of sparks, dust below --- */
   function impact(x, y, col, big) {
     ring(x, y, 'rgba(255,255,255,1)', big ? 40 : 22, big ? 0.4 : 0.28, big ? 2 : 1);
@@ -1059,6 +1229,66 @@
           ctx.restore();
           break;
         }
+        case 'word': {
+          /* it pops out past its size, then settles, then goes */
+          const sc = f < 0.18 ? 0.4 + (f / 0.18) * 0.75 : f > 0.7 ? 1.15 - (f - 0.7) / 0.3 * 0.25 : 1.15;
+          const k = Math.max(1, Math.round(2 * sc));
+          const w = SPR.textW(p.txt, k), hh = k * 8;
+          ctx.save();
+          ctx.translate(X, Y);
+          ctx.rotate(Math.sin(p.seed) * 0.12);
+          /* the jagged plate behind it */
+          const pts = 14, rx = w / 2 + 6 * k, ry = hh / 2 + 5 * k;
+          ctx.fillStyle = '#17141d';
+          ctx.beginPath();
+          for (let i = 0; i <= pts; i++) {
+            const a = (i / pts) * Math.PI * 2;
+            const rr = i % 2 ? 0.74 : 1;
+            ctx.lineTo(Math.cos(a) * rx * rr, Math.sin(a) * ry * rr);
+          }
+          ctx.fill();
+          ctx.fillStyle = p.col;
+          ctx.beginPath();
+          for (let i = 0; i <= pts; i++) {
+            const a = (i / pts) * Math.PI * 2;
+            const rr = (i % 2 ? 0.74 : 1) * 0.86;
+            ctx.lineTo(Math.cos(a) * rx * rr, Math.sin(a) * ry * rr);
+          }
+          ctx.fill();
+          SPR.drawTitle(ctx, p.txt, Math.round(-w / 2), Math.round(-hh / 2), '#17141d', null, k);
+          ctx.restore();
+          break;
+        }
+        case 'burst': {
+          const r = (0.4 + f * 0.9) * p.r1;
+          ctx.globalAlpha = Math.max(0, 1 - f * 1.3);
+          ctx.fillStyle = p.col;
+          ctx.beginPath();
+          for (let i = 0; i <= 16; i++) {
+            const a = (i / 16) * Math.PI * 2 + p.seed;
+            const rr = i % 2 ? 0.5 : 1;
+            ctx.lineTo(p.x + Math.cos(a) * r * rr, p.y + Math.sin(a) * r * rr * 0.8);
+          }
+          ctx.fill();
+          break;
+        }
+        case 'streak': {
+          const r0 = p.r0 + f * (p.r1 - p.r0) * 0.7, r1 = p.r0 + f * (p.r1 - p.r0);
+          ctx.globalAlpha = Math.max(0, 1 - f) * 0.9;
+          ctx.fillStyle = p.col;
+          const c = Math.cos(p.ang), sn = Math.sin(p.ang);
+          for (let d = r0; d < r1; d++) ctx.fillRect(Math.round(p.x + c * d), Math.round(p.y + sn * d * 0.75), 1, 1);
+          break;
+        }
+        case 'dizzy': {
+          const a = p.ph + p.t * 7;
+          const sx2 = Math.round(p.x + Math.cos(a) * p.rad), sy2 = Math.round(p.y + Math.sin(a) * p.rad * 0.45);
+          const sz = 2;
+          ctx.fillStyle = p.col;
+          ctx.fillRect(sx2 - sz, sy2, sz * 2 + 1, 1); ctx.fillRect(sx2, sy2 - sz, 1, sz * 2 + 1);
+          ctx.fillRect(sx2 - 1, sy2 - 1, 3, 3);
+          break;
+        }
         case 'num': {
           /* it pops out, holds, then goes: bigger for the first beat */
           const kk = f < 0.12 ? 2 : 1;
@@ -1077,7 +1307,7 @@
   /* ---- screen feel: a shake, a flash, and a held frame ---- */
   let shk = { t: 0, dur: 0, mag: 0 };
   function shake(mag, dur) {
-    if (!pOn()) return;
+    if (!GAME.setting('shake')) return;
     if (mag * 1.0 < shk.mag * (1 - shk.t / (shk.dur || 1))) return;   /* never soften a bigger one */
     shk = { t: 0, dur: dur || 0.24, mag };
   }
@@ -3135,12 +3365,46 @@
       if (Math.floor(now / 250) % 2) { ctx.fillStyle = 'rgba(255,240,180,.6)'; ctx.fillRect(Math.round(L.x + spr.width - 2), Math.round(L.y + 6), 2, 3); }
     }
   }
+  /* the drone: rotors turning, a beacon, the parcel swinging on the hook,
+     and a wash of dust on the ground under it while it hovers */
+  function drawDrone(now, dt) {
+    const D = GAME.drone;
+    if (!D) return;
+    const wob = Math.sin(now / 380 + D.wob) * 1.6;
+    const dy = D.y + wob;
+    const spr = SPR.droneSprite(Math.floor(now / 55) % 3, 1, S().company.col1, S().company.col2);
+    /* its shadow on the ground, small and far below */
+    SPR.shadowEll(ctx, D.x, D.y + 52, 9, 2, 0.16);
+    /* the parcel still on the hook */
+    if (D.rw) {
+      const sway = Math.sin(now / 300 + D.wob) * 2;
+      ctx.fillStyle = '#3a3f48';
+      ctx.fillRect(Math.round(D.x - 1), Math.round(dy + 14), 1, 8);
+      const pr = SPR.presentSprite(1, S().company.col1, S().company.col2);
+      ctx.save();
+      ctx.translate(Math.round(D.x + sway), Math.round(dy + 22));
+      ctx.rotate(sway * 0.04);
+      ctx.drawImage(pr, -7, 0);
+      ctx.restore();
+    }
+    ctx.drawImage(spr, Math.round(D.x - 15), Math.round(dy - 8));
+    /* downwash: a couple of curls of dust under the rotors */
+    if (D.state === 'hover' && GAME.setting('particles') && Math.random() < dt * 6) {
+      const side = Math.random() < 0.5 ? -1 : 1;
+      puff(D.x + side * 12, dy + 10, 'rgba(220,214,200,1)', 1, 14, -6);
+    }
+  }
   function drawPresents(now) {
     S().presents.forEach(p => {
       const spr = SPR.presentSprite(1, S().company.col1, S().company.col2);
       const bob = p.z >= 0 ? Math.sin(now / 260 + p.wob) * 1 : 0;
+      const sway = p.chute ? Math.sin(now / 260 + p.wob) * 3 : 0;
       SPR.shadowEll(ctx, p.x, p.y + 1, 6 + Math.min(0, p.z) * 0.15, 1.5, 0.24);
-      ctx.drawImage(spr, Math.round(p.x - 7), Math.round(p.y - 13 + p.z + bob));
+      if (p.chute) {
+        const ch = SPR.chuteSprite(1, S().company.col1, '#fff8ec');
+        ctx.drawImage(ch, Math.round(p.x - 11 + sway * 1.4), Math.round(p.y - 30 + p.z + bob));
+      }
+      ctx.drawImage(spr, Math.round(p.x - 7 + sway), Math.round(p.y - 13 + p.z + bob));
       /* a sparkle, and the clock running down */
       if (Math.floor(now / 300 + p.id) % 3 === 0) { ctx.fillStyle = '#ffffff'; ctx.fillRect(Math.round(p.x + 6), Math.round(p.y - 14 + bob), 1, 1); ctx.fillRect(Math.round(p.x - 8), Math.round(p.y - 6 + bob), 1, 1); }
       if (p.t < 30) SPR.drawBar(ctx, Math.round(p.x - 7), Math.round(p.y + 3), 14, p.t / 30, '#e8542f', { h: 3 });
@@ -3254,7 +3518,8 @@
     ctx.fillRect(0, 0, cv.width, cv.height);
     shk.t += realDt;
     const [shx, shy] = shakeOff();
-    ctx.setTransform(SC, 0, 0, SC, Math.round((-cam().x + shx) * SC), Math.round((-cam().y + shy) * SC));
+    const RS = SC * zoom;
+    ctx.setTransform(RS, 0, 0, RS, Math.round((-cam().x + shx) * RS), Math.round((-cam().y + shy) * RS));
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(groundCv, 0, 0);
 
@@ -3399,6 +3664,7 @@
     drawOrders(now);
     drawMovers(now);
     drawLimo(now);
+    drawDrone(now, dt);
     drawPresents(now);
     drawSaleSigns(now);
 
@@ -3483,6 +3749,7 @@
     drawHand(now);
 
     drawFlash(realDt);
+    drawCine(now);
 
     /* vignette */
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -3600,10 +3867,12 @@
           if (scoopCombo % 5 === 0) {
             popNum(e.x - 6, e.y - 12, 'x' + scoopCombo, '#ffd23f');
             twinkles(e.x, e.y, 6, '#ffd23f', 14); shake(0.7, 0.14); snd.clink();
+            if (scoopCombo % 15 === 0) { wordPop(e.x, e.y - 16, 'x' + scoopCombo, '#7fd7ff'); zoomPunch(0.06); }
           }
           if (e.golden) {
             sweepGold++; if (sweepGold >= 3) GAME.findSecret('goldrush');
             coinBurst(e.x, e.y, 5); flash('#ffd23f', 0.10, 0.14); shake(1.1, 0.18);
+            wordPop(e.x, e.y - 14, 'GOLD', '#ffd23f'); starburst(e.x, e.y, '#fff3c4', 26); zoomPunch(0.05);
           }
         }
         else if (r === 'full' && Math.random() < 0.05) floatWorld('BASKET FULL', ptr.x, ptr.y - 14, 'pink');
@@ -8213,37 +8482,14 @@
   }
 
   function tapWorld(x, y) {
-    const ward = GAME.wardenAt(x, y);
-    if (ward) {
-      if (S().tool === 'inspect') { setInspect({ kind: 'warden' }); return true; }
-      const f = GAME.tapWarden();
-      if (f) {
-        snd.grand();
-        puff(ward.x + 6, ward.y - 10, '#e8721c', 12, 40, 30);
-        coinBurst(ward.x + 6, ward.y - 8, 6); twinkles(ward.x + 6, ward.y - 6, 7, '#ffd23f', 16);
-        ring(ward.x + 6, ward.y + 6, 'rgba(255,210,63,1)', 26, 0.34); shake(0.8, 0.16);
-        floatWorld('HUSH MONEY +' + f, ward.x + 6, ward.y - 30, 'gold', 'feather');
-      } else { snd.plop(); heart(ward.x + 6, ward.y - 12, 1); }
+    /* the drone first: it is the thing the game just asked you to tap */
+    const dr = GAME.droneAt(x, y);
+    if (dr) {
+      GAME.tapDrone();
+      snd.build();
+      wordPop(dr.x, dr.y - 10, 'DROP IT', '#ffd23f');
       return true;
     }
-    const boss = GAME.bossAt(x, y);
-    if (boss) {
-      if (S().tool === 'inspect') { setInspect({ kind: 'boss' }); return true; }
-      GAME.bossTap();
-      snd.pet();
-      heart(boss.x + 14, boss.y - 8, 1);
-      twinkles(boss.x + 14, boss.y + 10, 6, '#fff8ec', 16);
-      shake(0.5, 0.12);
-      questSig = '';
-      return true;
-    }
-    const st = GAME.inStation(x, y, 5);
-    if (st === 'lab') { renderSkills(); openModal('#modal-skills'); snd.build(); return true; }
-    if (st === 'stand') { renderPedia(); openModal('#modal-pedia'); snd.build(); return true; }
-    if (st === 'depot') { if (window.WMAP) WMAP.open(); else { renderDepot(); openModal('#modal-depot'); } snd.build(); return true; }
-    if (st === 'brand') { openCompany(); snd.build(); return true; }
-    const fos = GAME.fossilAt(x, y);
-    if (fos && GAME.collectFossil(fos)) { snd.sparkle(); floatWorld('FOSSIL', x, y - 14, 'gold', 'fossil'); return true; }
     const gift = GAME.presentAt(x, y);
     if (gift) {
       const rw = GAME.openPresent(gift);
@@ -8257,6 +8503,38 @@
       }
       return true;
     }
+    const ward = GAME.wardenAt(x, y);
+    if (ward) {
+      if (S().tool === 'inspect') { setInspect({ kind: 'warden' }); return true; }
+      const f = GAME.tapWarden();
+      if (f) {
+        snd.grand();
+        puff(ward.x + 6, ward.y - 10, '#e8721c', 12, 40, 30);
+        coinBurst(ward.x + 6, ward.y - 8, 6); twinkles(ward.x + 6, ward.y - 6, 7, '#ffd23f', 16);
+        ring(ward.x + 6, ward.y + 6, 'rgba(255,210,63,1)', 26, 0.34); shake(0.8, 0.16);
+        wordPop(ward.x + 6, ward.y - 24, 'HUSH', '#ffd23f'); starburst(ward.x + 6, ward.y - 4, '#fff8ec', 22);
+        floatWorld('HUSH MONEY +' + f, ward.x + 6, ward.y - 30, 'gold', 'feather');
+      } else { snd.plop(); heart(ward.x + 6, ward.y - 12, 1); }
+      return true;
+    }
+    const boss = GAME.bossAt(x, y);
+    if (boss) {
+      if (S().tool === 'inspect') { setInspect({ kind: 'boss' }); return true; }
+      GAME.bossTap();
+      snd.pet();
+      heart(boss.x + 14, boss.y - 8, 1);
+      twinkles(boss.x + 14, boss.y + 10, 6, '#fff8ec', 16);
+      shake(0.5, 0.12); dizzy(boss.x + 14, boss.y - 12, 3, '#ffd23f'); zoomPunch(0.03);
+      questSig = '';
+      return true;
+    }
+    const st = GAME.inStation(x, y, 5);
+    if (st === 'lab') { renderSkills(); openModal('#modal-skills'); snd.build(); return true; }
+    if (st === 'stand') { renderPedia(); openModal('#modal-pedia'); snd.build(); return true; }
+    if (st === 'depot') { if (window.WMAP) WMAP.open(); else { renderDepot(); openModal('#modal-depot'); } snd.build(); return true; }
+    if (st === 'brand') { openCompany(); snd.build(); return true; }
+    const fos = GAME.fossilAt(x, y);
+    if (fos && GAME.collectFossil(fos)) { snd.sparkle(); floatWorld('FOSSIL', x, y - 14, 'gold', 'fossil'); return true; }
     const lm = GAME.limo;
     if (lm && x > lm.x - 4 && x < lm.x + 44 && y > lm.y - 8 && y < lm.y + 18) { snd.engine(); floatWorld('HONK HONK', x, y - 14, 'gold'); return true; }
     const mv = GAME.movers.van;
@@ -8282,7 +8560,8 @@
         puff(x, y, '#ffd23f', 18, 64, 44);
         ring(x, y, 'rgba(255,210,63,1)', 90, 0.6, 2); ring(x, y, 'rgba(255,255,255,1)', 60, 0.45);
         beam(x, y, '#ffd23f', 80, 0.9); twinkles(x, y, 12, '#fff8ec', 34);
-        flash('#ffe9a8', 0.16, 0.26); shake(1.8, 0.4); holdFrame(0.08);
+        flash('#ffe9a8', 0.16, 0.26); shake(1.8, 0.4); holdFrame(0.08); zoomPunch(0.12);
+        wordPop(x, y - 24, 'SOLD', '#ffd23f'); speedLines(x, y, 14, 'rgba(255,255,255,.85)', 50);
         toast({ icon: 'house', title: 'NEW LAND', body: 'The fences come down. Room to grow!' });
         GAME.clampCam();
       } else {
@@ -8337,6 +8616,17 @@
     cv.setPointerCapture(ev.pointerId);
     const p = eventToWorld(ev);
     Object.assign(ptr, { x: p.x, y: p.y, sx: p.sx, sy: p.sy, inside: true, down: true, downAt: performance.now(), moved: 0 });
+    /* the camera is being held for a beat: the only thing you can do is
+       the thing it is pointing at, so nothing else can be nudged by a
+       stray tap while the game is talking to you */
+    if (cineLocked()) {
+      ptr.mode = 'cine'; ptr.target = null; cand = null;
+      const dr = GAME.droneAt(p.x, p.y);
+      if (dr) { GAME.tapDrone(); snd.build(); wordPop(dr.x, dr.y - 10, 'DROP IT', '#ffd23f'); return; }
+      const gift = GAME.presentAt(p.x, p.y);
+      if (gift) { tapWorld(p.x, p.y); return; }
+      return;
+    }
     const tool = S().tool;
     ptr.mode = null; ptr.target = null; cand = null;
     if (tool === 'build') {
@@ -8381,6 +8671,7 @@
   function endPointer(ev) {
     if (!ptr.down) return;
     ptr.down = false;
+    if (ptr.mode === 'cine') { ptr.mode = null; lastPaint = null; dimPalettes(false); return; }
     lastPaint = null;
     dimPalettes(false);
     const wasTap = ptr.moved < 6 && performance.now() - ptr.downAt < 420;
@@ -8420,6 +8711,7 @@
           heart(cand.ch.x + 10, cand.ch.y - 4, 2);
           twinkles(cand.ch.x + 10, cand.ch.y + 4, 4, '#ffd6e8', 11);
           feathers(cand.ch.x + 10, cand.ch.y + 2, 2);
+          dizzy(cand.ch.x + 10, cand.ch.y - 8, 2, '#ff8ac0');
           snd.pet();
         }
         return;
@@ -8908,13 +9200,21 @@
         snd.sparkle();
       }
     });
+    /* the first one to hatch on this farm gets a moment to itself */
+    if (S().tut && !S().tut.hatch) {
+      S().tut.hatch = 1;
+      cineTo({ focus: { x, y: y - 6 }, zoom: 2.1, ease: 0.32, life: 3.0, lock: false, bars: true });
+      setTimeout(() => cineOff(), 2600);
+      GAME.bossSay('There it is. That is an employee.', 6, 'cheer');
+    }
     feathers(x, y - 6, 4 + births.length * 2);
     ring(x, y + 4, 'rgba(255,255,255,1)', 30, 0.36); twinkles(x, y - 4, 7, '#fff8ec', 16);
     shake(0.8, 0.18);
     if (rainbow) {
       puff(x, y - 10, '#ff5fd0', 16, 64, 42); snd.grand();
       beam(x, y, '#ff5fd0', 70, 0.9); flash('#ffb0e8', 0.18, 0.28); shake(2, 0.4);
-      twinkles(x, y - 8, 14, '#ff8ae0', 30); holdFrame(0.08);
+      twinkles(x, y - 8, 14, '#ff8ae0', 30); holdFrame(0.08); zoomPunch(0.13);
+      wordPop(x, y - 30, 'RAINBOW', '#ff8ae0'); starburst(x, y - 6, '#ffd0f0', 44); speedLines(x, y - 6, 14, 'rgba(255,255,255,.9)', 46);
     }
     if (births.length > 1) floatWorld('TWINS', x, y - 24, 'pink');
   });
@@ -8932,6 +9232,7 @@
     ring(W.truckHome.x + 26, W.truckHome.y + 6, 'rgba(255,210,63,1)', 30, 0.34);
     beam(W.truckHome.x + 26, W.truckHome.y, '#ffd23f', 44, 0.7);
     shake(Math.min(1.6, 0.5 + n * 0.05), 0.2);
+    if (n >= 8) { wordPop(W.truckHome.x + 26, W.truckHome.y - 26, 'KA-CHING', '#ffd23f'); zoomPunch(0.05); }
     floatWorld('+' + GAME.fmt(pay), W.truckHome.x + 20, W.truckHome.y - 22, 'gold', 'coin');
   });
   GAME.on('depart', ({ n, to }) => {
@@ -8949,9 +9250,55 @@
     snd.grand(); questSig = '';
     const b = GAME.boss();
     if (b) { twinkles(b.x + 14, b.y + 8, 10, '#ffd23f', 26); coinBurst(b.x + 14, b.y - 4, 8); beam(b.x + 14, b.y + 30, '#ffd23f', 70, 0.8); }
-    flash('#ffe9a8', 0.14, 0.22); shake(1.4, 0.3); holdFrame(0.07);
+    flash('#ffe9a8', 0.14, 0.22); shake(1.4, 0.3); holdFrame(0.07); zoomPunch(0.11);
+    if (b) { wordPop(b.x + 14, b.y - 26, 'SIGNED', '#7fd14f'); speedLines(b.x + 14, b.y, 12, 'rgba(255,255,255,.9)', 40); }
   });
   GAME.on('questready', ({ q }) => { snd.sparkle(); const b = GAME.boss(); if (b) { heart(b.x + 14, b.y - 8, 3); twinkles(b.x + 14, b.y + 4, 6, '#ffd23f', 18); } floatText('QUEST READY: ' + q.name.toUpperCase(), innerWidth / 2 - 90, 90, 'gold', 'quest'); });
+  /* ============================================================
+     THE FIRST DELIVERY
+     A quest reward comes in by drone. The first time one arrives the
+     game takes the camera off you for a moment: it pushes in on the
+     drone, drops the bars, and asks you to tap it. Tap it and it lets
+     go; the camera rides the parcel down and asks you to open it.
+     After that it is just a drone, and it drops on its own.
+     A ten second fuse on the hover and a fourteen second one on the
+     director mean it can never leave you stuck looking at the sky.
+     ============================================================ */
+  let droneCine = 0;
+  const pickDroneLine = () => DRONE_LINES[Math.floor(Math.random() * DRONE_LINES.length)];
+  GAME.on('drone', ({ state, d, p }) => {
+    if (state === 'coming') { snd.engine(); return; }
+    if (state === 'here') {
+      snd.engine();
+      if (d.first) {
+        droneCine = 1;
+        cineTo({
+          focus: () => { const c = GAME.drone; return c ? { x: c.x, y: c.y + 10 } : { x: d.x, y: d.y }; },
+          zoom: 2.4, prompt: 'TAP THE DRONE', life: 14,
+        });
+
+      } else {
+        floatWorld('DELIVERY', d.x, d.y - 20, 'gold', 'star');
+        twinkles(d.x, d.y + 8, 5, '#ffd23f', 14);
+      }
+      return;
+    }
+    if (state === 'released') {
+      snd.plop(); zoomPunch(0.07); shake(0.7, 0.16);
+      GAME.bossSay(pickDroneLine(), 6, 'cheer');
+      sparks(d.x, d.y + 14, 6, '#ffd23f', 70);
+      ring(d.x, d.y + 14, 'rgba(255,255,255,1)', 22, 0.3);
+      if (droneCine && p) {
+        droneCine = 2;
+        cineTo({
+          focus: () => (GAME.presents.indexOf(p) >= 0 ? { x: p.x, y: p.y + p.z - 6 } : { x: p.x, y: p.y - 6 }),
+          zoom: 2.2, prompt: 'NOW OPEN IT', life: 12,
+        });
+      }
+      return;
+    }
+    if (state === 'gone' && droneCine === 1) { droneCine = 0; cineOff(); }
+  });
   GAME.on('limo', ({ state, x, y }) => {
     if (state === 'here') {
       snd.engine(); floatWorld('A DELIVERY', x + 20, y - 18, 'gold', 'star');
@@ -8962,7 +9309,10 @@
   GAME.on('present', ({ p, state }) => {
     if (state === 'dropped') {
       snd.plop(); puff(p.x, p.y - 4, '#c9a35f', 6, 24, 14);
-      groundDust(p.x, p.y + 2, 6); ring(p.x, p.y + 2, 'rgba(255,255,255,1)', 18, 0.26); shake(0.6, 0.14);
+    } else if (state === 'opened') {
+      groundDust(p.x, p.y + 2, 10); ring(p.x, p.y + 2, 'rgba(255,255,255,1)', 30, 0.32);
+      shake(1.1, 0.2); zoomPunch(0.1);
+      if (droneCine) { droneCine = 0; setTimeout(() => cineOff(), 700); }
     }
   });
   GAME.on('achievement', ({ a }) => {
@@ -9011,7 +9361,8 @@
     ring(bx, r * 16 + b.h * 16 - 2, 'rgba(255,255,255,1)', 16 + b.w * 12, 0.4, 2);
     smoke(bx, by - 4, 5, 'rgba(220,214,204,1)', 14);
     sparks(bx, by, 6, '#ffd23f', 70);
-    shake(1.8, 0.36); holdFrame(0.07);
+    shake(1.8, 0.36); holdFrame(0.07); zoomPunch(0.09);
+    wordPop(bx, by - 20, 'BUILT', '#e0bd82'); speedLines(bx, r * 16 + b.h * 16 - 2, 10, 'rgba(255,255,255,.8)', 34);
     floatWorld(kind === 'storey' ? 'SECOND FLOOR' : b.name.toUpperCase() + ' BUILT', c * 16 + b.w * 8, r * 16 - 14, 'green');
   });
   GAME.on('honey', ({ x, y, v }) => { floatWorld('+' + v, x, y - 6, 'gold', 'honey'); twinkles(x, y - 4, 3, '#ffd23f', 9); snd.clink(); });
@@ -9035,7 +9386,12 @@
     const cx = cam().x + W.view.w / 2, cy = cam().y + W.view.h / 2;
     ring(cx, cy, a.hue || 'rgba(255,255,255,1)', 260, 0.9, 2);
     twinkles(cx, cy, 20, a.hue || '#fff8ec', 120);
-    flash(a.hue || '#fff8ec', 0.22, 0.5); shake(2.6, 0.6); holdFrame(0.11); toast({ icon: a.icon, title: 'THE ' + a.name.toUpperCase(), body: a.blurb, long: true }); renderToolbelt(); });
+    flash(a.hue || '#fff8ec', 0.22, 0.5); shake(2.6, 0.6); holdFrame(0.11); zoomPunch(0.16);
+    starburst(cx, cy, a.hue || '#fff8ec', 90);
+    { const b2 = GAME.boss();
+      if (b2) cineTo({ focus: () => { const q = GAME.boss(); return { x: q.x + 14, y: q.y + 4 }; },
+                       zoom: 1.55, ease: 0.5, life: 3.4, lock: false, bars: true }); }
+    setTimeout(() => cineOff(), 3200); toast({ icon: a.icon, title: 'THE ' + a.name.toUpperCase(), body: a.blurb, long: true }); renderToolbelt(); });
   GAME.on('cooked', ({ recipe, x, y }) => { puff(x, y, '#fff8ec', 6, 24, 20); smoke(x, y - 4, 4, 'rgba(255,250,240,1)', 20); twinkles(x, y - 6, 3, '#ffd23f', 8); floatWorld(RECIPE_BY_ID[recipe].name.toUpperCase(), x, y - 10, 'green', 'pan'); snd.clink(); });
   GAME.on('dine', ({ x, y, v }) => { floatWorld('+' + GAME.fmt(v), x, y - 12, 'gold', 'coin'); snd.coin(); });
   GAME.on('ticket', ({ x, y, v }) => { floatWorld('+' + GAME.fmt(v), x, y - 12, 'gold', 'ticket'); snd.clink(); });
@@ -9152,8 +9508,8 @@
     if (p >= 0.46 && !shut.done) { shut.done = true; if (shut.half) shut.half(); }
     const onTitle = !titleEl.hidden;
     const g2 = onTitle ? tctx : ctx;
-    const k = onTitle ? 1 : SC;
-    const w = onTitle ? TW : Math.round(cv.width / SC), h = onTitle ? TH : Math.round(cv.height / SC);
+    const k = onTitle ? 1 : SC * zoom;
+    const w = onTitle ? TW : Math.round(cv.width / k), h = onTitle ? TH : Math.round(cv.height / k);
     g2.setTransform(k, 0, 0, k, 0, 0);
     const cover = p < 0.46 ? p / 0.46 : 1 - (p - 0.46) / 0.54;
     const hh = Math.round(h * Math.min(1, cover * 1.02));
@@ -9178,6 +9534,8 @@
     $, S, W, snd, mkIcon, cloneCanvas, floatText, floatWorld, toast, openModal, closeModals, setInspect, refreshInspect,
     puff, heart, coinBurst, shellBurst, sparks, smoke, feathers, twinkles, shards,
     ring, glint, groundDust, bubbles, beam, popNum, impact, shake, flash, fly, holdFrame,
+    zoomPunch, cineTo, cineOff, cineSay, cineOn, cineLocked,
+    wordPop, starburst, speedLines, dizzy,
     worldToScreen, cam, paintCloud,
     showTitle, hideTitle, startIntro, openCompany, reloadWorld, renderToolbelt, renderPalette, renderHire,
     introNext, introSkip, shutter: startShutter, shuttering,
@@ -9224,6 +9582,7 @@
       }
       dt = Math.min(dt, 0.1);
       realDt = dt;
+      tickCine(dt);
       /* a held frame: the world stops for a beat so a hit lands */
       if (hold > 0) { hold = Math.max(0, hold - dt); dt = 0; }
       sprinkleCd = Math.max(0, sprinkleCd - dt);
@@ -9235,13 +9594,13 @@
       if (keys.arrowright || keys.d) pdx += 1;
       if (keys.arrowup || keys.w) pdy -= 1;
       if (keys.arrowdown || keys.s) pdy += 1;
-      if (ptr.down && ptr.inside && ptr.mode !== 'pan') {
+      if (ptr.down && ptr.inside && ptr.mode !== 'pan' && ptr.mode !== 'cine' && !cineLocked()) {
         const r = cv.getBoundingClientRect();
         const ex = (ptr.sx - r.left) / r.width, ey = (ptr.sy - r.top) / r.height;
         if (ex < 0.04) pdx -= 1; if (ex > 0.96) pdx += 1;
         if (ey < 0.05) pdy -= 1; if (ey > 0.95) pdy += 1;
       }
-      if (pdx || pdy) { cam().x += pdx * 150 * dt; cam().y += pdy * 150 * dt; GAME.clampCam(); }
+      if ((pdx || pdy) && !cineLocked()) { cam().x += pdx * 150 * dt; cam().y += pdy * 150 * dt; GAME.clampCam(); }
       if (!titleEl.hidden) { if (introMode) drawIntro(dt); else if (window.MENU) MENU.draw(dt, now); else drawTitleScreen(dt); }
       render(now, dt);
       if (!$('#modal-skills').hidden) drawTerm(now);

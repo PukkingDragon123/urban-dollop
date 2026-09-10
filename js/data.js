@@ -1199,6 +1199,12 @@ const BOSS_DONE = [
   'Good. Now something harder.',
   'The ledger likes you today.',
   'That went better than my last idea.',
+  'Signed, sealed, and mine.',
+  'Put that one in the annual report.',
+  'I knew you had it in you. I did not, but I said it.',
+  'One more of those and I am buying a hat for the hat.',
+  'Filed under: went well for once.',
+  'That is the sound of a business.',
 ];
 const BOSS_IDLE = [
   'Fine farm. Needs more of everything.',
@@ -1210,15 +1216,68 @@ const BOSS_IDLE = [
   'One day all of this is a chain.',
   'Mind the hen. She is particular.',
   'I have read the ledger twice. It is still good.',
+  'A tidy yard is a yard that is not earning.',
+  'I have been thinking. Dangerous, I know.',
+  'Somebody has to stand here and believe in it.',
+  'Growth. Say it with me. Growth.',
+  'I do not do heavy lifting. I do vision.',
+  'If it clucks, it can be scaled.',
+  'The trick is to look busy near something expensive.',
+  'We are one good quarter from a second hat.',
+  'I sleep four hours. Two of them in the barn.',
+  'The competition is asleep. The competition is a duck pond.',
+  'Nothing personal against the trees. Purely commercial.',
+  'Small is just big that has not been told yet.',
+  'When we are enormous, remind me to be humble about it.',
+  'I have a five year plan. Year one is this fence.',
+  'Money is only paper. Get me more paper.',
+  'Every hen here has equity. Do not tell them what in.',
+];
+/* he has something to say about the weather, the hour and the money */
+const BOSS_RAIN = [
+  'Rain is free irrigation. Bill it to nobody.',
+  'Do not melt. I need you.',
+  'The crops love this. I am indoors about it.',
+];
+const BOSS_NIGHT = [
+  'The night shift is just the day shift with worse lighting.',
+  'Look at those lamps. That is money burning, but prettily.',
+  'Nothing sleeps here. Least of all me.',
+];
+const BOSS_RICH = [
+  'We could buy the village. We will not. Yet.',
+  'I have stopped counting. That is a good sign.',
+  'Somebody get me a bigger safe.',
+];
+const BOSS_BROKE = [
+  'We are between fortunes. It happens.',
+  'Cash is a state of mind. A very thin one.',
+  'Sell something. Anything. Not the hen.',
 ];
 const BOSS_AT = {
-  mama:  ['She was Grandmama\'s. Be nice to her.', 'That hen has outlasted three of my schemes.'],
-  lab:   ['Feathers in, science out. My favourite trade.', 'Everything on this board is a plan I cannot afford yet.'],
-  truck: ['Every load that leaves is a coin that comes back.', 'One day this is a fleet. Watch.'],
-  road:  ['Cars all day and not one of them stops. Yet.', 'A big enough sign and they all pull in.'],
-  field: ['Dirt today, dinner tomorrow.', 'I like a field that owes me something.'],
-  inc:   ['Rock, crack, cluck. Best sound on the farm.', 'Every one of those is a new employee.'],
+  mama:  ['She was Grandmama\'s. Be nice to her.', 'That hen has outlasted three of my schemes.',
+          'She lays when she is fussed over. So do I.', 'Careful. That bird has seen things.'],
+  lab:   ['Feathers in, science out. My favourite trade.', 'Everything on this board is a plan I cannot afford yet.',
+          'Research is just guessing with a receipt.', 'One day this board is all lit up and I am insufferable.'],
+  truck: ['Every load that leaves is a coin that comes back.', 'One day this is a fleet. Watch.',
+          'Load it heavier. The suspension is a suggestion.', 'That road goes everywhere. Eventually.'],
+  road:  ['Cars all day and not one of them stops. Yet.', 'A big enough sign and they all pull in.',
+          'Traffic is just customers who have not been asked.', 'I have counted forty. Forty missed sales.'],
+  field: ['Dirt today, dinner tomorrow.', 'I like a field that owes me something.',
+          'Plant it. Water it. Bill it.', 'Every furrow is a little line in the ledger.'],
+  inc:   ['Rock, crack, cluck. Best sound on the farm.', 'Every one of those is a new employee.',
+          'Do not rush them. They are compounding.', 'Hatching is the only growth I can watch happen.'],
 };
+/* what he says when the drone lets go */
+const DRONE_LINES = [
+  'Air freight. I am not walking to the road twice.',
+  'Special delivery. Mostly for me.',
+  'It flies, it drops, it does not ask for wages.',
+  'The future, and it fits in a box.',
+  'Signed for. Open it before the hens do.',
+  'I bought six. This is the one that still works.',
+  'No driver, no lunch break, no opinions.',
+];
 
 /* ------------------------------------------------------------
    GRID LAYOUT - the map is a board of square nodes. Each module

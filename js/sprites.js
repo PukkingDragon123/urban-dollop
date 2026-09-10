@@ -3644,6 +3644,74 @@ const SPR = (() => {
     cache.set(key, c);
     return c;
   }
+  /* ============================================================
+     THE DELIVERY DRONE
+     The company car does not come up the farm track any more; the
+     rewards come in by air. A four-rotor drone in the company's
+     paint with a beacon on the nose, a hook under the belly and the
+     parcel slung off it. Three rotor frames, so it can hover, and a
+     parachute for when it lets go.
+     ============================================================ */
+  function droneSprite(frame, scale, col1, col2) {
+    const c1 = col1 || '#e8542f', c2 = col2 || '#ffd23f';
+    const key = 'drone_' + frame + '_' + scale + c1 + c2;
+    if (cache.has(key)) return cache.get(key);
+    const k = scale || 1;
+    const c = newCanvas(30 * k, 16 * k);
+    const ctx = c.getContext('2d');
+    const R = (x, y, w, h, col) => { if (!col) return; ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
+    const O = '#17141d', steel = '#8f9298', dark = '#4a5058';
+    /* the boom, arm to arm */
+    R(2, 6, 26, 3, O); R(3, 7, 24, 1, steel);
+    /* four motor pods */
+    [2, 8, 20, 26].forEach(x => { R(x, 4, 3, 4, O); R(x, 5, 2, 2, dark); });
+    /* the rotors: a blurred disc that flips through three frames */
+    const f = frame % 3;
+    [3, 9, 21, 27].forEach((x, i) => {
+      const ph = (f + i) % 3;
+      const w = ph === 0 ? 11 : ph === 1 ? 7 : 9;
+      R(x - Math.floor(w / 2), 3, w, 1, 'rgba(200,206,214,.75)');
+      R(x - Math.floor(w / 2) + 1, 2, w - 2, 1, 'rgba(200,206,214,.32)');
+    });
+    /* the body pod, in the company paint */
+    R(10, 5, 10, 7, O);
+    R(11, 6, 8, 5, c1);
+    R(11, 6, 8, 1, lighten(c1, 0.34));
+    R(11, 10, 8, 1, darken(c1, 0.32));
+    R(12, 8, 6, 1, c2);
+    /* a lit beacon on the nose, and a camera eye under it */
+    R(19, 6, 2, 2, O); R(19, 6, 1, 1, frame % 2 ? '#ff5f5f' : '#7a2020');
+    R(14, 11, 3, 2, O); R(15, 11, 1, 1, '#7fd7ff');
+    /* skids and the hook */
+    R(9, 12, 3, 1, dark); R(18, 12, 3, 1, dark);
+    R(14, 13, 2, 2, O); R(14, 13, 1, 1, steel);
+    cache.set(key, c);
+    return c;
+  }
+  /* the chute the parcel comes down on */
+  function chuteSprite(scale, col1, col2) {
+    const c1 = col1 || '#e8542f', c2 = col2 || '#fff8ec';
+    const key = 'chute_' + scale + c1 + c2;
+    if (cache.has(key)) return cache.get(key);
+    const k = scale || 1;
+    const c = newCanvas(22 * k, 16 * k);
+    const ctx = c.getContext('2d');
+    const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
+    const O = '#2e2216';
+    /* a dome in four gores, alternating the two colours */
+    R(6, 0, 10, 1, O); R(3, 1, 16, 1, O); R(1, 2, 20, 1, O); R(0, 3, 22, 4, O);
+    for (let i = 0; i < 4; i++) {
+      const x = 1 + i * 5, col = i % 2 ? c2 : c1;
+      R(x, 3, 5, 3, col);
+      if (i === 1 || i === 2) R(x, 1, 5, 2, col);
+    }
+    R(6, 1, 10, 1, c2);
+    /* the rigging */
+    R(1, 7, 1, 4, O); R(20, 7, 1, 4, O); R(7, 7, 1, 5, O); R(14, 7, 1, 5, O);
+    cache.set(key, c);
+    return c;
+  }
+
   /* HELP WANTED, pinned to a post */
   function posterSprite(scale) {
     const key = 'poster_' + scale;
@@ -3934,6 +4002,7 @@ const SPR = (() => {
     drawBezel, drawScanlines, drawPips, drawBox, TERM, drawHex, hexHit, hexRows, drawCube,
     carSprite, raccoonSprite, furnitureSprite, RAC_OFF, outfitOf,
     toolIconSprite, produceSprite, goodsSprite, presentSprite, posterSprite, shadowEll, drawBar,
+    droneSprite, chuteSprite,
     wardenSprite, WARD_OFF,
     newMask, mRect, mCircle, renderMask, mulberry, newCanvas,
     darken, lighten, warm, cool, lum, px, CELL, ICONS,

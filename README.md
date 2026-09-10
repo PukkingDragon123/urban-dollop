@@ -36,6 +36,20 @@ The four **cutscenes** are letterboxed shots with a slate in the corner - a wet 
 
 Founding the company is **one sheet with three things on it**: the name, in the biggest type on the page; the mark, from twelve; and the livery, picked as paint-and-trim pairs so you choose once instead of twice. Under them is the sign it will make and a line you have to **sign with the mouse or a finger** before FILE IT lights up. The registry's letterhead, the form number, the founder, the date and the captions are all gone.
 
+## The drone, and the camera
+
+Quest rewards used to come up the track in a limousine. They come in by air now: a **drone** in the company's paint lifts over the hill, crosses to wherever the founder is standing, hovers there with the parcel swinging on its hook, lets go, and climbs away. The parcel comes down on a **parachute** and sits on the grass until you open it.
+
+The **first** delivery is a scene. The game takes the camera off you: it pushes in on the drone, drops letterbox bars, fades the interface out of the way, puts a chevron over the drone and asks you to **tap it**. Tap it and it releases; the camera rides the parcel down and asks you to open that. After that it is just a drone and it drops on its own. A ten second fuse on the hover and a fourteen second one on the director mean it can never leave you looking at the sky.
+
+The camera that does this is the game's own. The world is drawn at a whole number of screen pixels to a world pixel, so **zoom is that number multiplied** - and because every piece of culling, every hit test and every screen-to-world conversion measures the viewport out of one record, keeping that record in step with the zoom makes the whole game agree about where things are without touching any of it. On top sits a small director: point at something, hold, drop the bars, put a line of instruction at the foot of the frame, hand the camera back. It also throws a **punch** - a quick shove of zoom about the centre of the screen - for the moments that want one: a building landing, a rainbow hatch, a plot of land bought, a new age.
+
+Two other beats have the camera to themselves: the **first egg to hatch** on a farm, and the turn of an **age**.
+
+## Cartoon
+
+On top of the fifteen kinds of particle there are four comic ones: a **word burst** - fat letters on a jagged plate that pops past its size and settles - for KA-CHING, BUILT, GOLD, SIGNED, SOLD, RAINBOW and HUSH; a **starburst**, the ragged flash a comic puts behind a bang; **speed lines** rushing out of a point; and the **dizzy stars** that go round a head that has just been fussed over.
+
 ## Work orders
 
 The founder no longer stands over you narrating the job list. Work comes down as **paperwork**: a numbered order (WO-014) from a department, a scope of work with tick boxes, a site, and a reward payable on completion. Three are open at once on a clipboard under the readout, and you **sign for** a finished one yourself - then the company car brings the reward. The board itself is a **filing cabinet**: five department drawers, one open at a time, each showing only the orders that have actually been issued and a line saying how many are still to come - rather than all forty-seven at once with most of them greyed out. He is still out on the farm with his own opinions; he just does not read you the objectives.
@@ -89,7 +103,7 @@ Menus are places, not panels:
 
 The raccoon who inherited the place is on the farm, not in a menu. He walks the owned land the way the crew do, in a top hat with the company colour on the band, and he heads for whatever the current job is about: the nest, the Lab, the bike, the incubator, the road, a field. When he gets there he says his piece in a **pixel speech cloud** - one of forty-seven lines written for the forty-seven jobs, plus something for each place he stops at and a pocketful of idle muttering. Pay a job out and he cheers, says so, and sets off for the next one.
 
-Every hint the game used to float over the field is now something he says out loud, so the interface has one voice instead of a cloud of tooltips. His **dialogue panel** sits under the resource bar: his photograph framed in the corner, his line in quotes beside it, then a strip across the foot with the job's name, what it pays and a rail showing how far along you are. Tap the panel and the Lab opens on that job; tap the raccoon himself and he says it again, or cheers if you keep bothering him.
+Every hint the game used to float over the field is now something he says out loud, so the interface has one voice instead of a cloud of tooltips. There are seventy-odd lines in him: twenty-five for standing about, fourteen for a job well paid, four for each place he stops at, and a handful each for the rain, the small hours, being rich and being broke - so he comments on the weather, the clock and the state of the ledger as well as the view. His **dialogue panel** sits under the resource bar: his photograph framed in the corner, his line in quotes beside it, then a strip across the foot with the job's name, what it pays and a rail showing how far along you are. Tap the panel and the Lab opens on that job; tap the raccoon himself and he says it again, or cheers if you keep bothering him.
 
 ### Landscaping
 

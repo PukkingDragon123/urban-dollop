@@ -2619,3 +2619,15 @@ body{
   .qb-wrap{ grid-template-columns:minmax(0,1fr); }
   .qb-list{ max-height:34vh; }
 }
+
+/* ---- while the camera is being held for a beat, the interface steps out
+   of the way: this is the game talking to you, not the readout ---- */
+body.cine-on #todo-panel,
+body.cine-on #res-float,
+body.cine-on .hud-bar,
+body.cine-on #toolbelt,
+body.cine-on #cursor-chip{
+  opacity:0; pointer-events:none; transition:opacity .25s steps(4,end);
+}
+#todo-panel, #res-float, .hud-bar, #toolbelt, #cursor-chip{ transition:opacity .3s steps(4,end); }
+body.cine-on #siderail{ filter:brightness(.55) saturate(.5); pointer-events:none; }

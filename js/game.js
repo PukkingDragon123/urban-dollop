@@ -65,7 +65,8 @@ const GAME = (() => {
       factories: {},         /* city id -> true: a factory of ours in that town */
       road: { events: [], t: 90, weather: {}, wt: 40 },
       presents: [],          /* gift boxes on the grass {id,x,y,z,vz,rw,t} */
-      limo: null, limoQueue: [],
+      limo: null, drone: null, limoQueue: [],
+      tut: {},                 /* what the game has already shown you once */
       ach: {},               /* achievement id -> when */
       cosOwned: {},          /* cosmetics unlocked beyond the free ones */
       wardrobe: Object.assign({}, WARDROBE_DEFAULT),
@@ -2399,40 +2400,86 @@ const GAME = (() => {
   }
   function claimAll() { let n = 0; QUESTS.forEach(q => { if (claimQuest(q.id)) n++; }); return n; }
 
-  /* ---------- the limousine and its presents ---------- */
+  /* ---------- the delivery drone and its presents ----------
+     The rewards used to come up the track in a limousine. They come
+     in by air now: a drone lifts over the hill, crosses to wherever
+     the founder is standing, hovers there with the parcel swinging
+     under it, lets go, and climbs away. The parcel comes down on a
+     chute and sits on the grass until you open it.
+     The very first delivery is held for the player: the drone waits
+     to be tapped rather than releasing on its own, and gives up
+     waiting after ten seconds so nothing can ever get stuck. */
   function sendPresent(rw) { S.limoQueue.push(rw); }
-  function limoSpot() { return { x: WORLD.layby.x + 44, y: WORLD.layby.y - 6 }; }
+  function droneTarget() {
+    const b = S.boss;
+    if (b && S.company.done) return { x: b.x + 14, y: b.y - 34 };
+    return { x: WORLD.layby.x + 44, y: WORLD.layby.y - 40 };
+  }
   function tickLimo(dt) {
-    if (!S.limo) {
+    if (!S.drone) {
       if (!S.limoQueue.length) return;
-      S.limo = { state: 'arrive', x: WORLD.W + 80, y: WORLD.roadY + 6, t: 0, rw: S.limoQueue.shift(), anim: 0 };
-      emit('limo', { state: 'coming' });
+      const t = droneTarget();
+      const first = !S.tut.drone;
+      S.drone = { state: 'in', x: -60, y: Math.max(20, t.y - 40), tx: t.x, ty: t.y,
+                  t: 0, anim: 0, rw: S.limoQueue.shift(), wait: first ? 10 : 1.4,
+                  first, held: false, wob: Math.random() * 6 };
+      emit('drone', { state: 'coming', d: S.drone });
     }
-    const L = S.limo, sp = limoSpot();
-    L.anim += dt;
-    if (L.state === 'arrive') {
-      const d = L.x - sp.x;
-      L.x -= Math.min(d, 78 * dt);
-      if (d < 60) L.y = WORLD.roadY + 6 + (sp.y - WORLD.roadY - 6) * (1 - Math.max(0, d) / 60);
-      if (d <= 0.5) { L.x = sp.x; L.y = sp.y; L.state = 'drop'; L.t = 1.6; emit('limo', { state: 'here', x: L.x, y: L.y }); }
-    } else if (L.state === 'drop') {
-      L.t -= dt;
-      if (L.t <= 0) {
-        const p = { id: nextId++, x: L.x + 12 + Math.random() * 10, y: WORLD.roadY - 14 - Math.random() * 6, z: -22, vz: 0, rw: L.rw, t: 90, wob: Math.random() * 6 };
-        S.presents.push(p);
-        L.state = 'leave';
-        emit('present', { p, state: 'dropped' });
-      }
-    } else {
-      L.x -= 84 * dt;
-      L.y += (WORLD.roadY + 6 - L.y) * Math.min(1, dt * 3);
-      if (L.x < -90) S.limo = null;
+    const D = S.drone;
+    D.anim += dt;
+    if (D.state === 'in') {
+      /* it keeps aiming at him even while he wanders off */
+      const t = droneTarget();
+      D.tx += (t.x - D.tx) * Math.min(1, dt * 1.2);
+      D.ty += (t.y - D.ty) * Math.min(1, dt * 1.2);
+      const dx = D.tx - D.x, dy = D.ty - D.y;
+      const d = Math.hypot(dx, dy) || 1;
+      const sp = Math.min(d, (70 + d * 0.9) * dt);
+      D.x += dx / d * sp; D.y += dy / d * sp;
+      if (d < 3) { D.state = 'hover'; D.t = D.wait; emit('drone', { state: 'here', d: D }); }
+    } else if (D.state === 'hover') {
+      D.t -= dt;
+      if (D.t <= 0 || D.held) dropFromDrone();
+    } else if (D.state === 'out') {
+      D.x += 96 * dt; D.y -= 42 * dt;
+      if (D.x > WORLD.W + 60 || D.y < -40) { S.drone = null; emit('drone', { state: 'gone' }); }
     }
+  }
+  /* the release: the parcel leaves the hook on a chute */
+  function dropFromDrone() {
+    const D = S.drone;
+    if (!D || D.state !== 'hover') return null;
+    const p = { id: nextId++, x: D.x, y: Math.min(WORLD.H - 20, D.y + 44), z: -(D.y + 44 - D.y) - 8,
+                vz: -6, rw: D.rw, t: 120, wob: Math.random() * 6, chute: 1 };
+    /* it falls from where the drone is to the ground under it */
+    p.z = -(44 + 8);
+    S.presents.push(p);
+    D.state = 'out';
+    D.rw = null;
+    if (!S.tut.drone) S.tut.drone = 1;
+    emit('present', { p, state: 'dropped' });
+    emit('drone', { state: 'released', d: D, p });
+    return p;
+  }
+  /* tapping the drone makes it let go there and then */
+  function droneAt(x, y) {
+    const D = S.drone;
+    if (!D || D.state !== 'hover') return null;
+    return (x > D.x - 20 && x < D.x + 20 && y > D.y - 14 && y < D.y + 22) ? D : null;
+  }
+  function tapDrone() {
+    const D = S.drone;
+    if (!D || D.state !== 'hover') return null;
+    D.held = true;
+    return dropFromDrone();
   }
   function tickPresents(dt) {
     for (let i = S.presents.length - 1; i >= 0; i--) {
       const p = S.presents[i];
-      if (p.z < 0) { p.vz += 90 * dt; p.z = Math.min(0, p.z + p.vz * dt); if (p.z >= 0 && p.vz > 30) { p.z = -0.01; p.vz = -p.vz * 0.35; } }
+      if (p.z < 0) {
+        if (p.chute) { p.vz = Math.min(26, p.vz + 40 * dt); p.z = Math.min(0, p.z + p.vz * dt); if (p.z >= 0) { p.chute = 0; p.vz = 0; } }
+        else { p.vz += 90 * dt; p.z = Math.min(0, p.z + p.vz * dt); if (p.z >= 0 && p.vz > 30) { p.z = -0.01; p.vz = -p.vz * 0.35; } }
+      }
       p.t -= dt;
       if (p.t <= 0) openPresent(p);
     }
@@ -3626,9 +3673,15 @@ const GAME = (() => {
   const pickLine = arr => arr[Math.floor(Math.random() * arr.length)];
   /* what he has to say where he is standing: the job first, then the place */
   function bossLineHere() {
-    /* the jobs come down as paperwork now; he only has opinions */
+    /* the jobs come down as paperwork now; he only has opinions - about
+       where he is standing, what the sky is doing, and how the money looks */
     const at = BOSS_AT[S.boss.at];
-    if (at && Math.random() < 0.6) return pickLine(at);
+    if (at && Math.random() < 0.5) return pickLine(at);
+    if (S.weather && S.weather.rain && Math.random() < 0.4) return pickLine(BOSS_RAIN);
+    const ph = dayPhase();
+    if (setting('dayNight') && (ph > 0.78 || ph < 0.08) && Math.random() < 0.35) return pickLine(BOSS_NIGHT);
+    if (S.coins > 250000 && Math.random() < 0.3) return pickLine(BOSS_RICH);
+    if (S.coins < 25 && Math.random() < 0.5) return pickLine(BOSS_BROKE);
     return pickLine(BOSS_IDLE);
   }
   function tickBoss(dt) {
@@ -3811,7 +3864,7 @@ const GAME = (() => {
     }
     Object.keys(S.sites).forEach(finishSite);
     S.orders = [];
-    S.limo = null;
+    S.limo = null; S.drone = null;
     if (factoryIncome()) earn(Math.round(factoryIncome() / 60 * dt), 'factories');
     S.eggs.forEach(e => { e.z = 0; e.vz = 0; });
     return { seconds: dt, laid, hatched, pay, feathersGot, wages };
@@ -3904,7 +3957,8 @@ const GAME = (() => {
        'kitchens', 'parks', 'timemachines', 'secrets', 'cooked', 'hrs', 'canneries', 'pantry', 'goods', 'factories', 'ach', 'cosOwned'].forEach(m => { if (!S[m]) S[m] = {}; });
       if (!Array.isArray(S.presents)) S.presents = [];
       if (!Array.isArray(S.limoQueue)) S.limoQueue = [];
-      S.limo = null;
+      if (!S.tut || typeof S.tut !== 'object') S.tut = {};
+      S.limo = null; S.drone = null; S.drone = null;
       if (S.warden && typeof S.warden.x !== 'number') S.warden = null;
       S.garage = Object.assign({ col: null, decal: 'none', upg: {}, routes: {} }, S.garage || {});
       if (!S.garage.upg) S.garage.upg = {};
@@ -4033,7 +4087,8 @@ const GAME = (() => {
     note,
     toolOpen, depotOpen, incCapAt,
     questProgress, questDone, currentQuest, questState, questReady, activeQuests, questObjs, objDone, goalProgress, claimQuest, claimAll,
-    presentAt, openPresent, get limo() { return S.limo; }, get presents() { return S.presents; },
+    presentAt, openPresent, droneAt, tapDrone, dropFromDrone,
+    get limo() { return S.limo; }, get drone() { return S.drone; }, get presents() { return S.presents; },
     pantryCount, goodsCount, pantryTotal, sellProduce, sellGoods, useGoods, canMake, hasCannery, setCanneryRecipe, setAllCanneries, canneryTime,
     garageLevel, garagePrice, canUpgrade, buyUpgrade, setPaint, paintInfo, routeStyle, setRouteStyle, tripTimeTo, payMultTo,
     eventAt, townWeather, factoryCost, canFactory, buyFactory, factoryIncome,
