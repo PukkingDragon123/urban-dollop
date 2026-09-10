@@ -3364,35 +3364,35 @@ const SPR = (() => {
      it as .ox, so a caller can keep the feet where they were.
      ============================================================ */
   const RACCOON_ROWS = [
-    '......ooo...........ooo.....',
-    '.....odppo.........oppdo....',
-    '.....odppo.........oppdo....',
-    '.....oddpgggooooogggpddo....',
-    '.......odgGGGGGGGGGgdo......',
-    '.......odgGGGGGGGGGgdo......',
-    '.......oddgGGGGGGGgddo......',
-    '.......odkkkkkkkkkkkdo......',
-    '.......okkkkkkkkkkkkko......',
-    '.......odGGGGGGGGGGGdo......',
-    '.......odGeeGGGGGeeGdo......',
-    '.......odGeeGGGGGeeGdo......',
-    '.......odGGcGGGGGcGGdo......',
-    '.......odGGGGGGGGGGGdo......',
-    '.......oogkkWWWWWkkgoo......',
-    '.........ogcWWWWWcgo........',
-    '...........oWnnnWo..........',
-    '...........onnWnno..........',
-    '.ooo....ogggggggggggo.......',
-    'oTTTo..ogggggggggggggo......',
-    'oTTTo..ogggggggggggggo......',
-    'otttto.ogggggggggggggo......',
-    '.ottttoogggggggggggggo......',
-    '.oTTTToogggggggggggggo......',
-    '..oTTTTogggggggggggggo......',
-    '..ottttogggggggggggggo......',
-    '...otttogggggggggggggo......',
-    '...oTTToogggggggggggo.......',
-    '....oooo.ogggo..ogggo.......',
+    '.......ooo.........ooo......',
+    '......ogggo.......ogggo.....',
+    '......ogppoooooooooppgo.....',
+    '......ogppGGGGGGGGGppgo.....',
+    '.......oGGGGGWWWGGGGGo......',
+    '.......ogGGGGWWWGGGGgo......',
+    '.......okkkkkWWWkkkkko......',
+    '.......okkwwkWWWkwwkko......',
+    '.......okkwwkWWWkwwkko......',
+    '.......okkkkkWWWkkkkko......',
+    '.......oGWWWWWWWWWWWGo......',
+    '........oGWWWWWWWWWGo....ooo',
+    '........oGWWWnnnWWWGo...ottt',
+    '.........oWWWWWWWWWo....ottt',
+    '.........oWWWWWWWWWo....ottt',
+    '..........oWWWWWWWo....oTTTo',
+    '..........odddddddo....oTTTo',
+    '..........ogggggggo....ottto',
+    '........ogggggggggggo.ottto.',
+    '.......ogggggggggggggooTTTo.',
+    '.......ogggggggggggggooTTTo.',
+    '.......ogggggggggggggottto..',
+    '.......ogggggggggggggottto..',
+    '.......ogggggggggggggoTTTo..',
+    '.......ogggggggggggggoTTTo..',
+    '.......ogggggggggggggottto..',
+    '.......ogggggggggggggotto...',
+    '........ogggggggggggo.oo....',
+    '.........ogggo..ogggo.......',
     '.........ogggo..ogggo.......',
     '.........ogggo..ogggo.......',
     '........oSSSSo.ossssso......',
@@ -3400,13 +3400,13 @@ const SPR = (() => {
     '........oooooo.ooooooo......',
 ];
   const RACCOON_PAL = {
-    o: '#17141d',   /* outline                */  d: '#5b6270',   /* fur, in shade      */
-    g: '#828a97',   /* fur                    */  G: '#bfc6cf',   /* fur, lit           */
-    W: '#e9eef4',   /* blaze and snout        */  k: '#2d2736',   /* the mask           */
-    w: '#ffffff',   /* eye                    */  e: '#0e0c12',   /* pupil              */
-    n: '#100e14',   /* nose and mouth         */  p: '#cf7f8f',   /* inside an ear      */
-    c: '#e89aa8',   /* a rosy cheek           */
-    t: '#3a4048',   /* tail, dark ring        */  T: '#a2aab6',   /* tail, pale ring    */
+    o: '#141118',   /* outline                */  d: '#6b7480',   /* fur, in shade      */
+    g: '#8f9aa6',   /* fur                    */  G: '#c3cbd4',   /* fur, lit           */
+    W: '#eef2f6',   /* blaze, muzzle, chest   */  k: '#2a2a33',   /* the mask patch     */
+    w: '#ffffff',   /* the eye                */  e: '#0e0c12',   /* pupil, where used  */
+    n: '#141118',   /* the nose bar           */  p: '#e6eaf0',   /* inside an ear      */
+    c: '#c3cbd4',   /* no blush on this one   */
+    t: '#2f3339',   /* tail, dark ring        */  T: '#b9c2cc',   /* tail, pale ring    */
     s: '#241f2c',   /* near shoe              */  S: '#39333f',   /* far shoe           */
   };
   /* ---------- the other species ----------
@@ -3441,8 +3441,9 @@ const SPR = (() => {
     const A = ANIMALS[species];
     if (!A || !A.pal) return RACCOON_PAL;
     const p = Object.assign({}, RACCOON_PAL, A.pal);
-    /* no mask on a fox or a cat: the brow band becomes plain lit fur */
-    if (!A.mask) { p.k = p.G; }
+    /* a fox or a cat wears no bandit mask, but the eye still needs
+       something dark behind it or the white square vanishes into the fur */
+    if (!A.mask) { p.k = darken(p.d, 0.45); }
     if (!A.rings) { p.T = p.g; p.t = p.d; }
     return p;
   }
@@ -3503,86 +3504,85 @@ const SPR = (() => {
        can ask for any of them by name. ---- */
     const EX = expr || DEFAULT_EXPR[pose] || 'happy';
     if (EX !== 'happy') {
-      const K_ = P.k, W_ = P.W, N_ = P.n, E_ = P.e, FUR = P.G, BROW = P.o;
+      const K_ = P.k, W_ = P.W, N_ = P.n, WH_ = P.w, FUR = P.G, BROW = P.o;
+      /* the eye lives in a dark mask patch: four wide at rows 6-10, with a
+         two by two white square high and inward in it. Every expression
+         wipes the patch back to mask and draws its own white over it. */
       const eyes = (l, r) => { l(9); r === undefined ? l(16) : r(16); };
-      /* the eye area: four by four of lit fur at rows 9-12, with a two by
-         two black dot low and inward in it. Wiping the box back to fur
-         first is what lets every expression draw over the default face. */
-      const wipe = x => { R(x, 9, 4, 4, FUR); R(x + (x < 14 ? 2 : 1), 12, 1, 1, P.c); };
-      const dot = (x, dx, dy, w, h) => {
+      const wipe = x => { R(x, 6, 4, 4, K_); R(x + (x < 14 ? 0 : 1), 10, 3, 1, K_); };
+      const eye = (x, dx, dy, w, h) => {
         wipe(x);
-        R(x + 1 + (dx || 0), 10 + (dy || 0), w || 2, h || 2, E_);
+        R(x + 1 + (dx || 0), 7 + (dy || 0), w || 2, h || 2, WH_);
       };
       const mouth = kind => {
-        /* the base mouth is a smile with the corners turned up; every
-           other shape is painted over the same two rows */
-        if (kind === 'grin') { R(12, 17, 5, 1, N_); R(13, 17, 3, 1, '#8a3a4a'); R(12, 16, 1, 1, N_); R(16, 16, 1, 1, N_); }
-        else if (kind === 'open') { R(12, 17, 5, 1, N_); R(13, 16, 3, 1, N_); R(13, 17, 3, 1, '#8a3a4a'); }
-        else if (kind === 'frown') { R(12, 17, 5, 1, W_); R(13, 17, 3, 1, N_); }
-        else if (kind === 'flat') { R(12, 17, 5, 1, N_); }
-        else if (kind === 'smirk') { R(12, 17, 5, 1, W_); R(14, 17, 3, 1, N_); R(16, 16, 1, 1, N_); }
-        else if (kind === 'o') { R(12, 17, 5, 1, W_); R(14, 17, 1, 1, N_); R(14, 16, 1, 1, N_); }
-        else if (kind === 'teeth') { R(11, 17, 7, 1, N_); R(12, 17, 5, 1, '#fff8ec'); R(14, 17, 1, 1, N_); }
+        /* the reference has no mouth line - the muzzle is just a nose bar -
+           so a mouth only appears when an expression calls for one, drawn
+           into the white of the muzzle at rows 13-14 */
+        if (kind === 'grin') { R(12, 14, 5, 1, N_); R(13, 14, 3, 1, '#8a3a4a'); R(12, 13, 1, 1, N_); R(16, 13, 1, 1, N_); }
+        else if (kind === 'open') { R(12, 14, 5, 1, N_); R(13, 13, 3, 1, N_); R(13, 14, 3, 1, '#8a3a4a'); }
+        else if (kind === 'frown') { R(12, 14, 5, 1, W_); R(13, 14, 3, 1, N_); R(12, 13, 1, 1, N_); R(16, 13, 1, 1, N_); }
+        else if (kind === 'flat') { R(12, 14, 5, 1, N_); }
+        else if (kind === 'smirk') { R(14, 14, 3, 1, N_); R(16, 13, 1, 1, N_); }
+        else if (kind === 'o') { R(13, 13, 3, 2, N_); R(14, 14, 1, 1, '#8a3a4a'); }
+        else if (kind === 'teeth') { R(11, 14, 7, 1, N_); R(12, 14, 5, 1, '#fff8ec'); R(14, 14, 1, 1, N_); }
       };
       switch (EX) {
-        case 'blink':                        /* both eyes shut: a lash line, curved happily */
-          eyes(x => { wipe(x); R(x, 11, 4, 1, E_); R(x, 10, 1, 1, E_); R(x + 3, 10, 1, 1, E_); });
+        case 'blink':                        /* shut: a white lash line low in the patch */
+          eyes(x => { wipe(x); R(x + 1, 8, 2, 1, WH_); R(x, 7, 1, 1, WH_); R(x + 3, 7, 1, 1, WH_); });
           break;
         case 'grin':                         /* squeezed shut, curved up */
-          eyes(x => { wipe(x); R(x + 1, 10, 2, 1, E_); R(x, 11, 1, 1, E_); R(x + 3, 11, 1, 1, E_); });
+          eyes(x => { wipe(x); R(x + 1, 7, 2, 1, WH_); R(x, 8, 1, 1, WH_); R(x + 3, 8, 1, 1, WH_); });
           mouth('grin');
           break;
-        case 'wow':                          /* the dots blow wide open */
-          eyes(x => dot(x, 0, -1, 3, 4));
-          R(9, 8, 4, 1, FUR); R(16, 8, 4, 1, FUR);
+        case 'wow':                          /* the whites blow wide open */
+          eyes(x => eye(x, -1, -1, 3, 3));
           mouth('o');
           break;
-        case 'angry':                        /* dots shoved inward under slanted brows */
-          dot(9, 1); dot(16, -1);
-          R(9, 8, 3, 1, BROW); R(11, 9, 2, 1, BROW); R(12, 10, 1, 1, BROW);
-          R(18, 8, 3, 1, BROW); R(17, 9, 2, 1, BROW); R(16, 10, 1, 1, BROW);
+        case 'angry':                        /* whites shoved inward, brows down over the patch */
+          eye(9, 1); eye(16, -1);
+          R(9, 5, 3, 1, BROW); R(11, 6, 2, 1, BROW);
+          R(18, 5, 3, 1, BROW); R(17, 6, 2, 1, BROW);
           mouth('teeth');
           break;
-        case 'determined':                   /* level brows, dots up under them */
-          dot(9, 0, 0); dot(16, 0, 0);
-          R(9, 8, 4, 1, BROW); R(16, 8, 4, 1, BROW);
-          R(10, 9, 3, 1, BROW); R(16, 9, 3, 1, BROW);
+        case 'determined':                   /* level brows low over the whites */
+          eye(9, 0, 1); eye(16, 0, 1);
+          R(9, 5, 4, 1, BROW); R(16, 5, 4, 1, BROW);
+          R(9, 6, 4, 1, BROW); R(16, 6, 4, 1, BROW);
           mouth('flat');
           break;
-        case 'smug':                         /* one eye shut, the other narrowed */
-          wipe(16); R(16, 11, 4, 1, E_);
-          R(10, 11, 2, 1, E_);
+        case 'smug':                         /* one eye down to a slit */
+          wipe(16); R(17, 8, 2, 1, WH_);
           mouth('smirk');
           break;
-        case 'sad':                          /* dots pushed down, brows up on the inside */
-          dot(9, 0, 2, 2, 1); dot(16, 0, 2, 2, 1);
-          R(11, 8, 2, 1, BROW); R(10, 9, 1, 1, BROW);
-          R(18, 8, 2, 1, BROW); R(19, 9, 1, 1, BROW);
+        case 'sad':                          /* whites down in the corners, brows up inside */
+          eye(9, 0, 2, 2, 1); eye(16, 0, 2, 2, 1);
+          R(11, 5, 2, 1, BROW); R(10, 6, 1, 1, BROW);
+          R(16, 5, 2, 1, BROW); R(18, 6, 1, 1, BROW);
           mouth('frown');
           break;
-        case 'love':                         /* a heart where each eye was */
+        case 'love':                         /* a heart in each patch */
           eyes(x => {
             wipe(x);
-            R(x, 10, 1, 2, '#ff5f9e'); R(x + 3, 10, 1, 2, '#ff5f9e');
-            R(x + 1, 9, 1, 1, '#ff5f9e'); R(x + 2, 9, 1, 1, '#ff5f9e');
-            R(x + 1, 10, 2, 2, '#ff5f9e'); R(x + 1, 12, 2, 1, '#ff5f9e');
-            R(x + 1, 10, 1, 1, '#ffb0d0');
+            R(x, 7, 1, 2, '#ff5f9e'); R(x + 3, 7, 1, 2, '#ff5f9e');
+            R(x + 1, 6, 1, 1, '#ff5f9e'); R(x + 2, 6, 1, 1, '#ff5f9e');
+            R(x + 1, 7, 2, 2, '#ff5f9e'); R(x + 1, 9, 2, 1, '#ff5f9e');
+            R(x + 1, 7, 1, 1, '#ffb0d0');
           });
           mouth('grin');
           break;
-        case 'dizzy':                        /* crossed out */
+        case 'dizzy':                        /* crossed out in white */
           eyes(x => {
             wipe(x);
-            R(x, 9, 1, 1, E_); R(x + 1, 10, 1, 1, E_); R(x + 2, 11, 1, 1, E_); R(x + 3, 12, 1, 1, E_);
-            R(x + 3, 9, 1, 1, E_); R(x + 2, 10, 1, 1, E_); R(x + 1, 11, 1, 1, E_); R(x, 12, 1, 1, E_);
+            R(x, 6, 1, 1, WH_); R(x + 1, 7, 1, 1, WH_); R(x + 2, 8, 1, 1, WH_); R(x + 3, 9, 1, 1, WH_);
+            R(x + 3, 6, 1, 1, WH_); R(x + 2, 7, 1, 1, WH_); R(x + 1, 8, 1, 1, WH_); R(x, 9, 1, 1, WH_);
           });
           mouth('open');
           break;
-        case 'money':                        /* coins where his eyes were */
+        case 'money':                        /* coins where the whites were */
           eyes(x => {
             wipe(x);
-            R(x + 1, 9, 2, 1, '#ffd23f'); R(x, 10, 4, 2, '#ffd23f'); R(x + 1, 12, 2, 1, '#ffd23f');
-            R(x + 1, 10, 2, 2, '#b87c10'); R(x + 1, 10, 1, 1, '#fff3c4');
+            R(x + 1, 6, 2, 1, '#ffd23f'); R(x, 7, 4, 2, '#ffd23f'); R(x + 1, 9, 2, 1, '#ffd23f');
+            R(x + 1, 7, 2, 2, '#b87c10'); R(x + 1, 7, 1, 1, '#fff3c4');
           });
           mouth('grin');
           break;
@@ -3738,22 +3738,22 @@ const SPR = (() => {
     if (of.glasses === 'gl_round') {
       const fr = '#c9a35f', li = '#f0dcac';
       [9, 15].forEach(x => {
-        R(x, 8, 5, 1, fr); R(x, 12, 5, 1, fr); R(x, 9, 1, 3, fr); R(x + 4, 9, 1, 3, fr);
-        R(x + 1, 9, 3, 3, 'rgba(190,225,245,.30)'); R(x + 1, 9, 2, 1, li);
+        R(x, 6, 5, 1, fr); R(x, 10, 5, 1, fr); R(x, 7, 1, 3, fr); R(x + 4, 7, 1, 3, fr);
+        R(x + 1, 7, 3, 3, 'rgba(190,225,245,.30)'); R(x + 1, 7, 2, 1, li);
       });
-      R(14, 10, 1, 1, fr); R(8, 10, 1, 1, fr); R(20, 10, 1, 1, fr);
+      R(14, 8, 1, 1, fr); R(8, 8, 1, 1, fr); R(20, 8, 1, 1, fr);
     } else if (of.glasses === 'gl_star') {
       [7, 14].forEach(x => {
-        R(x, 7, 8, 7, '#7fe8ff'); R(x + 1, 8, 6, 5, '#3fa7d6');
-        CLR(x, 7, 2, 1); CLR(x, 7, 1, 2); CLR(x + 6, 7, 2, 1); CLR(x + 7, 7, 1, 2);
-        CLR(x, 13, 2, 1); CLR(x, 12, 1, 2); CLR(x + 6, 13, 2, 1); CLR(x + 7, 12, 1, 2);
-        R(x + 1, 8, 2, 2, '#ffffff'); R(x + 5, 11, 2, 2, '#c9f4ff');
+        R(x, 5, 8, 7, '#7fe8ff'); R(x + 1, 6, 6, 5, '#3fa7d6');
+        CLR(x, 5, 2, 1); CLR(x, 5, 1, 2); CLR(x + 6, 5, 2, 1); CLR(x + 7, 5, 1, 2);
+        CLR(x, 11, 2, 1); CLR(x, 10, 1, 2); CLR(x + 6, 11, 2, 1); CLR(x + 7, 10, 1, 2);
+        R(x + 1, 6, 2, 2, '#ffffff'); R(x + 5, 9, 2, 2, '#c9f4ff');
       });
-      R(6, 6, 1, 1, '#ffffff'); R(23, 5, 1, 1, '#ffffff'); R(24, 9, 1, 1, '#ffffff');
+      R(6, 4, 1, 1, '#ffffff'); R(23, 3, 1, 1, '#ffffff'); R(24, 7, 1, 1, '#ffffff');
     } else if (of.glasses === 'gl_shades') {
-      R(7, 8, 8, 5, '#14141c'); R(14, 8, 8, 5, '#14141c'); R(13, 10, 3, 1, '#14141c');
-      R(8, 8, 3, 1, '#5a5a6a'); R(15, 8, 3, 1, '#5a5a6a');
-      R(12, 11, 2, 1, '#3a3a48'); R(19, 11, 2, 1, '#3a3a48');
+      R(7, 6, 8, 5, '#14141c'); R(14, 6, 8, 5, '#14141c'); R(13, 8, 3, 1, '#14141c');
+      R(8, 6, 3, 1, '#5a5a6a'); R(15, 6, 3, 1, '#5a5a6a');
+      R(12, 9, 2, 1, '#3a3a48'); R(19, 9, 2, 1, '#3a3a48');
     }
 
     /* ---- the hat: a brim on rows 1-3, a crown above, ear tips still showing ---- */
