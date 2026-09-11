@@ -320,10 +320,8 @@ window.QUESTS_UI = (() => {
         case 'quest-sel': { sel = btn.dataset.id; const qq = QUEST_BY_ID[sel]; if (qq) openDept = qq.chapter; boardSig = ''; render(); UI.snd.plop(); break; }
         case 'quest-dept': openDept = openDept === btn.dataset.dept ? null : btn.dataset.dept; boardSig = ''; render(); UI.snd.plop(); break;
         case 'claim-quest': {
-          if (GAME.claimQuest(btn.dataset.id)) {
-            UI.snd.grand();
-            UI.floatText('SIGNED - THE CAR IS ON ITS WAY', ev.clientX - 100, ev.clientY - 30, 'gold', 'car');
-          } else UI.snd.error();
+          if (GAME.claimQuest(btn.dataset.id)) UI.snd.grand();
+          else UI.snd.error();
           sig = ''; boardSig = '';
           if (!$('#modal-quests').hidden) render();
           break;

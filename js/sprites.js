@@ -2612,65 +2612,79 @@ const SPR = (() => {
      the founder's own frame; the clothes come from their look, so
      no two are dressed alike.
      ------------------------------------------------------------- */
+  /* the same face the founder wears, cut down to crew size: a round head
+     wider than the body, an ear at each top corner, a mask of two patches
+     either side of a pale blaze, a small eye with a pupil in each, and a
+     pale muzzle with a nose bar under them. */
+  const CREW_ROWS = [
+    'oggo....oggo',
+    'ogpoooooopgo',
+    'ogoGGWWGGogo',
+    '.okkkWWkkko.',
+    'ogwwkWWkwwgo',
+    'ogwekWWkewgo',
+    'ogkkkWWkkkgo',
+    'ocGWWWWWWGco',
+    '.oGGWnnWGGo.',
+    '..oGWWWWGo..',
+    '..oHHHHHHo..',
+    '..ohhhhhho..',
+    '..ohhhhhho..',
+    '..ojjjjjjo..',
+  ];
   function animalStaffSprite(species, look, frame, scale) {
     const A = ANIMALS[species] || ANIMALS.fox;
     const P = animalPal(species);
     const L = look || {};
     const shirt = L.shirt || '#5fa8e8', pants = L.pants || '#6e4a20', boot = L.boot || '#3a2a16';
-    const key = 'anst_' + species + '_' + [shirt, pants, boot, L.hat].join('|') + '_' + frame + '_' + scale;
+    const key = 'anst2_' + species + '_' + [shirt, pants, boot, L.hat].join('|') + '_' + frame + '_' + scale;
     if (cache.has(key)) return cache.get(key);
     const k = scale || 1;
     const c = newCanvas(12 * k, 18 * k);
     const ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
     const R = (x, y, w, h, col) => { if (!col) return; ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
-    const OUT = '#241d16';
+    const OUT = P.o;
     const f = frame ? 1 : 0;
 
-    /* ---- tail, behind everything, ringed if the species has rings ---- */
-    R(0, 10, 2, 5, OUT);
-    R(0, 11, 2, 3, P.T);
-    if (A.rings) R(0, 12, 2, 1, P.t);
-    if (A.tip) R(0, 10, 2, 1, A.tip);
+    /* ---- the tail, behind everything, ringed if the species has rings ---- */
+    R(0, 11, 2, 5, OUT);
+    R(0, 12, 2, 3, P.T);
+    if (A.rings) R(0, 13, 2, 1, P.t);
+    if (A.tip) R(0, 11, 2, 1, A.tip);
 
-    /* ---- ears, out at the corners of the head ---- */
+    /* ---- head, face and body in one grid, clothes folded into the palette ---- */
+    const PAL = Object.assign({}, P, {
+      h: shirt, H: lighten(shirt, 0.3), j: darken(shirt, 0.25),
+    });
+    drawGrid(ctx, CREW_ROWS, PAL, 0, 0, k);
+
+    /* there is no headroom on this frame, so a hare gets ears that are
+       bigger and swept out rather than ears that are taller */
     if (A.ears === 'long') {
-      R(2, 0, 2, 4, OUT); R(8, 0, 2, 4, OUT);
-      R(2, 1, 1, 3, P.d); R(9, 1, 1, 3, P.d);
-      R(2, 2, 1, 1, P.p); R(9, 2, 1, 1, P.p);
-    } else {
-      R(2, 2, 2, 2, OUT); R(8, 2, 2, 2, OUT);
-      R(2, 2, 1, 1, P.d); R(9, 2, 1, 1, P.d);
-      R(3, 3, 1, 1, P.p); R(8, 3, 1, 1, P.p);
+      R(0, 0, 4, 3, OUT); R(8, 0, 4, 3, OUT);
+      R(0, 0, 3, 2, P.g); R(9, 0, 3, 2, P.g);
+      R(1, 1, 2, 1, P.p); R(9, 1, 2, 1, P.p);
     }
-    /* ---- head: fur, a brow band on the masked species, dot eyes ---- */
-    R(3, 3, 6, 1, OUT);
-    R(2, 4, 8, 6, OUT);
-    R(3, 4, 6, 5, P.G);
-    R(3, 4, 6, 1, P.g);
-    if (A.mask) R(3, 5, 6, 1, P.k);
-    R(4, 6, 1, 1, P.e); R(7, 6, 1, 1, P.e);          /* the eyes */
-    R(4, 8, 4, 1, P.W);                               /* the muzzle */
-    R(5, 8, 2, 1, P.W); R(5, 9, 2, 1, P.W);
-    R(5, 9, 1, 1, P.n);                               /* the nose */
-    R(3, 7, 1, 1, P.c); R(8, 7, 1, 1, P.c);           /* a blush either side */
-    /* ---- body: a work shirt over dungarees ---- */
-    R(3, 10, 6, 1, OUT);
-    R(3, 10, 6, 4, shirt);
-    R(3, 10, 6, 1, lighten(shirt, 0.3));
-    R(3, 13, 6, 1, darken(shirt, 0.25));
-    R(5, 10, 2, 4, lighten(shirt, 0.15));             /* the bib */
-    R(4, 11, 1, 1, '#ffd23f'); R(7, 11, 1, 1, '#ffd23f');
-    /* ---- arms, swinging ---- */
-    R(2, 11 + f, 1, 3, P.g); R(9, 11 + (1 - f), 1, 3, P.g);
-    R(2, 14 + f, 1, 1, P.G); R(9, 14 + (1 - f), 1, 1, P.G);
+
+    /* ---- arms, swinging out of the sleeves ---- */
+    R(2, 10 + f, 1, 4, OUT);      R(9, 11 - f, 1, 4, OUT);
+    R(2, 10 + f, 1, 3, shirt);    R(9, 11 - f, 1, 3, shirt);
+    R(2, 13 + f, 1, 1, P.G);      R(9, 14 - f, 1, 1, P.G);
+
     /* ---- legs and boots ---- */
     R(3, 14, 2, 3, pants); R(7, 14, 2, 3, pants);
-    R(3, 14, 2, 1, lighten(pants, 0.2)); R(7, 14, 2, 1, lighten(pants, 0.2));
-    R(3 - (f ? 1 : 0), 17, 3, 1, boot);
-    R(7 + (f ? 1 : 0), 17, 3, 1, boot);
+    R(3, 14, 1, 3, lighten(pants, 0.2)); R(7, 14, 1, 3, lighten(pants, 0.2));
+    R(2, 14, 1, 3, OUT); R(5, 14, 2, 3, OUT); R(9, 14, 1, 3, OUT);
+    R(3 - f, 17, 3, 1, boot);
+    R(7 + f, 17, 3, 1, boot);
+
     /* ---- a hat, if their look calls for one ---- */
-    if (L.hat === 'straw') { R(1, 2, 10, 1, '#e0bd82'); R(3, 1, 6, 1, '#f2dcb0'); }
-    else if (L.hat === 'cap') { R(3, 1, 6, 2, shirt); R(8, 2, 3, 1, darken(shirt, 0.3)); R(4, 1, 3, 1, lighten(shirt, 0.4)); }
+    if (L.hat === 'straw') {
+      R(0, 2, 12, 1, OUT); R(0, 1, 12, 1, '#e0bd82'); R(3, 0, 6, 1, '#f2dcb0');
+    } else if (L.hat === 'cap') {
+      R(2, 0, 8, 2, shirt); R(2, 0, 8, 1, lighten(shirt, 0.4)); R(9, 2, 3, 1, darken(shirt, 0.3));
+    }
     cache.set(key, c);
     return c;
   }

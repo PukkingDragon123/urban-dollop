@@ -310,6 +310,9 @@
     const TAR = ['#8f6438', '#9c7040', '#835a30', '#aa7d49'].map(rgb);
     const PAVE = ['#b2ab9c', '#c2bbab', '#a29a8c', '#cdc5b4'].map(rgb);
     const KERB = rgb('#8a8578'), KERB2 = rgb('#6e6a60');
+    /* across the road there is no town: a trail, then forest */
+    const TRAIL = ['#a8895e', '#b89a6c', '#96794f', '#c4a87c'].map(rgb);
+    const LITTER = ['#2f4a26', '#3a5a2c', '#456a34', '#527a3e'].map(rgb);
 
     const nBig = makeNoise(11, 34, W.W, W.H);
     const nSml = makeNoise(29, 9, W.W, W.H);
@@ -322,14 +325,23 @@
       for (let x = 0; x < W.W; x++) {
         let c;
         if (y >= W.farY) {
-          /* the far side: a stone footpath, then the town's own paving */
+          /* the far side: a dirt trail along the verge, then forest floor
+             going back into the shade */
           const n = nSml(x, y);
-          c = PAVE[n < 0.3 ? 2 : n < 0.6 ? 0 : n < 0.88 ? 1 : 3];
-          if (y < W.farY + 3) c = y === W.farY ? KERB2 : KERB;
-          else {
-            /* flagstones: a joint every ten across, every eight down, offset per course */
-            const row = ((y - W.farY - 3) / 8) | 0;
-            if ((y - W.farY - 3) % 8 === 0 || (x + row * 5) % 10 === 0) c = PAVE[2];
+          const b = nBig(x, y);
+          if (y < W.farY + 2) c = TRAIL[3];                     /* the soft earth lip */
+          else if (y < W.farY + 15) {
+            /* the trail itself, worn where they walk */
+            c = TRAIL[n < 0.3 ? 2 : n < 0.62 ? 0 : n < 0.9 ? 1 : 3];
+            if ((x * 13 + y * 7) % 37 === 0) c = TRAIL[2];
+          } else {
+            /* leaf litter, darkening the further back it goes */
+            const v = b * 0.6 + n * 0.4;
+            let idx = v < 0.38 ? 0 : v < 0.55 ? 1 : v < 0.74 ? 2 : 3;
+            const deep = (y - W.farY - 15) / (W.H - W.farY - 15);
+            if (deep > 0.55 && idx > 0) idx--;
+            if (deep > 0.82 && idx > 0) idx--;
+            c = LITTER[idx];
           }
         } else if (y >= W.roadY) {
           /* two lanes of packed dirt, kerbed on both sides */
@@ -405,7 +417,7 @@
       g.fillRect(x, W.roadY + 4 + Math.floor(rndG() * 3), 1 + (rndG() < 0.3 ? 1 : 0), 1);
       g.fillRect(x, W.farY - 6 - Math.floor(rndG() * 3), 1 + (rndG() < 0.3 ? 1 : 0), 1);
     }
-    /* the town on the far side */
+    /* the forest on the far side */
     buildFarSide(g);
 
     /* grass blades everywhere */
@@ -736,80 +748,91 @@
      ============================================================ */
   function buildFarSide(g) {
     const rnd = SPR.mulberry(20260907);
-    const groundY = W.H - 2;              /* where the town stands */
-    const pathY = W.farY + 14;            /* the back of the footpath */
-    /* the footpath's back edge, and the shade the frontage casts on it */
-    g.fillStyle = '#9b9b90'; g.fillRect(0, pathY, W.W, 1);
-    g.fillStyle = 'rgba(0,0,0,.10)'; g.fillRect(0, pathY + 1, W.W, 2);
-    g.fillStyle = 'rgba(0,0,0,.16)'; g.fillRect(0, groundY - 1, W.W, 3);
-    g.fillStyle = '#6e6a60'; g.fillRect(0, W.H - 2, W.W, 2);
-    let x = -12;
-    let slot = 0;
-    while (x < W.W + 8) {
-      const roll = rnd();
-      if (slot % 5 === 4 && roll < 0.7) {
-        /* a break in the terrace: the bus stop, or a hoarding, or a tree */
-        const pick = rnd();
-        if (pick < 0.4) {
-          const sh = SPR.shelterSprite(1);
-          g.drawImage(sh, Math.round(x + 4), groundY - sh.height);
-          shadow(g, x + 4 + sh.width / 2, groundY, sh.width * 0.4);
-          /* a bus stop flag on the kerb */
-          g.fillStyle = '#3a3a4a'; g.fillRect(Math.round(x + sh.width + 8), W.farY + 4, 2, 14);
-          g.fillStyle = '#2e2216'; g.fillRect(Math.round(x + sh.width + 4), W.farY, 10, 6);
-          g.fillStyle = '#3fa7d6'; g.fillRect(Math.round(x + sh.width + 5), W.farY + 1, 8, 4);
-          x += sh.width + 20;
-        } else if (pick < 0.72) {
-          /* somebody else's advertising */
-          const bb = SPR.billboardSprite(SPR.billboardPreset('sale'), 1, false);
-          g.drawImage(bb, Math.round(x + 6), groundY - bb.height);
-          shadow(g, x + 6 + bb.width / 2, groundY, bb.width * 0.36);
-          x += bb.width + 16;
-        } else {
-          const t = SPR.decoSprite(rnd() < 0.5 ? 'tree' : 'pine', 1, Math.floor(rnd() * 9999));
-          g.drawImage(t, Math.round(x + 6), groundY - t.height);
-          shadow(g, x + 6 + t.width / 2, groundY, t.width * 0.34);
-          x += t.width + 14;
-        }
-      } else {
-        const kind = roll < 0.22 ? 'shed' : roll < 0.5 ? 'wide' : 'shop';
-        const spr = SPR.townSprite(kind, Math.floor(rnd() * 9999), 1);
-        g.drawImage(spr, Math.round(x), groundY - spr.height);
-        shadow(g, x + spr.width / 2, groundY, spr.width * 0.3);
-        x += spr.width + 2 + Math.floor(rnd() * 5);
-      }
-      slot++;
+    const groundY = W.H - 2;              /* the front of the wood */
+    const trailY = W.farY + 15;           /* where the trail gives way to litter */
+    const pick = a => a[Math.floor(rnd() * a.length)];
+
+    /* the shade the canopy throws forward onto the trail */
+    g.fillStyle = 'rgba(20,40,16,.16)'; g.fillRect(0, trailY, W.W, 5);
+    g.fillStyle = 'rgba(20,40,16,.10)'; g.fillRect(0, trailY + 5, W.W, 6);
+
+    /* a mass of canopy behind everything, so the gaps between trunks read
+       as more wood rather than as bare floor */
+    g.fillStyle = '#20381c';
+    g.fillRect(0, trailY + 4, W.W, groundY - trailY - 4);
+    for (let i = 0; i < 900; i++) {
+      const x = Math.floor(rnd() * W.W), y = trailY + 4 + Math.floor(rnd() * (groundY - trailY - 8));
+      const d = (y - trailY) / (groundY - trailY);
+      g.fillStyle = rnd() < 0.5 + d * 0.3 ? '#274420' : '#2f5026';
+      g.fillRect(x, y, 2 + (rnd() < 0.3 ? 1 : 0), 1 + (rnd() < 0.4 ? 1 : 0));
     }
-    /* street furniture along the footpath */
-    for (let lx = 26; lx < W.W; lx += 96 + Math.floor(rnd() * 40)) {
-      const lamp = SPR.furnitureSprite('lamp', Math.floor(rnd() * 900), 1);
-      g.drawImage(lamp, Math.round(lx), W.farY + 12 - lamp.height + 6);
-      g.fillStyle = 'rgba(40,40,30,.22)'; g.fillRect(Math.round(lx), W.farY + 16, 8, 2);
-      if (rnd() < 0.5) {
-        const kind = rnd() < 0.5 ? 'mailbox' : 'planter';
-        const f = SPR.furnitureSprite(kind, Math.floor(rnd() * 900), 1);
-        g.drawImage(f, Math.round(lx + 34), W.farY + 14 - f.height + 4);
+
+    /* rows of trees, back to front. The deeper rows stand higher up the
+       band and take a wash of shade, so the wood has depth in it. */
+    const row = (baseY, step, wash, pines, jitter) => {
+      let x = -14 + Math.floor(rnd() * step);
+      const drawn = [];
+      while (x < W.W + 14) {
+        const kind = rnd() < pines ? 'pine' : 'tree';
+        const t = SPR.decoSprite(kind, 1, Math.floor(rnd() * 9999));
+        const y = baseY - t.height + Math.floor(rnd() * (jitter || 4)) - ((jitter || 4) >> 1);
+        g.drawImage(t, Math.round(x), Math.round(y));
+        drawn.push([Math.round(x), Math.round(y), t.width, t.height]);
+        x += Math.max(9, step - 7 + Math.floor(rnd() * 13));
       }
+      if (wash) {
+        g.save();
+        g.globalCompositeOperation = 'source-atop';
+        g.fillStyle = wash;
+        drawn.forEach(([dx, dy, dw, dh]) => g.fillRect(dx, dy, dw, dh));
+        g.restore();
+      }
+    };
+    row(groundY - 44, 13, 'rgba(20,38,22,.66)', 0.8, 5);   /* the far dark     */
+    row(groundY - 30, 15, 'rgba(22,42,26,.46)', 0.7, 6);   /* deep in          */
+    row(groundY - 16, 19, 'rgba(26,48,28,.22)', 0.55, 7);  /* the middle       */
+    row(groundY - 2, 24, null, 0.4, 5);                    /* the front rank   */
+
+    /* undergrowth: brush along the front of the wood and the trail edge */
+    const UNDER = ['bush', 'fern', 'shroom', 'rock', 'moss', 'tuft', 'stump'];
+    for (let i = 0; i < 110; i++) {
+      const kind = pick(UNDER);
+      const d = SPR.decoSprite(kind, 1, Math.floor(rnd() * 9999));
+      const x = Math.floor(rnd() * (W.W + 20)) - 10;
+      const y = trailY + 6 + Math.floor(rnd() * (groundY - trailY - 8));
+      g.drawImage(d, Math.round(x), Math.round(y - d.height));
+      if (y < groundY - 20) {
+        g.save();
+        g.globalCompositeOperation = 'source-atop';
+        g.fillStyle = 'rgba(24,44,26,.30)';
+        g.fillRect(Math.round(x), Math.round(y - d.height), d.width, d.height);
+        g.restore();
+      }
+    }
+    /* a scatter of leaf litter and fallen twigs on the trail itself */
+    for (let i = 0; i < 220; i++) {
+      const x = Math.floor(rnd() * W.W), y = W.farY + 2 + Math.floor(rnd() * 13);
+      g.fillStyle = rnd() < 0.5 ? 'rgba(120,92,44,.42)' : 'rgba(78,104,50,.40)';
+      g.fillRect(x, y, 1 + (rnd() < 0.3 ? 1 : 0), 1);
     }
   }
-  /* the lamps come on over the town at runtime, so they can flicker */
+  /* the wood at runtime: fireflies drifting between the trunks */
   function drawFarSide(now) {
     if (cam().y + W.view.h < W.farY - 8) return;
-    const t0 = Math.floor(now / 520);
-    for (let lx = 26, i = 0; lx < W.W; lx += 96, i++) {
-      if (lx < cam().x - 30 || lx > cam().x + W.view.w + 30) continue;
-      const on = (i + t0) % 23 !== 0;
-      /* a dithered cone of light spilling onto the footpath */
-      ctx.fillStyle = on ? 'rgba(255,232,150,.20)' : 'rgba(255,232,150,.06)';
-      for (let dy = 0; dy < 16; dy++) {
-        const half = 2 + Math.round(dy * 0.55);
-        for (let dx = -half; dx <= half; dx++) {
-          if ((dx + dy + i) % 2 && dy > 4) continue;
-          ctx.fillRect(lx + 4 + dx, W.farY - 3 + dy, 1, 1);
-        }
-      }
-      ctx.fillStyle = on ? '#fff3c4' : '#8a8f98';
-      ctx.fillRect(lx + 2, W.farY - 14, 4, 3);
+    for (let i = 0; i < 26; i++) {
+      const seed = i * 97 + 11;
+      const bx = (seed * 37) % W.W;
+      const x = bx + Math.sin(now / (900 + i * 40) + i) * 14;
+      if (x < cam().x - 20 || x > cam().x + W.view.w + 20) continue;
+      const y = W.farY + 20 + ((seed * 13) % (W.H - W.farY - 26))
+              + Math.cos(now / (1100 + i * 33) + i * 1.7) * 6;
+      const on = Math.sin(now / 420 + i * 2.3) > 0.1;
+      if (!on) continue;
+      ctx.fillStyle = 'rgba(190,255,140,.30)';
+      ctx.fillRect(Math.round(x) - 1, Math.round(y), 3, 1);
+      ctx.fillRect(Math.round(x), Math.round(y) - 1, 1, 3);
+      ctx.fillStyle = '#e8ffb0';
+      ctx.fillRect(Math.round(x), Math.round(y), 1, 1);
     }
   }
 
