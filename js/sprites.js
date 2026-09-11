@@ -3374,9 +3374,9 @@ const SPR = (() => {
     '...ooogGGGGGGWWWGGGGGGgoo...',
     '....ogGkkkkGWWWWWGkkkkGgo...',
     '...oogkkkkkkWWWWWkkkkkkgoo..',
-    '...oggkwwwkkWWWWWkkwwwkggo..',
-    '...oggkwwwkkWWWWWkkwwwkggo..',
-    '...oggkkkkkkWWWWWkkkkkkggo..',
+    '...oggkwwwwkWWWWWkwwwwkggo..',
+    '...oggkweewkWWWWWkweewkggo..',
+    '...oggkweewkWWWWWkweewkggo..',
     '...oggkkkkkkWWWWWkkkkkkggo..',
     '...ooggkWWWWWWWWWWWWWkggoo..',
     '....ogGGWWWWWnnnWWWWWGGgo...',
@@ -3506,17 +3506,24 @@ const SPR = (() => {
        and a caller can ask for any of them by name. ---- */
     const EX = expr || DEFAULT_EXPR[pose] || 'happy';
     if (EX !== 'happy') {
-      const K_ = P.k, W_ = P.W, N_ = P.n, WH_ = P.w, BROW = P.o;
+      const K_ = P.k, W_ = P.W, N_ = P.n, WH_ = P.w, PU_ = P.e, BROW = P.o;
       /* the mask is two rounded patches, six wide at rows 6-11 (x6-11 and
-         x17-22), each holding a three by two white square at rows 8-9.
-         Every expression wipes its patch back to mask and draws its own
-         white over it. i is 0 for his left patch, 1 for his right. */
-      const PAT = [6, 17], EYX = [7, 19];
+         x17-22), each holding a small eye at rows 8-10: a four-by-three
+         white with a two-by-two pupil ringed inside it. Every expression
+         wipes its patch back to mask and draws its own eye over it. i is
+         0 for his left patch, 1 for his right. */
+      const PAT = [6, 17], EYX = [7, 18];
       const eyes = (f, g2) => { f(0); (g2 || f)(1); };
       const wipe = i => { const x = PAT[i]; R(x, 7, 6, 5, K_); R(x + 1, 6, 4, 1, K_); };
       const eye = (i, dx, dy, w, h) => {
         wipe(i);
-        R(EYX[i] + (dx || 0), 8 + (dy || 0), w || 3, h || 2, WH_);
+        const ww = w || 4, hh = h || 3;
+        const x = EYX[i] + (dx || 0), y = 8 + (dy || 0);
+        R(x, y, ww, hh, WH_);
+        /* the pupil sits low and centred in whatever white the
+           expression asked for, and shrinks with it */
+        const pw = Math.min(2, ww - 2) || 1, ph = Math.min(2, hh - 1) || 1;
+        R(x + ((ww - pw) >> 1), y + hh - ph, pw, ph, PU_);
       };
       /* a brow sits on the top edge of the patch; dy pushes it down into it */
       const brow = (i, dy, inner) => {
@@ -3538,18 +3545,18 @@ const SPR = (() => {
       };
       switch (EX) {
         case 'blink':                        /* shut: a white lash line low in the patch */
-          eyes(i => { wipe(i); R(EYX[i], 9, 3, 1, WH_); R(EYX[i] - 1, 8, 1, 1, WH_); R(EYX[i] + 3, 8, 1, 1, WH_); });
+          eyes(i => { wipe(i); R(EYX[i], 9, 4, 1, WH_); R(EYX[i] - 1, 8, 1, 1, WH_); R(EYX[i] + 4, 8, 1, 1, WH_); });
           break;
         case 'grin':                         /* squeezed shut, curved up */
-          eyes(i => { wipe(i); R(EYX[i], 8, 3, 1, WH_); R(EYX[i] - 1, 9, 1, 1, WH_); R(EYX[i] + 3, 9, 1, 1, WH_); });
+          eyes(i => { wipe(i); R(EYX[i], 8, 4, 1, WH_); R(EYX[i] - 1, 9, 1, 1, WH_); R(EYX[i] + 4, 9, 1, 1, WH_); });
           mouth('grin');
           break;
-        case 'wow':                          /* the whites blow wide open */
+        case 'wow':                          /* the eye blows wide open, pupil tiny in it */
           eyes(i => eye(i, -1, -1, 4, 4));
           mouth('o');
           break;
         case 'angry':                        /* whites shoved inward, brows down over the patch */
-          eye(0, 2); eye(1, -2);
+          eye(0, 1); eye(1, -1);
           brow(0, 0, true); brow(1, 0, true);
           mouth('teeth');
           break;
@@ -3559,11 +3566,11 @@ const SPR = (() => {
           mouth('flat');
           break;
         case 'smug':                         /* one eye down to a slit */
-          wipe(1); R(19, 9, 3, 1, WH_);
+          wipe(1); R(18, 9, 4, 1, WH_); R(19, 9, 2, 1, PU_);
           mouth('smirk');
           break;
         case 'sad':                          /* whites down in the corners, brows up inside */
-          eye(0, 0, 2, 3, 1); eye(1, 0, 2, 3, 1);
+          eye(0, 0, 2, 4, 1); eye(1, 0, 2, 4, 1);
           R(9, 6, 3, 1, BROW); R(8, 7, 2, 1, BROW);
           R(17, 6, 3, 1, BROW); R(19, 7, 2, 1, BROW);
           mouth('frown');
