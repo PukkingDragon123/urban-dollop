@@ -3057,7 +3057,7 @@ const GAME = (() => {
   }
 
   /* ---------- traffic: cars go by on the road ---------- */
-  const CAR_KINDS = ['sedan', 'sedan', 'hatch', 'pickup', 'van', 'bus'];
+  const CAR_KINDS = ['sedan', 'sedan', 'sedan', 'hatch', 'hatch', 'pickup', 'pickup', 'van', 'van', 'bus'];
   const CUSTOMER_CARS = ['sedan', 'hatch', 'pickup', 'van'];
   const CAR_COLS = ['#e8542f', '#3fa7d6', '#ffd23f', '#6ab04c', '#fff8ec', '#b06ee0', '#2e2216', '#f0a422', '#ff5f9e', '#c9ced6', '#8a5e2a'];
   const cars = [];
@@ -3067,7 +3067,7 @@ const GAME = (() => {
   function laneY(dir) { return dir === 1 ? WORLD.roadY + 28 : WORLD.roadY + 6; }
   function tickTraffic(dt) {
     carT -= dt;
-    if (carT <= 0 && cars.length < 4) {
+    if (carT <= 0 && cars.length < 9) {
       carT = ECON.carEvery * (0.5 + Math.random());
       const dir = Math.random() < 0.5 ? 1 : -1;
       const c = { id: nextId++, kind: pickOne(CAR_KINDS), col: pickOne(CAR_COLS), dir,
@@ -3139,9 +3139,10 @@ const GAME = (() => {
   const passers = [];
   let passT = 8;
   function passerY(path, dir) {
-    /* the verge is your side of the kerb; the path is over the road */
-    if (path === 'verge') return WORLD.roadY - 10 + (dir === 1 ? 3 : 0);
-    return WORLD.farY + 4 + (dir === 1 ? 4 : 0);
+    /* nobody walks through the wood over the road: everything that passes
+       keeps to the verge on your side of the kerb, two lines of it so
+       they do not tread on each other */
+    return WORLD.roadY - 10 + (dir === 1 ? 3 : 0);
   }
   function tickPassers(dt) {
     passT -= dt;
@@ -4070,7 +4071,7 @@ const GAME = (() => {
   function bossAt(x, y) {
     const b = S.boss;
     if (!b || !S.company.done) return null;
-    return (x > b.x - 2 && x < b.x + 30 && y > b.y - 10 && y < b.y + 36) ? b : null;
+    return (x > b.x - 2 && x < b.x + 24 && y > b.y - 8 && y < b.y + 29) ? b : null;
   }
 
   /* ---------- master tick ---------- */

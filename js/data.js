@@ -80,7 +80,7 @@ const ECON = {
   orderPay: 2.4,           // what an order pays per egg, against the sell value
   orderTip: 3,             // feathers tipped for a filled order
   maxOrders: 2,            // cars that fit in the lay-by
-  carEvery: 9,             // seconds between passing cars, give or take
+  carEvery: 3.4,           // seconds between passing cars, give or take
   siteBase: 6,             // seconds the movers need for the cheapest building
   storeyMult: 1.5,         // what a second storey does to a building's effect
   storeyCost: 1.4,         // second storey price against the building's base
@@ -423,16 +423,16 @@ const PASSERS = [
     says:['OINK.', 'SNRRRK.', 'OINK OINK.'] },
   { id:'goat',    critter:'goat',  v:19, w:0.8, stop:0.45, path:'verge', name:'A Goat',
     says:['BLEAT!', 'MEHHH.', 'IS THAT FENCE EDIBLE?'] },
-  { id:'ducks',   critter:'duck',  v:13, w:0.7, stop:0.25, path:'path', name:'Ducks', line:3,
+  { id:'ducks',   critter:'duck',  v:13, w:0.7, stop:0.25, path:'verge', name:'Ducks', line:3,
     says:['QUACK.', 'QUACK QUACK QUACK.', 'QUACK?'] },
   /* the ones that walk upright are folk, not people: a species on the
      founder's frame, or a droid out for a roll. `folk` names the
      species it is always drawn as; leave it off for a random one. */
-  { id:'walker',  folk:'badger', pet:'dog', v:22, w:1.2, stop:0.4, path:'path', name:'A Badger and a Dog' },
+  { id:'walker',  folk:'badger', pet:'dog', v:22, w:1.2, stop:0.4, path:'verge', name:'A Badger and a Dog' },
   { id:'shepherd',folk:'otter', pet:'sheep', v:18, w:0.6, stop:0.3, path:'verge', name:'An Otter and a Sheep' },
-  { id:'jogger',  folk:'hare',  v:38, w:0.8, stop:0.12, path:'path', name:'A Hare in a Hurry' },
-  { id:'stroll',  folk:true,    v:20, w:1.1, stop:0.55, path:'path', name:'Somebody Passing' },
-  { id:'droid',   folk:true, bot:true, v:26, w:0.9, stop:0.35, path:'path', name:'A Delivery Droid',
+  { id:'jogger',  folk:'hare',  v:38, w:0.8, stop:0.12, path:'verge', name:'A Hare in a Hurry' },
+  { id:'stroll',  folk:true,    v:20, w:1.1, stop:0.55, path:'verge', name:'Somebody Passing' },
+  { id:'droid',   folk:true, bot:true, v:26, w:0.9, stop:0.35, path:'verge', name:'A Delivery Droid',
     says:['BEEP.', 'PARCEL FOR A HEN?', 'SCANNING. NICE FENCE.', 'BOOP. GOOD DAY.'] },
 ];
 /* what the folk say when they stop and stare over the fence; the

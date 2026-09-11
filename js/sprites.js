@@ -2191,6 +2191,56 @@ const SPR = (() => {
     return c;
   }
 
+  /* ============================================================
+     WILD BIRDS - the sky over the valley is not empty. A flier is
+     a silhouette three frames deep (wings up, level, down) in two
+     builds: a small songbird and a bigger, slower one. A percher
+     sits folded, on a fence rail or a branch, and looks about.
+     ============================================================ */
+  const BIRD_FLY = {
+    small: [
+      ['.o...o.', 'o.o.o.o', '...o...'],       /* wings up    */
+      ['.......', 'oo.o.oo', '..ooo..'],       /* level       */
+      ['.......', '...o...', 'ooooooo'],       /* wings down  */
+    ],
+    big: [
+      ['o.......o', '.o.....o.', '..ooooo..', '....o....'],
+      ['.........', 'oo.....oo', '.ooooooo.', '...ooo...'],
+      ['.........', '....o....', '.ooooooo.', 'oo.ooo.oo'],
+    ],
+  };
+  function birdSprite(kind, frame, scale, col) {
+    const rows = (BIRD_FLY[kind] || BIRD_FLY.small)[frame % 3];
+    const key = 'bird_' + kind + '_' + frame + '_' + scale + '_' + (col || '');
+    if (cache.has(key)) return cache.get(key);
+    const k = scale || 1;
+    const c = newCanvas(rows[0].length * k, rows.length * k);
+    drawGrid(c.getContext('2d'), rows, { o: col || '#2f3a44' }, 0, 0, k);
+    cache.set(key, c);
+    return c;
+  }
+  /* a small bird sat still: body, folded wing, beak and a dot eye */
+  function percherSprite(frame, scale, col) {
+    const key = 'perch_' + frame + '_' + scale + '_' + (col || '');
+    if (cache.has(key)) return cache.get(key);
+    const k = scale || 1;
+    const c = newCanvas(6 * k, 7 * k);
+    const ctx = c.getContext('2d');
+    const R = (x, y, w, h, cc) => { ctx.fillStyle = cc; ctx.fillRect(x * k, y * k, w * k, h * k); };
+    const base = col || '#5e6b56', lit = lighten(base, 0.3), dk = darken(base, 0.3);
+    const tip = frame ? 1 : 0;                 /* a little peck on the off frame */
+    R(1, 1 + tip, 4, 3, base);                 /* the body            */
+    R(1, 1 + tip, 4, 1, lit);
+    R(2, 2 + tip, 2, 2, dk);                   /* the folded wing     */
+    R(1, 0 + tip, 3, 1, base);                 /* the head            */
+    R(0, 1 + tip, 1, 1, '#f0a422');            /* the beak            */
+    R(2, 0 + tip, 1, 1, '#14141a');            /* the eye             */
+    R(4, 3 + tip, 2, 1, dk);                   /* the tail            */
+    R(2, 4 + tip, 1, 2, '#c98a3a'); R(3, 4 + tip, 1, 2, '#c98a3a');   /* legs */
+    cache.set(key, c);
+    return c;
+  }
+
   function plumeSprite(scale) {
     const key = 'plume_' + scale;
     if (cache.has(key)) return cache.get(key);
@@ -3334,9 +3384,10 @@ const SPR = (() => {
 
   /* ============================================================
      THE RACCOON - who inherited the farm and means to get rich.
-     A 28 x 34 body on a canvas with nine rows of headroom for a
-     hat. He is a chibi: the head is a big circle sixteen rows tall
-     and twenty-one wide - wider than the body under it - with a
+     A 22 x 27 body on a canvas with seven rows of headroom for a
+     hat - he was half again that and towered over his own farm.
+     He is a chibi: the head is a circle thirteen rows tall and
+     sixteen wide - wider than the body under it - with a
      rounded ear at each top corner, a pale blaze straight down the
      middle of it, a bandit mask of two rounded black patches either
      side of that blaze, a white square eye in each, a wide pale
@@ -3344,44 +3395,37 @@ const SPR = (() => {
      ringed tail hanging down behind his right shoulder. Dressed from a
      wardrobe record { hat, suit, glasses, acc } and posed. The
      wide poses (dancing, chopping, hammering, punching, the
-     guitar) get a 44-wide canvas and report where the body sits on
+     guitar) get a 35-wide canvas and report where the body sits on
      it as .ox, so a caller can keep the feet where they were.
      ============================================================ */
   const RACCOON_ROWS = [
-    '...oogggoo.........oogggoo..',
-    '...ogggggo.ooooooo.ogggggo..',
-    '...ogpppgoooGGGGGooogpppgo..',
-    '...ogpppggGGGGGGGGGggpppgo..',
-    '...oggggGGGGGGGGGGGGggggoo..',
-    '...ooogGGGGGGWWWGGGGGGgoo...',
-    '....ogGkkkkGWWWWWGkkkkGgo...',
-    '...oogkkkkkkWWWWWkkkkkkgoo..',
-    '...oggkwwwwkWWWWWkwwwwkggo..',
-    '...oggkweewkWWWWWkweewkggo..',
-    '...oggkweewkWWWWWkweewkggo..',
-    '...oggkkkkkkWWWWWkkkkkkggo..',
-    '...ooggkWWWWWWWWWWWWWkggoo..',
-    '....ogGGWWWWWnnnWWWWWGGgo...',
-    '....oogGGWWWWWnWWWWWGGgoo...',
-    '.....oogGGWWWWWWWWWGGgoo....',
-    '......ooogGWWWWWWWGgooooooo.',
-    '........oooGdddddGooo.ottto.',
-    '........ogggggggggggo.ottto.',
-    '.......ogggggggggggggooTTTo.',
-    '.......ogggggggggggggoTTToo.',
-    '.......ogggggggggggggottto..',
-    '.......ogggggggggggggottto..',
-    '.......ogggggggggggggoTTTo..',
-    '.......ogggggggggggggoTTTo..',
-    '.......ogggggggggggggottto..',
-    '.......ogggggggggggggottto..',
-    '........ogggggggggggooTTTo..',
-    '.........ogggo..ogggoooooo..',
-    '.........ogggo..ogggo.......',
-    '.........ogggo..ogggo.......',
-    '........oSSSSo.ossssso......',
-    '........oSSSSo.ossssso......',
-    '........oooooo.ooooooo......',
+    '.ooggooooooooooooggoo.',
+    '.ogppgooGGGGGGoogppgo.',
+    '.ogppggGGGWWGGGggppgo.',
+    '.oggggGGGGWWGGGGggggo.',
+    '.ookkkkkkkWWkkkkkkkoo.',
+    '..okkwwwkkWWkkwwwkko..',
+    '..okkwewkkWWkkwewkko..',
+    '..okkwewkkWWkkwewkko..',
+    '..ogGWWWWWWWWWWWWGgo..',
+    '..oogGWWWWnnWWWWGgoo..',
+    '...ogGGWWWWWWWWGGgo...',
+    '...oogGGWWWWWWGGgoo...',
+    '....oogGGWWWWGGgooooo.',
+    '.....oooGddddGooottto.',
+    '......oggggggggoottto.',
+    '.....oggggggggggoTTTo.',
+    '.....oggggggggggoTTTo.',
+    '.....oggggggggggottto.',
+    '.....oggggggggggottto.',
+    '.....oggggggggggoTTTo.',
+    '.....oggggggggggoTTTo.',
+    '......oggggggggoottto.',
+    '.......oggooggo.ooooo.',
+    '.......oggooggo.......',
+    '......oSSSoossso......',
+    '......oSSSoossso......',
+    '......oooooooooo......',
 ];
   const RACCOON_PAL = {
     o: '#141118',   /* outline                */  d: '#6b7480',   /* fur, in shade      */
@@ -3431,8 +3475,8 @@ const SPR = (() => {
     if (!A.rings) { p.T = p.g; p.t = p.d; }
     return p;
   }
-  const RAC_OFF = 9;                       /* rows of headroom above the ears */
-  const RAC_W = 28, RAC_H = 34, RAC_MID = 14;
+  const RAC_OFF = 7;                       /* rows of headroom above the ears */
+  const RAC_W = 22, RAC_H = 27, RAC_MID = 11;
   /* what his face does in each pose unless a caller says otherwise */
   const DEFAULT_EXPR = {
     stand: 'happy', walk0: 'happy', walk1: 'happy', boss: 'smug', read: 'smug',
@@ -3454,12 +3498,25 @@ const SPR = (() => {
     if (cache.has(key)) return cache.get(key);
     const k = scale || 1;
     const wide = WIDE_POSES.includes(pose);
-    const ox = wide ? 8 : 0;
-    const c = newCanvas((wide ? 44 : 28) * k, (RAC_H + RAC_OFF) * k);
+    const ox = wide ? 6 : 0;
+    const c = newCanvas((wide ? 35 : RAC_W) * k, (RAC_H + RAC_OFF) * k);
     c.ox = ox;
     const ctx = c.getContext('2d');
-    const R = (x, y, w, h, col) => { if (!col) return; ctx.fillStyle = col; ctx.fillRect((x + ox) * k, (y + RAC_OFF) * k, w * k, h * k); };
-    const CLR = (x, y, w, h) => ctx.clearRect((x + ox) * k, (y + RAC_OFF) * k, w * k, h * k);
+    /* He used to be drawn on a 28 x 34 grid and towered over the farm.
+       The grid is 22 x 27 now, and every rectangle the suit, the limbs,
+       the hats and the props are built from was measured against the old
+       one - so both EDGES of each are mapped into the new grid and the
+       width taken from the difference. Blocks that touched still touch,
+       and nothing collapses to nothing. RR draws in the new grid direct,
+       for the face, which is hand-placed against it. */
+    const mx = v => Math.round(v * RAC_W / 28), my = v => Math.round(v * RAC_H / 34);
+    const box = (x, y, w, h) => {
+      const x0 = mx(x) + ox, y0 = my(y) + RAC_OFF;
+      return [x0 * k, y0 * k, Math.max(1, mx(x + w) - mx(x)) * k, Math.max(1, my(y + h) - my(y)) * k];
+    };
+    const R = (x, y, w, h, col) => { if (!col) return; ctx.fillStyle = col; ctx.fillRect.apply(ctx, box(x, y, w, h)); };
+    const CLR = (x, y, w, h) => ctx.clearRect.apply(ctx, box(x, y, w, h));
+    const RR = (x, y, w, h, col) => { if (!col) return; ctx.fillStyle = col; ctx.fillRect((x + ox) * k, (y + RAC_OFF) * k, w * k, h * k); };
     const P = animalPal(species);
     const SPEC = ANIMALS[species] || ANIMALS.raccoon;
     const O = P.o, g = P.g, G = P.G;
@@ -3481,108 +3538,103 @@ const SPR = (() => {
       R(6, -3, 1, 3, P.p); R(21, -3, 1, 3, P.p);
     }
     if (SPEC.tip) { R(22, 26, 3, 2, SPEC.tip); R(22, 25, 3, 1, SPEC.tip); }
-    /* ---- the face on top: one of eleven expressions, drawn over the
-       eyes (a 3x2 white square inside each mask patch) and the mouth
-       (into the white of the muzzle at rows 15-16). Each pose has a
-       default - he grins while he dances, scowls while he punches -
-       and a caller can ask for any of them by name. ---- */
+    /* ---- the face on top: one of eleven expressions, hand-placed
+       against the 22 x 27 grid (so these use RR, not the mapped R).
+       Each pose has a default - he grins while he dances, scowls while
+       he punches - and a caller can ask for any of them by name. ---- */
     const EX = expr || DEFAULT_EXPR[pose] || 'happy';
     if (EX !== 'happy') {
       const K_ = P.k, W_ = P.W, N_ = P.n, WH_ = P.w, PU_ = P.e, BROW = P.o;
-      /* the mask is two rounded patches, six wide at rows 6-11 (x6-11 and
-         x17-22), each holding a small eye at rows 8-10: a four-by-three
-         white with a two-by-two pupil ringed inside it. Every expression
-         wipes its patch back to mask and draws its own eye over it. i is
-         0 for his left patch, 1 for his right. */
-      const PAT = [6, 17], EYX = [7, 18];
+      /* the mask is two patches seven wide at rows 4-7 (x3-9 and x12-18),
+         each holding a three-wide white at rows 5-7 with a one-wide pupil
+         down the middle of it. Every expression wipes its patch back to
+         mask and draws its own eye over it. i is 0 for his left, 1 for
+         his right. */
+      const PAT = [3, 12], EYX = [5, 14];
       const eyes = (f, g2) => { f(0); (g2 || f)(1); };
-      const wipe = i => { const x = PAT[i]; R(x, 7, 6, 5, K_); R(x + 1, 6, 4, 1, K_); };
+      const wipe = i => { RR(PAT[i], 4, 7, 4, K_); };
       const eye = (i, dx, dy, w, h) => {
         wipe(i);
-        const ww = w || 4, hh = h || 3;
-        const x = EYX[i] + (dx || 0), y = 8 + (dy || 0);
-        R(x, y, ww, hh, WH_);
-        /* the pupil sits low and centred in whatever white the
-           expression asked for, and shrinks with it */
-        const pw = Math.min(2, ww - 2) || 1, ph = Math.min(2, hh - 1) || 1;
-        R(x + ((ww - pw) >> 1), y + hh - ph, pw, ph, PU_);
+        const ww = w || 3, hh = h || 3;
+        const x = EYX[i] + (dx || 0), y = 5 + (dy || 0);
+        RR(x, y, ww, hh, WH_);
+        RR(x + ((ww - 1) >> 1), y + hh - Math.min(2, hh), 1, Math.min(2, hh), PU_);
       };
-      /* a brow sits on the top edge of the patch; dy pushes it down into it */
+      /* a brow sits on the top edge of the patch; dy pushes it into it */
       const brow = (i, dy, inner) => {
-        const x = PAT[i];
-        R(x + (inner && i === 0 ? 2 : 0), 6 + (dy || 0), 4, 1, BROW);
-        R(i === 0 ? x + 4 : x, 7 + (dy || 0), 2, 1, BROW);
+        const x = PAT[i] + (inner ? (i === 0 ? 2 : 0) : 0);
+        RR(x, 4 + (dy || 0), 5, 1, BROW);
+        RR(i === 0 ? x + 3 : x, 5 + (dy || 0), 2, 1, BROW);
       };
       const mouth = kind => {
-        /* the reference has no mouth line - the muzzle is just a nose bar -
-           so a mouth only appears when an expression calls for one, drawn
-           into the white of the muzzle at rows 15-16 */
-        if (kind === 'grin') { R(12, 16, 5, 1, N_); R(13, 16, 3, 1, '#8a3a4a'); R(12, 15, 1, 1, N_); R(16, 15, 1, 1, N_); }
-        else if (kind === 'open') { R(12, 16, 5, 1, N_); R(13, 15, 3, 1, N_); R(13, 16, 3, 1, '#8a3a4a'); }
-        else if (kind === 'frown') { R(12, 16, 5, 1, W_); R(13, 16, 3, 1, N_); R(12, 15, 1, 1, N_); R(16, 15, 1, 1, N_); }
-        else if (kind === 'flat') { R(12, 16, 5, 1, N_); }
-        else if (kind === 'smirk') { R(14, 16, 3, 1, N_); R(16, 15, 1, 1, N_); }
-        else if (kind === 'o') { R(13, 15, 3, 2, N_); R(14, 16, 1, 1, '#8a3a4a'); }
-        else if (kind === 'teeth') { R(11, 16, 7, 1, N_); R(12, 16, 5, 1, '#fff8ec'); R(14, 16, 1, 1, N_); }
+        /* no mouth line by default - the muzzle is just a nose bar - so
+           one only appears when an expression calls for it, drawn into
+           the white of the muzzle at rows 10-11 */
+        if (kind === 'grin') { RR(9, 11, 4, 1, N_); RR(10, 11, 2, 1, '#8a3a4a'); RR(9, 10, 1, 1, N_); RR(12, 10, 1, 1, N_); }
+        else if (kind === 'open') { RR(9, 11, 4, 1, N_); RR(10, 10, 2, 1, N_); RR(10, 11, 2, 1, '#8a3a4a'); }
+        else if (kind === 'frown') { RR(9, 11, 4, 1, W_); RR(10, 11, 2, 1, N_); RR(9, 10, 1, 1, N_); RR(12, 10, 1, 1, N_); }
+        else if (kind === 'flat') { RR(9, 11, 4, 1, N_); }
+        else if (kind === 'smirk') { RR(11, 11, 2, 1, N_); RR(12, 10, 1, 1, N_); }
+        else if (kind === 'o') { RR(10, 10, 2, 2, N_); RR(10, 11, 1, 1, '#8a3a4a'); }
+        else if (kind === 'teeth') { RR(8, 11, 6, 1, N_); RR(9, 11, 4, 1, '#fff8ec'); RR(10, 11, 1, 1, N_); }
       };
       switch (EX) {
         case 'blink':                        /* shut: a white lash line low in the patch */
-          eyes(i => { wipe(i); R(EYX[i], 9, 4, 1, WH_); R(EYX[i] - 1, 8, 1, 1, WH_); R(EYX[i] + 4, 8, 1, 1, WH_); });
+          eyes(i => { wipe(i); RR(EYX[i], 6, 3, 1, WH_); RR(EYX[i] - 1, 5, 1, 1, WH_); RR(EYX[i] + 3, 5, 1, 1, WH_); });
           break;
         case 'grin':                         /* squeezed shut, curved up */
-          eyes(i => { wipe(i); R(EYX[i], 8, 4, 1, WH_); R(EYX[i] - 1, 9, 1, 1, WH_); R(EYX[i] + 4, 9, 1, 1, WH_); });
+          eyes(i => { wipe(i); RR(EYX[i], 5, 3, 1, WH_); RR(EYX[i] - 1, 6, 1, 1, WH_); RR(EYX[i] + 3, 6, 1, 1, WH_); });
           mouth('grin');
           break;
-        case 'wow':                          /* the eye blows wide open, pupil tiny in it */
-          eyes(i => eye(i, -1, -1, 4, 4));
+        case 'wow':                          /* the eye blows wide open */
+          eyes(i => eye(i, i === 0 ? -1 : 0, -1, 4, 4));
           mouth('o');
           break;
-        case 'angry':                        /* whites shoved inward, brows down over the patch */
+        case 'angry':                        /* eyes shoved inward, brows down over the patch */
           eye(0, 1); eye(1, -1);
           brow(0, 0, true); brow(1, 0, true);
           mouth('teeth');
           break;
-        case 'determined':                   /* level brows low over the whites */
+        case 'determined':                   /* level brows low over the eyes */
           eye(0, 0, 1); eye(1, 0, 1);
-          eyes(i => { R(PAT[i], 6, 6, 1, BROW); R(PAT[i], 7, 6, 1, BROW); });
+          eyes(i => { RR(PAT[i], 4, 7, 1, BROW); RR(PAT[i] + (i === 0 ? 1 : 0), 5, 6, 1, BROW); });
           mouth('flat');
           break;
         case 'smug':                         /* one eye down to a slit */
-          wipe(1); R(18, 9, 4, 1, WH_); R(19, 9, 2, 1, PU_);
+          wipe(1); RR(14, 6, 3, 1, WH_); RR(15, 6, 1, 1, PU_);
           mouth('smirk');
           break;
-        case 'sad':                          /* whites down in the corners, brows up inside */
-          eye(0, 0, 2, 4, 1); eye(1, 0, 2, 4, 1);
-          R(9, 6, 3, 1, BROW); R(8, 7, 2, 1, BROW);
-          R(17, 6, 3, 1, BROW); R(19, 7, 2, 1, BROW);
+        case 'sad':                          /* eyes down in the corners, brows up inside */
+          eye(0, 0, 2, 3, 1); eye(1, 0, 2, 3, 1);
+          RR(6, 4, 4, 1, BROW); RR(4, 5, 3, 1, BROW);
+          RR(12, 4, 4, 1, BROW); RR(15, 5, 3, 1, BROW);
           mouth('frown');
           break;
         case 'love':                         /* a heart in each patch */
           eyes(i => {
-            const x = EYX[i] - 1;
+            const x = EYX[i];
             wipe(i);
-            R(x, 7, 1, 2, '#ff5f9e'); R(x + 3, 7, 1, 2, '#ff5f9e');
-            R(x + 1, 6, 1, 1, '#ff5f9e'); R(x + 2, 6, 1, 1, '#ff5f9e');
-            R(x + 1, 7, 2, 2, '#ff5f9e'); R(x + 1, 9, 2, 1, '#ff5f9e');
-            R(x + 1, 7, 1, 1, '#ffb0d0');
+            RR(x, 5, 1, 2, '#ff5f9e'); RR(x + 2, 5, 1, 2, '#ff5f9e');
+            RR(x + 1, 5, 1, 3, '#ff5f9e');
+            RR(x, 4, 1, 1, '#ffb0d0');
           });
           mouth('grin');
           break;
         case 'dizzy':                        /* crossed out in white */
           eyes(i => {
-            const x = EYX[i] - 1;
+            const x = EYX[i];
             wipe(i);
-            R(x, 7, 1, 1, WH_); R(x + 1, 8, 1, 1, WH_); R(x + 2, 9, 1, 1, WH_); R(x + 3, 10, 1, 1, WH_);
-            R(x + 3, 7, 1, 1, WH_); R(x + 2, 8, 1, 1, WH_); R(x + 1, 9, 1, 1, WH_); R(x, 10, 1, 1, WH_);
+            RR(x, 5, 1, 1, WH_); RR(x + 1, 6, 1, 1, WH_); RR(x + 2, 7, 1, 1, WH_);
+            RR(x + 2, 5, 1, 1, WH_); RR(x, 7, 1, 1, WH_);
           });
           mouth('open');
           break;
-        case 'money':                        /* coins where the whites were */
+        case 'money':                        /* coins where the eyes were */
           eyes(i => {
-            const x = EYX[i] - 1;
+            const x = EYX[i];
             wipe(i);
-            R(x + 1, 6, 2, 1, '#ffd23f'); R(x, 7, 4, 3, '#ffd23f'); R(x + 1, 10, 2, 1, '#ffd23f');
-            R(x + 1, 7, 2, 2, '#b87c10'); R(x + 1, 7, 1, 1, '#fff3c4');
+            RR(x, 5, 3, 3, '#ffd23f');
+            RR(x + 1, 6, 1, 1, '#b87c10'); RR(x, 5, 1, 1, '#fff3c4');
           });
           mouth('grin');
           break;
@@ -4524,7 +4576,7 @@ const SPR = (() => {
     folkSprite, droidSprite, flyerSprite,
     soilSprite, cropSprite, chickSprite, vehicleSprite, skylineSprite, cursorSprite,
     pathSprite, terraceSprite, waterSprite, inkLine, parchment, compassRose, botSprite,
-    plumeSprite, signSprite, treeSprite, eggCrackSprite, shellHalfSprite,
+    plumeSprite, birdSprite, percherSprite, signSprite, treeSprite, eggCrackSprite, shellHalfSprite,
     billboardSprite, billboardPreset, blankArt, townSprite, shelterSprite,
     BILL_W, BILL_H, BILL_CH: CH,
     drawText, textW, drawTiny, tinyW, drawTitle,

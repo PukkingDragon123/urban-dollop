@@ -1542,6 +1542,98 @@
   }));
   const clouds = [0, 1, 2].map(i => ({ x: Math.random() * W.W, y: 60 + i * 120, w: 70 + i * 26, v: 3 + i * 1.4 }));
 
+  /* ---- wild birds ----
+     Fliers cross the valley on their own or in a loose V behind a
+     leader; perchers sit on the fence rail and the roofline and look
+     about. Both are ambient, both are cheap, and both turn off with
+     the particle setting. */
+  const BIRD_COLS = ['#2f3a44', '#3f4a54', '#4a3f30', '#2a3830', '#544a3a'];
+  const PERCH_COLS = ['#5e6b56', '#7a6a4a', '#4a5a6a', '#6a5544', '#55604a'];
+  function newFlier(i, ahead) {
+    const dir = Math.random() < 0.5 ? 1 : -1;
+    const big = Math.random() < 0.3;
+    return {
+      dir, big,
+      x: ahead ? Math.random() * W.W : (dir === 1 ? -40 - Math.random() * 200 : W.W + 40 + Math.random() * 200),
+      y: 20 + Math.random() * (W.roadY - 70),
+      v: (big ? 22 : 38) + Math.random() * 26,
+      bob: Math.random() * Math.PI * 2,
+      flap: 90 + Math.random() * 70,
+      col: BIRD_COLS[i % BIRD_COLS.length],
+      n: Math.random() < 0.34 ? 2 + Math.floor(Math.random() * 4) : 0,   /* a V behind it */
+    };
+  }
+  const fliers = [];
+  for (let i = 0; i < 34; i++) fliers.push(newFlier(i, true));
+  /* perchers: fixed spots along the fence line and the roofs, filled in
+     and left alone until one takes off and another drops in */
+  const perchers = [];
+  for (let i = 0; i < 30; i++) {
+    perchers.push({
+      x: 30 + Math.random() * (W.W - 60),
+      y: 60 + Math.random() * (W.roadY - 100),
+      col: PERCH_COLS[i % PERCH_COLS.length],
+      t: Math.random() * 14,
+      face: Math.random() < 0.5 ? 1 : -1,
+    });
+  }
+  function drawBirds(now, dt) {
+    if (!GAME.setting('particles')) return;
+    /* the ones on the wing */
+    fliers.forEach((b, i) => {
+      b.x += b.dir * b.v * dt;
+      if ((b.dir === 1 && b.x > W.W + 80) || (b.dir === -1 && b.x < -80)) {
+        Object.assign(b, newFlier(i, false));
+        return;
+      }
+      const frame = Math.floor(now / b.flap + i) % 3;
+      const spr = SPR.birdSprite(b.big ? 'big' : 'small', frame, 1, b.col);
+      const put = (px, py) => {
+        if (px + 12 < cam().x || px - 12 > cam().x + W.view.w) return;
+        if (py + 10 < cam().y || py - 10 > cam().y + W.view.h) return;
+        ctx.save();
+        if (b.dir === -1) { ctx.translate(Math.round(px) + spr.width, Math.round(py)); ctx.scale(-1, 1); ctx.drawImage(spr, 0, 0); }
+        else ctx.drawImage(spr, Math.round(px), Math.round(py));
+        ctx.restore();
+      };
+      const y = b.y + Math.sin(now / 700 + b.bob) * 3;
+      put(b.x, y);
+      /* whatever is flying behind it, stepped back and out on both sides */
+      for (let j = 1; j <= b.n; j++) {
+        const back = Math.ceil(j / 2) * (b.big ? 11 : 8);
+        const side = (j % 2 ? 1 : -1) * Math.ceil(j / 2) * (b.big ? 7 : 5);
+        const fx = b.x - b.dir * back;
+        const fy = y + side + Math.sin(now / 700 + b.bob + j * 0.6) * 2;
+        const f2 = Math.floor(now / b.flap + i + j) % 3;
+        const sp2 = SPR.birdSprite(b.big ? 'big' : 'small', f2, 1, b.col);
+        if (fx + 12 < cam().x || fx - 12 > cam().x + W.view.w) continue;
+        if (fy + 10 < cam().y || fy - 10 > cam().y + W.view.h) continue;
+        ctx.save();
+        if (b.dir === -1) { ctx.translate(Math.round(fx) + sp2.width, Math.round(fy)); ctx.scale(-1, 1); ctx.drawImage(sp2, 0, 0); }
+        else ctx.drawImage(sp2, Math.round(fx), Math.round(fy));
+        ctx.restore();
+      }
+    });
+    /* the ones sat still, hopping about and now and then moving on */
+    perchers.forEach((p, i) => {
+      p.t -= dt;
+      if (p.t <= 0) {
+        p.t = 8 + Math.random() * 22;
+        p.x = 30 + Math.random() * (W.W - 60);
+        p.y = 60 + Math.random() * (W.roadY - 100);
+        p.face = Math.random() < 0.5 ? 1 : -1;
+      }
+      if (p.x + 12 < cam().x || p.x - 12 > cam().x + W.view.w) return;
+      if (p.y + 12 < cam().y || p.y - 12 > cam().y + W.view.h) return;
+      const spr = SPR.percherSprite(Math.floor(now / 520 + i) % 2, 1, p.col);
+      SPR.shadowEll(ctx, p.x + 3, p.y + spr.height, 3, 1, 0.2);
+      ctx.save();
+      if (p.face === -1) { ctx.translate(Math.round(p.x) + spr.width, Math.round(p.y)); ctx.scale(-1, 1); ctx.drawImage(spr, 0, 0); }
+      else ctx.drawImage(spr, Math.round(p.x), Math.round(p.y));
+      ctx.restore();
+    });
+  }
+
   /* ================= INPUT STATE ================= */
   const ptr = { x: -999, y: -999, sx: 0, sy: 0, inside: false, down: false, downAt: 0, moved: 0, mode: null, target: null };
   let buildSel = null, placeDir = 0, paintTile = null, sprinkleCd = 0;
@@ -3054,7 +3146,7 @@
     const walking = b.state === 'walk';
     const bob = walking ? 0 : Math.sin(now / 620 + 1) * 0.6;
     const hop = pose === 'cheer' ? Math.abs(Math.sin(now / 190)) * 4 : 0;
-    SPR.shadowEll(ctx, b.x + 14, b.y + 34.5, 11 - hop * 0.4, 2, 0.3);
+    SPR.shadowEll(ctx, b.x + 11, b.y + 27.5, 9 - hop * 0.4, 2, 0.3);
     ctx.save();
     if (b.dir === 1) {
       ctx.translate(Math.round(b.x) + spr.width, Math.round(b.y - SPR.RAC_OFF + bob - hop));
@@ -3063,20 +3155,20 @@
     } else ctx.drawImage(spr, Math.round(b.x), Math.round(b.y - SPR.RAC_OFF + bob - hop));
     ctx.restore();
     /* dust off his heels while he walks */
-    if (walking && b.frame && GAME.setting('particles') && Math.floor(now / 120) % 2) { ctx.fillStyle = 'rgba(200,180,140,.55)'; ctx.fillRect(Math.round(b.x + (b.dir === 1 ? 3 : 20)), Math.round(b.y + 32), 4, 1); }
+    if (walking && b.frame && GAME.setting('particles') && Math.floor(now / 120) % 2) { ctx.fillStyle = 'rgba(200,180,140,.55)'; ctx.fillRect(Math.round(b.x + (b.dir === 1 ? 2 : 16)), Math.round(b.y + 25), 4, 1); }
     /* and a paw print every stride, left and right foot in turn */
     if (walking && ctx === mainCtx) {
       const d2 = Math.abs(b.x - bossPrint.x) + Math.abs(b.y - bossPrint.y);
       if (d2 > 9) {
         bossPrint.x = b.x; bossPrint.y = b.y; bossPrint.foot = -bossPrint.foot;
-        prints(b.x + 13 + bossPrint.foot * 3, b.y + 33, 'paw', b.dir === 1 ? -1 : 1);
-        if (Math.random() < 0.3) groundDust(b.x + 14, b.y + 33, 1, '#c9a878');
+        prints(b.x + 10 + bossPrint.foot * 3, b.y + 26, 'paw', b.dir === 1 ? -1 : 1);
+        if (Math.random() < 0.3) groundDust(b.x + 11, b.y + 26, 1, '#c9a878');
       }
     }
-    if (b.line && ctx === mainCtx) drawSay(b.line, b.x + 14, b.y - 10 - hop, 34);
+    if (b.line && ctx === mainCtx) drawSay(b.line, b.x + 11, b.y - 8 - hop, 34);
     else if (pose === 'read') {
       /* leafing through the ledger */
-      if (Math.floor(now / 500) % 2) { ctx.fillStyle = '#fff8ec'; ctx.fillRect(Math.round(b.x + 9), Math.round(b.y + 22), 3, 1); }
+      if (Math.floor(now / 500) % 2) { ctx.fillStyle = '#fff8ec'; ctx.fillRect(Math.round(b.x + 7), Math.round(b.y + 17), 3, 1); }
     }
   }
 
@@ -4031,6 +4123,9 @@
     drawDrone(now, dt);
     drawPresents(now);
     drawSaleSigns(now);
+
+    /* wild birds, over everything on the ground */
+    drawBirds(now, dt);
 
     /* butterflies */
     flies.forEach((f, i) => {
@@ -9677,12 +9772,12 @@
   GAME.on('quest', ({ q }) => {
     snd.grand(); questSig = '';
     const b = GAME.boss();
-    if (b) { twinkles(b.x + 14, b.y + 8, 10, '#ffd23f', 26); coinBurst(b.x + 14, b.y - 4, 8); beam(b.x + 14, b.y + 30, '#ffd23f', 70, 0.8); }
+    if (b) { twinkles(b.x + 11, b.y + 6, 10, '#ffd23f', 26); coinBurst(b.x + 11, b.y - 3, 8); beam(b.x + 11, b.y + 24, '#ffd23f', 70, 0.8); }
     flash('#ffe9a8', 0.14, 0.22); shake(1.4, 0.3); holdFrame(0.07); zoomPunch(0.11);
     faceSet('grin', 3000);
-    if (b) { wordPop(b.x + 14, b.y - 26, 'SIGNED', '#7fd14f'); speedLines(b.x + 14, b.y, 12, 'rgba(255,255,255,.9)', 40); }
+    if (b) { wordPop(b.x + 11, b.y - 21, 'SIGNED', '#7fd14f'); speedLines(b.x + 11, b.y, 12, 'rgba(255,255,255,.9)', 40); }
   });
-  GAME.on('questready', ({ q }) => { snd.sparkle(); const b = GAME.boss(); if (b) { heart(b.x + 14, b.y - 8, 3); twinkles(b.x + 14, b.y + 4, 6, '#ffd23f', 18); } floatText('QUEST READY: ' + q.name.toUpperCase(), innerWidth / 2 - 90, 90, 'gold', 'quest'); });
+  GAME.on('questready', ({ q }) => { snd.sparkle(); const b = GAME.boss(); if (b) { heart(b.x + 11, b.y - 6, 3); twinkles(b.x + 11, b.y + 3, 6, '#ffd23f', 18); } floatText('QUEST READY: ' + q.name.toUpperCase(), innerWidth / 2 - 90, 90, 'gold', 'quest'); });
   /* ============================================================
      THE FIRST DELIVERY
      A quest reward comes in by drone. The first time one arrives the
@@ -9819,7 +9914,7 @@
     flash(a.hue || '#fff8ec', 0.22, 0.5); shake(2.6, 0.6); holdFrame(0.11); zoomPunch(0.16);
     starburst(cx, cy, a.hue || '#fff8ec', 90);
     { const b2 = GAME.boss();
-      if (b2) cineTo({ focus: () => { const q = GAME.boss(); return { x: q.x + 14, y: q.y + 4 }; },
+      if (b2) cineTo({ focus: () => { const q = GAME.boss(); return { x: q.x + 11, y: q.y + 3 }; },
                        zoom: 1.55, ease: 0.5, life: 3.4, lock: false, bars: true }); }
     setTimeout(() => cineOff(), 3200); toast({ icon: a.icon, title: 'THE ' + a.name.toUpperCase(), body: a.blurb, long: true }); renderToolbelt(); });
   GAME.on('cooked', ({ recipe, x, y }) => { puff(x, y, '#fff8ec', 6, 24, 20); smoke(x, y - 4, 4, 'rgba(255,250,240,1)', 20); twinkles(x, y - 6, 3, '#ffd23f', 8); floatWorld(RECIPE_BY_ID[recipe].name.toUpperCase(), x, y - 10, 'green', 'pan'); snd.clink(); });
