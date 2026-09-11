@@ -103,7 +103,7 @@ const GAME = (() => {
       vehicle: 0,            /* index into VEHICLES - you start on a bike */
       routes: ['hamlet'],    /* cities you can deliver to */
       route: 'hamlet',       /* where the next load goes */
-      staff: [],             /* the crew: procedural people and robots */
+      staff: [],             /* the crew: animals and robots, no people */
       applicants: [],        /* folk who answered a flyer, waiting at the hut */
       flyer: null,           /* {t, need, n} a campaign in progress */
       flyerRuns: 0,          /* how many campaigns you have paid for */
@@ -1915,7 +1915,7 @@ const GAME = (() => {
 
   /* ============================================================
      THE CREW - flyers bring applicants, applicants become staff.
-     Every person is rolled procedurally: five stats, a look, a
+     Every hire is rolled procedurally: five stats, a look, a
      name and up to two traits. Roles lean on different stats, so
      who you put where actually matters.
      ============================================================ */
@@ -1984,14 +1984,8 @@ const GAME = (() => {
     return m;
   }
 
-  /* ---- rolling a person ---- */
+  /* ---- rolling a hire ---- */
   function pick(arr, rnd) { return arr[Math.floor(rnd() * arr.length)]; }
-  function rollName(rnd) {
-    let first = pick(NAME_A, rnd);
-    if (rnd() < 0.8) first += pick(NAME_B, rnd);
-    if (rnd() < 0.18) first += pick(NAME_B, rnd);
-    return first.charAt(0).toUpperCase() + first.slice(1) + ' ' + pick(NAME_C, rnd);
-  }
   function rollApplicant() {
     const seed = Math.floor(Math.random() * 1e9);
     const rnd = SPR.mulberry(seed);
@@ -2010,21 +2004,15 @@ const GAME = (() => {
       const t = pool.splice(Math.floor(rnd() * pool.length), 1)[0];
       if (t) traits.push(t.id);
     }
-    const look = {
-      skin: pick(SKINS, rnd), hair: pick(HAIRS, rnd), style: pick(HAIR_STYLES, rnd),
-      shirt: pick(SHIRTS, rnd), pants: pick(PANTS, rnd), boot: pick(BOOTS, rnd),
-      hat: pick(HATS, rnd),
-    };
-    /* a third of the applicants are not people at all: another species,
-       drawn on the founder's own frame, naturally good at one thing */
-    let animal = null;
-    if (rnd() < 0.34) {
-      const A = pick(CREW_ANIMALS, rnd);
-      animal = A.id;
-      st[A.stat] = Math.min(RECRUIT.statMax, st[A.stat] + 2);
-    }
+    /* nobody who answers a flyer is a person - they are all another
+       species, drawn on the founder's own frame and naturally good at
+       one thing. Robots are assembled, not recruited. */
+    const A = pick(CREW_ANIMALS, rnd);
+    const animal = A.id;
+    st[A.stat] = Math.min(RECRUIT.statMax, st[A.stat] + 2);
+    const look = rollFolk(rnd, animal);
     return {
-      id: nextId++, seed, name: animal ? pick(ANIMAL_NAMES, rnd) : rollName(rnd), st, traits, look, animal,
+      id: nextId++, seed, name: pick(ANIMAL_NAMES, rnd), st, traits, look, animal,
       wage: crewWage(st, traits), sign: crewSignCost(st, traits),
       t: RECRUIT.applicantLife,
     };
@@ -2083,7 +2071,7 @@ const GAME = (() => {
         emit('applicants', { got });
       }
     }
-    /* applicants are people in the world: they walk in, wait by the board, and walk off */
+    /* applicants are out in the world: they walk in, wait by the board, and walk off */
     let slot = 0;
     for (let i = 0; i < S.applicants.length; i++) {
       const ap = S.applicants[i];
@@ -2188,7 +2176,7 @@ const GAME = (() => {
   function setRole(id, role) {
     const w = S.staff.find(x => x.id === id);
     if (!w || !roleOpen(role)) return false;
-    /* people cannot take the jobs built for robots */
+    /* an animal cannot take the jobs built for robots */
     if (ROLES[role].botOnly && !w.bot) return false;
     w.role = role;
     if (w.bot) w.name = botName(role, (S.bots[role] || 0) + 1);
@@ -3108,9 +3096,7 @@ const GAME = (() => {
           const rnd = SPR.mulberry(seed);
           c.who = { x: c.x + (c.dir === 1 ? 8 : 24), y: c.y - 2, dir: -c.dir, frame: 0, anim: 0,
                     state: 'out', t: 0, seed,
-                    look: { skin: pick(SKINS, rnd), hair: pick(HAIRS, rnd), style: pick(HAIR_STYLES, rnd),
-                            shirt: pick(SHIRTS, rnd), pants: pick(PANTS, rnd), boot: pick(BOOTS, rnd),
-                            hat: pick(HATS, rnd) },
+                    look: rollFolk(rnd),
                     line: pickOne(PULLOVER_LINES), lineT: 4 };
           emit('pullover', { car: c, x: c.x + 16, y: c.y });
         }
@@ -3172,9 +3158,8 @@ const GAME = (() => {
       passers.push({ id: nextId++, def, dir, x: dir === 1 ? -30 : WORLD.W + 30, y,
         v: def.v * (0.85 + Math.random() * 0.3), state: 'walk', t: 0, frame: 0, anim: 0,
         seed, line: null, lineT: 0,
-        look: def.person ? { skin: pick(SKINS, rnd), hair: pick(HAIRS, rnd), style: pick(HAIR_STYLES, rnd),
-                             shirt: pick(SHIRTS, rnd), pants: pick(PANTS, rnd), boot: pick(BOOTS, rnd),
-                             hat: pick(HATS, rnd) } : null,
+        look: def.folk ? (def.bot ? Object.assign(rollFolk(rnd), { bot: true })
+                                  : rollFolk(rnd, def.folk === true ? undefined : def.folk)) : null,
         pets: def.line ? def.line - 1 : def.pet ? 1 : 0 });
       emit('passer', { p: passers[passers.length - 1] });
     }
@@ -3207,8 +3192,8 @@ const GAME = (() => {
   }
 
   /* ---------- customers: cars pull into the lay-by with an order ---------- */
-  const CUSTOMER_NAMES = ['MRS PLUME', 'OLD TOM', 'THE BAKER', 'A CHEF', 'MISS YOLK', 'GRAN B', 'THE VICAR',
-                          'DEL THE DRIVER', 'TWO KIDS', 'THE MAYOR', 'A PAINTER', 'NURSE KAY', 'THE TWINS', 'A BUSKER'];
+  const CUSTOMER_NAMES = ['MRS PLUME', 'OLD TOM CAT', 'THE BAKER BADGER', 'CHEF OTTER', 'MISS YOLK', 'GRAN VIXEN', 'UNIT 7',
+                          'DEL THE DROID', 'TWO CUBS', 'THE MAYOR MOLE', 'A PAINTER POSSUM', 'NURSE HARE', 'THE STOAT TWINS', 'A BUSKING BOT'];
   function orderSpots() {
     const L = WORLD.layby;
     return [{ x: L.x + 6, y: L.y - 8 }, { x: L.x + 58, y: L.y - 8 }, { x: L.x + 110, y: L.y - 8 }];
@@ -3236,7 +3221,7 @@ const GAME = (() => {
     S.chickens.forEach(ch => { if (!isChick(ch)) pool.push(SPECIES[ch.sp].tier); });
     return pool;
   }
-  const VIP_NAMES = ['THE COUNTESS', 'A FILM STAR', 'MR MONEYBAGS', 'A TYCOON', 'LADY YOLKINGTON', 'THE BANKER', 'A DUCHESS'];
+  const VIP_NAMES = ['THE COUNTESS STOAT', 'A FILM-STAR FOX', 'MR MONEYBAGS', 'TYCOON BADGER', 'LADY YOLKINGTON', 'THE BANKING DROID', 'A DUCHESS HARE'];
   function newOrder(spot) {
     const tier = pickOne(orderTierPool());
     /* once you have filled a couple, the odd VIP turns up: a longer car, a
@@ -3310,9 +3295,11 @@ const GAME = (() => {
 
   /* ---------- construction: a moving van pulls up and two movers build it ---------- */
   const INSTANT = { belt: 1, fence: 1 };
+  /* the two who get out of the van: a badger in a hi-vis cap and the
+     droid that carries the heavy end */
   const MOVER_LOOKS = [
-    { skin: '#f2c9a0', hair: '#5e3d18', style: 'short', shirt: '#f0a422', pants: '#3a3a4a', boot: '#2e2216', hat: 'cap' },
-    { skin: '#8d5a3a', hair: '#2e2216', style: 'bun',   shirt: '#f0a422', pants: '#2f5f9e', boot: '#2e2216', hat: 'cap' },
+    { species: 'badger', shirt: '#f0a422', pants: '#3a3a4a', boot: '#2e2216', hat: 'cap' },
+    { bot: true, shirt: '#c9cfd8', pants: '#f0a422', boot: '#3a3f4a' },
   ];
   function siteTime(type) { return ECON.siteBase + Math.sqrt(BUILDS[type].base) / 3; }
   function siteFor(k) { return S.sites[k] || null; }
@@ -3850,7 +3837,7 @@ const GAME = (() => {
 
   /* ============================================================
      VISITORS - diners at the kitchen hatch and tourists at the
-     park gate: little people who walk in, pay, gawp and leave
+     park gate: little folk who walk in, pay, gawp and leave
      ============================================================ */
   function spawnVisitor(kind, k, x, y, pay) {
     if (S.visitors.length > 40) return null;

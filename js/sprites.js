@@ -1721,8 +1721,8 @@ const SPR = (() => {
       '..o....o..', '.oNo..oNo.', 'oNNNooNNNo', 'oNnNooNnNo', 'oooooooooo',
       'oNnNooNnNo', 'oNNNooNNNo', '.oNo..oNo.', '..o....o..', '..........'],
     person: [
-      '...oooo...', '..oNNNNo..', '.oNNNNNNo.', '...osso...', '...oeso...',
-      '..obbbbo..', '.obbbbbbo.', '..obbbbo..', '..ok..ko..', '..oo..oo..'],
+      '.o......o.', 'ono....ono', 'onno..onno', '.oNNNNNNo.', 'oNNwNNwNNo',
+      'oNNNNNNNNo', '.oNNwwNNo.', '..obbbbo..', '.obbbbbbo.', '..oo..oo..'],
     bot: [
       '....o.....', '...oyo....', '..oWWWWo..', '.oWbbbbWo.', '.oWWWWWWo.',
       'ooWWWWWWoo', 'oWWkWWkWWo', 'oWWWWWWWWo', '.okkookko.', '..........'],
@@ -2207,103 +2207,71 @@ const SPR = (() => {
 
   /* ============================================================
      PROCEDURAL FARM FOLK
-     look = { skin, hair, style, shirt, pants, boot, hat }
-     Every hire on the ranch is a different person, built from
-     that little record - no two crews look alike.
+     There are no people in this valley. Everyone who walks through
+     it is either another species on the founder's own frame or a
+     little service droid, and both are drawn on the same twelve by
+     eighteen grid the crew use, so any of them can stand anywhere
+     one of the others could.
+     look = { species | bot, shirt, pants, boot, hat }
      ============================================================ */
-  function personSprite(look, frame, scale) {
+
+  /* a small hovering service droid: an antenna, a visor, a chest
+     lamp and a skirt of air where the legs would be */
+  function droidSprite(look, frame, scale) {
     const L = look || {};
-    const hat = L.hat || 'straw', style = L.style || 'short';
-    const key = 'per_' + [L.skin, L.hair, style, L.shirt, L.pants, L.boot, hat].join('|')
-              + '_' + frame + '_' + scale;
+    const shell = L.shirt || '#9aa6b4', trim = L.pants || '#3fa7d6', skirt = L.boot || '#3a3f4a';
+    const key = 'droid_' + [shell, trim, skirt].join('|') + '_' + frame + '_' + scale;
     if (cache.has(key)) return cache.get(key);
     const k = scale || 1;
-    const skin = L.skin || '#f2c9a0', hair = L.hair || '#5e3d18';
-    const shirt = L.shirt || '#5fa8e8', pants = L.pants || '#6e4a20', boot = L.boot || '#3a2a16';
     const c = newCanvas(12 * k, 18 * k);
     const ctx = c.getContext('2d');
     ctx.imageSmoothingEnabled = false;
-    const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
-    const OUT = '#2e2216';
+    const R = (x, y, w, h, col) => { if (!col) return; ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
+    const OUT = '#221a26';
+    const lite = lighten(shell, 0.38), shade = darken(shell, 0.26);
+    const f = frame ? 1 : 0;
+    const b = f;                       /* the whole machine rides up a pixel */
 
-    /* ---- hair, behind the head ---- */
-    const hd = darken(hair, 0.3), hl = lighten(hair, 0.3);
-    if (style !== 'bald') {
-      R(3, 3, 6, 4, hair);
-      R(3, 3, 6, 1, hl);
-      R(3, 6, 1, 2, hd); R(8, 6, 1, 2, hd);
-    }
-    if (style === 'long')  { R(2, 6, 1, 6, hair); R(9, 6, 1, 6, hair); R(2, 6, 1, 3, hl); }
-    if (style === 'braid') { R(9, 6, 1, 7, hair); R(9, 12, 2, 1, hd); }
-    if (style === 'bun')   { R(4, 1, 4, 2, hair); R(4, 1, 4, 1, hl); }
-    if (style === 'tuft')  { R(5, 1, 2, 2, hair); R(5, 1, 1, 1, hl); }
-    if (style === 'curl')  { R(2, 4, 1, 2, hair); R(9, 4, 1, 2, hair); R(4, 2, 4, 1, hair); }
-    if (style === 'mohawk'){ R(5, 0, 2, 4, hair); R(5, 0, 1, 2, hl); }
+    /* antenna, with a lamp on the end of it */
+    R(5, 1 + b, 1, 3, OUT);
+    R(4, 0 + b, 3, 2, OUT); R(5, 0 + b, 1, 1, lighten(trim, 0.5));
 
-    /* ---- head ---- */
-    R(4, 5, 4, 4, skin);
-    R(4, 5, 1, 4, darken(skin, 0.16));
-    R(7, 5, 1, 4, lighten(skin, 0.12));
-    ctx.fillStyle = OUT;
-    ctx.fillRect(5 * k, 6 * k, k, k); ctx.fillRect(7 * k, 6 * k, k, k);
-    ctx.fillStyle = '#e8917a'; ctx.fillRect(4 * k, 8 * k, k, k); ctx.fillRect(8 * k, 8 * k, k, k);
+    /* head: a box with a wide visor and two eye lamps in it */
+    R(2, 3 + b, 8, 6, OUT);
+    R(3, 4 + b, 6, 4, shell);
+    R(3, 4 + b, 6, 1, lite);
+    R(3, 7 + b, 6, 1, shade);
+    R(3, 5 + b, 6, 2, '#121820');
+    R(4, 5 + b, 2, 1, trim);
+    R(7, 5 + b, 1, 1, lighten(trim, 0.45));
 
-    /* ---- headwear ---- */
-    if (hat === 'straw' || hat === 'wide') {
-      const brim = hat === 'wide' ? 11 : 10, bx = hat === 'wide' ? 0 : 1;
-      R(3, 0, 6, 1, OUT); R(3, 1, 6, 2, '#e0bd82');
-      R(bx, 3, brim, 1, OUT); R(bx, 4, brim, 1, '#e0bd82');
-      R(bx + 1, 4, brim - 2, 1, '#b89355');
-      R(3, 1, 6, 1, '#f2dcb0');
-      R(4, 2, 4, 1, '#c9a35f');
-    } else if (hat === 'cap') {
-      R(3, 1, 6, 1, OUT); R(3, 2, 6, 2, shirt);
-      R(3, 2, 6, 1, lighten(shirt, 0.3));
-      R(8, 4, 3, 1, darken(shirt, 0.25));
-    } else if (hat === 'bandana') {
-      R(3, 2, 6, 2, '#e8542f');
-      R(3, 2, 6, 1, '#ff8f6a');
-      R(2, 3, 1, 3, '#c93f22');
-    } else if (hat === 'beanie') {
-      R(3, 1, 6, 3, '#6a7ac9');
-      R(3, 1, 6, 1, '#8f9ee0');
-      R(3, 4, 6, 1, '#4a5a9e');
-    }
+    /* body: a barrel with a lamp on the chest of it */
+    R(3, 9 + b, 6, 6, OUT);
+    R(4, 9 + b, 4, 5, shell);
+    R(4, 9 + b, 4, 1, lite);
+    R(4, 13 + b, 4, 1, shade);
+    R(5, 11 + b, 2, 2, trim);
+    R(5, 11 + b, 1, 1, lighten(trim, 0.45));
 
-    /* ---- body, arms, legs ---- */
-    const sd = darken(shirt, 0.28), sl = lighten(shirt, 0.28);
-    R(3, 9, 6, 5, OUT);
-    R(3, 9, 6, 4, shirt);
-    R(3, 12, 6, 1, sd);
-    R(3, 9, 6, 1, sl);
-    R(5, 10, 2, 1, sl);
-    R(2, 10 + (frame ? 0 : 1), 1, 3, shirt);
-    R(9, 10 + (frame ? 1 : 0), 1, 3, shirt);
-    R(2, 13 + (frame ? 0 : 1), 1, 1, skin);
-    R(9, 13 + (frame ? 1 : 0), 1, 1, skin);
-    R(4, 14, 2, 2 + (frame ? 1 : 0), pants);
-    R(7, 14, 2, 2 + (frame ? 0 : 1), pants);
-    R(4, 14, 1, 2, lighten(pants, 0.2));
-    R(3 + (frame ? 0 : 1), 16 + (frame ? 1 : 0), 3, 2, boot);
-    R(7, 16 + (frame ? 0 : 1), 3, 2, boot);
+    /* arms, swinging the way a walker's would */
+    R(2, 10 + b + f, 1, 4, shell); R(9, 11 + b - f, 1, 4, shell);
+    R(2, 13 + b + f, 1, 1, trim);  R(9, 14 + b - f, 1, 1, trim);
+
+    /* no legs at all: a skirt of air, and its glow on the ground */
+    R(3, 15 + b, 6, 1, OUT);
+    R(4, 15 + b, 4, 1, skirt);
+    R(3, 16 + b, 6, 1, 'rgba(140,236,255,.62)');
+    R(4, 16 + b, 4, 1, 'rgba(200,246,255,.72)');
+    R(4, 17, 4, 1, 'rgba(127,232,255,.30)');
     cache.set(key, c);
     return c;
   }
 
-  /* a portrait bust for the crew cards - same look, twice the head */
-  function faceSprite(look, scale) {
+  /* the one way anybody in the world gets drawn: a species, or a droid */
+  function folkSprite(look, frame, scale) {
     const L = look || {};
-    const key = 'face_' + [L.skin, L.hair, L.style, L.shirt, L.hat].join('|') + '_' + scale;
-    if (cache.has(key)) return cache.get(key);
-    const k = scale || 1;
-    const c = newCanvas(14 * k, 14 * k);
-    const ctx = c.getContext('2d');
-    ctx.imageSmoothingEnabled = false;
-    const body = personSprite(L, 0, 1);
-    /* crop the head and shoulders, then scale up inside the tile */
-    ctx.drawImage(body, 0, 0, 12, 14, k, 0, 12 * k, 14 * k);
-    cache.set(key, c);
-    return c;
+    if (L.bot) return droidSprite(L, frame, scale);
+    return animalStaffSprite(L.species || 'fox', L, frame, scale);
   }
 
   /* a paper flyer - "HELP WANTED" pinned to the hut */
@@ -2637,9 +2605,9 @@ const SPR = (() => {
   }
 
   /* ---------- animal crew ----------
-     The same twelve by eighteen frame the people use, so an animal
-     hire stands shoulder to shoulder with a human one instead of
-     towering over them. Ears, muzzle, tail and dot eyes come from
+     Twelve by eighteen, the same frame the droids use, so an animal
+     hire and a machine stand shoulder to shoulder on the payroll.
+     Ears, muzzle, tail and dot eyes come from
      the ANIMALS table, so a fox on the payroll matches the fox in
      the founder's own frame; the clothes come from their look, so
      no two are dressed alike.
@@ -2707,12 +2675,12 @@ const SPR = (() => {
     return c;
   }
 
-  /* w is a crew record: robots by their chassis, people by their look */
+  /* w is a crew record: robots by their chassis, animals by their look */
   function staffSprite(w, frame, scale) {
-    if (typeof w === 'string') return (w === 'cull' || w === 'match') ? botSprite(w, frame, scale) : personSprite(null, frame, scale);
+    if (typeof w === 'string') return (w === 'cull' || w === 'match') ? botSprite(w, frame, scale) : folkSprite(null, frame, scale);
     if (w && (w.bot || w.role === 'cull' || w.role === 'match')) return botSprite(w.role, frame, scale);
     if (w && w.animal) return animalStaffSprite(w.animal, w.look, frame, scale);
-    return personSprite(w && w.look, frame, scale);
+    return folkSprite(w && w.look, frame, scale);
   }
 
   /* wooden sign board — text drawn by the caller */
@@ -4539,7 +4507,7 @@ const SPR = (() => {
     chickenSprite, eggSprite, nestSprite, mamaSprite, decoSprite,
     cloudBubble, fossilSprite, dishSprite,
     uiSprite, iconSprite, basketSprite, feedbagSprite, hammerSprite, staffSprite,
-    personSprite, faceSprite, flyerSprite,
+    folkSprite, droidSprite, flyerSprite,
     soilSprite, cropSprite, chickSprite, vehicleSprite, skylineSprite, cursorSprite,
     pathSprite, terraceSprite, waterSprite, inkLine, parchment, compassRose, botSprite,
     plumeSprite, signSprite, treeSprite, eggCrackSprite, shellHalfSprite,

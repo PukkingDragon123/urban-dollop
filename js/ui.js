@@ -2355,20 +2355,18 @@
     if (Math.floor(now / 400 + f.id) % 3 === 0) { ctx.fillStyle = '#fff8ec'; ctx.fillRect(Math.round(f.x + 4), Math.round(f.y - 8 + f.z), 1, 1); }
   }
 
-  /* diners and tourists: people who are not on the payroll */
+  /* diners and day-trippers: folk who are not on the payroll */
   const visitorLooks = new Map();
   function drawVisitor(v, now) {
     if (ctx === mainCtx && (v.x + 20 < cam().x || v.x > cam().x + W.view.w || v.y + 24 < cam().y || v.y > cam().y + W.view.h)) return;
     let look = visitorLooks.get(v.id);
     if (!look) {
-      const rnd = SPR.mulberry(v.seed || v.id);
-      const pick = arr => arr[Math.floor(rnd() * arr.length)];
-      look = { skin: pick(SKINS), hair: pick(HAIRS), style: pick(HAIR_STYLES), shirt: pick(SHIRTS), pants: pick(PANTS), boot: pick(BOOTS), hat: pick(HATS) };
+      look = rollFolk(SPR.mulberry(v.seed || v.id));
       visitorLooks.set(v.id, look);
       if (visitorLooks.size > 200) visitorLooks.delete(visitorLooks.keys().next().value);
     }
     const moving = v.state !== 'stay';
-    const spr = SPR.personSprite(look, moving ? v.frame : 0, 1);
+    const spr = SPR.folkSprite(look, moving ? v.frame : 0, 1);
     groundShade(Math.round(v.x + 1), Math.round(v.y + spr.height - 2), 10, 2, 0.26);
     ctx.save();
     if (v.dir === 1) { ctx.translate(Math.round(v.x) + spr.width, Math.round(v.y)); ctx.scale(-1, 1); ctx.drawImage(spr, 0, 0); }
@@ -2471,7 +2469,7 @@
       const w = c.who;
       if (w) {
         const walking = w.state === 'out' || w.state === 'back';
-        const ps = SPR.personSprite(w.look, walking ? w.frame : 0, 1);
+        const ps = SPR.folkSprite(w.look, walking ? w.frame : 0, 1);
         SPR.shadowEll(ctx, w.x + 6, w.y + ps.height - 1, 5.5, 1.5, 0.26);
         ctx.save();
         if (w.dir > 0) { ctx.translate(Math.round(w.x) + ps.width, Math.round(w.y)); ctx.scale(-1, 1); ctx.drawImage(ps, 0, 0); }
@@ -2499,8 +2497,8 @@
         ctx.restore();
       };
       /* the one in front */
-      const lead = p.def.person
-        ? SPR.personSprite(p.look, walking ? p.frame : 0, 1)
+      const lead = p.def.folk
+        ? SPR.folkSprite(p.look, walking ? p.frame : 0, 1)
         : SPR.critterSprite(p.def.critter, walking ? p.frame : 0, 1);
       draw(lead, p.x, p.y - lead.height + 6, p.dir > 0);
       /* whatever is trailing behind: a dog on a lead, a sheep, ducklings */
@@ -2572,7 +2570,7 @@
     drawCar('mover', null, v.x, v.y - 4 + (moving ? Math.round(Math.sin(now / 45)) : 0), 1, moving ? Math.floor(now / 80) % 2 : 0);
     m.crew.forEach(w => {
       if (w.state === 'van') return;
-      const spr = SPR.personSprite(w.look, w.state === 'walk' ? w.frame : 0, 1);
+      const spr = SPR.folkSprite(w.look, w.state === 'walk' ? w.frame : 0, 1);
       groundShade(Math.round(w.x + 1), Math.round(w.y + spr.height - 2), 10, 2, 0.26);
       ctx.save();
       if (w.dir === 1) { ctx.translate(Math.round(w.x) + spr.width, Math.round(w.y)); ctx.scale(-1, 1); ctx.drawImage(spr, 0, 0); }
@@ -2673,7 +2671,7 @@
     if (a.x === undefined) return;
     if (ctx === mainCtx && (a.x + 20 < cam().x || a.x > cam().x + W.view.w || a.y + 24 < cam().y || a.y > cam().y + W.view.h)) return;
     const moving = a.state !== 'waiting';
-    const spr = SPR.personSprite(a.look, moving ? a.frame : 0, 1);
+    const spr = SPR.folkSprite(a.look, moving ? a.frame : 0, 1);
     const bob = moving ? 0 : Math.abs(Math.sin(now / 420 + a.id)) * (Math.floor((now + a.id * 300) / 2600) % 3 === 0 ? 2 : 0);
     SPR.shadowEll(ctx, a.x + 6, a.y + spr.height - 1, 5.5, 1.5, 0.26);
     ctx.save();
@@ -7310,7 +7308,7 @@
     if (kind === 'applicant') {
       const a = inspect.ref;
       if (st.applicants.indexOf(a) === -1) { setInspect(null); return; }
-      ipanel.appendChild(ipHead(cloneCanvas(SPR.personSprite(a.look, 0, 2)), a.name, 'looking for work'));
+      ipanel.appendChild(ipHead(cloneCanvas(SPR.folkSprite(a.look, 0, 2)), a.name, 'looking for work'));
       STAT_KEYS.forEach(k => ipanel.appendChild(ipRow(STATS[k].name.toLowerCase(), String(GAME.crewStat(a, k)))));
       ipanel.appendChild(ipRow('asks', (a.wage * Math.pow(0.88, GAME.lvl('wages'))).toFixed(2) + '/s'));
       ipanel.appendChild(ipRow('to sign', GAME.fmt(a.sign)));
@@ -9838,7 +9836,7 @@
   /* ---- the road ---- */
   GAME.on('pullover', ({ x, y }) => { snd.engine(); groundDust(x, y + 10, 5, '#c9a878'); });
   GAME.on('pullaway', ({ x, y }) => { snd.engine(); groundDust(x, y + 10, 6, '#c9a878'); smoke(x, y + 6, 3, 'rgba(190,186,180,1)', 14); });
-  GAME.on('passerstop', ({ p }) => { if (!p.def.person && Math.random() < 0.5) snd.squawk(); });
+  GAME.on('passerstop', ({ p }) => { if (!p.def.folk && Math.random() < 0.5) snd.squawk(); });
   GAME.on('bugup', ({ bug, x, y }) => {
     if (!GAME.setting('particles')) return;
     dirt(x, y, 3); groundDust(x, y + 1, 2, '#a07444');

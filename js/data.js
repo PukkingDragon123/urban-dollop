@@ -386,10 +386,10 @@ const BUILDS = {
 };
 
 /* ------------------------------------------------------------
-   THE ANIMAL CREW - not everyone who walks up the drive is a
-   person. Other species answer the posters too, drawn on the
-   founder's own frame at crew size, and each is naturally good
-   at one thing: it lands as a bonus on that stat when they roll.
+   THE ANIMAL CREW - nobody who walks up the drive is a person.
+   Every one of them is another species, drawn on the founder's own
+   frame at crew size, and each is naturally good at one thing: it
+   lands as a bonus on that stat when they roll.
    ------------------------------------------------------------ */
 const CREW_ANIMALS = [
   { id:'fox',     name:'Fox',     stat:'speed', line:'Quick on her feet and quicker with an excuse.' },
@@ -408,10 +408,11 @@ const ANIMAL_NAMES = ['BRUSH', 'BRAMBLE', 'PIP', 'NUTMEG', 'SORREL', 'BADGE', 'M
 
 /* ------------------------------------------------------------
    PASSERS-BY - the road is not only cars. Livestock gets loose,
-   people walk their dogs past the gate, and now and then someone
+   a badger walks its dog past the gate, and now and then somebody
    pulls over to gawp at the ranch and say something about it.
-   `critter` picks a four-legged sprite, `person` a procedural
-   human, and `pet` trails a second animal behind on a lead.
+   `critter` picks a four-legged sprite, `folk` one of the upright
+   ones - a species by name, or true for any of them - `bot` makes
+   that a droid, and `pet` trails an animal behind on a lead.
    ------------------------------------------------------------ */
 const PASSERS = [
   { id:'cow',     critter:'cow',   v:11, w:0.9, stop:0.5,  path:'verge', name:'A Loose Cow',
@@ -424,12 +425,17 @@ const PASSERS = [
     says:['BLEAT!', 'MEHHH.', 'IS THAT FENCE EDIBLE?'] },
   { id:'ducks',   critter:'duck',  v:13, w:0.7, stop:0.25, path:'path', name:'Ducks', line:3,
     says:['QUACK.', 'QUACK QUACK QUACK.', 'QUACK?'] },
-  { id:'walker',  person:true, pet:'dog', v:22, w:1.2, stop:0.4, path:'path', name:'A Dog Walker' },
-  { id:'shepherd',person:true, pet:'sheep', v:18, w:0.6, stop:0.3, path:'verge', name:'A Shepherd' },
-  { id:'jogger',  person:true, v:38, w:0.8, stop:0.12, path:'path', name:'A Jogger' },
-  { id:'stroll',  person:true, v:20, w:1.1, stop:0.55, path:'path', name:'A Passer-By' },
+  /* the ones that walk upright are folk, not people: a species on the
+     founder's frame, or a droid out for a roll. `folk` names the
+     species it is always drawn as; leave it off for a random one. */
+  { id:'walker',  folk:'badger', pet:'dog', v:22, w:1.2, stop:0.4, path:'path', name:'A Badger and a Dog' },
+  { id:'shepherd',folk:'otter', pet:'sheep', v:18, w:0.6, stop:0.3, path:'verge', name:'An Otter and a Sheep' },
+  { id:'jogger',  folk:'hare',  v:38, w:0.8, stop:0.12, path:'path', name:'A Hare in a Hurry' },
+  { id:'stroll',  folk:true,    v:20, w:1.1, stop:0.55, path:'path', name:'Somebody Passing' },
+  { id:'droid',   folk:true, bot:true, v:26, w:0.9, stop:0.35, path:'path', name:'A Delivery Droid',
+    says:['BEEP.', 'PARCEL FOR A HEN?', 'SCANNING. NICE FENCE.', 'BOOP. GOOD DAY.'] },
 ];
-/* what the people say when they stop and stare over the fence; the
+/* what the folk say when they stop and stare over the fence; the
    livestock have their own noises, up in PASSERS */
 const PASSER_LINES = [
   'IS THAT A RACCOON IN A SUIT?',
@@ -637,7 +643,7 @@ const RECIPE_BY_ID = Object.fromEntries(RECIPES.map(r => [r.id, r]));
 
 /* ------------------------------------------------------------
    CREW - five stats, and roles that each lean on different ones.
-   People answer flyers; robots get assembled at the hut.
+   Animals answer flyers; robots get assembled at the hut.
    ------------------------------------------------------------ */
 const STATS = {
   speed: { key:'speed', name:'SPEED', icon:'wind',   desc:'how fast they cross the field' },
@@ -666,7 +672,7 @@ const ROLES = {
 };
 const ROLE_KEYS = Object.keys(ROLES);
 
-/* Every role can be filled by a person or by a little robot. The bots are
+/* Every role can be filled by an animal or by a little robot. The bots are
    round, fat and cheerful; each role gets its own paint job and hat. */
 const BOTS = {
   hand:   { name:'Gather-Bot', shell:'#8fd6f9', trim:'#ffd23f', visor:'#3fd0ff', hat:'cap',    face:'happy' },
@@ -699,27 +705,28 @@ const TRAITS = [
 ];
 const TRAIT_BY_ID = Object.fromEntries(TRAITS.map(t => [t.id, t]));
 
-/* name syllables - a first name is two or three of these, then a farm surname */
-const NAME_A = ['Bram','Mar','Tes','Or','Nim','Sul','Wren','Hol','Fen','Pip','Cor','Del',
-                'Gus','Hes','Jun','Kes','Lark','Mos','Nel','Ost','Per','Quil','Ros','Sen',
-                'Tam','Ull','Ves','Wil','Yar','Zib','Ada','Bex','Cly','Dov','Elm','Fay'];
-const NAME_B = ['a','o','ie','ette','en','is','ard','wyn','ric','ley','ora','us','ina','eth',
-                'ick','ony','ell','iah','ka','na','ph','ta','va','well'];
-const NAME_C = ['Hensworth','Yolkley','Cluckett','Barleycorn','Thistlewood','Meadows','Featherby',
-                'Nestor','Coopwright','Peppercorn','Strawby','Grainger','Bramblewick','Hayloft',
-                'Ryefield','Dovecote','Corncrake','Wattleby','Broodmoor','Shellman','Pullet',
-                'Roostwood','Grubbins','Marrowfield','Applewhite','Chaffinch','Bantam','Downey'];
-
-/* procedural looks */
-const SKINS  = ['#f2c9a0','#e8b184','#d69a66','#b87a4a','#8f5a30','#6b4224','#f7dcc0','#c98f5f'];
-const HAIRS  = ['#3a2a18','#5e3d18','#8a5e2a','#c9a35f','#e8d5a8','#a03f2f','#2e2216','#7a5230',
-                '#d9d9c9','#4a5a6a','#6a4a7a','#2f4f4f'];
+/* procedural looks. Nobody in this valley is a person: everyone who
+   walks upright is either another species on the founder's own frame
+   or a little service droid, so a look carries a species or a bot
+   flag instead of a skin and a head of hair. */
+const FOLK_SPECIES = ['fox','badger','possum','cat','otter','hare','raccoon'];
+const DROID_SHELLS = ['#9aa6b4','#c9cfd8','#8a94a8','#b0a8c0','#7fa8b8','#c0b49a'];
+const DROID_TRIMS  = ['#3fa7d6','#ffd23f','#e8542f','#4fc46a','#c98af0','#ff8fa8'];
 const SHIRTS = ['#7fc4e8','#8fd14f','#ffb84d','#ff8fa8','#c9a3f0','#e8e2d0','#5fa8d6','#f2a03f',
                 '#a8d8b0','#e8607a','#6ab04c','#d0c0f0','#f0d060','#89a8c9'];
 const PANTS  = ['#4a5a7a','#5e3d18','#3f5a3f','#6a5a4a','#7a4a4a','#4a4a5a','#8a6a3a','#3a3a4a'];
 const BOOTS  = ['#5e3d18','#3a2a18','#6a4a2a','#4a3a2a','#2e2216'];
 const HATS   = ['straw','cap','bandana','none','none','beanie','wide'];
-const HAIR_STYLES = ['short','tuft','long','bun','curl','bald','mohawk','braid'];
+/* one in four of the folk out in the world is a droid; the rest are
+   another species. `rndFn` is a seeded 0..1 source. */
+function rollFolk(rndFn, species) {
+  const pick = a => a[Math.floor(rndFn() * a.length)];
+  if (!species && rndFn() < 0.26) {
+    return { bot: true, shirt: pick(DROID_SHELLS), pants: pick(DROID_TRIMS), boot: '#3a3f4a' };
+  }
+  return { species: typeof species === 'string' ? species : pick(FOLK_SPECIES),
+           shirt: pick(SHIRTS), pants: pick(PANTS), boot: pick(BOOTS), hat: pick(HATS) };
+}
 
 const RECRUIT = {
   flyerBase: 220,          // coins for one flyer run
@@ -1274,7 +1281,7 @@ const QUEST_SAY = {
   q_secret:   'This valley is hiding things. Go and poke at something odd.',
   q_land:     'Three plots. Buy the neighbours out before they get ideas.',
   q_steam:    'Boilers, belts and a proper kitchen. Take us to the Steam Age.',
-  q_park:     'People pay to look at chickens. Build the park. I checked. They do.',
+  q_park:     'They pay to look at chickens. Build the park. I checked. They do.',
   q_flock:    'Twenty hens on the ground. Now it sounds like a farm from the road.',
   q_visitors: 'A hundred visitors through that gate, and a ticket off every one.',
   q_fingers:  'Twenty-five harvests. You are frighteningly good at this.',
@@ -1500,7 +1507,7 @@ const ROUTE_STYLE_KEYS = Object.keys(ROUTE_STYLES);
 /* things that happen on the map: each sits on a town's road for a while */
 const ROAD_EVENTS = [
   { id:'jam',    name:'Traffic Jam',  icon:'car',    slow:1.45, pay:1,    dur:120, col:'#e8542f', desc:'Everything crawls. Trips through here take half again as long.' },
-  { id:'works',  name:'Roadworks',    icon:'hammer', slow:1.25, pay:1,    dur:200, col:'#f0a422', desc:'Cones and a man with a flag. A quarter slower.' },
+  { id:'works',  name:'Roadworks',    icon:'hammer', slow:1.25, pay:1,    dur:200, col:'#f0a422', desc:'Cones and a mole with a flag. A quarter slower.' },
   { id:'fair',   name:'Egg Fair',     icon:'star',   slow:1,    pay:1.35, dur:150, col:'#ffd23f', desc:'The town wants eggs today. 35% more for every load here.' },
   { id:'storm',  name:'Storm',        icon:'water',  slow:1.5,  pay:1,    dur:90,  col:'#3fa7d6', desc:'Sheets of rain on the road. Half again as slow.' },
   { id:'parade', name:'Parade',       icon:'flag',   slow:1.6,  pay:1.15, dur:100, col:'#b06ee0', desc:'The whole town is in the street. Slow, but they buy.' },
