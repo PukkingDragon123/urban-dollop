@@ -3353,46 +3353,48 @@ const SPR = (() => {
   /* ============================================================
      THE RACCOON - who inherited the farm and means to get rich.
      A 28 x 34 body on a canvas with nine rows of headroom for a
-     hat: four rows of ear, a pale blaze up the forehead, a black
-     bandit mask that flares at the eyes and points down the cheeks,
-     four-pixel eyes with pupils that both look the way he is
-     facing, a snout with a nose and a small grin, and a fat
-     five-ringed tail hanging down behind him. Dressed from a
+     hat. He is a chibi: the head is a big circle sixteen rows tall
+     and twenty-one wide - wider than the body under it - with a
+     rounded ear at each top corner, a pale blaze straight down the
+     middle of it, a bandit mask of two rounded black patches either
+     side of that blaze, a white square eye in each, a wide pale
+     muzzle under them with a short black nose bar, and a fat
+     ringed tail hanging down behind his right shoulder. Dressed from a
      wardrobe record { hat, suit, glasses, acc } and posed. The
      wide poses (dancing, chopping, hammering, punching, the
      guitar) get a 44-wide canvas and report where the body sits on
      it as .ox, so a caller can keep the feet where they were.
      ============================================================ */
   const RACCOON_ROWS = [
-    '.......ooo.........ooo......',
-    '......ogggo.......ogggo.....',
-    '......ogppoooooooooppgo.....',
-    '......ogppGGGGGGGGGppgo.....',
-    '.......oGGGGGWWWGGGGGo......',
-    '.......ogGGGGWWWGGGGgo......',
-    '.......okkkkkWWWkkkkko......',
-    '.......okkwwkWWWkwwkko......',
-    '.......okkwwkWWWkwwkko......',
-    '.......okkkkkWWWkkkkko......',
-    '.......oGWWWWWWWWWWWGo......',
-    '........oGWWWWWWWWWGo....ooo',
-    '........oGWWWnnnWWWGo...ottt',
-    '.........oWWWWWWWWWo....ottt',
-    '.........oWWWWWWWWWo....ottt',
-    '..........oWWWWWWWo....oTTTo',
-    '..........odddddddo....oTTTo',
-    '..........ogggggggo....ottto',
+    '...oogggoo.........oogggoo..',
+    '...ogggggo.ooooooo.ogggggo..',
+    '...ogpppgoooGGGGGooogpppgo..',
+    '...ogpppggGGGGGGGGGggpppgo..',
+    '...oggggGGGGGGGGGGGGggggoo..',
+    '...ooogGGGGGGWWWGGGGGGgoo...',
+    '....ogGkkkkGWWWWWGkkkkGgo...',
+    '...oogkkkkkkWWWWWkkkkkkgoo..',
+    '...oggkwwwkkWWWWWkkwwwkggo..',
+    '...oggkwwwkkWWWWWkkwwwkggo..',
+    '...oggkkkkkkWWWWWkkkkkkggo..',
+    '...oggkkkkkkWWWWWkkkkkkggo..',
+    '...ooggkWWWWWWWWWWWWWkggoo..',
+    '....ogGGWWWWWnnnWWWWWGGgo...',
+    '....oogGGWWWWWnWWWWWGGgoo...',
+    '.....oogGGWWWWWWWWWGGgoo....',
+    '......ooogGWWWWWWWGgooooooo.',
+    '........oooGdddddGooo.ottto.',
     '........ogggggggggggo.ottto.',
     '.......ogggggggggggggooTTTo.',
-    '.......ogggggggggggggooTTTo.',
+    '.......ogggggggggggggoTTToo.',
     '.......ogggggggggggggottto..',
     '.......ogggggggggggggottto..',
     '.......ogggggggggggggoTTTo..',
     '.......ogggggggggggggoTTTo..',
     '.......ogggggggggggggottto..',
-    '.......ogggggggggggggotto...',
-    '........ogggggggggggo.oo....',
-    '.........ogggo..ogggo.......',
+    '.......ogggggggggggggottto..',
+    '........ogggggggggggooTTTo..',
+    '.........ogggo..ogggoooooo..',
     '.........ogggo..ogggo.......',
     '.........ogggo..ogggo.......',
     '........oSSSSo.ossssso......',
@@ -3492,77 +3494,84 @@ const SPR = (() => {
     drawGrid(ctx, RACCOON_ROWS, P, ox * k, RAC_OFF * k, k);
     /* a hare's ears carry on above the head; a fox gets a white tail tip */
     if (SPEC.ears === 'long') {
-      R(6, -3, 3, 4, P.o); R(7, -2, 2, 3, P.d);
-      R(19, -3, 3, 4, P.o); R(19, -2, 2, 3, P.d);
-      R(7, -1, 1, 2, P.p); R(20, -1, 1, 2, P.p);
+      R(4, -4, 5, 5, P.o); R(5, -3, 3, 4, P.d);
+      R(19, -4, 5, 5, P.o); R(20, -3, 3, 4, P.d);
+      R(6, -3, 1, 3, P.p); R(21, -3, 1, 3, P.p);
     }
-    if (SPEC.tip) { R(1, 19, 3, 2, SPEC.tip); R(0, 20, 1, 1, SPEC.tip); }
+    if (SPEC.tip) { R(22, 26, 3, 2, SPEC.tip); R(22, 25, 3, 1, SPEC.tip); }
     /* ---- the face on top: one of eleven expressions, drawn over the
-       eyes (two 4x4 boxes at rows 9-12, each holding a round bead with
-       a low pupil) and the mouth (rows 16-17). Each pose has a default -
-       he grins while he dances, scowls while he punches - and a caller
-       can ask for any of them by name. ---- */
+       eyes (a 3x2 white square inside each mask patch) and the mouth
+       (into the white of the muzzle at rows 15-16). Each pose has a
+       default - he grins while he dances, scowls while he punches -
+       and a caller can ask for any of them by name. ---- */
     const EX = expr || DEFAULT_EXPR[pose] || 'happy';
     if (EX !== 'happy') {
-      const K_ = P.k, W_ = P.W, N_ = P.n, WH_ = P.w, FUR = P.G, BROW = P.o;
-      /* the eye lives in a dark mask patch: four wide at rows 6-10, with a
-         two by two white square high and inward in it. Every expression
-         wipes the patch back to mask and draws its own white over it. */
-      const eyes = (l, r) => { l(9); r === undefined ? l(16) : r(16); };
-      const wipe = x => { R(x, 6, 4, 4, K_); R(x + (x < 14 ? 0 : 1), 10, 3, 1, K_); };
-      const eye = (x, dx, dy, w, h) => {
-        wipe(x);
-        R(x + 1 + (dx || 0), 7 + (dy || 0), w || 2, h || 2, WH_);
+      const K_ = P.k, W_ = P.W, N_ = P.n, WH_ = P.w, BROW = P.o;
+      /* the mask is two rounded patches, six wide at rows 6-11 (x6-11 and
+         x17-22), each holding a three by two white square at rows 8-9.
+         Every expression wipes its patch back to mask and draws its own
+         white over it. i is 0 for his left patch, 1 for his right. */
+      const PAT = [6, 17], EYX = [7, 19];
+      const eyes = (f, g2) => { f(0); (g2 || f)(1); };
+      const wipe = i => { const x = PAT[i]; R(x, 7, 6, 5, K_); R(x + 1, 6, 4, 1, K_); };
+      const eye = (i, dx, dy, w, h) => {
+        wipe(i);
+        R(EYX[i] + (dx || 0), 8 + (dy || 0), w || 3, h || 2, WH_);
+      };
+      /* a brow sits on the top edge of the patch; dy pushes it down into it */
+      const brow = (i, dy, inner) => {
+        const x = PAT[i];
+        R(x + (inner && i === 0 ? 2 : 0), 6 + (dy || 0), 4, 1, BROW);
+        R(i === 0 ? x + 4 : x, 7 + (dy || 0), 2, 1, BROW);
       };
       const mouth = kind => {
         /* the reference has no mouth line - the muzzle is just a nose bar -
            so a mouth only appears when an expression calls for one, drawn
-           into the white of the muzzle at rows 13-14 */
-        if (kind === 'grin') { R(12, 14, 5, 1, N_); R(13, 14, 3, 1, '#8a3a4a'); R(12, 13, 1, 1, N_); R(16, 13, 1, 1, N_); }
-        else if (kind === 'open') { R(12, 14, 5, 1, N_); R(13, 13, 3, 1, N_); R(13, 14, 3, 1, '#8a3a4a'); }
-        else if (kind === 'frown') { R(12, 14, 5, 1, W_); R(13, 14, 3, 1, N_); R(12, 13, 1, 1, N_); R(16, 13, 1, 1, N_); }
-        else if (kind === 'flat') { R(12, 14, 5, 1, N_); }
-        else if (kind === 'smirk') { R(14, 14, 3, 1, N_); R(16, 13, 1, 1, N_); }
-        else if (kind === 'o') { R(13, 13, 3, 2, N_); R(14, 14, 1, 1, '#8a3a4a'); }
-        else if (kind === 'teeth') { R(11, 14, 7, 1, N_); R(12, 14, 5, 1, '#fff8ec'); R(14, 14, 1, 1, N_); }
+           into the white of the muzzle at rows 15-16 */
+        if (kind === 'grin') { R(12, 16, 5, 1, N_); R(13, 16, 3, 1, '#8a3a4a'); R(12, 15, 1, 1, N_); R(16, 15, 1, 1, N_); }
+        else if (kind === 'open') { R(12, 16, 5, 1, N_); R(13, 15, 3, 1, N_); R(13, 16, 3, 1, '#8a3a4a'); }
+        else if (kind === 'frown') { R(12, 16, 5, 1, W_); R(13, 16, 3, 1, N_); R(12, 15, 1, 1, N_); R(16, 15, 1, 1, N_); }
+        else if (kind === 'flat') { R(12, 16, 5, 1, N_); }
+        else if (kind === 'smirk') { R(14, 16, 3, 1, N_); R(16, 15, 1, 1, N_); }
+        else if (kind === 'o') { R(13, 15, 3, 2, N_); R(14, 16, 1, 1, '#8a3a4a'); }
+        else if (kind === 'teeth') { R(11, 16, 7, 1, N_); R(12, 16, 5, 1, '#fff8ec'); R(14, 16, 1, 1, N_); }
       };
       switch (EX) {
         case 'blink':                        /* shut: a white lash line low in the patch */
-          eyes(x => { wipe(x); R(x + 1, 8, 2, 1, WH_); R(x, 7, 1, 1, WH_); R(x + 3, 7, 1, 1, WH_); });
+          eyes(i => { wipe(i); R(EYX[i], 9, 3, 1, WH_); R(EYX[i] - 1, 8, 1, 1, WH_); R(EYX[i] + 3, 8, 1, 1, WH_); });
           break;
         case 'grin':                         /* squeezed shut, curved up */
-          eyes(x => { wipe(x); R(x + 1, 7, 2, 1, WH_); R(x, 8, 1, 1, WH_); R(x + 3, 8, 1, 1, WH_); });
+          eyes(i => { wipe(i); R(EYX[i], 8, 3, 1, WH_); R(EYX[i] - 1, 9, 1, 1, WH_); R(EYX[i] + 3, 9, 1, 1, WH_); });
           mouth('grin');
           break;
         case 'wow':                          /* the whites blow wide open */
-          eyes(x => eye(x, -1, -1, 3, 3));
+          eyes(i => eye(i, -1, -1, 4, 4));
           mouth('o');
           break;
         case 'angry':                        /* whites shoved inward, brows down over the patch */
-          eye(9, 1); eye(16, -1);
-          R(9, 5, 3, 1, BROW); R(11, 6, 2, 1, BROW);
-          R(18, 5, 3, 1, BROW); R(17, 6, 2, 1, BROW);
+          eye(0, 2); eye(1, -2);
+          brow(0, 0, true); brow(1, 0, true);
           mouth('teeth');
           break;
         case 'determined':                   /* level brows low over the whites */
-          eye(9, 0, 1); eye(16, 0, 1);
-          R(9, 5, 4, 1, BROW); R(16, 5, 4, 1, BROW);
-          R(9, 6, 4, 1, BROW); R(16, 6, 4, 1, BROW);
+          eye(0, 0, 1); eye(1, 0, 1);
+          eyes(i => { R(PAT[i], 6, 6, 1, BROW); R(PAT[i], 7, 6, 1, BROW); });
           mouth('flat');
           break;
         case 'smug':                         /* one eye down to a slit */
-          wipe(16); R(17, 8, 2, 1, WH_);
+          wipe(1); R(19, 9, 3, 1, WH_);
           mouth('smirk');
           break;
         case 'sad':                          /* whites down in the corners, brows up inside */
-          eye(9, 0, 2, 2, 1); eye(16, 0, 2, 2, 1);
-          R(11, 5, 2, 1, BROW); R(10, 6, 1, 1, BROW);
-          R(16, 5, 2, 1, BROW); R(18, 6, 1, 1, BROW);
+          eye(0, 0, 2, 3, 1); eye(1, 0, 2, 3, 1);
+          R(9, 6, 3, 1, BROW); R(8, 7, 2, 1, BROW);
+          R(17, 6, 3, 1, BROW); R(19, 7, 2, 1, BROW);
           mouth('frown');
           break;
         case 'love':                         /* a heart in each patch */
-          eyes(x => {
-            wipe(x);
+          eyes(i => {
+            const x = EYX[i] - 1;
+            wipe(i);
             R(x, 7, 1, 2, '#ff5f9e'); R(x + 3, 7, 1, 2, '#ff5f9e');
             R(x + 1, 6, 1, 1, '#ff5f9e'); R(x + 2, 6, 1, 1, '#ff5f9e');
             R(x + 1, 7, 2, 2, '#ff5f9e'); R(x + 1, 9, 2, 1, '#ff5f9e');
@@ -3571,17 +3580,19 @@ const SPR = (() => {
           mouth('grin');
           break;
         case 'dizzy':                        /* crossed out in white */
-          eyes(x => {
-            wipe(x);
-            R(x, 6, 1, 1, WH_); R(x + 1, 7, 1, 1, WH_); R(x + 2, 8, 1, 1, WH_); R(x + 3, 9, 1, 1, WH_);
-            R(x + 3, 6, 1, 1, WH_); R(x + 2, 7, 1, 1, WH_); R(x + 1, 8, 1, 1, WH_); R(x, 9, 1, 1, WH_);
+          eyes(i => {
+            const x = EYX[i] - 1;
+            wipe(i);
+            R(x, 7, 1, 1, WH_); R(x + 1, 8, 1, 1, WH_); R(x + 2, 9, 1, 1, WH_); R(x + 3, 10, 1, 1, WH_);
+            R(x + 3, 7, 1, 1, WH_); R(x + 2, 8, 1, 1, WH_); R(x + 1, 9, 1, 1, WH_); R(x, 10, 1, 1, WH_);
           });
           mouth('open');
           break;
         case 'money':                        /* coins where the whites were */
-          eyes(x => {
-            wipe(x);
-            R(x + 1, 6, 2, 1, '#ffd23f'); R(x, 7, 4, 2, '#ffd23f'); R(x + 1, 9, 2, 1, '#ffd23f');
+          eyes(i => {
+            const x = EYX[i] - 1;
+            wipe(i);
+            R(x + 1, 6, 2, 1, '#ffd23f'); R(x, 7, 4, 3, '#ffd23f'); R(x + 1, 10, 2, 1, '#ffd23f');
             R(x + 1, 7, 2, 2, '#b87c10'); R(x + 1, 7, 1, 1, '#fff3c4');
           });
           mouth('grin');
@@ -3708,16 +3719,19 @@ const SPR = (() => {
       arm(7, 19, 8);
       if (of.acc === 'acc_coin' || of.acc === 'acc_egg') {
         /* the arm bends up and he holds it out where you can see it */
+        /* the head is a wide circle, so there is no room beside it: the arm
+           comes in across the chest and holds it out at the lapel instead */
         const egg = of.acc === 'acc_egg';
         R(19, 20, 4, 5, O); R(20, 21, 2, 3, suitCol);            /* upper arm */
-        R(19, 15, 4, 6, O); R(20, 16, 2, 3, suitCol); R(20, 19, 2, 1, cuff);
-        R(19, 13, 4, 3, O); R(20, 13, 2, 2, paw); R(20, 13, 1, 1, pawLit);
+        R(18, 23, 5, 4, O); R(19, 24, 3, 2, suitCol); R(19, 23, 3, 1, suitLit);
+        R(19, 26, 3, 1, cuff);                                   /* forearm across */
+        R(16, 23, 4, 4, O); R(17, 24, 2, 2, paw); R(17, 24, 1, 1, pawLit);
         if (egg) {
-          R(20, 8, 3, 1, O); R(19, 9, 5, 4, O);
-          R(20, 9, 3, 4, '#fff3d0'); R(20, 9, 1, 2, '#ffffff'); R(22, 11, 1, 1, '#d8cdb0');
+          R(17, 18, 3, 1, O); R(16, 19, 5, 5, O);
+          R(17, 19, 3, 4, '#fff3d0'); R(17, 19, 1, 2, '#ffffff'); R(19, 21, 1, 1, '#d8cdb0');
         } else {
-          R(20, 9, 3, 1, O); R(19, 10, 5, 3, O);
-          R(20, 10, 3, 2, '#ffd23f'); R(20, 10, 1, 1, '#fff3c4'); R(22, 11, 1, 1, '#c99a10');
+          R(17, 19, 3, 1, O); R(16, 20, 5, 4, O);
+          R(17, 20, 3, 2, '#ffd23f'); R(17, 20, 1, 1, '#fff3c4'); R(19, 21, 1, 1, '#c99a10');
         }
       } else if (of.acc === 'acc_cane') {
         arm(18, 19, 8); R(23, 16, 2, 17, '#5e3d18'); R(23, 16, 1, 17, '#7a5024');
@@ -3734,66 +3748,69 @@ const SPR = (() => {
       } else arm(18, 19, 8);
     }
 
-    /* ---- glasses over the eyes (rows 8-12, lenses at x9-12 and x16-19) ---- */
+    /* ---- glasses over the eyes (rows 6-11, lenses at x6-11 and x17-22) ---- */
     if (of.glasses === 'gl_round') {
       const fr = '#c9a35f', li = '#f0dcac';
-      [9, 15].forEach(x => {
-        R(x, 6, 5, 1, fr); R(x, 10, 5, 1, fr); R(x, 7, 1, 3, fr); R(x + 4, 7, 1, 3, fr);
-        R(x + 1, 7, 3, 3, 'rgba(190,225,245,.30)'); R(x + 1, 7, 2, 1, li);
+      [6, 17].forEach(x => {
+        R(x, 6, 6, 1, fr); R(x, 11, 6, 1, fr); R(x, 7, 1, 4, fr); R(x + 5, 7, 1, 4, fr);
+        R(x + 1, 7, 4, 4, 'rgba(190,225,245,.30)'); R(x + 1, 7, 2, 1, li);
       });
-      R(14, 8, 1, 1, fr); R(8, 8, 1, 1, fr); R(20, 8, 1, 1, fr);
+      R(12, 8, 5, 1, fr); R(5, 8, 1, 1, fr); R(23, 8, 1, 1, fr);
     } else if (of.glasses === 'gl_star') {
-      [7, 14].forEach(x => {
+      [5, 16].forEach(x => {
         R(x, 5, 8, 7, '#7fe8ff'); R(x + 1, 6, 6, 5, '#3fa7d6');
         CLR(x, 5, 2, 1); CLR(x, 5, 1, 2); CLR(x + 6, 5, 2, 1); CLR(x + 7, 5, 1, 2);
         CLR(x, 11, 2, 1); CLR(x, 10, 1, 2); CLR(x + 6, 11, 2, 1); CLR(x + 7, 10, 1, 2);
         R(x + 1, 6, 2, 2, '#ffffff'); R(x + 5, 9, 2, 2, '#c9f4ff');
       });
-      R(6, 4, 1, 1, '#ffffff'); R(23, 3, 1, 1, '#ffffff'); R(24, 7, 1, 1, '#ffffff');
+      R(4, 4, 1, 1, '#ffffff'); R(24, 3, 1, 1, '#ffffff'); R(25, 7, 1, 1, '#ffffff');
     } else if (of.glasses === 'gl_shades') {
-      R(7, 6, 8, 5, '#14141c'); R(14, 6, 8, 5, '#14141c'); R(13, 8, 3, 1, '#14141c');
-      R(8, 6, 3, 1, '#5a5a6a'); R(15, 6, 3, 1, '#5a5a6a');
-      R(12, 9, 2, 1, '#3a3a48'); R(19, 9, 2, 1, '#3a3a48');
+      R(5, 7, 8, 5, '#14141c'); R(16, 7, 8, 5, '#14141c'); R(12, 8, 5, 1, '#14141c');
+      R(6, 7, 4, 1, '#5a5a6a'); R(17, 7, 4, 1, '#5a5a6a');
+      R(10, 10, 2, 1, '#3a3a48'); R(21, 10, 2, 1, '#3a3a48');
     }
 
-    /* ---- the hat: a brim on rows 1-3, a crown above, ear tips still showing ---- */
+    /* ---- the hat: it sits on the round head, brim across rows 3-5,
+       crown above, the ear tips still showing either side. RH draws two
+       rows lower than the old narrow head wanted. ---- */
     const H = of.hat;
+    const RH = (x, y, w, h, col) => R(x, y + 2, w, h, col);
     if (H === 'hat_top') {
-      R(8, 1, 13, 3, O); R(9, 1, 11, 2, '#2e2216'); R(9, 1, 11, 1, '#453b3a');
-      R(10, -7, 9, 9, O); R(11, -6, 7, 8, '#2e2216'); R(11, -6, 2, 8, '#453b3a');
-      R(11, -1, 7, 2, trim); R(11, -1, 7, 1, lighten(trim, 0.3));
-      R(12, -6, 4, 1, '#57484a');
+      RH(6, 1, 17, 3, O); RH(7, 1, 15, 2, '#2e2216'); RH(7, 1, 15, 1, '#453b3a');
+      RH(10, -7, 9, 9, O); RH(11, -6, 7, 8, '#2e2216'); RH(11, -6, 2, 8, '#453b3a');
+      RH(11, -1, 7, 2, trim); RH(11, -1, 7, 1, lighten(trim, 0.3));
+      RH(12, -6, 4, 1, '#57484a');
     } else if (H === 'hat_cap') {
-      R(9, 0, 12, 4, O); R(10, 0, 10, 3, suitCol); R(10, 0, 10, 1, suitLit);
-      R(19, 3, 7, 2, O); R(19, 2, 6, 1, suitDk); R(14, 0, 2, 3, trim);
+      RH(8, -3, 14, 7, O); RH(9, -3, 12, 6, suitCol); RH(9, -3, 12, 2, suitLit);
+      RH(20, 2, 7, 2, O); RH(20, 1, 6, 1, suitDk); RH(14, -3, 2, 6, trim);
     } else if (H === 'hat_straw') {
-      R(4, 3, 21, 2, O); R(5, 3, 19, 1, '#e0bd82');
-      R(10, -1, 10, 4, O); R(11, -1, 8, 4, '#e0bd82'); R(11, -1, 8, 1, '#f2dcb0'); R(11, 2, 8, 1, '#c9a35f');
+      RH(2, 3, 25, 2, O); RH(3, 3, 23, 1, '#e0bd82');
+      RH(10, -1, 10, 4, O); RH(11, -1, 8, 4, '#e0bd82'); RH(11, -1, 8, 1, '#f2dcb0'); RH(11, 2, 8, 1, '#c9a35f');
     } else if (H === 'hat_crown') {
-      R(9, -3, 12, 6, O); R(10, -2, 10, 4, '#ffd23f'); R(10, -2, 10, 2, '#fff3c4');
-      [9, 13, 17].forEach(x => { R(x, -6, 3, 3, O); R(x + 1, -6, 1, 3, '#ffd23f'); });
-      R(11, 1, 2, 1, '#e8542f'); R(14, 1, 2, 1, '#3fa7d6'); R(17, 1, 2, 1, '#4fc46a');
+      RH(9, -3, 12, 6, O); RH(10, -2, 10, 4, '#ffd23f'); RH(10, -2, 10, 2, '#fff3c4');
+      [9, 13, 17].forEach(x => { RH(x, -6, 3, 3, O); RH(x + 1, -6, 1, 3, '#ffd23f'); });
+      RH(11, 1, 2, 1, '#e8542f'); RH(14, 1, 2, 1, '#3fa7d6'); RH(17, 1, 2, 1, '#4fc46a');
     } else if (H === 'hat_beanie') {
-      R(9, -2, 12, 5, O); R(10, -2, 10, 3, '#6a7ac9'); R(10, -2, 10, 1, '#8f9ee0');
-      R(10, 1, 10, 2, '#4a5a9e'); R(13, -5, 3, 3, '#fff8ec');
+      RH(9, -2, 12, 5, O); RH(10, -2, 10, 3, '#6a7ac9'); RH(10, -2, 10, 1, '#8f9ee0');
+      RH(10, 1, 10, 2, '#4a5a9e'); RH(13, -5, 3, 3, '#fff8ec');
     } else if (H === 'hat_wizard') {
       const wc = '#4a3a9e';
-      R(13, -9, 3, 2, O); R(12, -7, 5, 2, O); R(13, -7, 3, 1, wc);
-      R(11, -5, 7, 2, O); R(12, -5, 5, 1, wc);
-      R(10, -3, 9, 2, O); R(11, -3, 7, 1, wc);
-      R(9, -1, 12, 4, O); R(10, -1, 10, 3, wc); R(6, 2, 17, 2, O); R(7, 2, 15, 1, wc);
-      R(13, -5, 1, 1, '#ffd23f'); R(16, -1, 1, 1, '#ffd23f'); R(11, 1, 1, 1, '#8f7fe0');
+      RH(13, -9, 3, 2, O); RH(12, -7, 5, 2, O); RH(13, -7, 3, 1, wc);
+      RH(11, -5, 7, 2, O); RH(12, -5, 5, 1, wc);
+      RH(10, -3, 9, 2, O); RH(11, -3, 7, 1, wc);
+      RH(8, -1, 14, 4, O); RH(9, -1, 12, 3, wc); RH(4, 2, 21, 2, O); RH(5, 2, 19, 1, wc);
+      RH(13, -5, 1, 1, '#ffd23f'); RH(16, -1, 1, 1, '#ffd23f'); RH(11, 1, 1, 1, '#8f7fe0');
     } else if (H === 'hat_cowboy') {
-      R(3, 3, 23, 2, O); R(4, 3, 21, 1, '#a8783f');
-      R(9, -3, 12, 6, O); R(10, -2, 10, 5, '#a8783f'); R(10, -2, 10, 2, '#c9924f');
-      R(10, 2, 10, 1, '#3a2a16'); R(13, -4, 4, 1, '#a8783f');
+      RH(1, 3, 27, 2, O); RH(2, 3, 25, 1, '#a8783f');
+      RH(9, -3, 12, 6, O); RH(10, -2, 10, 5, '#a8783f'); RH(10, -2, 10, 2, '#c9924f');
+      RH(10, 2, 10, 1, '#3a2a16'); RH(13, -4, 4, 1, '#a8783f');
     } else if (H === 'hat_halo') {
-      R(9, -6, 12, 2, '#ffd23f'); R(8, -5, 1, 2, '#ffd23f'); R(21, -5, 1, 2, '#ffd23f');
-      R(9, -3, 12, 2, '#ffd23f'); R(11, -5, 8, 1, '#fff3c4');
+      RH(9, -6, 12, 2, '#ffd23f'); RH(8, -5, 1, 2, '#ffd23f'); RH(21, -5, 1, 2, '#ffd23f');
+      RH(9, -3, 12, 2, '#ffd23f'); RH(11, -5, 8, 1, '#fff3c4');
     } else if (H === 'hat_chef') {
-      R(9, 0, 12, 3, O); R(10, 0, 10, 2, '#e8dcc0');
-      R(7, -6, 16, 6, O); R(8, -5, 14, 5, '#fff8ec'); R(8, -5, 14, 2, '#ffffff');
-      R(12, -7, 6, 1, '#fff8ec'); R(10, -8, 4, 2, '#fff8ec'); R(16, -8, 5, 2, '#fff8ec');
+      RH(8, 0, 14, 3, O); RH(9, 0, 12, 2, '#e8dcc0');
+      RH(7, -6, 16, 6, O); RH(8, -5, 14, 5, '#fff8ec'); RH(8, -5, 14, 2, '#ffffff');
+      RH(12, -7, 6, 1, '#fff8ec'); RH(10, -8, 4, 2, '#fff8ec'); RH(16, -8, 5, 2, '#fff8ec');
     }
     cache.set(key, c);
     return c;
