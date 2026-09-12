@@ -23,6 +23,7 @@
         <button class="pill" id="pill-food" data-act="open-food" title="The pantry - produce and goods, tap to open"><b id="r-food">0</b></button>
         <button class="pill" id="pill-bugs" data-act="open-bugs" title="The bug jar - worms and grubs, tap to scatter or sell" hidden><b id="r-bugs">0</b></button>
         <span class="pill" id="pill-sky" title="The weather over the valley"><b id="r-sky">CLEAR</b></span>
+        <span class="decree-pill" id="pill-decree" title="What the valley talked you into, and how long it lasts" hidden><b id="r-decree"></b></span>
         <button class="pill" id="pill-age" data-act="open-ages" title="The age the company is in - tap for what the next one needs"><b id="r-age">STRAW AGE</b></button>
       </div>
     </div>
@@ -258,6 +259,27 @@
     <div class="modal-panel ach">
       <div class="modal-head"><h2>ACHIEVEMENTS</h2><span class="panel-sub" id="ach-sub"></span><button class="btn btn-tiny" data-act="close-modal">CLOSE</button></div>
       <div id="ach-body"></div>
+    </div>
+  </div>
+
+  <!-- the Chronicle: spins in from nothing, lands, and waits for an answer -->
+  <div class="modal paper" id="modal-news" hidden>
+    <div class="news-sheet" id="news-sheet">
+      <div class="news-rule"></div>
+      <div class="news-masthead">
+        <span class="news-ear" id="news-ear-l">PRICE 1d</span>
+        <h2 id="news-name">THE CLUCKTON CHRONICLE</h2>
+        <span class="news-ear" id="news-ear-r">LATE EDITION</span>
+      </div>
+      <div class="news-rule"></div>
+      <h1 id="news-head">HEADLINE</h1>
+      <p id="news-sub">subhead</p>
+      <div class="news-body">
+        <div class="news-cut" id="news-cut"></div>
+        <div class="news-cols" id="news-cols"></div>
+      </div>
+      <div class="news-rule"></div>
+      <div class="news-choices" id="news-choices"></div>
     </div>
   </div>
 

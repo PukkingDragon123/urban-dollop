@@ -126,6 +126,7 @@ const ECON = {
   blowerPush: 46,          // px/sec push
   sorterRare: 2,           // tier >= this goes straight through a sorter
   diaryMax: 160,
+  newsEvery: 190,          // seconds between editions of the Chronicle
   staffTireless: 90,       // seconds of work before a worker wants a breather
   staffRest: 14,           // seconds of breather at a hut
   techAuraR: 58,           // px a Technician's speed aura reaches
@@ -454,6 +455,14 @@ const PASSER_LINES = [
   'I COULD DO THIS. I COULD.',
   'THE DOG HAS NEVER SEEN A HEN IN A HAT.',
   'IS HE HIRING? ASKING FOR ME.',
+  'THAT FENCE WENT UP WITHOUT PLANNING.',
+  'ALL THAT, AND HE STILL PARKS ON THE VERGE.',
+  'PRODUCTIVITY, THEY CALL IT. IT IS HENS.',
+  'HE HAS A MISSION STATEMENT. FOR CHICKENS.',
+  'FIRST IT IS EGGS. THEN IT IS THE WATER RIGHTS.',
+  'MY COUSIN APPLIED. THEY ASKED HIS STAT LINE.',
+  'SOMEBODY IS GETTING A GRANT FOR THIS.',
+  'I VOTED FOR THE OTHER RACCOON.',
 ];
 /* and what a driver says when they pull over for a look */
 const PULLOVER_LINES = [
@@ -467,6 +476,16 @@ const PULLOVER_LINES = [
   'TAKE A PHOTO. NOBODY WILL BELIEVE IT.',
   'ARE WE STOPPING? WE ARE STOPPING.',
   'IT WAS A FIELD LAST YEAR!',
+  'HE HAS A SUPPLY CHAIN. IN A FIELD.',
+  'THE COUNCIL WANTS A WORD ABOUT THAT SIGN.',
+  'VERTICAL INTEGRATION, THEY CALL IT. IT IS A SHED.',
+  'THAT IS WHAT DEREGULATION LOOKS LIKE.',
+  'MY BROTHER-IN-LAW IS ON THE PLANNING COMMITTEE.',
+  'IS THAT A UNION? THAT IS A QUEUE FOR FEED.',
+  'HE PAYS IN FEATHERS. IS THAT LEGAL?',
+  'SOMEBODY SHOULD REGULATE THE RACCOON.',
+  'THEY SAY HE LOBBIES. IN A TOP HAT.',
+  'TAX BREAK, THAT IS. HAS TO BE.',
 ];
 
 /* ------------------------------------------------------------
@@ -1343,6 +1362,23 @@ const BOSS_IDLE = [
   'The competition is asleep. The competition is a duck pond.',
   'Nothing personal against the trees. Purely commercial.',
   'Small is just big that has not been told yet.',
+  'I am not anti-regulation. I am pro-loophole.',
+  'The hens have no vote. That is the beauty of it.',
+  'We do not lobby. We explain, at length, with a hamper.',
+  'Synergy is two sheds that can see each other.',
+  'I told the council it was a hobby. It is a sector.',
+  'Every empire starts as an unlicensed shed.',
+  'Downsizing is when the hens do it to themselves.',
+  'The market is efficient. I have met it. It is a duck.',
+  'Call it a co-operative and nobody asks questions.',
+  'I am a job creator. The jobs are in the barn.',
+  'Trickle-down works. Ask the worms.',
+  'A subsidy is just a compliment with a number on it.',
+  'My five-year plan is four years of hats.',
+  'I would run for office, but the hours here are better.',
+  'Automate it, and then automate whoever asks why.',
+  'Never trust a quarterly. Trust a full basket.',
+  'The chickens are stakeholders. They just do not know.',
   'When we are enormous, remind me to be humble about it.',
   'I have a five year plan. Year one is this fence.',
   'Money is only paper. Get me more paper.',
@@ -1505,6 +1541,181 @@ const ROUTE_STYLES = {
 };
 const ROUTE_STYLE_KEYS = Object.keys(ROUTE_STYLES);
 /* things that happen on the map: each sits on a town's road for a while */
+/* ------------------------------------------------------------
+   THE CHRONICLE - now and then the valley has an opinion about
+   you, and it arrives the way opinions did: a newspaper spinning
+   in out of nowhere with your name in the headline and two ways
+   out of it underneath. Each choice does something you can feel,
+   and most of them cost you something.
+
+   `need` gates it on progress; `w` is how often it comes up.
+   An effect is any of { coins, feathers, eggs } as a flat number,
+   or `decree` for a timed change to how the valley treats you:
+     pay   multiplies what every egg is worth
+     wage  multiplies what the crew costs you
+     cars  multiplies how much traffic the road gets
+   ------------------------------------------------------------ */
+const NEWS_PAPER = 'THE CLUCKTON CHRONICLE';
+const NEWS_FILLER = [
+  'Sources close to the barn confirmed the figures late last night.',
+  'The committee met for six hours and adjourned for sandwiches.',
+  'Local opinion remains divided, loud, and largely uninformed.',
+  'Our correspondent was escorted from the premises by a goose.',
+  'A spokesraccoon declined to comment, then commented at length.',
+  'Analysts described the move as bold, or possibly as a shed.',
+  'The minister was unavailable, being at the time inside a hedge.',
+  'Turnout was described as brisk. Feed prices held firm.',
+  'No hens were harmed. Several were extremely inconvenienced.',
+  'The full text of the ordinance runs to nine pages and a diagram.',
+];
+const EVENTS = [
+  { id:'inspector', w:1.2, need:{ staff:1 },
+    head:'EGG INSPECTOR AT THE GATE',
+    sub:'Ministry official demands to see the paperwork nobody has',
+    icon:'doc',
+    choices:[
+      { label:'PAY THE FEE', blurb:'Quietly. Everyone does.', cost:{ coins:260 },
+        fx:{ coins:-260, decree:{ pay:1.3, t:90, name:'CERTIFIED' } },
+        line:'Certified. Stamped. Framed by lunchtime.' },
+      { label:'ARGUE', blurb:'You have a mouth. Use it.',
+        fx:{ decree:{ pay:0.75, t:70, name:'UNDER REVIEW' } },
+        line:'We are under review. We have always been under review.' },
+    ] },
+  { id:'union', w:1.1, need:{ staff:3 },
+    head:'CREW FORMS A COMMITTEE',
+    sub:'Demands include shorter shifts and a better class of pellet',
+    icon:'hands',
+    choices:[
+      { label:'GIVE THE RAISE', blurb:'Costs more, works harder.',
+        fx:{ coins:-180, decree:{ wage:1.3, pay:1.2, t:140, name:'HAPPY CREW' } },
+        line:'Fine. Pellets for everyone. Do not tell the hens.' },
+      { label:'CALL IT A CO-OP', blurb:'Cheaper. They will notice.',
+        fx:{ feathers:-8, decree:{ pay:0.9, t:80, name:'GRUMBLING' } },
+        line:'It is not a pay cut, it is an ownership stake in a shed.' },
+    ] },
+  { id:'zoning', w:1.0,
+    head:'COUNCIL QUERIES THE FENCE',
+    sub:'Planning department discovers the farm exists, is furious',
+    icon:'fence',
+    choices:[
+      { label:'GREASE IT', blurb:'A hamper. A large one.', cost:{ coins:400 },
+        fx:{ coins:-400, decree:{ cars:1.6, pay:1.15, t:120, name:'PERMITTED' } },
+        line:'It is not a bribe, it is a gift basket with intent.' },
+      { label:'MOVE THE FENCE', blurb:'Free. Slow. Humiliating.',
+        fx:{ feathers:6, decree:{ pay:0.85, t:60, name:'REBUILDING' } },
+        line:'Two feet left. Two feet! I have measured it in spite.' },
+    ] },
+  { id:'strikeroad', w:1.0,
+    head:'HAULIERS BLOCK THE ROAD',
+    sub:'Fuel duty protest reaches the bottom of the drive',
+    icon:'truck',
+    choices:[
+      { label:'FEED THEM', blurb:'Eggs buy goodwill.',
+        fx:{ eggs:-6, decree:{ cars:2.2, pay:1.25, t:110, name:'GOODWILL' } },
+        line:'Six dozen and they love us. Cheapest advertising going.' },
+      { label:'DRIVE THROUGH', blurb:'Bold. Loud. Memorable.',
+        fx:{ coins:180, decree:{ cars:0.4, t:90, name:'BOYCOTT' } },
+        line:'We got through. We are also on a list now.' },
+    ] },
+  { id:'subsidy', w:1.1,
+    head:'RURAL GROWTH FUND OPENS',
+    sub:'Money available to anyone who can fill in the form',
+    icon:'coin',
+    choices:[
+      { label:'APPLY HONESTLY', blurb:'Slow money, clean money.',
+        fx:{ coins:420, feathers:4 },
+        line:'Filled it in twice. Got it right the second time.' },
+      { label:'EMBELLISH', blurb:'More money, more questions.',
+        fx:{ coins:1100, decree:{ pay:0.8, t:100, name:'AUDITED' } },
+        line:'I may have described the shed as a campus.' },
+    ] },
+  { id:'tycoonrival', w:1.0, need:{ coins:5000 },
+    head:'RIVAL EGG BARON BUYS THE VALLEY',
+    sub:'Mystery consortium acquires everything except your field',
+    icon:'skull',
+    choices:[
+      { label:'UNDERCUT HIM', blurb:'Sell cheap. Hurt him.',
+        fx:{ decree:{ pay:0.7, cars:2.4, t:130, name:'PRICE WAR' } },
+        line:'Sell at a loss for long enough and you win. Somehow.' },
+      { label:'RAISE PRICES', blurb:'Let him have the cheap end.',
+        fx:{ decree:{ pay:1.45, cars:0.55, t:130, name:'PREMIUM' } },
+        line:'Ours are artisanal now. Same hens. Bigger word.' },
+    ] },
+  { id:'election', w:1.0,
+    head:'ELECTION CALLED IN CLUCKTON',
+    sub:'Both candidates promise the farm road will finally be fixed',
+    icon:'flag',
+    choices:[
+      { label:'DONATE TO BOTH', blurb:'Hedged. Expensive.', cost:{ coins:600 },
+        fx:{ coins:-600, decree:{ pay:1.35, cars:1.8, t:150, name:'WELL CONNECTED' } },
+        line:'I believe in democracy twice, at the same time.' },
+      { label:'STAY OUT OF IT', blurb:'Principled. Cheap.',
+        fx:{ feathers:10 },
+        line:'No comment. Put that in the paper. No comment.' },
+    ] },
+  { id:'safety', w:1.0, need:{ staff:2 },
+    head:'SAFETY AUDIT FINDS THE BARN',
+    sub:'Inspector lists nine hazards, eight of which are the goat',
+    icon:'wrench',
+    choices:[
+      { label:'FIX IT PROPERLY', blurb:'Dull. Correct.', cost:{ coins:320 },
+        fx:{ coins:-320, decree:{ wage:0.85, pay:1.2, t:130, name:'COMPLIANT' } },
+        line:'Handrails. Signage. A little gate. I hate it. It works.' },
+      { label:'MOVE THE GOAT', blurb:'Technically compliant.',
+        fx:{ feathers:5, decree:{ pay:0.95, t:60, name:'IMPROVISED' } },
+        line:'Eight hazards solved by one gate and a firm word.' },
+    ] },
+  { id:'automation', w:1.0, need:{ staff:4 },
+    head:'MACHINES COULD DO IT CHEAPER',
+    sub:'Consultant with a clipboard says so, at length, for a fee',
+    icon:'robot',
+    choices:[
+      { label:'BUY THE MACHINES', blurb:'Fast now, awkward later.', cost:{ coins:520 },
+        fx:{ coins:-520, decree:{ pay:1.5, wage:1.2, t:120, name:'AUTOMATED' } },
+        line:'The robots do not ask about pellets. I respect that.' },
+      { label:'KEEP THE CREW', blurb:'Slower. They remember.',
+        fx:{ feathers:12, decree:{ wage:0.8, t:140, name:'LOYAL' } },
+        line:'Machines break. Badgers hold a grudge. Easy call.' },
+    ] },
+  { id:'scandal', w:0.9, need:{ coins:12000 },
+    head:'"WHERE DOES THE MONEY GO?"',
+    sub:'Chronicle prints a diagram with your hat in the middle of it',
+    icon:'quest',
+    choices:[
+      { label:'BUY THE PAPER', blurb:'Simple. Suspicious.', cost:{ coins:1400 },
+        fx:{ coins:-1400, decree:{ pay:1.4, t:160, name:'GOOD PRESS' } },
+        line:'I now own the front page. It is very complimentary.' },
+      { label:'GIVE A TOUR', blurb:'Honest. Risky.',
+        fx:{ feathers:18, decree:{ cars:2.6, t:120, name:'FAMOUS' } },
+        line:'Showed them everything. They loved the compost heap.' },
+    ] },
+  { id:'weatherbill', w:1.0,
+    head:'STORM LEVY PROPOSED',
+    sub:'Every farm on the road to pay for one broken culvert',
+    icon:'cloud',
+    choices:[
+      { label:'PAY YOUR SHARE', blurb:'Neighbourly.', cost:{ coins:240 },
+        fx:{ coins:-240, decree:{ cars:1.7, pay:1.15, t:110, name:'GOOD NEIGHBOUR' } },
+        line:'Paid up. Smiled. Made sure everyone saw me smile.' },
+      { label:'REFUSE', blurb:'It is not your culvert.',
+        fx:{ coins:240, decree:{ cars:0.5, t:100, name:'UNPOPULAR' } },
+        line:'It is a culvert. I did not break it. I am at peace.' },
+    ] },
+  { id:'tariff', w:1.0, need:{ routes:2 },
+    head:'TARIFF ON OUT-OF-VALLEY EGGS',
+    sub:'Protectionism arrives, wearing a rosette and a small hat',
+    icon:'map',
+    choices:[
+      { label:'BACK THE TARIFF', blurb:'Good for you, briefly.',
+        fx:{ decree:{ pay:1.4, cars:0.6, t:140, name:'PROTECTED' } },
+        line:'Free trade is wonderful. So is a moat.' },
+      { label:'OPPOSE IT', blurb:'Principles, and more traffic.',
+        fx:{ feathers:9, decree:{ cars:2.4, pay:1.1, t:140, name:'OPEN ROAD' } },
+        line:'Let them all come. Ours are better. Probably.' },
+    ] },
+];
+const EVENT_BY_ID = Object.fromEntries(EVENTS.map(e => [e.id, e]));
+
 const ROAD_EVENTS = [
   { id:'jam',    name:'Traffic Jam',  icon:'car',    slow:1.45, pay:1,    dur:120, col:'#e8542f', desc:'Everything crawls. Trips through here take half again as long.' },
   { id:'works',  name:'Roadworks',    icon:'hammer', slow:1.25, pay:1,    dur:200, col:'#f0a422', desc:'Cones and a mole with a flag. A quarter slower.' },

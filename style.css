@@ -2717,3 +2717,102 @@ body.big-ui{ --key:80px; }
 .cf-pick{ width:44px; height:44px; }
 .cf-pick.pair{ width:44px; height:44px; }
 .cf-pick{ overflow:hidden; }
+
+/* ============================================================
+   THE CHRONICLE
+   A newspaper spins in out of nothing, lands crooked, settles,
+   and waits. Newsprint is warm grey-white with a halftone screen
+   over it; the type is the game's own face, ranged like a front
+   page. Two choices are set as a boxed panel at the foot.
+   ============================================================ */
+.modal.paper{
+  background:rgba(10,10,12,.72);
+  align-items:center;
+  perspective:900px;
+}
+.news-sheet{
+  width:min(680px, 100%);
+  background:#e8e2d2;
+  color:#191712;
+  border:3px solid #191712;
+  padding:12px 14px 14px;
+  box-shadow:10px 12px 0 rgba(0,0,0,.45);
+  /* the halftone screen of cheap newsprint */
+  background-image:
+    repeating-linear-gradient(0deg, rgba(25,23,18,.055) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(25,23,18,.04) 0 1px, transparent 1px 4px);
+  animation:news-spin .82s cubic-bezier(.16,.9,.3,1.02) both;
+  transform-origin:50% 50%;
+}
+.news-sheet.news-out{ animation:news-away .42s ease-in forwards; }
+@keyframes news-spin{
+  0%   { transform:scale(.06) rotate(-1080deg); opacity:0; }
+  62%  { transform:scale(1.06) rotate(14deg);  opacity:1; }
+  78%  { transform:scale(.98) rotate(-5deg); }
+  90%  { transform:scale(1.01) rotate(2deg); }
+  100% { transform:scale(1) rotate(0deg); }
+}
+@keyframes news-away{
+  0%   { transform:scale(1) rotate(0deg); opacity:1; }
+  100% { transform:scale(.5) rotate(220deg) translateY(40%); opacity:0; }
+}
+@media (prefers-reduced-motion:reduce){
+  .news-sheet{ animation:news-fade .2s ease-out both; }
+  .news-sheet.news-out{ animation:news-fade .18s ease-in reverse forwards; }
+  @keyframes news-fade{ from{ opacity:0 } to{ opacity:1 } }
+}
+.news-rule{ height:3px; background:#191712; margin:5px 0; }
+.news-masthead{ display:flex; align-items:center; gap:10px; }
+.news-masthead h2{
+  font-family:var(--font-px); font-size:24px; margin:0 auto; letter-spacing:1px;
+  color:#191712; text-align:center;
+}
+.news-ear{ font-family:var(--font-px); font-size:8px; color:#5a544a; white-space:nowrap; }
+#news-head{
+  font-family:var(--font-px); font-size:24px; line-height:1.15; margin:8px 0 4px;
+  text-align:center; color:#191712;
+}
+#news-sub{
+  font-family:var(--font-px); font-size:8px; margin:0 0 8px; text-align:center;
+  color:#4a453c; border-bottom:1px solid #a8a08c; padding-bottom:7px;
+}
+.news-body{ display:flex; gap:10px; align-items:flex-start; }
+.news-cut{
+  flex:0 0 auto; border:2px solid #191712; background:#d6cfbc; padding:3px;
+  line-height:0;
+}
+.news-cut canvas{ image-rendering:pixelated; display:block; }
+.news-cols{
+  flex:1 1 auto; display:grid; grid-template-columns:1fr 1fr; gap:8px;
+  font-family:var(--font-px); font-size:8px; color:#39342c; line-height:1.5;
+}
+.news-cols p{ margin:0; }
+.news-cols p::first-line{ color:#191712; }
+.news-choices{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }
+.news-pick{
+  display:block; width:100%; text-align:left; cursor:pointer;
+  background:#d6cfbc; border:3px solid #191712; color:#191712;
+  padding:7px 8px; font-family:var(--font-px); font-size:16px;
+  box-shadow:3px 3px 0 rgba(25,23,18,.35);
+}
+.news-pick:hover:not(:disabled){ background:#191712; color:#e8e2d2; }
+.news-pick:active:not(:disabled){ transform:translate(2px,2px); box-shadow:1px 1px 0 rgba(25,23,18,.35); }
+.news-pick:disabled{ opacity:.45; cursor:default; }
+.news-pick .np-blurb{ display:block; font-size:8px; color:#5a544a; margin-top:3px; }
+.news-pick:hover:not(:disabled) .np-blurb{ color:#bdb6a4; }
+.news-pick .np-cost{ display:block; font-size:8px; color:#8a3a1a; margin-top:2px; }
+.news-pick:hover:not(:disabled) .np-cost{ color:#ffb32e; }
+@media (max-width:560px){
+  .news-body{ flex-direction:column; align-items:center; }
+  .news-cols{ grid-template-columns:1fr; }
+  .news-choices{ grid-template-columns:1fr; }
+  #news-head{ font-size:16px; }
+  .news-masthead h2{ font-size:16px; }
+}
+/* the standing decree, on the resource bar */
+.decree-pill{
+  display:inline-flex; align-items:center; gap:4px;
+  font-family:var(--font-px); font-size:8px; color:#191712;
+  background:var(--gold); border:2px solid var(--ink); padding:1px 5px;
+}
+.decree-pill.bad{ background:var(--stop); color:#fff3ec; }

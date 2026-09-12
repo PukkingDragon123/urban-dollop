@@ -40,6 +40,8 @@ const GAME = (() => {
     return {
       v: 7,
       coins: 0, feathers: 0,
+      decree: null,          /* a timed change the valley voted on you */
+      newsT: ECON.newsEvery, newsSeen: [], news: null,  /* the Chronicle's clock, memory and open front page */
       plots,
       mamaTier: 0,
       mama: { lay: 8, petCd: 0, belly: 1 },
@@ -145,6 +147,11 @@ const GAME = (() => {
   const disc = () => S.disc.length;
   const overclock = () => (lvl('overclock') ? 2 : 1);
   const tycoon = () => (lvl('tycoon') ? 2 : 1);
+  /* whatever the Chronicle talked you into last, while it lasts */
+  function decreeMul(key) {
+    const d = S.decree;
+    return d && d.t > 0 && d[key] !== undefined ? d[key] : 1;
+  }
   const ownedPlots = () => S.plots.filter(Boolean).length;
 
   function eggValue(tier, golden, polished) {
@@ -154,7 +161,7 @@ const GAME = (() => {
     if (tier === TIER_DINO && lvl('bigeggs')) v *= 2;
     if (golden) v *= ECON.goldenMult;
     if (polished) v *= ECON.polishMult;
-    return Math.round(v * tycoon());
+    return Math.round(v * tycoon() * decreeMul('pay'));
   }
   function layTime(t) { return ECON.layTime(t) / (1 + 0.10 * lvl('happy')); }
   function petCd(isMama) { return (isMama ? ECON.mamaPetCd : ECON.basePetCd) * Math.pow(0.85, lvl('pets')); }
@@ -1923,7 +1930,7 @@ const GAME = (() => {
     return ECON.staffBaseSlots + Math.round(Object.keys(S.huts).reduce((a, k) => a + ECON.hutSlots * storeyMult(k), 0)) + 2 * lvl('crewcap');
   }
   function unionMult() { return lvl('union') ? 1.5 : 1; }
-  function wageMult() { return Math.pow(0.88, lvl('wages')); }
+  function wageMult() { return Math.pow(0.88, lvl('wages')) * decreeMul('wage'); }
   function wagePerSec() { return S.staff.reduce((a, w) => a + (w.wage || 0), 0) * wageMult(); }
   function restCap() { return ECON.staffTireless * (1 + 0.25 * lvl('overtime')); }
   function auraR() { return ECON.techAuraR * (1 + 0.35 * lvl('foreman')); }
@@ -3068,7 +3075,7 @@ const GAME = (() => {
   function tickTraffic(dt) {
     carT -= dt;
     if (carT <= 0 && cars.length < 9) {
-      carT = ECON.carEvery * (0.5 + Math.random());
+      carT = ECON.carEvery * (0.5 + Math.random()) / decreeMul('cars');
       const dir = Math.random() < 0.5 ? 1 : -1;
       const c = { id: nextId++, kind: pickOne(CAR_KINDS), col: pickOne(CAR_COLS), dir,
                   x: dir === 1 ? -70 : WORLD.W + 70, y: laneY(dir), v: 36 + Math.random() * 34,
@@ -4074,6 +4081,79 @@ const GAME = (() => {
     return (x > b.x - 2 && x < b.x + 24 && y > b.y - 8 && y < b.y + 29) ? b : null;
   }
 
+  /* ============================================================
+     THE CHRONICLE - the valley's opinion of you, delivered as a
+     newspaper with two ways out of it printed underneath. One waits
+     on the front page until you pick; the clock does not start
+     again until you have.
+     ============================================================ */
+  function newsEligible(e) {
+    const n = e.need || {};
+    if (n.staff !== undefined && S.staff.length < n.staff) return false;
+    if (n.coins !== undefined && S.stats.coinsEarned < n.coins) return false;
+    if (n.routes !== undefined && S.routes.length < n.routes) return false;
+    return true;
+  }
+  function rollEvent() {
+    /* prefer the ones you have not had yet; once they are all used, the
+       memory clears and they come round again */
+    let pool = EVENTS.filter(e => newsEligible(e) && S.newsSeen.indexOf(e.id) === -1);
+    if (!pool.length) { S.newsSeen = []; pool = EVENTS.filter(newsEligible); }
+    if (!pool.length) return null;
+    const tot = pool.reduce((a, e) => a + (e.w || 1), 0);
+    let roll = Math.random() * tot;
+    for (const e of pool) { roll -= (e.w || 1); if (roll <= 0) return e; }
+    return pool[pool.length - 1];
+  }
+  function openNews(id) {
+    const e = id ? EVENT_BY_ID[id] : rollEvent();
+    if (!e || S.news) return null;
+    const rnd = Math.random;
+    const filler = NEWS_FILLER.slice().sort(() => rnd() - 0.5).slice(0, 3);
+    S.news = { id: e.id, filler, t: 0 };
+    if (S.newsSeen.indexOf(e.id) === -1) S.newsSeen.push(e.id);
+    S.stats.news = (S.stats.news || 0) + 1;
+    emit('news', { ev: e, news: S.news });
+    return e;
+  }
+  /* can you afford what this choice says it costs? */
+  function newsAfford(e, i) {
+    const c = (e.choices[i] || {}).cost || {};
+    if (c.coins !== undefined && S.coins < c.coins) return false;
+    if (c.feathers !== undefined && S.feathers < c.feathers) return false;
+    return true;
+  }
+  function chooseNews(i) {
+    if (!S.news) return false;
+    const e = EVENT_BY_ID[S.news.id];
+    const ch = e && e.choices[i];
+    if (!ch || !newsAfford(e, i)) return false;
+    const fx = ch.fx || {};
+    if (fx.coins) S.coins = Math.max(0, S.coins + fx.coins);
+    if (fx.feathers) S.feathers = Math.max(0, S.feathers + fx.feathers);
+    if (fx.eggs) {
+      if (fx.eggs < 0) { for (let n = 0; n < -fx.eggs && S.eggs.length; n++) S.eggs.pop(); }
+      else for (let n = 0; n < fx.eggs; n++) layEgg(WORLD.mama.x + Math.random() * 40 - 20, WORLD.mama.y + Math.random() * 24 - 12);
+    }
+    if (fx.decree) S.decree = Object.assign({ T: fx.decree.t }, fx.decree);
+    S.news = null;
+    S.newsT = ECON.newsEvery * (0.7 + Math.random() * 0.6);
+    mark('news');
+    note('news', e.head + ' - ' + ch.label.toLowerCase() + '.');
+    if (ch.line) bossSay(ch.line, 'boss', 5);
+    emit('newsdone', { ev: e, choice: ch, i });
+    return true;
+  }
+  function tickNews(dt) {
+    if (S.decree) {
+      S.decree.t -= dt;
+      if (S.decree.t <= 0) { const d = S.decree; S.decree = null; emit('decreeover', { decree: d }); }
+    }
+    if (S.news || !S.company.done) return;
+    S.newsT -= dt;
+    if (S.newsT <= 0) { S.newsT = ECON.newsEvery; openNews(); }
+  }
+
   /* ---------- master tick ---------- */
   function tick(dt) {
     tickMama(dt);
@@ -4093,6 +4173,7 @@ const GAME = (() => {
     tickRecruit(dt);
     tickBees(dt);
     tickTraffic(dt);
+    tickNews(dt);
     tickOrders(dt);
     moversTick(dt);
     tickQuests();
@@ -4442,6 +4523,7 @@ const GAME = (() => {
     orderAt, orderSpots, giveEgg, basketToOrder, maxOrders, orderWait,
     billboardPull, billboardArt, setBillboardArt,
     boss, bossSay, bossTap, bossAt, bossGo,
+    openNews, chooseNews, newsAfford, rollEvent,
     digAt, bugAt, catchBug, spawnBug, scatterBugs, sellJar, jarCount, jarValue, nearestBug,
     get passers() { return passers; },
     get bugs() { return S.bugs; }, get bugjar() { return S.bugjar; },

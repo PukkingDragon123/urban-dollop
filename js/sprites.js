@@ -4063,16 +4063,23 @@ const SPR = (() => {
      caller flips them to walk the other way. Same rules as the rest
      of the farm: outline all round, a lit top, a dark belly.
      ============================================================ */
+  /* ============================================================
+     THE LIVESTOCK - the ones on four legs. Drawn to the same rules
+     as the founder and his crew: a heavy outline all the way round,
+     a head bigger than it has any business being, a pale muzzle, a
+     white eye with a pupil in it, and the light coming from above
+     so the barrel has some volume to it. Two frames of walk.
+     ============================================================ */
   const CRITTERS = {
-    cow:   { w: 22, h: 15, body: '#f2ece2', spot: '#3a3028', leg: '#d8d0c4', ear: '#e8b0b8' },
-    sheep: { w: 20, h: 14, body: '#f2eee6', spot: '#e0d8c8', leg: '#3a3430', ear: '#3a3430' },
-    pig:   { w: 20, h: 13, body: '#f0a8b0', spot: '#d88a94', leg: '#d88a94', ear: '#f8c0c8' },
-    goat:  { w: 19, h: 14, body: '#e8dcc0', spot: '#c9b898', leg: '#a89878', ear: '#c9b898' },
-    duck:  { w: 14, h: 12, body: '#fff8ec', spot: '#e8dcc0', leg: '#f0a422', ear: '#f0a422' },
-    dog:   { w: 17, h: 12, body: '#c9924f', spot: '#8a5e2a', leg: '#a8783f', ear: '#6e4a20' },
+    cow:   { w: 26, h: 18, body: '#f2ece2', spot: '#3a3028', leg: '#d8d0c4', ear: '#e8b0b8', muz: '#f0c0c4' },
+    sheep: { w: 24, h: 17, body: '#f4f0e8', spot: '#ded6c6', leg: '#3a3430', ear: '#3a3430', muz: '#4a443e' },
+    pig:   { w: 23, h: 16, body: '#f0a8b0', spot: '#d88a94', leg: '#d88a94', ear: '#f8c0c8', muz: '#f8c0c8' },
+    goat:  { w: 23, h: 17, body: '#e8dcc0', spot: '#c9b898', leg: '#a89878', ear: '#c9b898', muz: '#f4ecd8' },
+    duck:  { w: 15, h: 13, body: '#fff8ec', spot: '#e8dcc0', leg: '#f0a422', ear: '#f0a422', muz: '#f0a422' },
+    dog:   { w: 21, h: 15, body: '#c9924f', spot: '#8a5e2a', leg: '#a8783f', ear: '#6e4a20', muz: '#e8d0a8' },
   };
   function critterSprite(kind, frame, scale) {
-    const key = 'crit_' + kind + '_' + frame + '_' + scale;
+    const key = 'crit2_' + kind + '_' + frame + '_' + scale;
     if (cache.has(key)) return cache.get(key);
     const C = CRITTERS[kind] || CRITTERS.cow;
     const k = scale || 1;
@@ -4080,78 +4087,109 @@ const SPR = (() => {
     const ctx = c.getContext('2d');
     const R = (x, y, w, h, col) => { if (!col) return; ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
     const OUT = '#241a14';
-    const body = C.body, lit = lighten(body, 0.3), dk = darken(body, 0.22), spot = C.spot;
+    const body = C.body, lit = lighten(body, 0.26), dk = darken(body, 0.2), deep = darken(body, 0.36);
+    const spot = C.spot;
     const f = frame ? 1 : 0;
+    const done = () => { cache.set(key, c); return c; };
+    /* the eye every one of them shares: a white with a pupil low in it */
+    const eye = (x, y) => { R(x, y, 2, 2, '#ffffff'); R(x + (kind === 'dog' ? 1 : 0), y + 1, 1, 1, '#14141a'); };
 
     if (kind === 'duck') {
-      /* a duck: round body, tucked wing, orange bill and paddling feet */
-      R(3, 3, 8, 1, OUT); R(2, 4, 10, 4, OUT); R(3, 8, 8, 1, OUT);
-      R(3, 4, 8, 4, body); R(3, 4, 7, 1, lit); R(3, 7, 8, 1, dk);
-      R(4, 5, 4, 2, spot);                                  /* the folded wing */
-      R(2, 1, 4, 1, OUT); R(1, 2, 5, 2, OUT);
-      R(2, 2, 4, 2, body); R(2, 2, 3, 1, lit);
-      R(2, 2, 1, 1, OUT);                                   /* the eye */
-      R(0, 3, 2, 1, C.leg); R(0, 3, 1, 1, lighten(C.leg, 0.4));
-      R(f ? 4 : 6, 9, 2, 1, C.leg); R(f ? 8 : 7, 9, 2, 1, C.leg);
+      /* a duck: a round body with a tucked wing, a bill and paddling feet */
+      R(4, 3, 8, 1, OUT); R(3, 4, 10, 1, OUT); R(2, 5, 12, 4, OUT); R(3, 9, 10, 1, OUT); R(4, 10, 8, 1, OUT);
+      R(4, 4, 8, 1, lit);
+      R(3, 5, 10, 3, body);
+      R(3, 5, 9, 1, lit);
+      R(4, 8, 8, 1, dk);
+      R(4, 9, 7, 1, deep);
+      R(5, 6, 5, 2, spot); R(5, 6, 4, 1, lighten(spot, 0.3));    /* the folded wing */
+      /* the head, high and round on a short neck */
+      R(2, 0, 5, 1, OUT); R(1, 1, 7, 4, OUT);
+      R(2, 1, 5, 3, body); R(2, 1, 4, 1, lit); R(2, 3, 5, 1, dk);
+      eye(3, 2);
+      R(0, 2, 2, 2, OUT); R(0, 2, 2, 1, C.leg); R(0, 3, 1, 1, darken(C.leg, 0.25));   /* the bill */
+      R(f ? 4 : 6, 11, 3, 1, C.leg); R(f ? 9 : 8, 11, 3, 1, darken(C.leg, 0.2));
       return done();
     }
-    /* everything else: a barrel body on four legs with a head at the left */
-    const bw = C.w - 6, by = 3;
-    R(3, by - 1, bw, 1, OUT);
-    R(2, by, bw + 2, 5, OUT);
-    R(3, by + 5, bw, 1, OUT);
-    R(3, by, bw, 1, lit);
-    R(3, by + 1, bw, 3, body);
-    R(3, by + 4, bw, 1, dk);
-    /* markings */
-    if (kind === 'cow') { R(6, by + 1, 4, 3, spot); R(12, by + 2, 3, 2, spot); R(4, by + 3, 2, 1, spot); }
-    if (kind === 'sheep') { for (let i = 0; i < 5; i++) R(4 + i * 3, by + (i % 2), 2, 2, spot); }
-    if (kind === 'pig') { R(5, by + 2, 3, 1, spot); R(11, by + 1, 2, 2, spot); }
-    if (kind === 'goat') { R(4, by + 3, bw - 6, 1, spot); }
-    if (kind === 'dog') { R(4, by + 1, 4, 2, spot); R(11, by + 3, 3, 1, spot); }
-    /* legs, front pair and back pair swapping with the frame */
-    const legY = by + 6, legH = C.h - legY - 1;
-    const fx = f ? 4 : 3, bx = f ? C.w - 9 : C.w - 8;
-    R(fx, legY, 2, legH, C.leg); R(fx, legY + legH - 1, 2, 1, OUT);
-    R(fx + 3, legY, 2, legH - 1, darken(C.leg, 0.2)); R(fx + 3, legY + legH - 2, 2, 1, OUT);
-    R(bx, legY, 2, legH - 1, darken(C.leg, 0.2)); R(bx, legY + legH - 2, 2, 1, OUT);
-    R(bx - 3, legY, 2, legH, C.leg); R(bx - 3, legY + legH - 1, 2, 1, OUT);
-    /* head at the left, on a short neck */
-    const hy = kind === 'goat' || kind === 'dog' ? 1 : 2;
-    R(1, hy, 5, 1, OUT); R(0, hy + 1, 7, 4, OUT);
-    R(1, hy + 1, 5, 3, body);
-    R(1, hy + 1, 5, 1, lit);
-    R(1, hy + 3, 5, 1, dk);
-    R(2, hy + 2, 1, 1, OUT);                                /* the eye */
-    R(0, hy + 2, 1, 2, kind === 'pig' ? C.ear : darken(body, 0.1));  /* the muzzle */
-    if (kind === 'pig') { R(0, hy + 2, 1, 1, OUT); }
-    /* ears, horns and tails per animal */
+
+    /* ---- the four-legged ones: a barrel, four legs and a big head ---- */
+    const bw = C.w - 10, bx0 = 8, by = 5;
+    R(bx0 + 1, by - 1, bw - 2, 1, OUT);
+    R(bx0, by, bw, 1, OUT);
+    R(bx0 - 1, by + 1, bw + 2, 5, OUT);
+    R(bx0, by + 6, bw, 1, OUT);
+    R(bx0 + 1, by + 7, bw - 2, 1, OUT);
+    R(bx0 + 1, by, bw - 2, 1, lit);
+    R(bx0, by + 1, bw, 1, lit);
+    R(bx0, by + 2, bw, 3, body);
+    R(bx0, by + 5, bw, 1, dk);
+    R(bx0 + 1, by + 6, bw - 2, 1, deep);
+    /* markings, each one its own */
+    if (kind === 'cow') { R(bx0 + 1, by + 1, 4, 3, spot); R(bx0 + 7, by + 3, 4, 2, spot); }
+    if (kind === 'sheep') { for (let i = 0; i < 4; i++) { R(bx0 + i * 3, by + (i % 2), 3, 3, lit); R(bx0 + i * 3, by + (i % 2), 2, 1, '#ffffff'); } }
+    if (kind === 'pig') { R(bx0 + 1, by + 3, 3, 1, spot); R(bx0 + 6, by + 1, 3, 2, spot); }
+    if (kind === 'goat') { R(bx0, by + 4, bw - 3, 1, spot); R(bx0 + 5, by + 1, 3, 2, spot); }
+    if (kind === 'dog') { R(bx0, by + 1, 4, 3, spot); R(bx0 + 6, by + 4, 4, 1, spot); }
+    /* four legs: the near pair solid, the far pair in shade and a step
+       behind, each pair swapping which one is lifted with the frame */
+    const legY = by + 8, legH = C.h - legY - 1;
+    const leg = (x, dark, lift) => {
+      const h = legH - (lift ? 1 : 0);
+      R(x - 1, legY, 4, h, OUT);
+      R(x, legY, 2, h - 1, dark ? darken(C.leg, 0.3) : C.leg);
+      R(x, legY, 2, 1, dark ? C.leg : lighten(C.leg, 0.3));
+      R(x - 1, legY + h - 1, 4, 1, OUT);
+      R(x, legY + h - 1, 2, 1, darken(C.leg, 0.5));          /* the hoof */
+    };
+    leg(bx0 + 4, true, !f);                 /* far front  */
+    leg(C.w - 6, true, f);                  /* far back   */
+    leg(bx0 + 1, false, f);                 /* near front */
+    leg(C.w - 9, false, !f);                /* near back  */
+    /* the neck, tucked in under the shoulder */
+    R(5, by + 1, 4, 5, OUT);
+    R(6, by + 2, 3, 3, body);
+    R(6, by + 2, 3, 1, lit);
+    /* the head, big and round, out in front of it */
+    const hy = kind === 'goat' || kind === 'dog' ? 0 : 1;
+    R(2, hy, 5, 1, OUT); R(1, hy + 1, 7, 1, OUT); R(0, hy + 2, 9, 4, OUT); R(1, hy + 6, 7, 1, OUT);
+    R(2, hy + 1, 5, 1, lit);
+    R(1, hy + 2, 7, 3, body);
+    R(1, hy + 2, 6, 1, lit);
+    R(1, hy + 5, 7, 1, dk);
+    eye(2, hy + 2);
+    /* a pale muzzle with a nostril in it, the way the founder wears his */
+    R(0, hy + 4, 4, 2, OUT);
+    R(0, hy + 4, 3, 2, C.muz);
+    R(0, hy + 4, 3, 1, lighten(C.muz, 0.28));
+    R(1, hy + 5, 1, 1, darken(C.muz, 0.5));
+    /* ears, horns, tails */
     if (kind === 'cow') {
-      R(4, hy - 1, 1, 1, OUT); R(5, hy - 2, 1, 2, C.ear);
-      R(1, hy - 1, 2, 1, '#e8dcc0');                        /* a horn stub */
-      R(C.w - 3, by, 1, 4, dk); R(C.w - 3, by + 4, 1, 2, OUT);  /* the tail */
-      R(C.w - 4, by + 5, 2, 1, '#3a3028');
+      R(6, hy + 1, 3, 2, OUT); R(6, hy + 1, 2, 1, C.ear);
+      R(2, hy - 1, 1, 1, OUT); R(3, hy - 2, 2, 2, OUT); R(3, hy - 2, 2, 1, '#efe6cc');
+      R(C.w - 2, by + 1, 2, 4, OUT); R(C.w - 2, by + 1, 1, 3, dk);
+      R(C.w - 3, by + 5, 3, 2, OUT); R(C.w - 3, by + 5, 2, 1, '#3a3028');
     } else if (kind === 'sheep') {
-      R(5, hy, 2, 1, C.ear);
-      for (let i = 0; i < 3; i++) R(2 + i * 2, hy - 1, 2, 1, lighten(body, 0.4));
-      R(C.w - 3, by + 1, 1, 2, lighten(body, 0.4));
+      R(6, hy + 2, 3, 2, OUT); R(6, hy + 2, 2, 1, C.ear);
+      for (let i = 0; i < 3; i++) { R(1 + i * 2, hy - 1, 3, 2, OUT); R(1 + i * 2, hy - 1, 2, 1, '#ffffff'); }
+      R(C.w - 2, by + 2, 2, 3, OUT); R(C.w - 2, by + 2, 2, 2, lit);
     } else if (kind === 'pig') {
-      R(4, hy - 1, 2, 1, C.ear);
-      R(C.w - 3, by, 1, 1, C.leg); R(C.w - 2, by + 1, 1, 1, C.leg); R(C.w - 3, by + 2, 1, 1, C.leg);
+      R(4, hy - 1, 3, 2, OUT); R(4, hy - 1, 2, 1, C.ear);
+      R(C.w - 2, by + 1, 2, 1, OUT); R(C.w - 1, by + 2, 2, 1, OUT); R(C.w - 2, by + 3, 2, 1, OUT);
+      R(C.w - 2, by + 1, 1, 1, C.leg); R(C.w - 1, by + 2, 1, 1, C.leg);
     } else if (kind === 'goat') {
-      R(3, hy - 2, 1, 2, '#e8dcc0'); R(4, hy - 3, 1, 2, '#e8dcc0');   /* horns */
-      R(1, hy + 4, 2, 1, '#e8dcc0');                                  /* beard */
-      R(C.w - 3, by, 1, 3, dk);
+      R(3, hy - 3, 2, 4, OUT); R(3, hy - 3, 1, 3, '#efe6cc');
+      R(5, hy - 4, 2, 4, OUT); R(5, hy - 4, 1, 3, '#efe6cc');
+      R(6, hy + 2, 3, 2, OUT); R(6, hy + 2, 2, 1, C.ear);
+      R(0, hy + 6, 3, 2, OUT); R(0, hy + 6, 2, 1, '#efe6cc');              /* the beard */
+      R(C.w - 2, by, 2, 4, OUT); R(C.w - 2, by, 1, 3, dk);
     } else if (kind === 'dog') {
-      R(5, hy - 1, 2, 2, C.ear);
-      R(C.w - 3, by - 1 - f, 1, 3, C.leg); R(C.w - 4, by - 2 - f, 1, 1, C.leg);  /* a wagging tail */
+      R(6, hy, 3, 4, OUT); R(6, hy, 2, 3, C.ear);                          /* a flopped ear */
+      R(C.w - 2, by - 1 - f, 2, 4, OUT); R(C.w - 2, by - 1 - f, 1, 3, C.leg);
+      R(1, hy + 1, 3, 1, lighten(body, 0.4));                              /* a pale brow */
     }
     return done();
-
-    function done() { cache.set(key, c); return c; }
   }
 
-  /* produce: a 10x10 tile per crop's harvest */
   function produceSprite(id, scale) {
     const key = 'prod_' + id + '_' + scale;
     if (cache.has(key)) return cache.get(key);

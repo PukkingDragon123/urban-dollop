@@ -4888,6 +4888,7 @@
         const sb = document.createElement('b'); sb.textContent = txt; el.skyPill.appendChild(sb);
       }
     }
+    renderDecree();
     /* a number that just changed pops - measured on the target, so the
        punch lands when the money arrives and not on every rolling frame */
     [[el.coins, S().coins], [el.feathers, S().feathers]].forEach(([node, v]) => {
@@ -5174,6 +5175,7 @@
     renderToolbelt(); renderPalette(); updateCursorChip();
     GAME.clampCam();
     questSig = '';
+    restoreNews();
   }
 
   /* ================= THE INTRO =================
@@ -9674,6 +9676,29 @@
         break;
       }
       case 'mute': GAME.setSetting('sound', !GAME.setting('sound')); break;
+      case 'news-pick': {
+        const i = +btn.dataset.i;
+        const cur = S().news && EVENT_BY_ID[S().news.id];
+        if (!cur || !GAME.newsAfford(cur, i)) { snd.error(); break; }
+        const ch = cur.choices[i];
+        snd.grand();
+        closeNews(() => {
+          GAME.chooseNews(i);
+          const fx = ch.fx || {};
+          const b = GAME.boss();
+          if (b) {
+            if (fx.coins > 0) coinBurst(b.x + 11, b.y - 4, 10);
+            if (fx.feathers > 0) twinkles(b.x + 11, b.y, 8, '#fff8ec', 20);
+            if (fx.coins < 0 || fx.feathers < 0) puff(b.x + 11, b.y + 4, '#8a8f98', 8, 22, 18);
+          }
+          if (fx.decree && b) {
+            wordPop(b.x + 11, b.y - 24, fx.decree.name, (fx.decree.pay || 1) >= 1 ? '#7fd14f' : '#e0432c');
+            flash(fx.decree.pay >= 1 ? '#fff3c4' : '#ffb0a0', 0.12, 0.24);
+            shake(1.1, 0.22);
+          }
+        });
+        break;
+      }
       case 'save': GAME.save(); floatText('SAVED', ev.clientX - 20, ev.clientY - 24, 'green'); break;
       case 'reset':
         if (confirm('Reset everything? The chickens will write memoirs.')) {
@@ -9683,7 +9708,115 @@
     }
   });
 
+  /* ============================================================
+     THE CHRONICLE
+     The valley's opinion of you, delivered the way opinions used
+     to be: a newspaper spinning in out of nowhere, landing crooked,
+     settling, and waiting. The cut is a real sprite from the game,
+     the columns are set in the game's own face, and the two ways
+     out of it are printed at the foot. Nothing else can be done
+     until one is picked - and the front page does not go away on
+     its own, so nobody misses one.
+     ============================================================ */
+  const NEWS_CUT = {
+    doc: () => SPR.folkSprite({ species: 'badger', shirt: '#8a8f98', pants: '#3a3a4a', boot: '#2e2216', hat: 'cap' }, 0, 4),
+    hands: () => SPR.folkSprite({ species: 'otter', shirt: '#f0a422', pants: '#4a5a7a', boot: '#3a2a16' }, 1, 4),
+    fence: () => SPR.decoSprite('bush', 4, 12),
+    truck: () => SPR.vehicleSprite ? SPR.carSprite('van', '#e8542f', 0, 3) : SPR.carSprite('van', '#e8542f', 0, 3),
+    coin: () => SPR.iconSprite('coin', 6),
+    skull: () => SPR.raccoonSprite('boss', 2, { hat: 'hat_top', suit: 'suit_black' }, 'smug'),
+    flag: () => SPR.folkSprite({ species: 'hare', shirt: '#e8542f', pants: '#2f5f9e', boot: '#2e2216' }, 0, 4),
+    wrench: () => SPR.critterSprite('goat', 0, 5),
+    robot: () => SPR.botSprite('tech', 0, 4),
+    quest: () => SPR.raccoonSprite('read', 2, { hat: 'hat_top' }, 'wow'),
+    cloud: () => SPR.plumeSprite(8),
+    map: () => SPR.carSprite('lorry', '#3fa7d6', 0, 3),
+  };
+  function newsCut(icon) {
+    try { const f = NEWS_CUT[icon]; if (f) { const c = f(); if (c) return c; } } catch (e) { /* fall through */ }
+    return SPR.iconSprite(icon || 'quest', 6);
+  }
+  let newsOpen = false;
+  function renderNews(ev) {
+    const sheet = $('#news-sheet');
+    $('#news-name').textContent = NEWS_PAPER;
+    $('#news-ear-r').textContent = 'DAY ' + S().day;
+    $('#news-head').textContent = ev.head;
+    $('#news-sub').textContent = ev.sub;
+    const cut = $('#news-cut');
+    cut.innerHTML = '';
+    cut.appendChild(newsCut(ev.icon));
+    const cols = $('#news-cols');
+    cols.innerHTML = '';
+    ((S().news && S().news.filler) || NEWS_FILLER.slice(0, 3)).forEach(t => {
+      const para = document.createElement('p');
+      para.textContent = t;
+      cols.appendChild(para);
+    });
+    const picks = $('#news-choices');
+    picks.innerHTML = '';
+    ev.choices.forEach((ch, i) => {
+      const b = document.createElement('button');
+      b.className = 'news-pick';
+      b.dataset.act = 'news-pick';
+      b.dataset.i = String(i);
+      b.appendChild(document.createTextNode(ch.label));
+      const sub = document.createElement('span');
+      sub.className = 'np-blurb';
+      sub.textContent = ch.blurb || '';
+      b.appendChild(sub);
+      const cost = ch.cost || {};
+      if (cost.coins || cost.feathers) {
+        const cs = document.createElement('span');
+        cs.className = 'np-cost';
+        cs.textContent = 'COSTS ' + (cost.coins ? GAME.fmt(cost.coins) + ' COINS' : '')
+                       + (cost.coins && cost.feathers ? ' + ' : '')
+                       + (cost.feathers ? cost.feathers + ' FEATHERS' : '');
+        b.appendChild(cs);
+      }
+      if (!GAME.newsAfford(ev, i)) b.disabled = true;
+      picks.appendChild(b);
+    });
+    sheet.classList.remove('news-out');
+    /* restart the spin even if the sheet is already in the DOM */
+    void sheet.offsetWidth;
+    openModal('#modal-news');
+    newsOpen = true;
+  }
+  function closeNews(then) {
+    const sheet = $('#news-sheet');
+    sheet.classList.add('news-out');
+    newsOpen = false;
+    setTimeout(() => { $('#modal-news').hidden = true; sheet.classList.remove('news-out'); if (then) then(); }, 420);
+  }
+
   /* ================= GAME EVENT FX ================= */
+  function renderDecree() {
+    const pill = $('#pill-decree');
+    if (!pill) return;
+    const d = S().decree;
+    if (!d || d.t <= 0) { pill.hidden = true; return; }
+    pill.hidden = false;
+    pill.classList.toggle('bad', (d.pay || 1) < 1);
+    $('#r-decree').textContent = d.name + ' ' + Math.ceil(d.t) + 'S';
+  }
+  /* a front page nobody answered survives a save: put it back up */
+  function restoreNews() {
+    const n = S().news;
+    if (!n) { if (newsOpen) { $('#modal-news').hidden = true; newsOpen = false; } return; }
+    const ev = EVENT_BY_ID[n.id];
+    if (ev) renderNews(ev);
+  }
+  GAME.on('news', ({ ev }) => {
+    /* stop whatever the camera was doing and put the paper on screen */
+    closeModals();
+    snd.grand();
+    renderNews(ev);
+    shake(1.6, 0.3);
+  });
+  GAME.on('newsdone', ({ choice }) => { renderDecree(); });
+  GAME.on('decreeover', () => { renderDecree(); });
+
   let lastMutToast = 0;
   GAME.on('lay', ({ egg, mutated, fromPet }) => {
     if (fromPet) snd.lay();
