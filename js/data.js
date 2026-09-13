@@ -1826,13 +1826,13 @@ const ACHIEVEMENTS = [
 const ACH_BY_ID = Object.fromEntries(ACHIEVEMENTS.map(a => [a.id, a]));
 
 /* ---- settings and slots ---- */
-const SETTINGS_DEFAULT = { sound:true, volume:0.7, news:false, shake:true, dayNight:true, particles:true, bigUI:false, showFps:false, autosave:true };
+const SETTINGS_DEFAULT = { sound:true, music:true, volume:0.7, news:false, shake:true, dayNight:true, particles:true, bigUI:false, showFps:false, autosave:true };
 const SAVE_SLOTS = 3;
 
 /* ---- the founder's sequence on the main menu: what he sings while he does it ---- */
 const MENU_ACTS = [
-  { id:'dance',  secs:5.0, line:'HOW BAD CAN I POSSIBLY BE?' },
-  { id:'chop',   secs:4.2, line:'I\'M JUST BUILDING THE ECONOMY' },
-  { id:'build',  secs:4.6, line:'A LITTLE SMOKE NEVER HURT ANYONE' },
-  { id:'punch',  secs:3.6, line:'ALL THE CHICKENS WORK FOR ME' },
+  { id:'dance',  secs:5.0, line:'I AM ONLY AS BAD AS THE MARKET' },
+  { id:'chop',   secs:4.2, line:'EVERY TREE IS A CHAIR IN WAITING' },
+  { id:'build',  secs:4.6, line:'THE SMOKE MEANS IT IS WORKING' },
+  { id:'punch',  secs:3.6, line:'AND EVERY HEN IS ON THE PAYROLL' },
 ];

@@ -1091,7 +1091,9 @@ window.MENU = (() => {
 
   /* ================= the DOM screens this front of house owns ================= */
   const SETTING_NAMES = {
-    sound: ['SOUND', 'Every beep, cluck and clink.'], volume: ['VOLUME', ''],
+    sound: ['SOUND', 'Every beep, cluck and clink.'],
+    music: ['MUSIC', 'The band. A strut for the menu, something slower for the valley.'],
+    volume: ['VOLUME', ''],
     news: ['NEWS CARDS', 'Little cards in the corner for every event. Off by default; the work orders carry the news.'],
     shake: ['READOUT POP', 'Figures flick when they change.'],
     dayNight: ['DAY AND NIGHT', 'Dawn, dusk, night and lamps over the valley.'],
@@ -1209,7 +1211,16 @@ window.MENU = (() => {
       const btn = ev.target.closest('[data-act]');
       if (!btn || btn.disabled) return;
       switch (btn.dataset.act) {
-        case 'set-toggle': GAME.setSetting(btn.dataset.k, !GAME.setting(btn.dataset.k)); UI.snd.plop(); renderSettings(); break;
+        case 'set-toggle': {
+          const k = btn.dataset.k;
+          GAME.setSetting(k, !GAME.setting(k)); UI.snd.plop(); renderSettings();
+          /* the band starts and stops the moment you ask it to */
+          if (k === 'music' || k === 'sound') {
+            if (GAME.setting('music') && GAME.setting('sound')) MUSIC.play(UI.titleHidden ? 'valley' : 'strut');
+            else MUSIC.stop(false);
+          }
+          break;
+        }
         case 'wear': if (GAME.wearCosmetic(btn.dataset.id)) { UI.snd.sparkle(); renderWardrobe(); } else UI.snd.error(); break;
       }
     });

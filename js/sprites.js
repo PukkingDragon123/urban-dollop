@@ -2270,49 +2270,51 @@ const SPR = (() => {
   function droidSprite(look, frame, scale) {
     const L = look || {};
     const shell = L.shirt || '#9aa6b4', trim = L.pants || '#3fa7d6', skirt = L.boot || '#3a3f4a';
-    const key = 'droid_' + [shell, trim, skirt].join('|') + '_' + frame + '_' + scale;
+    const key = 'droid2_' + [shell, trim, skirt].join('|') + '_' + frame + '_' + scale;
     if (cache.has(key)) return cache.get(key);
     const k = scale || 1;
-    const c = newCanvas(12 * k, 18 * k);
+    const c = newCanvas(CREW_W * k, CREW_H * k);
     const ctx = c.getContext('2d');
     ctx.imageSmoothingEnabled = false;
-    const R = (x, y, w, h, col) => { if (!col) return; ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
+    const R = (x, y, w, h, cc) => { if (!cc) return; ctx.fillStyle = cc; ctx.fillRect(x * k, y * k, w * k, h * k); };
     const OUT = '#221a26';
-    const lite = lighten(shell, 0.38), shade = darken(shell, 0.26);
+    const lite = lighten(shell, 0.38), shade = darken(shell, 0.26), deep = darken(shell, 0.44);
     const f = frame ? 1 : 0;
     const b = f;                       /* the whole machine rides up a pixel */
 
     /* antenna, with a lamp on the end of it */
-    R(5, 1 + b, 1, 3, OUT);
-    R(4, 0 + b, 3, 2, OUT); R(5, 0 + b, 1, 1, lighten(trim, 0.5));
+    R(8, 1 + b, 2, 4, OUT);
+    R(7, 0 + b, 4, 2, OUT); R(8, 0 + b, 2, 1, lighten(trim, 0.5));
 
-    /* head: a box with a wide visor and two eye lamps in it */
-    R(2, 3 + b, 8, 6, OUT);
-    R(3, 4 + b, 6, 4, shell);
-    R(3, 4 + b, 6, 1, lite);
-    R(3, 7 + b, 6, 1, shade);
-    R(3, 5 + b, 6, 2, '#121820');
-    R(4, 5 + b, 2, 1, trim);
-    R(7, 5 + b, 1, 1, lighten(trim, 0.45));
+    /* the head: a box with a wide visor and two eye lamps in it */
+    R(3, 4 + b, 12, 8, OUT);
+    R(4, 5 + b, 10, 6, shell);
+    R(4, 5 + b, 10, 1, lite);
+    R(4, 10 + b, 10, 1, shade);
+    R(4, 6 + b, 10, 3, '#121820');
+    R(5, 7 + b, 3, 1, trim);
+    R(11, 7 + b, 2, 1, lighten(trim, 0.45));
+    R(5, 6 + b, 4, 1, 'rgba(255,255,255,.16)');
 
-    /* body: a barrel with a lamp on the chest of it */
-    R(3, 9 + b, 6, 6, OUT);
-    R(4, 9 + b, 4, 5, shell);
-    R(4, 9 + b, 4, 1, lite);
-    R(4, 13 + b, 4, 1, shade);
-    R(5, 11 + b, 2, 2, trim);
-    R(5, 11 + b, 1, 1, lighten(trim, 0.45));
+    /* the body: a barrel with a lamp on the chest of it */
+    R(4, 12 + b, 10, 8, OUT);
+    R(5, 12 + b, 8, 7, shell);
+    R(5, 12 + b, 8, 1, lite);
+    R(5, 18 + b, 8, 1, shade);
+    R(7, 14 + b, 4, 3, trim);
+    R(7, 14 + b, 2, 1, lighten(trim, 0.45));
+    R(6, 16 + b, 1, 1, deep); R(11, 16 + b, 1, 1, deep);
 
     /* arms, swinging the way a walker's would */
-    R(2, 10 + b + f, 1, 4, shell); R(9, 11 + b - f, 1, 4, shell);
-    R(2, 13 + b + f, 1, 1, trim);  R(9, 14 + b - f, 1, 1, trim);
+    R(2, 13 + b + f, 2, 5, OUT);   R(14, 14 + b - f, 2, 5, OUT);
+    R(2, 13 + b + f, 2, 4, shell); R(14, 14 + b - f, 2, 4, shell);
+    R(2, 17 + b + f, 2, 1, trim);  R(14, 18 + b - f, 2, 1, trim);
 
     /* no legs at all: a skirt of air, and its glow on the ground */
-    R(3, 15 + b, 6, 1, OUT);
-    R(4, 15 + b, 4, 1, skirt);
-    R(3, 16 + b, 6, 1, 'rgba(140,236,255,.62)');
-    R(4, 16 + b, 4, 1, 'rgba(200,246,255,.72)');
-    R(4, 17, 4, 1, 'rgba(127,232,255,.30)');
+    R(4, 20 + b, 10, 1, OUT);
+    R(5, 20 + b, 8, 1, skirt);
+    R(4, 21 + b - 1, 10, 1, 'rgba(140,236,255,.62)');
+    R(5, 21, 8, 1, 'rgba(200,246,255,.45)');
     cache.set(key, c);
     return c;
   }
@@ -2666,31 +2668,40 @@ const SPR = (() => {
      wider than the body, an ear at each top corner, a mask of two patches
      either side of a pale blaze, a small eye with a pupil in each, and a
      pale muzzle with a nose bar under them. */
+  const CREW_W = 18, CREW_H = 22;
   const CREW_ROWS = [
-    'oggo....oggo',
-    'ogpoooooopgo',
-    'ogoGGWWGGogo',
-    '.okkkWWkkko.',
-    'ogwwkWWkwwgo',
-    'ogwekWWkewgo',
-    'ogkkkWWkkkgo',
-    'ocGWWWWWWGco',
-    '.oGGWnnWGGo.',
-    '..oGWWWWGo..',
-    '..oHHHHHHo..',
-    '..ohhhhhho..',
-    '..ohhhhhho..',
-    '..ojjjjjjo..',
+    '.ooggooooooooggoo.',
+    '.ogppgoGGGGogppgo.',
+    '.ogppgGGWWGGgppgo.',
+    '.ookkkkkWWkkkkkoo.',
+    '..okwwwkWWkwwwko..',
+    '..okwewkWWkwewko..',
+    '..okkkkkWWkkkkko..',
+    '..ogWWWWWWWWWWgo..',
+    '..oogWWWnnWWWgoo..',
+    '...ogWWWWWWWWgo...',
+    '...oogWWWWWWgoo...',
+    '....oooddddooo....',
+    '....oHHHHHHHHo....',
+    '...ohhhHHHHhhho...',
+    '...ohhyHHHHyhho...',
+    '...ohhhHHHHhhho...',
+    '...ojjjjjjjjjjo...',
+    '....oUuuooUuuo....',
+    '....ouuuoouuuo....',
+    '...obbbboobbbbo...',
+    '...obbbboobbbbo...',
+    '...oooooooooooo...',
   ];
   function animalStaffSprite(species, look, frame, scale) {
     const A = ANIMALS[species] || ANIMALS.fox;
     const P = animalPal(species);
     const L = look || {};
     const shirt = L.shirt || '#5fa8e8', pants = L.pants || '#6e4a20', boot = L.boot || '#3a2a16';
-    const key = 'anst2_' + species + '_' + [shirt, pants, boot, L.hat].join('|') + '_' + frame + '_' + scale;
+    const key = 'anst3_' + species + '_' + [shirt, pants, boot, L.hat].join('|') + '_' + frame + '_' + scale;
     if (cache.has(key)) return cache.get(key);
     const k = scale || 1;
-    const c = newCanvas(12 * k, 18 * k);
+    const c = newCanvas(CREW_W * k, CREW_H * k);
     const ctx = c.getContext('2d');
     ctx.imageSmoothingEnabled = false;
     const R = (x, y, w, h, col) => { if (!col) return; ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
@@ -2698,42 +2709,45 @@ const SPR = (() => {
     const f = frame ? 1 : 0;
 
     /* ---- the tail, behind everything, ringed if the species has rings ---- */
-    R(0, 11, 2, 5, OUT);
-    R(0, 12, 2, 3, P.T);
-    if (A.rings) R(0, 13, 2, 1, P.t);
-    if (A.tip) R(0, 11, 2, 1, A.tip);
+    R(0, 13, 3, 6, OUT);
+    R(0, 14, 3, 4, P.T);
+    if (A.rings) R(0, 15, 3, 1, P.t);
+    if (A.tip) R(0, 13, 3, 1, A.tip);
 
-    /* ---- head, face and body in one grid, clothes folded into the palette ---- */
+    /* ---- head, face, shirt and dungarees in one grid ---- */
     const PAL = Object.assign({}, P, {
       h: shirt, H: lighten(shirt, 0.3), j: darken(shirt, 0.25),
+      u: pants, U: lighten(pants, 0.22), b: boot, y: '#ffd23f',
     });
     drawGrid(ctx, CREW_ROWS, PAL, 0, 0, k);
 
-    /* there is no headroom on this frame, so a hare gets ears that are
-       bigger and swept out rather than ears that are taller */
+    /* a hare's ears are bigger and swept out - there is no headroom
+       on this frame for ears that are taller */
     if (A.ears === 'long') {
-      R(0, 0, 4, 3, OUT); R(8, 0, 4, 3, OUT);
-      R(0, 0, 3, 2, P.g); R(9, 0, 3, 2, P.g);
-      R(1, 1, 2, 1, P.p); R(9, 1, 2, 1, P.p);
+      R(0, 0, 5, 3, OUT); R(13, 0, 5, 3, OUT);
+      R(0, 0, 4, 2, P.g); R(14, 0, 4, 2, P.g);
+      R(1, 1, 2, 1, P.p); R(15, 1, 2, 1, P.p);
     }
 
     /* ---- arms, swinging out of the sleeves ---- */
-    R(2, 10 + f, 1, 4, OUT);      R(9, 11 - f, 1, 4, OUT);
-    R(2, 10 + f, 1, 3, shirt);    R(9, 11 - f, 1, 3, shirt);
-    R(2, 13 + f, 1, 1, P.G);      R(9, 14 - f, 1, 1, P.G);
+    R(3, 12 + f, 2, 5, OUT);       R(13, 13 - f, 2, 5, OUT);
+    R(3, 12 + f, 2, 4, shirt);     R(13, 13 - f, 2, 4, shirt);
+    R(3, 12 + f, 2, 1, lighten(shirt, 0.3)); R(13, 13 - f, 2, 1, lighten(shirt, 0.3));
+    R(3, 16 + f, 2, 1, P.G);       R(13, 17 - f, 2, 1, P.G);
 
-    /* ---- legs and boots ---- */
-    R(3, 14, 2, 3, pants); R(7, 14, 2, 3, pants);
-    R(3, 14, 1, 3, lighten(pants, 0.2)); R(7, 14, 1, 3, lighten(pants, 0.2));
-    R(2, 14, 1, 3, OUT); R(5, 14, 2, 3, OUT); R(9, 14, 1, 3, OUT);
-    R(3 - f, 17, 3, 1, boot);
-    R(7 + f, 17, 3, 1, boot);
+    /* ---- the stride: the near boot steps out on the off frame ---- */
+    if (f) {
+      R(3, 19, 6, 2, OUT); R(3, 19, 5, 1, boot);
+      R(10, 20, 5, 1, OUT); R(10, 20, 4, 1, darken(boot, 0.25));
+    }
 
     /* ---- a hat, if their look calls for one ---- */
     if (L.hat === 'straw') {
-      R(0, 2, 12, 1, OUT); R(0, 1, 12, 1, '#e0bd82'); R(3, 0, 6, 1, '#f2dcb0');
+      R(1, 2, 16, 1, OUT); R(1, 1, 16, 1, '#e0bd82');
+      R(5, 0, 8, 1, OUT); R(5, -1, 8, 1, '#f2dcb0');
     } else if (L.hat === 'cap') {
-      R(2, 0, 8, 2, shirt); R(2, 0, 8, 1, lighten(shirt, 0.4)); R(9, 2, 3, 1, darken(shirt, 0.3));
+      R(4, 0, 10, 1, OUT); R(4, -1, 10, 2, shirt);
+      R(4, -1, 10, 1, lighten(shirt, 0.4)); R(13, 1, 4, 1, darken(shirt, 0.3));
     }
     cache.set(key, c);
     return c;

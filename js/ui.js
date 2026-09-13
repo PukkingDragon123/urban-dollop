@@ -2482,7 +2482,7 @@
     }
     const moving = v.state !== 'stay';
     const spr = SPR.folkSprite(look, moving ? v.frame : 0, 1);
-    groundShade(Math.round(v.x + 1), Math.round(v.y + spr.height - 2), 10, 2, 0.26);
+    groundShade(Math.round(v.x + 1), Math.round(v.y + spr.height - 2), 16, 2, 0.26);
     ctx.save();
     if (v.dir === 1) { ctx.translate(Math.round(v.x) + spr.width, Math.round(v.y)); ctx.scale(-1, 1); ctx.drawImage(spr, 0, 0); }
     else ctx.drawImage(spr, Math.round(v.x), Math.round(v.y));
@@ -2585,7 +2585,7 @@
       if (w) {
         const walking = w.state === 'out' || w.state === 'back';
         const ps = SPR.folkSprite(w.look, walking ? w.frame : 0, 1);
-        SPR.shadowEll(ctx, w.x + 6, w.y + ps.height - 1, 5.5, 1.5, 0.26);
+        SPR.shadowEll(ctx, w.x + 9, w.y + ps.height - 1, 7, 1.6, 0.26);
         ctx.save();
         if (w.dir > 0) { ctx.translate(Math.round(w.x) + ps.width, Math.round(w.y)); ctx.scale(-1, 1); ctx.drawImage(ps, 0, 0); }
         else ctx.drawImage(ps, Math.round(w.x), Math.round(w.y));
@@ -2686,7 +2686,7 @@
     m.crew.forEach(w => {
       if (w.state === 'van') return;
       const spr = SPR.folkSprite(w.look, w.state === 'walk' ? w.frame : 0, 1);
-      groundShade(Math.round(w.x + 1), Math.round(w.y + spr.height - 2), 10, 2, 0.26);
+      groundShade(Math.round(w.x + 1), Math.round(w.y + spr.height - 2), 16, 2, 0.26);
       ctx.save();
       if (w.dir === 1) { ctx.translate(Math.round(w.x) + spr.width, Math.round(w.y)); ctx.scale(-1, 1); ctx.drawImage(spr, 0, 0); }
       else ctx.drawImage(spr, Math.round(w.x), Math.round(w.y));
@@ -2788,7 +2788,7 @@
     const moving = a.state !== 'waiting';
     const spr = SPR.folkSprite(a.look, moving ? a.frame : 0, 1);
     const bob = moving ? 0 : Math.abs(Math.sin(now / 420 + a.id)) * (Math.floor((now + a.id * 300) / 2600) % 3 === 0 ? 2 : 0);
-    SPR.shadowEll(ctx, a.x + 6, a.y + spr.height - 1, 5.5, 1.5, 0.26);
+    SPR.shadowEll(ctx, a.x + 9, a.y + spr.height - 1, 7, 1.6, 0.26);
     ctx.save();
     if (a.dir === 1) { ctx.translate(Math.round(a.x) + spr.width, Math.round(a.y - bob)); ctx.scale(-1, 1); ctx.drawImage(spr, 0, 0); }
     else ctx.drawImage(spr, Math.round(a.x), Math.round(a.y - bob));
@@ -2950,8 +2950,8 @@
     const moving = w.state === 'walk';
     const spr = SPR.staffSprite(w, moving ? w.frame : 0, 1);
     const bob = moving ? 0 : Math.sin(now / 600 + w.id) * 0.5;
-    SPR.shadowEll(ctx, w.x + 6, w.y + spr.height - 1, 5.5, 1.5, 0.26);
-    if (moving && w.frame && GAME.setting('particles') && Math.floor(now / 130) % 2) { ctx.fillStyle = 'rgba(200,180,140,.5)'; ctx.fillRect(Math.round(w.x + (w.dir === 1 ? 0 : 10)), Math.round(w.y + spr.height - 2), 2, 1); }
+    SPR.shadowEll(ctx, w.x + 9, w.y + spr.height - 1, 7, 1.6, 0.26);
+    if (moving && w.frame && GAME.setting('particles') && Math.floor(now / 130) % 2) { ctx.fillStyle = 'rgba(200,180,140,.5)'; ctx.fillRect(Math.round(w.x + (w.dir === 1 ? 0 : 16)), Math.round(w.y + spr.height - 2), 2, 1); }
     ctx.save();
     if (w.dir === 1) {
       ctx.translate(Math.round(w.x) + spr.width, Math.round(w.y + bob));
@@ -5166,8 +5166,13 @@
     titleEl.hidden = false; railUp(false); setInspect(null); introMode = null; closeModals();
     $('#intro-ui').hidden = true; $('#company-form').hidden = true; $('#title-buttons').hidden = true;
     if (window.MENU) MENU.show(); else $('#title-buttons').hidden = false;
+    if (window.MUSIC) MUSIC.play('strut');
   }
-  function hideTitle() { titleEl.hidden = true; railUp(true); S().seenTitle = true; introMode = null; if (window.MENU) MENU.hide(); }
+  function hideTitle() {
+    titleEl.hidden = true; railUp(true); S().seenTitle = true; introMode = null;
+    if (window.MENU) MENU.hide();
+    if (window.MUSIC) MUSIC.play('valley');
+  }
   /* the world after a slot change or a reset: everything baked from the save is stale */
   function reloadWorld() {
     buildGround(); terrDirty = true; leaves = [];
@@ -8966,7 +8971,7 @@
   function staffAt(x, y) {
     for (let i = S().staff.length - 1; i >= 0; i--) {
       const w = S().staff[i];
-      if (x > w.x - 2 && x < w.x + 14 && y > w.y - 6 && y < w.y + 18) return w;
+      if (x > w.x - 2 && x < w.x + 20 && y > w.y - 6 && y < w.y + 22) return w;
     }
     return null;
   }
@@ -9807,14 +9812,19 @@
     const ev = EVENT_BY_ID[n.id];
     if (ev) renderNews(ev);
   }
+  /* the Chronicle gets its own hit, over whatever the band is playing */
   GAME.on('news', ({ ev }) => {
+    if (window.MUSIC) MUSIC.sting('news');
     /* stop whatever the camera was doing and put the paper on screen */
     closeModals();
     snd.grand();
     renderNews(ev);
     shake(1.6, 0.3);
   });
-  GAME.on('newsdone', ({ choice }) => { renderDecree(); });
+  GAME.on('newsdone', ({ choice }) => {
+    renderDecree();
+    if (window.MUSIC) MUSIC.sting((choice.fx && choice.fx.decree && (choice.fx.decree.pay || 1) < 1) ? 'bad' : 'good');
+  });
   GAME.on('decreeover', () => { renderDecree(); });
 
   let lastMutToast = 0;
@@ -10256,6 +10266,15 @@
     railUp,
   };
   window.UI = UI;
+
+  /* The browser will not let the band play before you have touched
+     something, so the first tap anywhere starts whichever track the
+     screen you are on wants. */
+  ['pointerdown', 'keydown', 'touchstart'].forEach(ev => {
+    window.addEventListener(ev, () => {
+      if (window.MUSIC && !MUSIC.playing) MUSIC.play(titleEl.hidden ? 'valley' : 'strut');
+    }, { capture: true, passive: true });
+  });
 
   /* ================= BOOT ================= */
   function boot() {

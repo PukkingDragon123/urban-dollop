@@ -2118,7 +2118,7 @@ const GAME = (() => {
     for (let i = S.applicants.length - 1; i >= 0; i--) {
       const a = S.applicants[i];
       if (a.x === undefined || a.state === 'leaving') continue;
-      if (x > a.x - 3 && x < a.x + 15 && y > a.y - 6 && y < a.y + 20) return a;
+      if (x > a.x - 3 && x < a.x + 21 && y > a.y - 6 && y < a.y + 24) return a;
     }
     return null;
   }
