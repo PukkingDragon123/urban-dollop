@@ -1,0 +1,107 @@
+<!doctype html><meta charset=utf-8><body style="margin:0;background:#111">
+<canvas id=cover width=630 height=500></canvas>
+<script src="js/data.js"></script><script src="js/sprites.js"></script>
+<script>
+(function paint(){
+  const W = 630, H = 500;
+  const g = document.getElementById('cover').getContext('2d');
+  g.imageSmoothingEnabled = false;
+  const rnd = SPR.mulberry(20260915);
+
+  /* --- sky: a dusk gradient, banded so it stays pixel art --- */
+  const BANDS = ['#2a2340','#3b2c4e','#55395a','#75485e','#9a5c5a','#c07a52','#dd9a4f','#eeba5c'];
+  const bh = Math.ceil(H * 0.60 / BANDS.length);
+  BANDS.forEach((col,i) => { g.fillStyle = col; g.fillRect(0, i*bh, W, bh+1); });
+  for (let i=0;i<70;i++){
+    const x = Math.floor(rnd()*W), y = Math.floor(rnd()*H*0.28);
+    g.fillStyle = rnd()<.5 ? 'rgba(255,250,230,.75)' : 'rgba(255,250,230,.35)';
+    g.fillRect(x,y,2,2);
+  }
+  /* a low sun, well off to the side so it does not fight the hen */
+  const sx = Math.round(W*0.14), sy = Math.round(H*0.34);
+  const disc = (r,col) => { g.fillStyle = col;
+    for (let dy=-r; dy<=r; dy+=4){ const half = Math.round(Math.sqrt(Math.max(0,r*r-dy*dy))/4)*4; g.fillRect(sx-half, sy+dy, half*2, 4); } };
+  disc(30,'rgba(255,216,138,.45)'); disc(23,'#ffd88a'); disc(16,'#fff0c0');
+
+  /* --- hills and a treeline behind --- */
+  const hill = (baseY,col,amp,seed) => { const r2 = SPR.mulberry(seed); g.fillStyle = col; let y = baseY;
+    for (let x=0;x<W;x+=8){ y += Math.round((r2()-0.5)*amp); y = Math.max(baseY-amp*3, Math.min(baseY+amp*2,y)); g.fillRect(x,y,8,H-y); } };
+  hill(Math.round(H*0.56), '#3d5e3a', 6, 7);
+  hill(Math.round(H*0.63), '#4a7440', 7, 19);
+  for (let x=-10; x<W+10; x += 16 + Math.floor(rnd()*10)) {
+    const t = SPR.decoSprite(rnd()<0.6?'pine':'tree', 2, Math.floor(rnd()*9999));
+    const y = Math.round(H*0.655) - t.height*0.6;
+    g.drawImage(t, x, y);
+    g.fillStyle = 'rgba(24,44,26,.40)'; g.fillRect(x, y, t.width, t.height);
+  }
+
+  /* --- the ground she sits on --- */
+  const gy = Math.round(H*0.70);
+  g.fillStyle = '#6fa44f'; g.fillRect(0,gy,W,H-gy);
+  g.fillStyle = '#7fb85a'; g.fillRect(0,gy,W,5);
+  for (let i=0;i<340;i++){ g.fillStyle = rnd()<.5 ? '#5e9142' : '#86c063';
+    g.fillRect(Math.floor(rnd()*W), gy+Math.floor(rnd()*(H-gy)), 3, 2); }
+  g.fillStyle = '#8a5e2a';
+  for (let x=4;x<W;x+=22) g.fillRect(x, gy-18, 4, 20);
+  g.fillStyle = '#a8783f'; g.fillRect(0,gy-15,W,4); g.fillRect(0,gy-7,W,4);
+
+  const shadow = (x,w,y) => { g.fillStyle = 'rgba(20,30,16,.30)'; g.fillRect(x, y, w, 5); };
+  const put = (spr, cx, feet) => { const x = Math.round(cx - spr.width/2), y = Math.round(feet - spr.height);
+    g.drawImage(spr, x, y); return [x,y]; };
+
+  /* --- SHE IS THE SUBJECT: Mama Hen on her nest, front and centre --- */
+  const MK = 7;
+  const nest = SPR.nestSprite(MK);
+  const mama = SPR.mamaSprite(0, MK, 'happy');
+  const feet = H - 64;
+  const nx = Math.round(W/2 - nest.width/2);
+  /* a pool of shade so a pale grey bird does not sink into pale grey hills */
+  g.fillStyle = 'rgba(20,40,16,.20)';
+  g.fillRect(nx - 30, feet - 12, nest.width + 60, 16);
+  shadow(nx + 4, nest.width - 8, feet - 6);
+  g.drawImage(nest, nx, feet - nest.height);
+  /* she sits IN it: her body bottom overlaps the rim, not the ground */
+  put(mama, W/2, feet - nest.height + MK * 3);
+
+  /* a grown hen either side of her, a step out and behind */
+  [[-1.42,0],[1.42,1]].forEach(([o,dy],i) => {
+    const h = SPR.chickenSprite(SPECIES[i?3:2], 5, false);
+    const p = put(h, W/2 + o*nest.width*0.78, feet + 6 + dy);
+    shadow(p[0]+5, h.width-10, feet + 3 + dy);
+  });
+  /* the front row, left to right: a chick, the eggs, a chick - so the
+     clutch reads as hers and nothing sits on top of anything else */
+  const fy = feet + 30;
+  [[-118,0],[112,2]].forEach(([dx,dy],i) => {
+    const c = SPR.chickSprite(SPECIES[i?1:0], 5);
+    const p = put(c, W/2 + dx, fy + dy);
+    shadow(p[0]+4, c.width-8, fy - 3 + dy);
+  });
+  [[-46,0],[-14,4],[18,-2],[50,2]].forEach(([dx,dy],i) => {
+    const e = SPR.eggSprite(i===2?2:0, 4);
+    const ex = Math.round(W/2 + dx - e.width/2);
+    g.fillStyle = 'rgba(20,30,16,.26)';
+    g.fillRect(ex + 2, fy + dy, e.width - 4, 4);
+    g.drawImage(e, ex, fy + dy - e.height);
+  });
+
+  /* --- the founder, small, at the edge: his company, her farm --- */
+  const boss = SPR.raccoonSprite('boss', 3, { hat:'hat_top' }, 'smug');
+  const bp = put(boss, W - 54, feet + 18);
+  shadow(bp[0]+8, boss.width-16, feet + 15);
+
+  /* --- the title, and nothing under it --- */
+  const title = 'INF EGG CO.';
+  const tk = 7, tw = SPR.textW(title, tk);
+  const tx = Math.round((W - tw)/2), ty = 34;
+  SPR.drawText(g, title, tx + tk, ty + tk, 'rgba(20,14,10,.55)', tk);
+  SPR.drawText(g, title, tx, ty, '#14171a', tk);
+  SPR.drawText(g, title, tx, ty - Math.round(tk*0.6), '#ffd23f', tk);
+
+  /* a hazard rule along the foot */
+  g.fillStyle = '#14171a'; g.fillRect(0,H-10,W,10);
+  for (let x=-10;x<W;x+=20){ g.fillStyle='#ffb32e'; g.beginPath();
+    g.moveTo(x,H); g.lineTo(x+10,H-10); g.lineTo(x+20,H-10); g.lineTo(x+10,H); g.closePath(); g.fill(); }
+  window.DONE = 1;
+})();
+</script>
