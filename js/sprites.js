@@ -1781,6 +1781,55 @@ const SPR = (() => {
     return c;
   }
 
+  /* A skill badge: the 10x10 icon set into a little gem of its lane's
+     colour, 20 square - the plate lit from the top left and shaded to
+     the bottom right with a bevel, the glyph cut out with a dark line
+     round it and a glint in the corner. 'lit' is the full jewel, 'dim'
+     is the same gem under a cloth, 'dark' is just the glyph's shadow
+     on a black stone - you can see what it is, not have it. */
+  function skillBadge(name, hue, look, scale) {
+    const key = 'sb_' + name + '_' + hue + '_' + look + '_' + scale;
+    if (cache.has(key)) return cache.get(key);
+    const k = scale || 1, W = 20;
+    const c = newCanvas(W * k, W * k);
+    const ctx = c.getContext('2d');
+    const px = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x * k, y * k, w * k, h * k); };
+    const base = look === 'lit' ? hue : look === 'dim' ? darken(hue, 0.5) : darken(hue, 0.8);
+    const hi = lighten(base, look === 'lit' ? 0.38 : 0.14), lo = darken(base, 0.32), deep = darken(base, 0.6);
+    /* the plate, corners clipped one pixel so it reads as a cut stone */
+    px(1, 0, W - 2, W, base); px(0, 1, W, W - 2, base);
+    /* a soft diagonal light: the top-left half a shade up */
+    for (let y = 1; y < W - 1; y++) {
+      const n = Math.max(0, W - 2 - y - 6);
+      if (n > 0) px(1, y, n, 1, lighten(base, look === 'lit' ? 0.12 : 0.05));
+    }
+    px(1, 0, W - 2, 1, hi); px(0, 1, 1, W - 2, hi);
+    px(1, W - 1, W - 2, 1, deep); px(W - 1, 1, 1, W - 2, deep);
+    px(1, W - 2, W - 2, 1, lo); px(W - 2, 1, 1, W - 3, lo);
+    /* the glyph: an outline first, one pixel all round, then the icon */
+    const rows = ICONS[name] || ICONS.egg;
+    const ox = 5, oy = 5;
+    const on = (x, y) => y >= 0 && y < 10 && x >= 0 && x < 10 && rows[y][x] !== '.' && rows[y][x] !== ' ';
+    const lineCol = look === 'lit' ? deep : darken(base, 0.75);
+    for (let y = -1; y <= 10; y++) for (let x = -1; x <= 10; x++) {
+      if (on(x, y)) continue;
+      if (on(x - 1, y) || on(x + 1, y) || on(x, y - 1) || on(x, y + 1)) px(ox + x, oy + y, 1, 1, lineCol);
+    }
+    if (look === 'dark') {
+      for (let y = 0; y < 10; y++) for (let x = 0; x < 10; x++) if (on(x, y)) px(ox + x, oy + y, 1, 1, lighten(base, 0.22));
+    } else {
+      /* a drop shadow a pixel down-right, then the icon itself */
+      for (let y = 0; y < 10; y++) for (let x = 0; x < 10; x++) if (on(x, y) && !on(x + 1, y + 1)) px(ox + x + 1, oy + y + 1, 1, 1, lineCol);
+      if (look === 'dim') ctx.globalAlpha = 0.62;
+      drawGrid(ctx, rows, IP, ox * k, oy * k, k);
+      ctx.globalAlpha = 1;
+    }
+    /* the glint */
+    if (look === 'lit') { px(2, 2, 2, 1, '#fff8ec'); px(2, 3, 1, 1, '#fff8ec'); px(W - 4, W - 4, 1, 1, lighten(base, 0.5)); }
+    cache.set(key, c);
+    return c;
+  }
+
   /* ============================================================
      BILLBOARDS
      A poster is a grid of fat pixels: BILL_W x BILL_H cells, each
@@ -4626,7 +4675,7 @@ const SPR = (() => {
     cloudBubble, fossilSprite, dishSprite,
     uiSprite, iconSprite, basketSprite, feedbagSprite, hammerSprite, staffSprite,
     folkSprite, droidSprite, flyerSprite,
-    soilSprite, cropSprite, chickSprite, vehicleSprite, skylineSprite, cursorSprite,
+    soilSprite, cropSprite, chickSprite, vehicleSprite, skylineSprite, cursorSprite, skillBadge,
     pathSprite, terraceSprite, waterSprite, inkLine, parchment, compassRose, botSprite,
     plumeSprite, birdSprite, percherSprite, signSprite, treeSprite, eggCrackSprite, shellHalfSprite,
     billboardSprite, billboardPreset, blankArt, townSprite, shelterSprite,

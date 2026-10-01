@@ -12,12 +12,13 @@
    horn stabs on the off-beat and a hook that struts. The melody,
    the changes and the words he sings over it are this game's own.
 
-   THE VALLEY is what plays while you work: the same band, sat
-   down, brushes instead of sticks, a slow pastoral turn-around
-   that stays out of the way.
+   THE VALLEY is what plays while you work: a little bouncy tune in
+   F for a marimba, a ukulele strumming the off-beats, a soft kick,
+   a shaker and a glockenspiel that comes in for the second half.
+   Sixteen bars, an A and a B, all of it this game's own.
    ============================================================ */
 const MUSIC = (() => {
-  let ac = null, master = null, noise = null;
+  let ac = null, master = null, noise = null, echo = null;
   let timer = 0, track = null, step = 0, nextT = 0, wanted = null;
   const LOOK = 0.14;                 /* how far ahead we schedule, in seconds */
 
@@ -36,6 +37,15 @@ const MUSIC = (() => {
       noise = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
       const d = noise.getChannelData(0);
       for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      /* a short tape echo the bells and the marimba can send to, so the
+         valley sounds like a room rather than a circuit */
+      echo = ac.createDelay(1);
+      echo.delayTime.value = 0.21;
+      const fb = ac.createGain(), wet = ac.createGain(), lp = ac.createBiquadFilter();
+      fb.gain.value = 0.32; wet.gain.value = 0.3;
+      lp.type = 'lowpass'; lp.frequency.value = 2600;
+      echo.connect(lp).connect(fb).connect(echo);
+      lp.connect(wet).connect(master);
     }
     if (ac.state === 'suspended') ac.resume().catch(() => {});
     return ac;
@@ -86,6 +96,60 @@ const MUSIC = (() => {
     o.connect(g).connect(master);
     o.start(t); o.stop(t + dur + 0.02);
   }
+  /* a marimba: a sine with a soft fourth-harmonic knock on top, gone in
+     a third of a second */
+  function marimba(n, t, dur, v, send) {
+    const f = hz(n);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(v, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + Math.min(0.55, 0.22 + dur * 0.5));
+    [[1, 1], [4, 0.18], [10, 0.05]].forEach(([m, a]) => {
+      const o = ac.createOscillator(), og = ac.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(f * m, t);
+      og.gain.setValueAtTime(a, t);
+      if (m > 1) og.gain.exponentialRampToValueAtTime(0.001, t + 0.06 * (m === 4 ? 2 : 1));
+      o.connect(og).connect(g);
+      o.start(t); o.stop(t + 0.6);
+    });
+    g.connect(master);
+    if (send && echo) { const s = ac.createGain(); s.gain.value = send; g.connect(s).connect(echo); }
+  }
+  /* a glockenspiel: pure, bright, and a long ring */
+  function bell(n, t, v) {
+    const f = hz(n);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(v, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.1);
+    [[1, 1], [2.76, 0.3], [5.4, 0.1]].forEach(([m, a]) => {
+      const o = ac.createOscillator(), og = ac.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(f * m, t);
+      og.gain.setValueAtTime(a, t);
+      o.connect(og).connect(g);
+      o.start(t); o.stop(t + 1.15);
+    });
+    g.connect(master);
+    if (echo) { const s = ac.createGain(); s.gain.value = 0.5; g.connect(s).connect(echo); }
+  }
+  /* a ukulele strum: the chord rolled upward, each string a quick
+     filtered pluck */
+  function strum(ch, t, v) {
+    ch.forEach((n, k) => {
+      const tt = t + k * 0.011;
+      const o = ac.createOscillator(), g = ac.createGain(), lp = ac.createBiquadFilter();
+      o.type = 'triangle';
+      o.frequency.setValueAtTime(hz(n), tt);
+      lp.type = 'lowpass'; lp.frequency.setValueAtTime(hz(n) * 6, tt); lp.frequency.exponentialRampToValueAtTime(hz(n) * 1.5, tt + 0.15);
+      g.gain.setValueAtTime(0.0001, tt);
+      g.gain.linearRampToValueAtTime(v, tt + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001, tt + 0.2);
+      o.connect(lp).connect(g).connect(master);
+      o.start(tt); o.stop(tt + 0.22);
+    });
+  }
   function drum(kind, t, v) {
     if (kind === 'kick') {
       const o = ac.createOscillator(), g = ac.createGain();
@@ -104,8 +168,10 @@ const MUSIC = (() => {
     if (kind === 'snare') { f.type = 'bandpass'; f.frequency.value = 1750; f.Q.value = 0.9; }
     else if (kind === 'brush') { f.type = 'bandpass'; f.frequency.value = 2400; f.Q.value = 0.5; }
     else if (kind === 'crash') { f.type = 'highpass'; f.frequency.value = 4200; }
+    else if (kind === 'shaker') { f.type = 'highpass'; f.frequency.value = 5200; }
+    else if (kind === 'block') { f.type = 'bandpass'; f.frequency.value = 1300; f.Q.value = 6; }
     else { f.type = 'highpass'; f.frequency.value = 7200; }
-    const dur = kind === 'crash' ? 0.9 : kind === 'snare' ? 0.13 : kind === 'brush' ? 0.09 : 0.035;
+    const dur = kind === 'crash' ? 0.9 : kind === 'snare' ? 0.13 : kind === 'brush' ? 0.09 : kind === 'shaker' ? 0.05 : kind === 'block' ? 0.04 : 0.035;
     g.gain.setValueAtTime(v, t);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     s.connect(f).connect(g).connect(master);
@@ -136,6 +202,34 @@ const MUSIC = (() => {
   ];
   const KICK = [0, 6, 8, 14], SNARE = [4, 12];
 
+  /* ---------------- THE VALLEY ----------------
+     Sixteen bars in F. A: F C Dm Bb | F C Bb C.  B: Bb C Am Dm | Gm C F F.
+     The tune is [step, note, length in sixteenths]. */
+  const VCH = {
+    F: { n: [57, 60, 65], b: [41, 48] }, C: { n: [55, 60, 64], b: [36, 43] },
+    Dm: { n: [57, 62, 65], b: [38, 45] }, Bb: { n: [58, 62, 65], b: [46, 41] },
+    Am: { n: [57, 60, 64], b: [45, 40] }, Gm: { n: [55, 58, 62], b: [43, 38] },
+  };
+  const VPROG = ['F', 'C', 'Dm', 'Bb', 'F', 'C', 'Bb', 'C', 'Bb', 'C', 'Am', 'Dm', 'Gm', 'C', 'F', 'F'];
+  const VMEL = [
+    [[0, 72, 2], [2, 69, 2], [4, 72, 2], [6, 77, 4], [12, 76, 2], [14, 74, 2]],
+    [[0, 72, 4], [4, 67, 2], [6, 69, 2], [8, 72, 6]],
+    [[0, 74, 2], [2, 72, 2], [4, 74, 2], [6, 77, 4], [12, 81, 4]],
+    [[0, 79, 6], [8, 77, 2], [10, 74, 2], [12, 74, 4]],
+    [[0, 72, 2], [2, 69, 2], [4, 72, 2], [6, 77, 4], [12, 76, 2], [14, 74, 2]],
+    [[0, 72, 2], [2, 74, 2], [4, 76, 2], [6, 79, 4], [12, 76, 4]],
+    [[0, 77, 2], [2, 76, 2], [4, 74, 2], [6, 72, 4], [12, 70, 2], [14, 69, 2]],
+    [[0, 67, 4], [4, 72, 2], [6, 76, 2], [8, 72, 8]],
+    [[0, 74, 4], [6, 77, 2], [8, 74, 4], [12, 72, 4]],
+    [[0, 76, 4], [6, 79, 2], [8, 76, 4], [12, 72, 4]],
+    [[0, 76, 2], [2, 77, 2], [4, 76, 2], [6, 72, 4], [12, 69, 4]],
+    [[0, 74, 6], [8, 72, 2], [10, 74, 2], [12, 77, 4]],
+    [[0, 79, 4], [4, 77, 2], [6, 74, 2], [8, 70, 4], [12, 74, 4]],
+    [[0, 72, 4], [4, 76, 2], [6, 79, 2], [8, 84, 4], [12, 82, 4]],
+    [[0, 81, 2], [2, 79, 2], [4, 77, 4], [8, 72, 2], [10, 74, 2], [12, 76, 2], [14, 79, 2]],
+    [[0, 77, 8]],
+  ];
+
   const TRACKS = {
     strut: {
       bpm: 126, swing: 0.64, len: 128, gain: 0.5,
@@ -154,23 +248,30 @@ const MUSIC = (() => {
       },
     },
     valley: {
-      bpm: 86, swing: 0.5, len: 128, gain: 0.32,
+      bpm: 108, swing: 0.56, len: 256, gain: 0.36,
       play(i, t, beat) {
-        /* C - Am - F - G, twice round, brushes and a music box */
-        const CH = [[48, 52, 55], [45, 48, 52], [41, 45, 48], [43, 47, 50]];
-        const bar = (i / 16) | 0, s = i % 16, ch = CH[bar % 4];
-        if (s === 0) bass(ch[0] - 12, t, beat * 1.7, 0.13);
-        if (s === 8) bass(ch[2] - 12, t, beat * 0.9, 0.09);
-        if (s === 4 || s === 12) drum('brush', t, 0.05);
-        if (s % 4 === 2) drum('hat', t, 0.022);
-        /* a music-box arpeggio, one note every other eighth */
-        if (s % 4 === 0) pluck(ch[(s / 4) % 3] + 24, t, 0.5, 0.05, 'sine');
-        if (s === 6 || s === 14) pluck(ch[(s === 6 ? 1 : 2)] + 12, t, 0.35, 0.032, 'triangle');
-        /* a whistle line that only shows up in the second half */
-        if (bar >= 4) {
-          const LINE = [[0, 72], [6, 74], [8, 76], [14, 74]];
-          LINE.forEach(([ls, n]) => { if (ls === s) pluck(n, t, beat * 0.8, 0.038, 'sine'); });
-        }
+        const bar = (i / 16) | 0, s = i % 16;
+        const c = VCH[VPROG[bar]];
+        /* a soft kick on one and three, a wood block on two and four,
+           a shaker under everything */
+        if (s === 0 || s === 8) drum('kick', t, 0.2);
+        if (s === 4 || s === 12) drum('block', t, 0.09);
+        if (s % 2 === 0) drum('shaker', t, s % 4 === 2 ? 0.03 : 0.018);
+        /* the bass bounces root and fifth */
+        if (s === 0) bass(c.b[0], t, beat * 0.8, 0.15);
+        if (s === 8) bass(c.b[1], t, beat * 0.8, 0.12);
+        if (s === 14 && bar % 2) bass(c.b[0] + 2, t, beat * 0.35, 0.08);
+        /* the ukulele on the off-beats */
+        if (s === 2 || s === 6 || s === 10 || s === 14) strum(c.n, t, s === 6 || s === 14 ? 0.03 : 0.022);
+        /* the tune on the marimba; the glockenspiel doubles it an octave
+           up through the B section */
+        VMEL[bar].forEach(([ms, n, len]) => {
+          if (ms !== s) return;
+          marimba(n, t, len * beat / 4, 0.1, 0.25);
+          if (bar >= 8 && bar < 15) bell(n + 12, t, 0.022);
+        });
+        /* a sparkle run into the top of the loop */
+        if (bar === 15 && s >= 8 && s % 2 === 0) bell([77, 81, 84, 89][(s - 8) / 2], t, 0.03);
       },
     },
   };
@@ -230,7 +331,9 @@ const MUSIC = (() => {
       [57, 60, 64].forEach((n, i) => horn(n, t + i * 0.055, 0.42, 0.09 * g));
       horn(69, t + 0.2, 0.7, 0.1 * g);
     } else if (kind === 'good') {
-      [62, 66, 69, 74].forEach((n, i) => horn(n, t + i * 0.06, 0.4, 0.08 * g));
+      /* a little ta-da on the marimba with a bell on top */
+      [65, 69, 72, 77].forEach((n, i) => marimba(n, t + i * 0.07, 0.2, 0.12 * g, 0.3));
+      bell(84, t + 0.3, 0.06 * g);
     } else {
       [62, 61, 58, 55].forEach((n, i) => horn(n, t + i * 0.07, 0.38, 0.08 * g));
     }

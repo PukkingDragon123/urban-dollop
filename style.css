@@ -1528,10 +1528,9 @@ button:focus-visible{ outline:3px dashed var(--pink); outline-offset:2px; }
 }
 /* the title card is composed at the stage's own size in script, so it
    scales by a whole number and needs no cropping or squashing */
-/* an empty strap while the title screen is up: no keys to press yet, and
-   no jump in the stage's width when they arrive */
-#app.title-up #siderail > *{ visibility:hidden; }
-#app.title-up #siderail{ pointer-events:none; }
+/* no strap at all while the title screen is up: the menu is the whole
+   window, and the stage re-measures itself the moment the rail comes in */
+#app.title-up #siderail{ display:none; }
 
 /* ============================================================
    NOTHING BELOW THE FOLD
@@ -2816,3 +2815,69 @@ body.big-ui{ --key:80px; }
   background:var(--gold); border:2px solid var(--ink); padding:1px 5px;
 }
 .decree-pill.bad{ background:var(--stop); color:#fff3ec; }
+
+/* ---- the research board: the panel fills the screen and the board fills
+   the panel; the canvas is sized to its box in device pixels by sizeBoard() ---- */
+.modal.lab{ align-items:center; padding:12px 10px; }
+.modal.lab .tree-panel{
+  width:min(1120px, 100%);
+  height:min(760px, calc(100dvh - 24px));
+  display:flex; flex-direction:column;
+}
+.modal.lab #tree-wrap{
+  flex:1; min-height:0; position:relative;
+  border:4px solid #0c0907; background:#17120e;
+  box-shadow:inset 0 0 0 2px #c9973a, inset 0 0 0 4px #0c0907;
+}
+.modal.lab #tree-canvas{ position:absolute; inset:0; width:100%; height:100%; }
+.modal.lab #skill-card{ flex:none; }
+@media (max-width:560px), (max-height:500px){
+  .modal.lab{ padding:0; }
+  .modal.lab .tree-panel{ height:100dvh; width:100%; padding:8px; border-width:3px; box-shadow:none; }
+  .modal.lab .modal-head{ margin-bottom:6px; }
+  .modal.lab #skill-card{ margin-top:6px; padding:6px 8px; min-height:0; gap:8px; }
+  .modal.lab #skill-card b, .modal.lab #skill-card span{ font-size:14px; }
+}
+@media (max-height:500px){
+  .modal.lab .skc-mid > span{ display:none; }
+  .modal.lab .modal-head{ margin:-8px -8px 4px !important; padding:4px 10px 7px; }
+  .modal.lab .modal-head h2{ font-size:16px; }
+  .modal.lab #skill-card{ margin-top:4px; padding:4px 8px; }
+  .modal.lab #skill-card canvas{ transform:scale(.75); }
+}
+
+/* ---- a phone: the rail is two single rows under the field, each one
+   scrolling sideways if it has to, and the clipboard keeps one order ---- */
+#todo-panel .td-more{
+  font-family:var(--font-px); font-size:var(--fs-tiny); color:var(--ink-soft);
+  padding:5px 8px; cursor:pointer; text-align:center; letter-spacing:1px;
+}
+@media (max-width:520px){
+  #siderail{ flex-direction:column; flex-wrap:nowrap; gap:4px; padding:6px 6px; }
+  #siderail #deskbar, #siderail #toolbelt{
+    display:grid; grid-template-columns:none; grid-auto-flow:column; grid-auto-columns:42px;
+    gap:4px; overflow-x:auto; overflow-y:hidden; padding:4px 2px 5px;
+    justify-content:safe center; scrollbar-width:none; -webkit-overflow-scrolling:touch;
+  }
+  #siderail #deskbar::-webkit-scrollbar, #siderail #toolbelt::-webkit-scrollbar{ display:none; }
+  #siderail #toolbelt{ border-left:none; padding-left:2px; border-top:3px solid rgba(255,179,46,.45); padding-top:6px; }
+  #siderail .desk-btn, #siderail .tool-btn,
+  #siderail .tool-btn.tool-menu, #siderail .tool-btn.tool-crew{ width:42px; height:42px; }
+  #siderail #deskbar > :last-child:nth-child(odd),
+  #siderail #toolbelt > :last-child:nth-child(odd){ grid-column:auto; }
+}
+/* a phone on its side: the room keys and the tools stand side by side in
+   two narrow columns, names off, so both fit in the height */
+@media (max-height:500px) and (orientation:landscape){
+  #siderail{ flex-direction:row; align-items:flex-start; gap:6px; padding:6px; overflow-y:auto; scrollbar-width:none; }
+  #siderail #deskbar, #siderail #toolbelt{ grid-template-columns:repeat(2, 40px); gap:4px; }
+  #siderail #toolbelt{ border-top:none; padding-top:0; border-left:3px solid rgba(255,179,46,.45); padding-left:6px; }
+  #siderail .desk-btn, #siderail .tool-btn,
+  #siderail .tool-btn.tool-menu, #siderail .tool-btn.tool-crew{ width:40px; height:40px; padding:0; }
+  #siderail .desk-btn small{ display:none; }
+  #siderail .desk-btn canvas, #siderail .tool-btn canvas{ transform:scale(.85); }
+  #siderail #deskbar > :last-child:nth-child(odd),
+  #siderail #toolbelt > :last-child:nth-child(odd){ grid-column:auto; }
+  #todo-panel{ width:min(240px, 40%); }
+  #pill-sky{ display:none; }
+}

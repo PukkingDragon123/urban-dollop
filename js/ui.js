@@ -5161,7 +5161,15 @@
   /* the rail stands outside the stage, so the title screen no longer
      covers it. Blank the strap instead of removing it: taking it out of
      the row would widen the stage and snap it back again. */
-  function railUp(up) { const a = $('#app'); if (a) a.classList.toggle('title-up', !up); }
+  function railUp(up) {
+    const a = $('#app');
+    if (!a) return;
+    const was = a.classList.contains('title-up');
+    a.classList.toggle('title-up', !up);
+    /* the rail takes width when it comes in and gives it back when it
+       goes, so the stage has to measure itself again either way */
+    if (was === up) requestAnimationFrame(() => { sizeStage(); syncCamPad(); });
+  }
   function showTitle() {
     titleEl.hidden = false; railUp(false); setInspect(null); introMode = null; closeModals();
     $('#intro-ui').hidden = true; $('#company-form').hidden = true; $('#title-buttons').hidden = true;
@@ -6390,26 +6398,33 @@
     document.querySelectorAll('.modal').forEach(m => m.hidden = true);
   }
 
-  /* ================= THE LAB - A COMPUTER ON A DESK =================
-     Open the Lab and you are looking at a monitor: a desk, a
-     keyboard, a mug, and on the screen an operating system called
-     EGGOS running SKILLMAP.EXE - a hex map of research. Only hexes
-     you have installed or could install right now are on the map;
-     the rest is dark. A pixel mouse pointer follows your finger.
+  /* ================= THE LAB - THE RESEARCH BOARD =================
+     One tree at a time. A row of tabs across the top - one for the
+     quest chain, one for the ages, one for every lane of research -
+     and under it that tree laid out the way a skill tree should be:
+     each branch is a lane with its name on the left, its packages
+     run left to right in framed square sockets with their rank on a
+     plate underneath, brass rails join a package to the ones it
+     opens, and anything the tree has not reached yet hangs behind a
+     chain and a padlock. The feathers you have to spend sit on a bar
+     along the foot.
+
+     The canvas is sized to the device every time it opens, at a
+     whole number of device pixels to a board pixel, so it is as
+     crisp on a phone as on a monitor.
      ============================================================ */
-  const TERM_W = 1140, TERM_H = 660, TK = 3;
-  const VW = TERM_W / TK, VH = TERM_H / TK;         /* 380 x 220 */
-  const SCR = { x: 18, y: 10, w: 344, h: 166 };     /* the glass */
-  const MAPW = { x: SCR.x + 4, y: SCR.y + 4, w: 236, h: 146 };
-  const RDW = { x: SCR.x + 244, y: SCR.y + 4, w: 96, h: 146 };
-  /* the board: 14px cubes, columns are depth, rows are packed lanes */
-  const NODE = 14, COLW = 24, ROWH = 18, GUT = 32;
-  const MAP_BG = '#081a14';
+  let TK = 2, VW = 480, VH = 300;
+  /* a socket is 26 square; columns and lanes are spaced to leave room
+     for the rails between them and the rank plate underneath */
+  const NODE = 26, COLW = 36, ROWH = 38;
+  const B_BG = '#17120e';
   let termCv = null, termCtx = null;
   let termSel = null, termHover = null, termHits = [];
   let mapPan = { x: 0, y: 0 }, mapDrag = null;
   let termMouse = { x: 0, y: 0, inside: false };
-  let labOpenedAt = 0, installFx = null, termKeys = 0;
+  let labOpenedAt = 0, installFx = null;
+  let boardTab = 'tools', tabFx = 0;
+  let lastTap = { id: null, t: 0 };
 
   /* every package is on the board, always: the whole tree reads at a
      glance. State says how far off it is: aged (its lane waits for an
@@ -6424,8 +6439,7 @@
     return 'short';
   }
   function pkgVisible(sk) { return true; }
-  const pkgDark = st => st === 'locked' || st === 'aged';
-  /* quests show the chain up to one past the current goal */
+  const pkgDark = st => st === 'locked' || st === 'aged' || st === 'later';
   function questIndex(q) { return QUESTS.indexOf(q); }
   function questVisible(q) {
     const cur = GAME.currentQuest();
@@ -6437,486 +6451,462 @@
     const cur = GAME.currentQuest();
     return cur && cur.id === q.id ? 'current' : 'later';
   }
-  const mapInner = () => ({ x: MAPW.x + 1, y: MAPW.y + 10, w: MAPW.w - 2, h: MAPW.h - 11 });
-  /* top-left of a node's front face on the glass */
-  function nodePos(id) {
-    const p = GRID_POS[id] || { col: 0, row: 0 };
-    const inner = mapInner();
-    return { x: Math.round(inner.x + GUT + p.col * COLW + mapPan.x), y: Math.round(inner.y + 8 + p.row * ROWH + mapPan.y), col: p.col, row: p.row };
+  function ageState(i) {
+    const cur = GAME.ageIndex();
+    return i <= cur ? 'done' : i === cur + 1 ? 'current' : 'later';
   }
-  function clampPan() {
-    const inner = mapInner();
-    const boardW = GRID.cols * COLW + 8, boardH = GRID.rows * ROWH + 12;
-    mapPan.x = Math.min(0, Math.max(-(boardW - (inner.w - GUT)), mapPan.x));
-    mapPan.y = Math.min(0, Math.max(-(boardH - inner.h), mapPan.y));
-  }
-  function centerOn(id) {
-    const p = GRID_POS[id] || { col: 0, row: 0 };
-    const inner = mapInner();
-    mapPan = { x: -(p.col * COLW) + (inner.w - GUT) / 2 - NODE / 2, y: -(p.row * ROWH) + inner.h / 2 - NODE / 2 - 8 };
-    clampPan();
-  }
-  /* Every node wears its lane's colour, always - the lane is the thing you
-     read at a glance. State is carried by how bright it is: installed burns
-     full, affordable is lit with a gold rim pulsing round it, and one you
-     cannot pay for yet sits dark. */
-  function nodePal(state, hue) {
-    if (state === 'root') return { base: '#c9a35f', light: '#eccf95', dark: '#8a5e2a', out: '#3e2810' };
-    if (state === 'done' || state === 'current') return { base: hue, light: SPR.lighten(hue, 0.40), dark: SPR.darken(hue, 0.28), out: SPR.darken(hue, 0.68) };
-    if (state === 'ready') {
-      const b = SPR.darken(hue, 0.18);
-      return { base: b, light: SPR.lighten(b, 0.30), dark: SPR.darken(b, 0.28), out: '#ffc72f' };
-    }
-    if (pkgDark(state)) {
-      const d = SPR.darken(hue, 0.76);
-      return { base: d, light: SPR.lighten(d, 0.10), dark: SPR.darken(d, 0.4), out: '#0f1f16' };
-    }
-    const d = SPR.darken(hue, 0.66);
-    return { base: d, light: SPR.lighten(d, 0.14), dark: SPR.darken(d, 0.35), out: '#0f1f16' };
-  }
-  /* the current quest points at a node; if that node is still dark, at the
-     nearest lit one on the way to it */
+  /* the current quest points at a package; the board points at it too */
   function questTarget() {
     const q = GAME.currentQuest();
     if (!q || q.goal.k !== 'skill') return null;
-    let sk = SKILL_BY_ID[q.goal.id];
-    const path = [];
-    while (sk && !pkgVisible(sk)) { path.push(sk.id); sk = skillPrereq(sk); }
-    return sk ? { id: sk.id, hidden: path } : null;
+    const sk = SKILL_BY_ID[q.goal.id];
+    return sk ? { id: sk.id, hidden: [] } : null;
   }
 
+  /* ---------------- what is on each tab ----------------
+     A tab is a list of lanes; a lane is a label and a run of nodes,
+     each node { id, col, row, kind } in board columns and lane rows.
+     Built once per tab and kept: the shape of a tree never changes,
+     only the state of what is in it. */
+  const TABS = MODULES.map(m => m.id);
+  const tabCache = {};
+  function tabOf(id) {
+    if (QUEST_BY_ID[id]) return 'quests';
+    if (AGE_INDEX[id] !== undefined) return 'ages';
+    const sk = SKILL_BY_ID[id];
+    return sk && sk.id !== 'root' ? sk.br : null;
+  }
+  function tabLayout(tab) {
+    /* the quest chain is laid out as many to a lane as fit the screen */
+    const PER = Math.max(4, Math.min(8, Math.floor((VW - 8 - gutter() - 6) / COLW)));
+    const key = tab === 'quests' ? tab + PER : tab;
+    if (tabCache[key]) return tabCache[key];
+    const lanes = [], nodes = [];
+    if (tab === 'quests') {
+      /* the chain, a page at a time */
+      for (let i = 0; i < QUESTS.length; i += PER) {
+        const row = lanes.length;
+        lanes.push({ label: 'ORDERS ' + (i + 1) + '-' + Math.min(QUESTS.length, i + PER), row });
+        QUESTS.slice(i, i + PER).forEach((q, j) => nodes.push({ id: q.id, col: j, row, kind: 'quest', pre: i + j ? QUESTS[i + j - 1].id : null }));
+      }
+    } else if (tab === 'ages') {
+      lanes.push({ label: 'THE AGES', row: 0 });
+      AGES.forEach((a, i) => nodes.push({ id: a.id, col: i, row: 0, kind: 'age', pre: i ? AGES[i - 1].id : null }));
+    } else {
+      /* a research lane: its block of GRID rows, each one a branch */
+      const L = GRID.lanes.find(l => l.id === tab);
+      const mine = SKILLS.filter(sk => sk.br === tab && sk.id !== 'root' && GRID_POS[sk.id]);
+      const minCol = Math.min(...mine.map(sk => GRID_POS[sk.id].col));
+      for (let r = 0; r < L.rows; r++) {
+        const inRow = mine.filter(sk => GRID_POS[sk.id].row === L.top + r).sort((a, b) => GRID_POS[a.id].col - GRID_POS[b.id].col);
+        lanes.push({ label: inRow.length ? inRow[0].name.toUpperCase().replace(/^THE /, '') : '', row: r });
+      }
+      mine.forEach(sk => nodes.push({ id: sk.id, col: GRID_POS[sk.id].col - minCol, row: GRID_POS[sk.id].row - L.top, kind: sk.kind, pre: sk.pre === 'root' ? null : sk.pre }));
+    }
+    const cols = nodes.reduce((a, n) => Math.max(a, n.col + 1), 1);
+    const out = { lanes, nodes, cols, rows: lanes.length, byId: Object.fromEntries(nodes.map(n => [n.id, n])) };
+    tabCache[key] = out;
+    return out;
+  }
+
+  /* ---------------- the frame of the board ---------------- */
+  const narrow = () => VW < 340;
+  /* a phone on its side: little height, so smaller tabs and a slimmer header */
+  const compact = () => VH < 230;
+  /* tabs: one strip, or two rows of them on a narrow screen */
+  function tabRects() {
+    const n = TABS.length, perRow = narrow() ? Math.ceil(n / 2) : n;
+    const tw = Math.min(30, Math.floor((VW - 8) / perRow)), th = compact() ? 16 : 24;
+    const rowsN = Math.ceil(n / perRow);
+    const total = perRow * tw;
+    const x0 = Math.round((VW - total) / 2);
+    return TABS.map((id, i) => {
+      const r = Math.floor(i / perRow), c = i % perRow;
+      return { id, x: x0 + c * tw, y: 4 + r * (th + 2), w: tw - 2, h: th, rowsN };
+    });
+  }
+  function boardArea() {
+    const tr = tabRects();
+    const tabsH = tr[0].rowsN * (tr[0].h + 2) + 4;
+    const head = compact() ? 15 : 22, foot = compact() ? 14 : 18;
+    const top = 4 + tabsH + head;
+    return { x: 4, y: top, w: VW - 8, h: VH - top - foot - 6, headY: 4 + tabsH, footY: VH - foot - 3 };
+  }
+  /* lane labels sit to the left of the lane on a wide board, and over
+     it on a narrow one, where the width is worth more than the height */
+  const gutter = () => (narrow() ? 6 : compact() ? 62 : 76);
+  /* a lane name cut to the gutter, a whole word at a time where it can be */
+  function fitLabel(s) {
+    const room = gutter() - 10;
+    if (SPR.tinyW(s, 1) <= room) return s;
+    const words = s.split(' ');
+    while (words.length > 1 && SPR.tinyW(words.join(' '), 1) > room) words.pop();
+    let t = words.join(' ');
+    while (t.length > 1 && SPR.tinyW(t, 1) > room) t = t.slice(0, -1);
+    return t;
+  }
+  const laneH = () => ROWH + (narrow() ? 8 : 0);
+  function nodeXY(n) {
+    const A = boardArea();
+    return {
+      x: Math.round(A.x + gutter() + n.col * COLW + mapPan.x),
+      y: Math.round(A.y + 6 + (narrow() ? 8 : 0) + n.row * laneH() + mapPan.y),
+    };
+  }
+  function contentSize(L) {
+    return { w: gutter() + L.cols * COLW + 6, h: 6 + L.rows * laneH() + 4 };
+  }
+  function clampPan() {
+    const A = boardArea(), L = tabLayout(boardTab), C = contentSize(L);
+    mapPan.x = Math.min(0, Math.max(-(C.w - A.w), mapPan.x));
+    mapPan.y = Math.min(0, Math.max(-(C.h - A.h), mapPan.y));
+  }
+  function setTab(tab, keepPan) {
+    if (!TABS.includes(tab)) return;
+    if (tab !== boardTab) { boardTab = tab; tabFx = performance.now(); if (!keepPan) mapPan = { x: 0, y: 0 }; }
+    clampPan();
+  }
+  /* switch to whichever tab holds this node and bring it into view */
+  function centerOn(id) {
+    const tab = tabOf(id);
+    if (!tab) return;
+    setTab(tab);
+    const n = tabLayout(tab).byId[id];
+    if (!n) return;
+    const A = boardArea();
+    mapPan = { x: 0, y: 0 };
+    const p = nodeXY(n);
+    if (p.x + NODE + 8 > A.x + A.w) mapPan.x = (A.x + A.w) - (p.x + NODE + 12);
+    if (p.y + NODE + 12 > A.y + A.h) mapPan.y = (A.y + A.h) - (p.y + NODE + 16);
+    clampPan();
+  }
+  /* the tab to open on: whatever is selected, else what the quest wants,
+     else the first lane with something you can afford */
+  function pickTab() {
+    if (termSel && tabOf(termSel)) return tabOf(termSel);
+    const t = questTarget();
+    if (t) return tabOf(t.id);
+    const ready = MODULES.find(m => SKILLS_BY_MODULE[MOD_INDEX[m.id]].some(sk => pkgState(sk) === 'ready'));
+    return ready ? ready.id : 'tools';
+  }
+
+  /* ---------------- the art ---------------- */
+  /* a brass socket: outline, a bevelled rim lit from the top left, a
+     little cap at the top like a bolt head, and the well inside it */
+  function drawSocket(g, x, y, st, sel, hov, now) {
+    const dim = pkgDark(st);
+    const rimL = dim ? '#6a5a44' : st === 'done' || st === 'current' ? '#ffe7a0' : '#e8c46a';
+    const rim = dim ? '#4a3e30' : st === 'done' || st === 'current' ? '#e0b048' : '#c9973a';
+    const rimD = dim ? '#2c241c' : '#7a5420';
+    g.fillStyle = '#0c0907'; g.fillRect(x - 1, y - 1, NODE + 2, NODE + 2);
+    g.fillStyle = rim; g.fillRect(x, y, NODE, NODE);
+    g.fillStyle = rimL; g.fillRect(x, y, NODE, 1); g.fillRect(x, y, 1, NODE);
+    g.fillStyle = rimD; g.fillRect(x, y + NODE - 1, NODE, 1); g.fillRect(x + NODE - 1, y, 1, NODE);
+    /* the cap */
+    const cx = x + NODE / 2;
+    g.fillStyle = '#0c0907'; g.fillRect(cx - 3, y - 4, 6, 4);
+    g.fillStyle = rim; g.fillRect(cx - 2, y - 3, 4, 3);
+    g.fillStyle = rimL; g.fillRect(cx - 2, y - 3, 4, 1);
+    /* corner rivets */
+    g.fillStyle = rimD;
+    [[2, 2], [NODE - 3, 2], [2, NODE - 3], [NODE - 3, NODE - 3]].forEach(([a, b]) => g.fillRect(x + a, y + b, 1, 1));
+    /* the well */
+    g.fillStyle = '#0c0907'; g.fillRect(x + 3, y + 3, NODE - 6, NODE - 6);
+    /* a hover lift and a selection ring outside the rim */
+    if (sel || hov) {
+      g.fillStyle = sel ? '#fff8ec' : 'rgba(255,248,236,.5)';
+      g.fillRect(x - 3, y - 3, NODE + 6, 1); g.fillRect(x - 3, y + NODE + 2, NODE + 6, 1);
+      g.fillRect(x - 3, y - 3, 1, NODE + 6); g.fillRect(x + NODE + 2, y - 3, 1, NODE + 6);
+    }
+    if ((st === 'ready' || st === 'current') && !sel) {
+      const a = 0.35 + 0.35 * Math.sin(now / 240);
+      g.fillStyle = st === 'ready' ? 'rgba(255,214,80,' + a.toFixed(2) + ')' : 'rgba(255,255,255,' + a.toFixed(2) + ')';
+      g.fillRect(x - 2, y - 2, NODE + 4, 1); g.fillRect(x - 2, y + NODE + 1, NODE + 4, 1);
+      g.fillRect(x - 2, y - 2, 1, NODE + 4); g.fillRect(x + NODE + 1, y - 2, 1, NODE + 4);
+    }
+  }
+  /* the chain and padlock hung over anything the tree has not reached */
+  function drawChain(g, x, y, aged) {
+    /* two links across the corner, then the lock hanging off them */
+    g.fillStyle = '#0c0907';
+    for (let i = 0; i < 5; i++) { g.fillRect(x + 2 + i * 4, y + NODE - 8 - i * 2, 4, 3); }
+    g.fillStyle = '#9aa0a8';
+    for (let i = 0; i < 5; i++) {
+      g.fillRect(x + 3 + i * 4, y + NODE - 7 - i * 2, 2, 1);
+      g.fillStyle = i % 2 ? '#c8ccd2' : '#9aa0a8';
+    }
+    const lx = x + NODE - 10, ly = y + NODE - 9;
+    g.fillStyle = '#0c0907'; g.fillRect(lx - 1, ly - 4, 10, 13);
+    g.fillStyle = '#9aa0a8'; g.fillRect(lx + 2, ly - 3, 4, 1); g.fillRect(lx + 1, ly - 2, 1, 3); g.fillRect(lx + 6, ly - 2, 1, 3);
+    g.fillStyle = aged ? '#d8a840' : '#c8ccd2'; g.fillRect(lx, ly, 8, 7);
+    g.fillStyle = aged ? '#f0cc6a' : '#eef0f2'; g.fillRect(lx, ly, 8, 1);
+    g.fillStyle = aged ? '#8a6420' : '#6a7078'; g.fillRect(lx, ly + 6, 8, 1);
+    g.fillStyle = '#0c0907'; g.fillRect(lx + 3, ly + 2, 2, 2); g.fillRect(lx + 4, ly + 4, 1, 2);
+  }
+  /* the rank plate under a socket: 2/5 for a stack, a tick for a done
+     unlock, the progress of a quest or an age in work */
+  function drawPlate(g, x, y, text, col, fill) {
+    const w = Math.max(14, SPR.tinyW(text, 1) + 6);
+    const px = Math.round(x + NODE / 2 - w / 2), py = y + NODE - 1;
+    g.fillStyle = '#0c0907'; g.fillRect(px - 1, py, w + 2, 9);
+    g.fillStyle = '#3a2c1c'; g.fillRect(px, py + 1, w, 7);
+    if (fill !== undefined) { g.fillStyle = 'rgba(255,214,80,.32)'; g.fillRect(px, py + 1, Math.round(w * fill), 7); }
+    g.fillStyle = '#5a4430'; g.fillRect(px, py + 1, w, 1);
+    SPR.drawTiny(g, text, px + Math.round(w / 2 - SPR.tinyW(text, 1) / 2), py + 2, col, 1);
+  }
+
+  /* ---------------- drawing the board ---------------- */
   function drawTerm(now) {
     if (!termCv) return;
     const g = termCtx;
-    const T = SPR.TERM;
     g.imageSmoothingEnabled = false;
     g.setTransform(TK, 0, 0, TK, 0, 0);
     termHits = [];
+    const A = boardArea();
 
-    /* ---------- the desk ---------- */
-    g.fillStyle = '#2a1e12'; g.fillRect(0, 0, VW, VH);
-    g.fillStyle = '#8a5e2a'; g.fillRect(0, 184, VW, 36);
-    g.fillStyle = '#a8783f'; g.fillRect(0, 184, VW, 2);
-    g.fillStyle = '#7a5230';
-    for (let y = 190; y < VH; y += 6) for (let x = (y % 12) ? 0 : 7; x < VW; x += 14) g.fillRect(x, y, 9, 1);
-    /* monitor glow on the desk */
-    g.fillStyle = 'rgba(126,242,168,.10)'; g.fillRect(40, 186, 300, 30);
+    /* the board: dark wood-and-iron, a big faint gear behind everything */
+    g.fillStyle = B_BG; g.fillRect(0, 0, VW, VH);
+    drawGearMark(g, Math.round(VW / 2), Math.round(A.y + A.h / 2), Math.min(A.w, A.h) * 0.46, now);
 
-    /* ---------- monitor ---------- */
-    g.fillStyle = '#1a1410'; g.fillRect(10, 2, 360, 184);
-    g.fillStyle = '#d9d2c0'; g.fillRect(11, 3, 358, 182);
-    g.fillStyle = '#f2ece0'; g.fillRect(11, 3, 358, 2);
-    g.fillStyle = '#a89e8c'; g.fillRect(11, 180, 358, 5);
-    g.fillStyle = '#8c8270'; g.fillRect(11, 3, 2, 182); g.fillRect(367, 3, 2, 182);
-    /* glass well */
-    g.fillStyle = '#1a1410'; g.fillRect(SCR.x - 2, SCR.y - 2, SCR.w + 4, SCR.h + 4);
-    /* badge, power lamp, stand */
-    SPR.drawTiny(g, 'EGGTRON 3000', 150, 179, '#6e6656', 1);
-    g.fillStyle = Math.floor(now / 900) % 2 ? '#7ac74f' : '#4f9b3f'; g.fillRect(352, 180, 4, 3);
-    g.fillStyle = '#8c8270'; g.fillRect(170, 186, 40, 5); g.fillStyle = '#a89e8c'; g.fillRect(150, 190, 80, 3);
-    /* sticky notes on the bezel */
-    const note = (x, y, col, lines, tilt) => {
-      g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(x + 1, y + 1, 26, 22);
-      g.fillStyle = col; g.fillRect(x, y, 26, 22);
-      g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(x, y, 26, 2);
-      lines.forEach((l, i) => SPR.drawTiny(g, l, x + 2 + tilt, y + 4 + i * 6, '#3a2a16', 1));
-    };
-    note(8, 190, '#ffe27a', ['FEED', 'CHICKS'], 0);
-    note(38, 196, '#ffb0d0', ['WATER', 'CROPS'], 1);
-    note(346, 194, '#b8f0c8', ['PET', 'MAMA'], 0);
+    /* ---- the tabs ---- */
+    tabRects().forEach(t => {
+      const m = MOD_BY_ID[t.id];
+      const on = t.id === boardTab;
+      const open = GAME.laneOpen(t.id);
+      const ready = t.id !== 'quests' && t.id !== 'ages' && SKILLS_BY_MODULE[MOD_INDEX[t.id]].some(sk => pkgState(sk) === 'ready');
+      g.fillStyle = '#0c0907'; g.fillRect(t.x - 1, t.y - 1, t.w + 2, t.h + 2);
+      g.fillStyle = on ? SPR.darken(m.hue, 0.25) : open ? '#2e2418' : '#1e1812';
+      g.fillRect(t.x, t.y, t.w, t.h);
+      g.fillStyle = on ? SPR.lighten(m.hue, 0.25) : open ? '#4a3a28' : '#2a2219';
+      g.fillRect(t.x, t.y, t.w, 1);
+      if (on) { g.fillStyle = m.hue; g.fillRect(t.x, t.y + t.h - 2, t.w, 2); }
+      g.globalAlpha = open ? 1 : 0.35;
+      const big = t.h >= 24;
+      const ic = SPR.iconSprite(m.icon, big ? 2 : 1);
+      g.drawImage(ic, Math.round(t.x + t.w / 2 - (big ? 10 : 5)), t.y + (big ? 2 : 3));
+      g.globalAlpha = 1;
+      if (!open) { g.fillStyle = '#0c0907'; g.fillRect(t.x + t.w - 7, t.y + t.h - 9, 6, 7); g.fillStyle = '#d8a840'; g.fillRect(t.x + t.w - 6, t.y + t.h - 6, 4, 3); g.fillRect(t.x + t.w - 5, t.y + t.h - 8, 2, 2); }
+      if (ready && Math.floor(now / 340) % 2) { g.fillStyle = '#0c0907'; g.fillRect(t.x + t.w - 6, t.y + 1, 5, 5); g.fillStyle = '#ffd23f'; g.fillRect(t.x + t.w - 5, t.y + 2, 3, 3); }
+      termHits.push({ kind: 'tab', id: t.id, x: t.x, y: t.y, w: t.w, h: t.h });
+    });
 
-    /* ---------- keyboard ---------- */
-    g.fillStyle = '#1a1410'; g.fillRect(70, 196, 200, 20);
-    g.fillStyle = '#d9d2c0'; g.fillRect(71, 197, 198, 18);
-    g.fillStyle = '#a89e8c'; g.fillRect(71, 212, 198, 3);
-    for (let r = 0; r < 3; r++) for (let c = 0; c < 22; c++) {
-      const kx = 74 + c * 9 + (r % 2) * 3, ky = 199 + r * 4;
-      if (kx + 8 > 268) continue;
-      const lit = installFx && (now - installFx.t) < 600 && ((c + r * 3) % 7) === Math.floor((now - installFx.t) / 60) % 7;
-      g.fillStyle = lit ? '#7ef2a8' : '#f2ece0'; g.fillRect(kx, ky, 7, 3);
-      g.fillStyle = lit ? '#4fb072' : '#b8b0a0'; g.fillRect(kx, ky + 2, 7, 1);
+    /* ---- the header: the tree's crest, its name and how far along it is ---- */
+    const m = MOD_BY_ID[boardTab];
+    const L = tabLayout(boardTab);
+    const hy = A.headY - (compact() ? 3 : 0);
+    const slide = Math.max(0, 1 - (now - tabFx) / 220);
+    if (!compact()) {
+      g.fillStyle = '#0c0907'; g.fillRect(4, hy + 2, 18, 18);
+      g.fillStyle = SPR.darken(m.hue, 0.2); g.fillRect(5, hy + 3, 16, 16);
+      g.fillStyle = SPR.lighten(m.hue, 0.3); g.fillRect(5, hy + 3, 16, 1);
+      g.drawImage(SPR.iconSprite(m.icon, 1), 8, hy + 6);
+      SPR.drawText(g, m.name, 26 + Math.round(slide * 8), hy + 5, '#f2dca0', 1);
+    } else SPR.drawTiny(g, m.name.toUpperCase(), 6 + Math.round(slide * 8), hy + 7, '#f2dca0', 1);
+    let doneN = 0, allN = L.nodes.length;
+    L.nodes.forEach(n => {
+      if (n.kind === 'quest') { if (GAME.questDone(QUEST_BY_ID[n.id])) doneN++; }
+      else if (n.kind === 'age') { if (ageState(AGE_INDEX[n.id]) === 'done') doneN++; }
+      else if (GAME.lvl(n.id) >= SKILL_BY_ID[n.id].max) doneN++;
+    });
+    const prog = doneN + ' / ' + allN;
+    SPR.drawTiny(g, prog, VW - 6 - SPR.tinyW(prog, 1), hy + 7, '#c9a35f', 1);
+    if (m.age && !GAME.laneOpen(m.id)) {
+      const ag = 'OPENS IN THE ' + AGES[AGE_INDEX[m.age]].name.toUpperCase();
+      if (compact()) SPR.drawTiny(g, ag, Math.round(VW / 2 - SPR.tinyW(ag, 1) / 2), hy + 7, '#d8a840', 1);
+      else SPR.drawTiny(g, ag, VW - 6 - SPR.tinyW(ag, 1), hy + 14, '#d8a840', 1);
     }
-    g.fillStyle = '#f2ece0'; g.fillRect(120, 211, 90, 3); g.fillStyle = '#b8b0a0'; g.fillRect(120, 213, 90, 1);
-    /* mouse on its pad */
-    g.fillStyle = '#3a5a8a'; g.fillRect(282, 194, 34, 22);
-    g.fillStyle = '#4a6a9a'; g.fillRect(282, 194, 34, 2);
-    g.fillStyle = '#1a1410'; g.fillRect(292, 198, 14, 16);
-    g.fillStyle = '#f2ece0'; g.fillRect(293, 199, 12, 14);
-    g.fillStyle = '#c9c0a8'; g.fillRect(293, 205, 12, 1); g.fillRect(299, 199, 1, 6);
-    g.fillStyle = termMouse.inside ? '#7ef2a8' : '#8c8270'; g.fillRect(298, 201, 2, 2);
-    /* mug with steam */
-    g.fillStyle = '#1a1410'; g.fillRect(324, 190, 15, 19); g.fillRect(338, 194, 4, 9);
-    g.fillStyle = '#e8542f'; g.fillRect(325, 191, 13, 17); g.fillRect(339, 195, 2, 7);
-    g.fillStyle = '#ff8f6a'; g.fillRect(325, 191, 13, 2);
-    g.fillStyle = '#5e3d18'; g.fillRect(326, 192, 11, 2);
-    g.fillStyle = '#fff8ec'; g.fillRect(330, 197, 3, 3); g.fillRect(331, 198, 1, 1);
-    g.fillStyle = 'rgba(255,255,255,.45)';
-    for (let i = 0; i < 3; i++) { const sy = 186 - ((now / 120 + i * 9) % 14); g.fillRect(328 + i * 3 + Math.round(Math.sin(now / 300 + i) * 1), Math.round(sy), 1, 2); }
+    /* a brass rule under the header */
+    g.fillStyle = '#5a4430'; g.fillRect(4, A.y - 2, VW - 8, 1);
+    g.fillStyle = '#2a2018'; g.fillRect(4, A.y - 1, VW - 8, 1);
 
-    /* ---------- the screen ---------- */
-    const boot = (now - labOpenedAt) / 1000;
-    if (boot < 1.15) { drawBoot(g, boot, now); }
-    else drawDesktop(g, now);
+    /* ---- the lanes ---- */
+    g.save();
+    g.beginPath(); g.rect(A.x, A.y, A.w, A.h); g.clip();
+    termHits.push({ kind: 'map', x: A.x, y: A.y, w: A.w, h: A.h });
+    const target = questTarget();
+    const nodeSt = n => n.kind === 'quest' ? questState(QUEST_BY_ID[n.id])
+                      : n.kind === 'age' ? ageState(AGE_INDEX[n.id])
+                      : pkgState(SKILL_BY_ID[n.id]);
+    /* the label of every lane, with its rule running in to the first socket */
+    L.lanes.forEach((ln, i) => {
+      const y0 = Math.round(A.y + 6 + ln.row * laneH() + mapPan.y);
+      const first = L.nodes.filter(n => n.row === ln.row).sort((a, b) => a.col - b.col)[0];
+      const fx = first ? nodeXY(first).x : A.x + gutter();
+      if (i % 2) { g.fillStyle = 'rgba(255,240,200,.022)'; g.fillRect(A.x, y0 - 4, A.w, laneH()); }
+      if (narrow()) {
+        SPR.drawTiny(g, ln.label, A.x + 2 + Math.max(0, mapPan.x + 4), y0 - 2, '#c9a35f', 1);
+      } else {
+        const ly = y0 + (narrow() ? 8 : 0) + NODE / 2;
+        SPR.drawTiny(g, fitLabel(ln.label), A.x + 2, ly - 7, '#e8c88a', 1);
+        g.fillStyle = '#6a5034'; g.fillRect(A.x + 2, ly, Math.max(0, fx - A.x - 4), 1);
+        g.fillStyle = '#2a2018'; g.fillRect(A.x + 2, ly + 1, Math.max(0, fx - A.x - 4), 1);
+      }
+    });
+    /* the rails: from the right of a socket to the left of what it opens;
+       across and down in a right angle when the child is on another lane */
+    const rail = (x0, y0, x1, y1, lit) => {
+      g.fillStyle = '#0c0907';
+      const hx = Math.min(x0, x1), hw = Math.abs(x1 - x0) + 2, vy = Math.min(y0, y1), vh = Math.abs(y1 - y0) + 2;
+      if (y0 === y1) g.fillRect(hx, y0 - 1, hw, 4);
+      else if (x0 === x1) g.fillRect(x0 - 1, vy, 4, vh);
+      g.fillStyle = lit ? '#e0b048' : '#4a3a28';
+      if (y0 === y1) g.fillRect(hx, y0, hw, 2);
+      else if (x0 === x1) g.fillRect(x0, vy, 2, vh);
+      if (lit) {
+        g.fillStyle = '#ffe7a0';
+        if (y0 === y1) g.fillRect(hx, y0, hw, 1);
+        else if (x0 === x1) g.fillRect(x0, vy, 1, vh);
+      }
+    };
+    L.nodes.forEach(n => {
+      if (!n.pre || !L.byId[n.pre]) return;
+      const a = nodeXY(L.byId[n.pre]), b = nodeXY(n);
+      const pst = nodeSt(L.byId[n.pre]);
+      const lit = pst === 'done';
+      const ay = a.y + NODE / 2 - 1, by = b.y + NODE / 2 - 1;
+      if (n.row === L.byId[n.pre].row) rail(a.x + NODE + 1, ay, b.x - 2, ay, lit);
+      else if (b.col === L.byId[n.pre].col && n.kind !== 'quest') rail(a.x + NODE / 2 - 1, a.y + NODE + 9, a.x + NODE / 2 - 1, b.y - 5, lit);
+      else if (b.col > L.byId[n.pre].col) {
+        const mx = b.x - Math.round((COLW - NODE) / 2) - 1;
+        rail(a.x + NODE + 1, ay, mx, ay, lit);
+        rail(mx, ay, mx, by, lit);
+        rail(mx, by, b.x - 2, by, lit);
+      }
+      /* a quest that starts a new lane is the next page: no rail, the
+         numbers on the plates carry the order */
+    });
+    /* the sockets */
+    L.nodes.forEach(n => {
+      const p = nodeXY(n);
+      if (p.x > A.x + A.w + 4 || p.x + NODE < A.x - 4 || p.y > A.y + A.h + 4 || p.y + NODE + 10 < A.y - 4) return;
+      const st = nodeSt(n);
+      const sel = termSel === n.id, hov = termHover === n.id;
+      drawSocket(g, p.x, p.y, st, sel, hov, now);
+      let icon, hue;
+      if (n.kind === 'quest') { const q = QUEST_BY_ID[n.id]; icon = q.icon; hue = '#ffd23f'; }
+      else if (n.kind === 'age') { const a = AGES[AGE_INDEX[n.id]]; icon = a.icon; hue = a.hue; }
+      else { const sk = SKILL_BY_ID[n.id]; icon = sk.icon; hue = MOD_BY_ID[sk.br].hue; }
+      const look = st === 'done' || st === 'current' || st === 'ready' ? 'lit' : st === 'short' || st === 'later' ? 'dim' : 'dark';
+      g.drawImage(SPR.skillBadge(icon, hue, look, 1), p.x + 3, p.y + 3);
+      if (st === 'locked' || st === 'aged') drawChain(g, p.x, p.y, st === 'aged');
+      /* the plate */
+      if (n.kind === 'quest') {
+        const q = QUEST_BY_ID[n.id];
+        if (st === 'current') { const [c, t] = GAME.questProgress(q); drawPlate(g, p.x, p.y, c + '/' + t, '#fff8ec', t ? c / t : 0); }
+        else drawPlate(g, p.x, p.y, String(questIndex(q) + 1), st === 'done' ? '#ffd23f' : '#7a6448');
+      } else if (n.kind === 'age') {
+        const a = AGES[AGE_INDEX[n.id]];
+        if (st === 'current') { const [c, t] = GAME.ageProgress(a); drawPlate(g, p.x, p.y, c + '/' + t, '#fff8ec', t ? c / t : 0); }
+        else drawPlate(g, p.x, p.y, st === 'done' ? 'DONE' : 'AGE ' + (AGE_INDEX[n.id] + 1), st === 'done' ? '#ffd23f' : '#7a6448');
+      } else {
+        const sk = SKILL_BY_ID[n.id], cur = GAME.lvl(sk.id);
+        const txt = sk.max > 1 ? cur + '/' + sk.max : cur ? 'OK' : '0';
+        drawPlate(g, p.x, p.y, txt, st === 'done' ? '#ffd23f' : cur ? '#fff8ec' : pkgDark(st) ? '#6a5640' : '#c9a35f', sk.max > 1 ? cur / sk.max : undefined);
+      }
+      /* the install burst */
+      if (installFx && installFx.id === n.id && now - installFx.t < 700) {
+        const f = (now - installFx.t) / 700, r = Math.round(f * 12);
+        g.fillStyle = 'rgba(255,240,180,' + (1 - f).toFixed(2) + ')';
+        g.fillRect(p.x - r, p.y - r, NODE + r * 2, 1); g.fillRect(p.x - r, p.y + NODE + r - 1, NODE + r * 2, 1);
+        g.fillRect(p.x - r, p.y - r, 1, NODE + r * 2); g.fillRect(p.x + NODE + r - 1, p.y - r, 1, NODE + r * 2);
+      }
+      termHits.push({ kind: n.kind === 'quest' ? 'quest' : n.kind === 'age' ? 'age' : 'node', id: n.id, x: p.x - 3, y: p.y - 4, w: NODE + 6, h: NODE + 13 });
+    });
+    /* a bouncing arrow over the current quest and the package it wants */
+    const bounce = Math.round(Math.abs(Math.sin(now / 260)) * 3);
+    const arrow = (n) => {
+      const p = nodeXY(n), ax = p.x + NODE / 2, ay = p.y - 9 - bounce;
+      g.fillStyle = '#0c0907'; g.fillRect(ax - 3, ay - 4, 6, 5); g.fillRect(ax - 4, ay, 8, 2); g.fillRect(ax - 2, ay + 2, 4, 2);
+      g.fillStyle = '#fff8ec'; g.fillRect(ax - 2, ay - 3, 4, 3); g.fillRect(ax - 3, ay, 6, 1); g.fillRect(ax - 1, ay + 1, 2, 2);
+    };
+    const cq = GAME.currentQuest();
+    if (cq && L.byId[cq.id] && cq.id !== termSel) arrow(L.byId[cq.id]);
+    if (target && L.byId[target.id] && target.id !== termSel) arrow(L.byId[target.id]);
+    /* the frozen gutter: labels stay put while the lanes slide sideways */
+    if (!narrow() && mapPan.x < 0) {
+      g.fillStyle = 'rgba(23,18,14,.92)'; g.fillRect(A.x, A.y, gutter() - 6, A.h);
+      L.lanes.forEach(ln => {
+        const ly = Math.round(A.y + 6 + ln.row * laneH() + mapPan.y) + NODE / 2;
+        SPR.drawTiny(g, fitLabel(ln.label), A.x + 2, ly - 7, '#e8c88a', 1);
+      });
+    }
+    g.restore();
+    /* more to see: little brass arrows at the edges that can scroll */
+    const C = contentSize(L);
+    const edge = (x, y, dir) => {
+      g.fillStyle = '#0c0907'; g.fillRect(x - 3, y - 3, 7, 7);
+      g.fillStyle = '#e0b048';
+      if (dir === 'r') { g.fillRect(x - 1, y - 2, 1, 5); g.fillRect(x, y - 1, 1, 3); g.fillRect(x + 1, y, 1, 1); }
+      if (dir === 'l') { g.fillRect(x + 1, y - 2, 1, 5); g.fillRect(x, y - 1, 1, 3); g.fillRect(x - 1, y, 1, 1); }
+      if (dir === 'd') { g.fillRect(x - 2, y - 1, 5, 1); g.fillRect(x - 1, y, 3, 1); g.fillRect(x, y + 1, 1, 1); }
+      if (dir === 'u') { g.fillRect(x - 2, y + 1, 5, 1); g.fillRect(x - 1, y, 3, 1); g.fillRect(x, y - 1, 1, 1); }
+    };
+    if (C.w + mapPan.x > A.w + 1) edge(A.x + A.w - 5, A.y + A.h / 2, 'r');
+    if (mapPan.x < 0) edge(A.x + (narrow() ? 5 : gutter()), A.y + A.h / 2, 'l');
+    if (C.h + mapPan.y > A.h + 1) edge(A.x + A.w / 2, A.y + A.h - 5, 'd');
+    if (mapPan.y < 0) edge(A.x + A.w / 2, A.y + 5, 'u');
 
-    /* glass: scanlines, band, reflection */
-    SPR.drawScanlines(g, SCR.x, SCR.y, SCR.w, SCR.h, now);
-    g.fillStyle = 'rgba(255,255,255,.05)'; g.fillRect(SCR.x + 6, SCR.y + 4, 40, 2); g.fillRect(SCR.x + 6, SCR.y + 7, 20, 1);
+    /* ---- the foot: feathers to spend, like points left on a tree ---- */
+    const fy = A.footY;
+    g.fillStyle = '#5a4430'; g.fillRect(4, fy - 3, VW - 8, 1);
+    const fx = GAME.fmt(S().feathers) + ' FEATHERS';
+    const fw = SPR.tinyW(fx, 1) + 22;
+    const fh = compact() ? 12 : 14, ty = fy + (compact() ? 3 : 5);
+    g.fillStyle = '#0c0907'; g.fillRect(5, fy - 1, fw + 2, fh + 2);
+    g.fillStyle = '#2e2418'; g.fillRect(6, fy, fw, fh);
+    g.fillStyle = '#4a3a28'; g.fillRect(6, fy, fw, 1);
+    g.drawImage(SPR.iconSprite('feather', 1), 9, fy + (compact() ? 1 : 2));
+    SPR.drawTiny(g, fx, 22, ty, '#ffd23f', 1);
+    const readyN = L.nodes.filter(n => n.kind !== 'quest' && n.kind !== 'age' && pkgState(SKILL_BY_ID[n.id]) === 'ready').length;
+    const idle = boardTab === 'quests' ? 'TAP AN ORDER' : boardTab === 'ages' ? 'TAP AN AGE' : 'TAP A SKILL';
+    const selReady = termSel && L.byId[termSel] && SKILL_BY_ID[termSel] && pkgState(SKILL_BY_ID[termSel]) === 'ready';
+    const hintShown = selReady ? 'TAP AGAIN TO INSTALL' : readyN ? readyN + ' READY TO INSTALL' : idle;
+    SPR.drawTiny(g, hintShown, VW - 6 - SPR.tinyW(hintShown, 1), ty, readyN || hintShown.startsWith('TAP AGAIN') ? '#ffd23f' : '#8a7458', 1);
 
-    /* ---------- the pointer ---------- */
-    if (termMouse.inside) {
+    /* ---- the pointer (a mouse; a finger needs no arrow) ---- */
+    if (termMouse.inside && termMouse.mouse) {
       const over = termHitAt(termMouse.x, termMouse.y);
-      const kind = over && (over.kind === 'node' || over.kind === 'quest' || over.kind === 'age' || over.kind === 'install' || over.kind === 'mod' || over.kind === 'home' || over.kind === 'close') ? 'hand' : 'arrow';
+      const kind = over && over.kind !== 'map' ? 'hand' : 'arrow';
       const cur = SPR.cursorSprite(kind, 1);
       g.drawImage(cur, Math.round(termMouse.x) - (kind === 'hand' ? 4 : 0), Math.round(termMouse.y) - (kind === 'hand' ? 2 : 0));
     }
     g.setTransform(1, 0, 0, 1, 0, 0);
   }
 
-  function drawBoot(g, t, now) {
-    g.fillStyle = '#05100a'; g.fillRect(SCR.x, SCR.y, SCR.w, SCR.h);
-    const lines = ['EGGTRON BIOS v3.0', 'MEMORY 640 EGGS OK', 'CHECKING COOPS.... OK', 'MOUNTING FEATHERS.. OK',
-                   'LOADING EGGOS 5.0', 'RUNNING SKILLMAP.EXE'];
-    const n = Math.min(lines.length, Math.floor(t / 0.16));
-    for (let i = 0; i < n; i++) SPR.drawText(g, lines[i], SCR.x + 6, SCR.y + 6 + i * 9, i === n - 1 ? '#d8ffe8' : '#7ef2a8', 1);
-    if (n < lines.length && Math.floor(now / 120) % 2) { g.fillStyle = '#7ef2a8'; g.fillRect(SCR.x + 6 + SPR.textW(lines[n] || '', 1) * 0, SCR.y + 6 + n * 9, 4, 6); }
-    if (t > 1.0) { g.fillStyle = 'rgba(200,255,220,' + ((t - 1.0) / 0.15) + ')'; g.fillRect(SCR.x, SCR.y, SCR.w, SCR.h); }
-  }
-
-  function drawDesktop(g, now) {
-    /* wallpaper */
-    g.fillStyle = '#0f2a24'; g.fillRect(SCR.x, SCR.y, SCR.w, SCR.h);
-    g.fillStyle = '#123229';
-    for (let y = SCR.y; y < SCR.y + SCR.h; y += 12) for (let x = SCR.x + ((y / 12) % 2) * 8; x < SCR.x + SCR.w; x += 16) { g.fillRect(x + 2, y + 3, 3, 4); g.fillRect(x + 1, y + 4, 5, 2); }
-
-    /* ---- SKILLMAP window ---- */
-    drawWindow(g, MAPW, 'SKILLMAP.EXE', now);
-    const inner = mapInner();
-    g.save();
-    g.beginPath(); g.rect(inner.x, inner.y, inner.w, inner.h); g.clip();
-    /* the drag area goes in first so every node drawn on top of it wins the hit test */
-    termHits.push({ kind: 'map', x: inner.x, y: inner.y, w: inner.w, h: inner.h });
-    g.fillStyle = MAP_BG; g.fillRect(inner.x, inner.y, inner.w, inner.h);
-    /* dotted board */
-    g.fillStyle = '#0f2e22';
-    const ox = inner.x + GUT + mapPan.x, oy = inner.y + 8 + mapPan.y;
-    for (let x = ox + NODE / 2; x < inner.x + inner.w; x += COLW) for (let y = oy + NODE / 2; y < inner.y + inner.h; y += ROWH) if (x > inner.x + GUT) g.fillRect(Math.round(x), Math.round(y), 1, 1);
-    /* lane bands */
-    GRID.lanes.forEach((L, i) => {
-      const y0 = Math.round(oy + L.top * ROWH - 3), h = L.rows * ROWH;
-      if (i % 2) { g.fillStyle = 'rgba(255,255,255,.028)'; g.fillRect(inner.x, y0, inner.w, h); }
-      g.fillStyle = 'rgba(126,242,168,.12)'; g.fillRect(inner.x, y0, inner.w, 1);
-    });
-
-    /* axis-aligned 1px segments; dotted when the way is not yet open */
-    const seg = (x0, y0, x1, y1, col, dotted) => {
-      const dx = Math.sign(x1 - x0), dy = Math.sign(y1 - y0);
-      const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
-      g.fillStyle = col;
-      for (let i = 0; i <= n; i++) {
-        if (dotted && (i % 4) > 1) continue;
-        g.fillRect(x0 + dx * i, y0 + dy * i, 1, 1);
-      }
-    };
-    /* an elbow from the right edge of a to the left edge of b */
-    const elbow = (a, b, col, dotted) => {
-      const ax = a.x + NODE, ay = a.y + NODE / 2, bx = b.x, by = b.y + NODE / 2;
-      if (a.col === b.col) { seg(a.x + NODE / 2, a.y + NODE, a.x + NODE / 2, b.y - 1, col, dotted); return; }
-      const mx = bx - 6;
-      seg(ax, ay, mx, ay, col, dotted);
-      if (by !== ay) seg(mx, ay, mx, by, col, dotted);
-      seg(mx, by, bx - 1, by, col, dotted);
-    };
-    const target = questTarget();
-    const onPath = new Set();
-    if (target) { let sk = SKILL_BY_ID[target.id]; while (sk) { onPath.add(sk.id); sk = skillPrereq(sk); } }
-
-    const visible = SKILLS.filter(pkgVisible);
-    const root = nodePos('root');
-    /* the trunk: every first package hangs off the kernel down the left edge */
-    const firsts = visible.filter(sk => sk.pre === 'root');
-    let trunkEnd = root.y + NODE;
-    firsts.forEach(sk => { trunkEnd = Math.max(trunkEnd, nodePos(sk.id).y + NODE / 2); });
-    seg(root.x + NODE / 2, root.y + NODE, root.x + NODE / 2, trunkEnd, 'rgba(201,163,95,.55)', false);
-    /* paths: installed -> child */
-    visible.forEach(sk => {
-      if (!sk.pre) return;
-      const a = nodePos(sk.pre), b = nodePos(sk.id);
-      const st = pkgState(sk);
-      const hue = MOD_BY_ID[sk.br].hue;
-      const col = onPath.has(sk.id) && st !== 'done' ? '#ffffff' : st === 'done' ? hue : st === 'ready' ? '#ffc72f' : pkgDark(st) ? '#173226' : '#2f6a48';
-      if (sk.pre === 'root') seg(root.x + NODE / 2 + 1, b.y + NODE / 2, b.x - 1, b.y + NODE / 2, col, st !== 'done');
-      else elbow(a, b, col, st !== 'done');
-    });
-    /* the quest chain zigzags along the top */
-    QUESTS.forEach((q, i) => {
-      if (!i || !questVisible(q)) return;
-      const a = nodePos(QUESTS[i - 1].id), b = nodePos(q.id);
-      const done = GAME.questDone(QUESTS[i - 1]);
-      const col = done ? '#ffd23f' : '#4a4a2a';
-      if (a.col === b.col) seg(a.x + NODE / 2, a.y + NODE, a.x + NODE / 2, b.y - 1, col, !done);
-      else { seg(a.x + NODE, a.y + NODE / 2, b.x - 6, a.y + NODE / 2, col, !done); seg(b.x - 6, a.y + NODE / 2, b.x - 6, b.y + NODE / 2, col, !done); seg(b.x - 6, b.y + NODE / 2, b.x - 1, b.y + NODE / 2, col, !done); }
-    });
-
-    /* a node: shadow, cube, glyph, then what state it is in */
-    const ring = (x, y, col) => {
-      g.fillStyle = col;
-      g.fillRect(x - 2, y - 2, NODE + 4, 1); g.fillRect(x - 2, y + NODE + 1, NODE + 4, 1);
-      g.fillRect(x - 2, y - 2, 1, NODE + 4); g.fillRect(x + NODE + 1, y - 2, 1, NODE + 4);
-    };
-    const drawNode = (id, hue, st, icon, kind, sel, hov) => {
-      const p = nodePos(id);
-      if (p.x < inner.x + GUT - NODE || p.x > inner.x + inner.w + 4 || p.y < inner.y - NODE - 4 || p.y > inner.y + inner.h + 4) return;
-      g.fillStyle = 'rgba(0,0,0,.4)'; g.fillRect(p.x + 1, p.y + 2, NODE + 1, NODE);
-      const dim = st === 'short' || st === 'later' ? 0.5 : pkgDark(st) ? 0.3 : 1;
-      SPR.drawCube(g, p.x, p.y, NODE, nodePal(st, hue), { depth: dim < 1 ? 1 : 2, bg: MAP_BG });
-      g.globalAlpha = dim;
-      g.drawImage(SPR.iconSprite(icon, 1), p.x + 2, p.y + 2);
-      g.globalAlpha = 1;
-      /* a little padlock on anything the tree has not reached yet */
-      if (pkgDark(st)) {
-        g.fillStyle = '#0f1f16'; g.fillRect(p.x + NODE - 6, p.y + NODE - 7, 6, 7);
-        g.fillStyle = st === 'aged' ? '#8a7a3a' : '#5a7a88';
-        g.fillRect(p.x + NODE - 5, p.y + NODE - 4, 4, 3); g.fillRect(p.x + NODE - 4, p.y + NODE - 6, 1, 2); g.fillRect(p.x + NODE - 3, p.y + NODE - 6, 1, 2);
-      }
-      if (sel || hov) ring(p.x, p.y, sel ? '#ffffff' : 'rgba(255,255,255,.55)');
-      if ((st === 'ready' || st === 'current') && Math.floor(now / 340) % 2) ring(p.x, p.y, st === 'ready' ? 'rgba(255,214,80,.85)' : 'rgba(255,255,255,.7)');
-      if (installFx && installFx.id === id && now - installFx.t < 600) {
-        const f = (now - installFx.t) / 600;
-        const r2 = Math.round(f * 8);
-        g.fillStyle = 'rgba(255,255,255,' + (1 - f) + ')';
-        g.fillRect(p.x - r2, p.y - r2, NODE + r2 * 2, 1); g.fillRect(p.x - r2, p.y + NODE + r2 - 1, NODE + r2 * 2, 1);
-        g.fillRect(p.x - r2, p.y - r2, 1, NODE + r2 * 2); g.fillRect(p.x + NODE + r2 - 1, p.y - r2, 1, NODE + r2 * 2);
-      }
-      /* kind badges in the bottom-right corner */
-      if (pkgDark(st)) { /* the padlock says it all */ }
-      else if (kind === 'unlock' && st !== 'done') {
-        g.fillStyle = '#0f1f16'; g.fillRect(p.x + NODE - 5, p.y + NODE - 6, 5, 6);
-        g.fillStyle = st === 'ready' ? '#ffd23f' : '#4fb072'; g.fillRect(p.x + NODE - 4, p.y + NODE - 3, 3, 2); g.fillRect(p.x + NODE - 3, p.y + NODE - 5, 1, 2);
-      } else if (kind === 'unlock' || (kind === 'quest' && st === 'done')) {
-        g.fillStyle = '#0f1f16'; g.fillRect(p.x + NODE - 6, p.y + NODE - 6, 6, 6);
-        g.fillStyle = '#7ef2a8'; g.fillRect(p.x + NODE - 5, p.y + NODE - 3, 1, 1); g.fillRect(p.x + NODE - 4, p.y + NODE - 2, 1, 1); g.fillRect(p.x + NODE - 3, p.y + NODE - 3, 1, 1); g.fillRect(p.x + NODE - 2, p.y + NODE - 4, 1, 1);
-      } else if (kind === 'quest') {
-        g.fillStyle = '#0f1f16'; g.fillRect(p.x + NODE - 5, p.y + NODE - 6, 5, 6);
-        g.fillStyle = st === 'current' ? '#ffffff' : '#7a6a2a'; g.fillRect(p.x + NODE - 4, p.y + NODE - 5, 1, 4); g.fillRect(p.x + NODE - 3, p.y + NODE - 5, 2, 2);
-      }
-      return p;
-    };
-    visible.forEach(sk => {
-      const st = sk.id === 'root' ? 'root' : pkgState(sk);
-      const hue = MOD_BY_ID[sk.br].hue;
-      const p = drawNode(sk.id, hue, st, sk.icon, sk.kind, termSel === sk.id, termHover === sk.id);
-      if (!p) return;
-      /* stat nodes carry their level as pips along the foot */
-      if (sk.kind === 'stat') {
-        const cur = GAME.lvl(sk.id), n = Math.min(sk.max, 6);
-        for (let i = 0; i < n; i++) {
-          const lit = cur > Math.round(i * sk.max / n);
-          g.fillStyle = lit ? '#fff8ec' : 'rgba(0,0,0,.5)';
-          g.fillRect(p.x + 1 + i * 2, p.y + NODE + 3, 1, 1);
-        }
-        if (sk.max > 6 && cur >= sk.max) { g.fillStyle = '#ffd23f'; g.fillRect(p.x + 1, p.y + NODE + 3, 12, 1); }
-      }
-      termHits.push({ kind: 'node', id: sk.id, x: p.x - 1, y: p.y - 2, w: NODE + 3, h: NODE + 3 });
-    });
-    QUESTS.forEach(q => {
-      if (!questVisible(q)) return;
-      const st = questState(q);
-      const p = drawNode(q.id, '#ffd23f', st, q.icon, 'quest', termSel === q.id, termHover === q.id);
-      if (!p) return;
-      if (st === 'current') {
-        const [cur, n] = GAME.questProgress(q);
-        g.fillStyle = '#0f1f16'; g.fillRect(p.x - 1, p.y + NODE + 2, NODE + 2, 3);
-        g.fillStyle = '#ffd23f'; g.fillRect(p.x, p.y + NODE + 3, Math.round(NODE * cur / n), 1);
-      }
-      termHits.push({ kind: 'quest', id: q.id, x: p.x - 1, y: p.y - 2, w: NODE + 3, h: NODE + 3 });
-    });
-    /* the ages, in a row of their own: reached, next, and still to come */
-    AGES.forEach((a, i) => {
-      const cur = GAME.ageIndex();
-      const st = i <= cur ? 'done' : i === cur + 1 ? 'current' : 'later';
-      if (i) {
-        const p0 = nodePos(AGES[i - 1].id), p1 = nodePos(a.id);
-        seg(p0.x + NODE, p0.y + NODE / 2, p1.x - 1, p1.y + NODE / 2, i <= cur ? a.hue : '#3a3a2a', i > cur);
-      }
-      const p = drawNode(a.id, a.hue, st, a.icon, 'age', termSel === a.id, termHover === a.id);
-      if (!p) return;
-      if (st === 'current') {
-        const [c2, n2] = GAME.ageProgress(a);
-        g.fillStyle = '#0f1f16'; g.fillRect(p.x - 1, p.y + NODE + 2, NODE + 2, 3);
-        g.fillStyle = a.hue; g.fillRect(p.x, p.y + NODE + 3, Math.round(NODE * c2 / n2), 1);
-      }
-      termHits.push({ kind: 'age', id: a.id, x: p.x - 1, y: p.y - 2, w: NODE + 3, h: NODE + 3 });
-    });
-    /* the way forward: a bouncing arrow over the current quest, and over
-       the package it wants you to install */
-    const bounce = Math.round(Math.abs(Math.sin(now / 260)) * 2);
-    const arrow = (p, col) => {
-      const ax = p.x + NODE / 2, ay = p.y - 7 - bounce;
-      g.fillStyle = col;
-      g.fillRect(ax - 1, ay - 3, 2, 3); g.fillRect(ax - 2, ay, 4, 1); g.fillRect(ax - 1, ay + 1, 2, 1);
-    };
-    const cq = GAME.currentQuest();
-    if (cq && cq.id !== termSel) arrow(nodePos(cq.id), '#fff8ec');
-    if (target && target.id !== termSel) arrow(nodePos(target.id), '#fff8ec');
-
-    /* the gutter: lane names, frozen while the board pans sideways */
-    g.fillStyle = MAP_BG; g.fillRect(inner.x, inner.y, GUT - 2, inner.h);
-    GRID.lanes.forEach((L, i) => {
-      const y0 = Math.round(oy + L.top * ROWH - 3), h = L.rows * ROWH;
-      if (i % 2) { g.fillStyle = 'rgba(255,255,255,.028)'; g.fillRect(inner.x, y0, GUT - 2, h); }
-      const m = MOD_BY_ID[L.id];
-      const ready = (L.id === 'quests' || L.id === 'ages') ? false : SKILLS_BY_MODULE[MOD_INDEX[L.id]].some(sk => pkgState(sk) === 'ready');
-      const shut = m.age && !GAME.laneOpen(m.id);
-      g.fillStyle = shut ? '#2a3a34' : m.hue; g.fillRect(inner.x, y0 + 1, 2, h - 1);
-      SPR.drawTiny(g, m.name, inner.x + 4, y0 + 4, shut ? '#3a5560' : m.hue, 1);
-      if (shut) SPR.drawTiny(g, AGES[AGE_INDEX[m.age]].name.split(' ')[0].toUpperCase(), inner.x + 4, y0 + 11, '#3a5560', 1);
-      if (ready && Math.floor(now / 340) % 2) { g.fillStyle = '#ffd23f'; g.fillRect(inner.x + 4 + SPR.tinyW(m.name, 1) + 2, y0 + 5, 2, 2); }
-    });
-    g.fillStyle = 'rgba(126,242,168,.18)'; g.fillRect(inner.x + GUT - 2, inner.y, 1, inner.h);
-    g.restore();
-    /* window status line */
-    const tot = SKILLS.length - 1, inst = SKILLS.filter(sk => sk.id !== 'root' && GAME.lvl(sk.id) >= sk.max).length;
-    const doneQ = QUESTS.filter(GAME.questDone).length;
-    const status = inst + '/' + tot + ' IN  QUESTS ' + doneQ + '/' + QUESTS.length + '  ' + GAME.age().name.toUpperCase();
-    g.fillStyle = 'rgba(8,26,20,.85)'; g.fillRect(inner.x + 1, inner.y + inner.h - 9, SPR.tinyW(status, 1) + 4, 8);
-    SPR.drawTiny(g, status, inner.x + 3, inner.y + inner.h - 7, '#4fb072', 1);
-
-    /* ---- README window ---- */
-    drawWindow(g, RDW, 'README.TXT', now);
-    const rx = RDW.x + 4, ry = RDW.y + 14;
-    g.fillStyle = '#0b1f18'; g.fillRect(RDW.x + 1, RDW.y + 10, RDW.w - 2, RDW.h - 11);
-    const wrap = (text, x, y, col) => {
-      let line = '', y2 = y;
-      text.toUpperCase().split(' ').forEach(w => {
-        if (SPR.tinyW(line + ' ' + w, 1) > RDW.w - 10) { SPR.drawTiny(g, line, x, y2, col, 1); y2 += 7; line = w; }
-        else line = line ? line + ' ' + w : w;
-      });
-      if (line) { SPR.drawTiny(g, line, x, y2, col, 1); y2 += 7; }
-      return y2;
-    };
-    const sk = termSel && SKILL_BY_ID[termSel] ? SKILL_BY_ID[termSel] : null;
-    const q = termSel && QUEST_BY_ID[termSel] ? QUEST_BY_ID[termSel] : null;
-    if (sk) {
-      const st = sk.id === 'root' ? 'root' : pkgState(sk);
-      const hue = MOD_BY_ID[sk.br].hue;
-      SPR.drawCube(g, rx + 1, ry + 3, 16, nodePal(st, hue), { depth: 2, bg: '#0b1f18' });
-      g.drawImage(SPR.iconSprite(sk.icon, 1), rx + 4, ry + 6);
-      const words = sk.name.toUpperCase().split(' ');
-      words.slice(0, 2).forEach((w, i) => SPR.drawTiny(g, w, rx + 22, ry + 1 + i * 7, '#d8ffe8', 1));
-      SPR.drawTiny(g, sk.kind === 'unlock' ? 'UNLOCK' : MOD_BY_ID[sk.br].code, rx + 22, ry + 15, sk.kind === 'unlock' ? '#ffd23f' : '#4fb072', 1);
-      let y2 = wrap(sk.desc, rx, ry + 25, '#7ef2a8') + 4;
-      const cur = GAME.lvl(sk.id);
-      if (sk.id !== 'root') {
-        SPR.drawTiny(g, 'LEVEL ' + cur + ' / ' + sk.max, rx, y2, '#d8ffe8', 1); y2 += 7;
-        if (sk.max > 1) { SPR.drawPips(g, rx, y2, cur, Math.min(sk.max, 12), hue, '#1d3628'); y2 += 8; }
-        if (st !== 'done') {
-          const cost = skillCost(sk, cur);
-          SPR.drawTiny(g, 'COST ' + GAME.fmt(cost) + ' FEATHERS', rx, y2, st === 'ready' ? '#ffd23f' : '#e8607a', 1); y2 += 9;
-          const bw = RDW.w - 10, bh = 13, bx = rx, by = RDW.y + RDW.h - 20;
-          const busy = installFx && now - installFx.t < 500;
-          SPR.drawBox(g, bx, by, bw, bh, st === 'ready' ? SPR.darken('#ffc72f', 0.35) : '#1d2a22', st === 'ready' ? '#ffc72f' : null, st === 'ready' ? '#ffc72f' : '#2f6a48');
-          if (busy) {
-            const f = (now - installFx.t) / 500;
-            g.fillStyle = '#7ef2a8'; g.fillRect(bx + 2, by + 2, Math.round((bw - 4) * f), bh - 4);
-            SPR.drawTiny(g, 'INSTALLING', bx + 6, by + 4, '#03110a', 1);
-          } else {
-            const lab2 = st === 'ready' ? '> INSTALL' : st === 'aged' ? AGES[AGE_INDEX[MOD_BY_ID[sk.br].age]].name.toUpperCase()
-                       : st === 'locked' ? 'NEEDS ' + skillPrereq(sk).name.toUpperCase().slice(0, 10) : 'NEED MORE';
-            SPR.drawTiny(g, lab2, bx + Math.round(bw / 2 - SPR.tinyW(lab2, 1) / 2), by + 4, st === 'ready' ? '#fff8ec' : '#4fb072', 1);
-          }
-          if (st === 'ready') termHits.push({ kind: 'install', id: sk.id, x: bx, y: by, w: bw, h: bh });
-        } else {
-          SPR.drawTiny(g, 'INSTALLED', rx, RDW.y + RDW.h - 16, '#4fb072', 1);
-        }
-      } else {
-        SPR.drawTiny(g, 'THE KERNEL.', rx, y2, '#d8ffe8', 1);
-        SPR.drawTiny(g, 'EVERY LANE STARTS HERE.', rx, y2 + 7, '#7ef2a8', 1);
-      }
-    } else if (termSel && AGE_INDEX[termSel] !== undefined) {
-      /* an age: what it takes to get there, ticked off */
-      const a = AGES[AGE_INDEX[termSel]], ai = AGE_INDEX[termSel], cur = GAME.ageIndex();
-      const st = ai <= cur ? 'done' : ai === cur + 1 ? 'current' : 'later';
-      SPR.drawCube(g, rx + 1, ry + 3, 16, nodePal(st, a.hue), { depth: 2, bg: '#0b1f18' });
-      g.drawImage(SPR.iconSprite(a.icon, 1), rx + 4, ry + 6);
-      a.name.toUpperCase().split(' ').slice(0, 2).forEach((w, i) => SPR.drawTiny(g, w, rx + 22, ry + 1 + i * 7, '#d8ffe8', 1));
-      SPR.drawTiny(g, ai <= cur ? (ai === cur ? 'NOW' : 'PAST') : 'AGE ' + (ai + 1), rx + 22, ry + 15, a.hue, 1);
-      let y2 = wrap(a.blurb, rx, ry + 25, '#7ef2a8') + 4;
-      const needs = GAME.ageNeeds(a);
-      if (!needs.length) { SPR.drawTiny(g, 'WHERE IT ALL STARTED', rx, y2, '#4fb072', 1); y2 += 7; }
-      needs.forEach(n => {
-        g.fillStyle = n.ok ? '#7ef2a8' : '#1d3628'; g.fillRect(rx, y2 + 1, 4, 4);
-        if (n.ok) { g.fillStyle = '#03110a'; g.fillRect(rx + 1, y2 + 2, 2, 2); }
-        const txt = (n.k === 'moon' ? '' : GAME.fmt(n.have) + '/' + GAME.fmt(n.want) + ' ') + n.name.toUpperCase();
-        SPR.drawTiny(g, txt.slice(0, 22), rx + 6, y2, n.ok ? '#d8ffe8' : '#4fb072', 1); y2 += 7;
-      });
-      const opens = MODULES.filter(m => m.age === a.id).map(m => m.name).join(', ');
-      if (opens) { SPR.drawTiny(g, 'OPENS ' + opens, rx, y2 + 2, '#ffd23f', 1); y2 += 9; }
-      SPR.drawTiny(g, '+' + Math.round(ECON.ageBonus * 100 * ai) + '% ON EVERY COIN', rx, RDW.y + RDW.h - 16, ai <= cur ? '#7ef2a8' : '#4fb072', 1);
-    } else if (q) {
-      const st = questState(q);
-      SPR.drawCube(g, rx + 1, ry + 3, 16, nodePal(st, '#ffd23f'), { depth: 2, bg: '#0b1f18' });
-      g.drawImage(SPR.iconSprite(q.icon, 1), rx + 4, ry + 6);
-      q.name.toUpperCase().split(' ').slice(0, 2).forEach((w, i) => SPR.drawTiny(g, w, rx + 22, ry + 1 + i * 7, '#d8ffe8', 1));
-      SPR.drawTiny(g, 'QUEST ' + (questIndex(q) + 1), rx + 22, ry + 15, '#ffd23f', 1);
-      let y2 = wrap(q.hint, rx, ry + 25, '#7ef2a8') + 4;
-      const [cur, n] = GAME.questProgress(q);
-      SPR.drawTiny(g, st === 'done' ? 'DONE' : 'PROGRESS ' + cur + ' / ' + n, rx, y2, st === 'done' ? '#4fb072' : '#d8ffe8', 1); y2 += 8;
-      g.fillStyle = '#1d3628'; g.fillRect(rx, y2, RDW.w - 10, 3);
-      g.fillStyle = '#ffd23f'; g.fillRect(rx, y2, Math.round((RDW.w - 10) * (st === 'done' ? 1 : cur / n)), 3); y2 += 7;
-      const rw = [];
-      if (q.rw.c) rw.push(GAME.fmt(q.rw.c) + ' COINS');
-      if (q.rw.f) rw.push(q.rw.f + ' FEATHERS');
-      SPR.drawTiny(g, 'REWARD ' + rw.join(' + '), rx, y2, '#ffd23f', 1);
-      if (st === 'later') SPR.drawTiny(g, 'AFTER THE ONE BEFORE', rx, RDW.y + RDW.h - 16, '#4fb072', 1);
-      if (st === 'current') SPR.drawTiny(g, 'PAYS OUT BY ITSELF', rx, RDW.y + RDW.h - 16, '#4fb072', 1);
-    } else {
-      const cq2 = GAME.currentQuest();
-      SPR.drawTiny(g, 'TAP A CUBE', rx, ry, '#d8ffe8', 1);
-      let y2 = ry + 12;
-      if (cq2) {
-        SPR.drawTiny(g, 'NEXT STEP', rx, y2, '#ffd23f', 1); y2 += 8;
-        y2 = wrap(cq2.name, rx, y2, '#fff8ec');
-        const [cur, n] = GAME.questProgress(cq2);
-        SPR.drawTiny(g, cur + ' / ' + n, rx, y2, '#d8ffe8', 1);
-      } else SPR.drawTiny(g, 'EVERY QUEST DONE', rx, y2, '#ffd23f', 1);
+  /* the big gear in the background of every tree, turning very slowly */
+  function drawGearMark(g, cx, cy, r, now) {
+    const teeth = 14, rot = now / 24000;
+    g.fillStyle = 'rgba(255,220,160,.035)';
+    for (let i = 0; i < teeth; i++) {
+      const a = rot + i / teeth * Math.PI * 2;
+      const tx = Math.round(cx + Math.cos(a) * r), ty = Math.round(cy + Math.sin(a) * r);
+      g.fillRect(tx - 5, ty - 5, 10, 10);
     }
-
-    /* ---- taskbar ---- */
-    const tb = { x: SCR.x, y: SCR.y + SCR.h - 14, w: SCR.w, h: 14 };
-    g.fillStyle = '#1d3628'; g.fillRect(tb.x, tb.y, tb.w, tb.h);
-    g.fillStyle = '#2f6a48'; g.fillRect(tb.x, tb.y, tb.w, 1);
-    SPR.drawBox(g, tb.x + 3, tb.y + 2, 34, 10, '#2a4a3a', '#4fb072', '#0f1f16');
-    g.drawImage(SPR.iconSprite('egg', 1), tb.x + 5, tb.y + 2);
-    SPR.drawTiny(g, 'EGGOS', tb.x + 16, tb.y + 4, '#d8ffe8', 1);
-    termHits.push({ kind: 'home', x: tb.x + 3, y: tb.y + 2, w: 34, h: 10 });
-    /* lane chips: click to pan there */
-    MODULES.forEach((m, i) => {
-      const cx = tb.x + 42 + i * 14;
-      const has = m.id === 'quests' || m.id === 'ages' || GAME.laneOpen(m.id);
-      const ready = (m.id === 'quests' || m.id === 'ages') ? false : SKILLS_BY_MODULE[i].some(sk => pkgState(sk) === 'ready');
-      SPR.drawBox(g, cx, tb.y + 2, 12, 10, has ? SPR.darken(m.hue, 0.5) : '#142a20', has ? m.hue : null, '#0f1f16');
-      g.globalAlpha = has ? 1 : 0.4;
-      g.drawImage(SPR.iconSprite(m.icon, 1), cx + 1, tb.y + 2);
-      g.globalAlpha = 1;
-      g.fillStyle = has ? m.hue : '#24382c';
-      g.fillRect(cx + 1, tb.y + 10, 10, 1);
-      if (ready && Math.floor(now / 340) % 2) { g.fillStyle = '#ffd23f'; g.fillRect(cx + 9, tb.y + 2, 3, 3); }
-      termHits.push({ kind: 'mod', i, x: cx, y: tb.y + 2, w: 12, h: 10 });
-    });
-    const fx = 'FEATHERS ' + GAME.fmt(S().feathers);
-    SPR.drawTiny(g, fx, tb.x + tb.w - 4 - SPR.tinyW(fx, 1), tb.y + 4, '#ffd23f', 1);
+    for (let ring = 0; ring < 3; ring++) {
+      const rr = r * (0.9 - ring * 0.28);
+      for (let i = 0; i < 64; i++) {
+        const a = i / 64 * Math.PI * 2;
+        g.fillRect(Math.round(cx + Math.cos(a) * rr) - 1, Math.round(cy + Math.sin(a) * rr) - 1, 3, 3);
+      }
+    }
   }
 
-  function drawWindow(g, r, title, now) {
-    g.fillStyle = '#0f1f16'; g.fillRect(r.x - 1, r.y - 1, r.w + 2, r.h + 2);
-    g.fillStyle = '#2a4a3a'; g.fillRect(r.x, r.y, r.w, 9);
-    g.fillStyle = '#4fb072'; g.fillRect(r.x, r.y, r.w, 1);
-    SPR.drawTiny(g, title, r.x + 3, r.y + 2, '#d8ffe8', 1);
-    /* buttons */
-    g.fillStyle = '#7ef2a8'; g.fillRect(r.x + r.w - 15, r.y + 2, 5, 5);
-    g.fillStyle = '#e8607a'; g.fillRect(r.x + r.w - 8, r.y + 2, 5, 5);
-    g.fillStyle = '#0f1f16'; g.fillRect(r.x + r.w - 14, r.y + 5, 3, 1); g.fillRect(r.x + r.w - 7, r.y + 3, 1, 1); g.fillRect(r.x + r.w - 5, r.y + 3, 1, 1); g.fillRect(r.x + r.w - 6, r.y + 4, 1, 1); g.fillRect(r.x + r.w - 7, r.y + 5, 1, 1); g.fillRect(r.x + r.w - 5, r.y + 5, 1, 1);
-    termHits.push({ kind: 'close', x: r.x + r.w - 9, y: r.y + 1, w: 8, h: 8 });
+  /* fit the canvas to its box, at a whole number of device pixels to a
+     board pixel: two CSS pixels to a board pixel on a wide screen, one
+     and a half on a phone, where the board has to be denser to fit */
+  function sizeBoard() {
+    if (!termCv) return;
+    const wrap = $('#tree-wrap');
+    const r = wrap.getBoundingClientRect();
+    if (r.width < 10 || r.height < 10) return;
+    const dpr = window.devicePixelRatio || 1;
+    const per = r.width < 560 || r.height < 320 ? 1.5 : 2;
+    TK = Math.max(1, Math.round(dpr * per));
+    const dw = Math.round(r.width * dpr), dh = Math.round(r.height * dpr);
+    if (termCv.width !== dw || termCv.height !== dh) { termCv.width = dw; termCv.height = dh; }
+    VW = Math.floor(dw / TK); VH = Math.floor(dh / TK);
+    termCtx = termCv.getContext('2d');
+    clampPan();
   }
 
   function termHitAt(cx, cy) {
@@ -7005,7 +6995,7 @@
       const hint = document.createElement('span');
       hint.className = 'sk-hint';
       const cq = GAME.currentQuest();
-      hint.textContent = cq ? cq.hint : 'tap a cube.';
+      hint.textContent = cq ? cq.hint : 'tap a skill.';
       card.appendChild(hint);
       return;
     }
@@ -7018,7 +7008,7 @@
     const b = document.createElement('b');
     b.textContent = sk.name;
     const small = document.createElement('small');
-    small.textContent = ' ' + cur + '/' + sk.max + '  ' + MOD_BY_ID[sk.br].code + (sk.kind === 'unlock' ? '  UNLOCK' : '');
+    small.textContent = ' ' + cur + '/' + sk.max + '  ' + MOD_BY_ID[sk.br].name.toUpperCase() + (sk.kind === 'unlock' ? '  UNLOCK' : '');
     b.appendChild(small);
     mid.appendChild(b);
     const desc = document.createElement('span');
@@ -7048,12 +7038,14 @@
   function renderSkills() {
     if (!termCv) {
       termCv = $('#tree-canvas');
-      termCv.width = TERM_W; termCv.height = TERM_H;
       termCtx = termCv.getContext('2d');
+      if (window.ResizeObserver) new ResizeObserver(() => sizeBoard()).observe($('#tree-wrap'));
+      window.addEventListener('resize', () => sizeBoard());
       termCv.addEventListener('pointermove', ev => {
         const p = termCoords(ev);
-        termMouse = { x: p.x, y: p.y, inside: true };
+        termMouse = { x: p.x, y: p.y, inside: true, mouse: ev.pointerType === 'mouse' };
         if (mapDrag) {
+          if (Math.abs(p.x - mapDrag.x) + Math.abs(p.y - mapDrag.y) > 3) mapDrag.moved = true;
           mapPan = { x: mapDrag.px + (p.x - mapDrag.x), y: mapDrag.py + (p.y - mapDrag.y) };
           clampPan();
           return;
@@ -7064,41 +7056,51 @@
       termCv.addEventListener('pointerleave', () => { termMouse.inside = false; termHover = null; mapDrag = null; });
       termCv.addEventListener('pointerdown', ev => {
         ev.preventDefault();
-        termCv.setPointerCapture(ev.pointerId);
+        try { termCv.setPointerCapture(ev.pointerId); } catch (e) {}
         const p = termCoords(ev);
-        termMouse = { x: p.x, y: p.y, inside: true };
+        termMouse = { x: p.x, y: p.y, inside: true, mouse: ev.pointerType === 'mouse' };
         const h = termHitAt(p.x, p.y);
         if (!h) return;
-        if (h.kind === 'node' || h.kind === 'quest' || h.kind === 'age') { termSel = h.id; snd.plop(); renderSkillCard(); mapDrag = null; return; }
-        if (h.kind === 'install') { installPkg(h.id); return; }
-        if (h.kind === 'mod') {
-          const m = MODULES[h.i];
-          const first = m.id === 'quests' ? (GAME.currentQuest() || QUESTS[0]) : m.id === 'ages' ? (GAME.nextAge() || GAME.age()) : SKILLS_BY_MODULE[h.i][0];
-          if (first) { centerOn(first.id); snd.plop(); }
+        if (h.kind === 'tab') { setTab(h.id); snd.plop(); renderSkillCard(); return; }
+        /* a press on a socket may still turn into a drag of the board; it
+           only counts as a tap when it lets go where it started */
+        mapDrag = { x: p.x, y: p.y, px: mapPan.x, py: mapPan.y, hit: h.kind === 'map' ? null : h, moved: false };
+      });
+      termCv.addEventListener('pointerup', () => {
+        const d = mapDrag;
+        mapDrag = null;
+        if (!d || d.moved || !d.hit) return;
+        const h = d.hit, now = performance.now();
+        /* tap to pick, tap the picked one again to install it */
+        if (h.kind === 'node' && termSel === h.id && SKILL_BY_ID[h.id] && pkgState(SKILL_BY_ID[h.id]) === 'ready' && now - lastTap.t < 4000) {
+          installPkg(h.id);
+          lastTap = { id: null, t: 0 };
           return;
         }
-        if (h.kind === 'home') { mapPan = { x: 0, y: 0 }; snd.plop(); return; }
-        if (h.kind === 'close') { closeModals(); snd.plop(); return; }
-        if (h.kind === 'map') { mapDrag = { x: p.x, y: p.y, px: mapPan.x, py: mapPan.y }; }
+        termSel = h.id;
+        lastTap = { id: h.id, t: now };
+        snd.plop();
+        renderSkillCard();
       });
-      termCv.addEventListener('pointerup', () => { mapDrag = null; });
+      termCv.addEventListener('pointercancel', () => { mapDrag = null; });
       termCv.addEventListener('wheel', ev => {
         ev.preventDefault();
-        if (ev.shiftKey || Math.abs(ev.deltaX) > Math.abs(ev.deltaY)) mapPan.x -= (ev.shiftKey ? ev.deltaY : ev.deltaX) > 0 ? 14 : -14;
-        else mapPan.y -= ev.deltaY > 0 ? 14 : -14;
+        if (ev.shiftKey || Math.abs(ev.deltaX) > Math.abs(ev.deltaY)) mapPan.x -= (ev.shiftKey ? ev.deltaY : ev.deltaX) > 0 ? 18 : -18;
+        else mapPan.y -= ev.deltaY > 0 ? 18 : -18;
         clampPan();
       }, { passive: false });
     }
-    /* opening the Lab starts at the top-left of the board, where the quests
-       and the kernel are; a selection off that first screen is panned to.
-       A refresh while the Lab is already open leaves the board where it is. */
+    /* opening the Lab picks the tree that matters right now - the one the
+       selection is on, else the one the quest wants - and brings the
+       selection into view. A refresh while open leaves the board alone. */
     if ($('#modal-skills').hidden) {
       labOpenedAt = performance.now();
-      mapPan = { x: 0, y: 0 };
-      if (termSel) {
-        const p = nodePos(termSel), inner = mapInner();
-        if (p.x + NODE > inner.x + inner.w || p.y + NODE > inner.y + inner.h) centerOn(termSel);
-      }
+      requestAnimationFrame(() => {
+        sizeBoard();
+        setTab(pickTab());
+        mapPan = { x: 0, y: 0 };
+        if (termSel) centerOn(termSel);
+      });
     }
     $('#research-sub').textContent = GAME.fmt(S().feathers) + ' FEATHERS';
     renderSkillCard();
@@ -10262,6 +10264,8 @@
     introNext, introSkip, shutter: startShutter, shuttering,
     cameraFeed, buildingThumb, statRow, statBlock, traitChips, crewCard, applicantCard, noticeBoard, botBench,
     labOn(id) { termSel = id; renderSkills(); openModal('#modal-skills'); if (id) centerOn(id); },
+    __labTab(t) { setTab(t); return boardTab; },
+    __labHits() { const r = termCv.getBoundingClientRect(); return termHits.map(h => ({ kind: h.kind, id: h.id, x: r.left + (h.x + h.w / 2) / VW * r.width, y: r.top + (h.y + h.h / 2) / VH * r.height })); },
     get SC() { return SC; }, get titleHidden() { return titleEl.hidden; }, get introMode() { return introMode; },
     railUp,
   };

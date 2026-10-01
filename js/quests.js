@@ -51,7 +51,7 @@ window.QUESTS_UI = (() => {
     if (!box) return;
     if (!UI.titleHidden) { if (!box.hidden) box.hidden = true; sig = ''; return; }
     const act = GAME.activeQuests();
-    const s2 = collapsed + '|' + act.map(q => q.id + ':' + GAME.questState(q) + ':' +
+    const s2 = collapsed + '|' + ((window.innerWidth <= 520 || window.innerHeight <= 500)) + '|' + act.map(q => q.id + ':' + GAME.questState(q) + ':' +
       GAME.questObjs(q).map(o => GAME.goalProgress(o).join('/')).join(',')).join(';');
     if (s2 === sig && !box.hidden) return;
     sig = s2;
@@ -82,7 +82,11 @@ window.QUESTS_UI = (() => {
     box.appendChild(head);
     if (collapsed) return;
 
-    act.forEach(q => {
+    /* a phone has room for one order over the field: the one to sign
+       first, else the oldest; the rest are a tap away in the book */
+    const small = (window.innerWidth <= 520 || window.innerHeight <= 500);
+    const shownQ = small ? [act.find(GAME.questReady) || act[0]].filter(Boolean) : act;
+    shownQ.forEach(q => {
       const st = GAME.questState(q);
       const card = document.createElement('div');
       card.className = 'td-quest ' + st;
@@ -118,6 +122,13 @@ window.QUESTS_UI = (() => {
       }
       box.appendChild(card);
     });
+    if (shownQ.length < act.length) {
+      const more = document.createElement('div');
+      more.className = 'td-more';
+      more.dataset.act = 'open-quests';
+      more.textContent = '+ ' + (act.length - shownQ.length) + ' MORE IN THE BOOK';
+      box.appendChild(more);
+    }
   }
 
   /* ---- the order book ---- */

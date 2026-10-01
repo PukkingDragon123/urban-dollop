@@ -52,8 +52,15 @@ Twelve events, two ways out of each, and a standing decree afterwards that moves
 what eggs are worth, what the crew costs and how busy the road gets.
 
 🎺 **A band that plays itself.** A brassy, strutting, minor-key number for the
-menu — written for this game — and something slower for the valley, both
-synthesised live out of oscillators and one buffer of noise.
+menu, and for the valley a bouncy little tune for marimba, ukulele and
+glockenspiel. Both were written for this game and both are synthesised live
+out of oscillators and one buffer of noise.
+
+🔬 **A proper skill tree.** The Lab is a research board with one tab per
+branch. Every branch is laid out in lanes of framed sockets joined by brass
+rails, with a rank plate under each one. Anything you can't reach yet hangs
+behind a chain and a padlock. Tap a skill to read it, then tap it again to
+install it.
 
 🦡 **No people anywhere.** Every worker, passer-by and day-tripper is another
 species on the founder's own frame — fox, badger, possum, cat, otter, hare — or
@@ -70,8 +77,9 @@ that dither their own edges.
 
 ### Controls
 
-Mouse or touch, that is the whole of it. Pick a tool from the rack on the right,
-drag on the land, tap anything to inspect it. Works on a phone.
+Mouse or touch, that is the whole of it. Pick a tool from the rack, drag on the
+land, tap anything to inspect it. Works on a phone, held either way up: in
+portrait the rack folds into two rows under the field.
 
 ### Credits
 
@@ -106,6 +114,8 @@ own boasts over the top of it are this game's own.
 | File | What it is |
 |---|---|
 | `inf-egg-co-web.zip` | The playable build — upload this and tick **This file will be played in the browser** |
-| `cover-630x500.png` | Cover image |
-| `banner-1600x500.png` | Page banner |
+| `cover-630x500.gif` | Cover image, animated (itch takes a GIF cover) |
+| `cover-630x500.png` | Cover image, still |
+| `banner-1600x500.gif` | Page banner, animated |
+| `banner-1600x500.png` | Page banner, still |
 | `shot-1-menu.png` … `shot-5-orders.png` | Screenshots |

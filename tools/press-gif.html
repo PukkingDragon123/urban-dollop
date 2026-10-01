@@ -1,0 +1,327 @@
+<!doctype html><meta charset=utf-8><body style="margin:0;background:#111">
+<!-- The animated itch cover (630x500) and banner (1600x500), drawn with the
+     game's own sprite engine and encoded to GIF right here in the page - there
+     is no image tool in the build, so the encoder is the forty lines below.
+     tools/make-gifs.js opens this page and saves what it returns. -->
+<script src="../js/data.js"></script><script src="../js/sprites.js"></script>
+<script>
+/* ================= a GIF89a encoder =================
+   One global palette for the whole loop, built from every frame. After the
+   first frame each one is cropped to the box that changed and the pixels
+   that did not change are written as the transparent index, so a still
+   field with a hen bobbing in it costs only the hen. */
+function encodeGIF(frames, W, H, delayCs) {
+  /* the palette: every colour used, most used first; past 255 of them the
+     rare ones are mapped to the nearest common one */
+  const hist = new Map();
+  frames.forEach(f => { const d = f.data; for (let i = 0; i < d.length; i += 4) { const c = (d[i] << 16) | (d[i + 1] << 8) | d[i + 2]; hist.set(c, (hist.get(c) || 0) + 1); } });
+  const cols = [...hist.entries()].sort((a, b) => b[1] - a[1]).map(e => e[0]);
+  const pal = cols.slice(0, 255);
+  const index = new Map(pal.map((c, i) => [c, i]));
+  const near = c => {
+    if (index.has(c)) return index.get(c);
+    const r = c >> 16, g = (c >> 8) & 255, b = c & 255;
+    let best = 0, bd = 1e9;
+    pal.forEach((p, i) => { const dr = r - (p >> 16), dg = g - ((p >> 8) & 255), db = b - (p & 255); const d = dr * dr * 2 + dg * dg * 3 + db * db; if (d < bd) { bd = d; best = i; } });
+    index.set(c, best);
+    return best;
+  };
+  const TR = 255;
+  const out = [];
+  const byte = b => out.push(b & 255);
+  const word = w => { byte(w); byte(w >> 8); };
+  const str = s => { for (const ch of s) byte(ch.charCodeAt(0)); };
+  str('GIF89a'); word(W); word(H);
+  byte(0xF7); byte(0); byte(0);                 /* global table, 256 entries */
+  for (let i = 0; i < 256; i++) { const c = pal[i] || 0; byte(c >> 16); byte(c >> 8); byte(c); }
+  byte(0x21); byte(0xFF); byte(11); str('NETSCAPE2.0'); byte(3); byte(1); word(0); byte(0);   /* loop forever */
+  let prev = null;
+  frames.forEach(f => {
+    const idx = new Uint8Array(W * H);
+    const d = f.data;
+    for (let i = 0, p = 0; p < W * H; p++, i += 4) idx[p] = near((d[i] << 16) | (d[i + 1] << 8) | d[i + 2]);
+    let x0 = 0, y0 = 0, x1 = W - 1, y1 = H - 1, px = idx;
+    if (prev) {
+      x0 = W; y0 = H; x1 = -1; y1 = -1;
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        const p = y * W + x;
+        if (idx[p] !== prev[p]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      }
+      if (x1 < 0) { x0 = y0 = 0; x1 = y1 = 0; }
+      const w = x1 - x0 + 1, h = y1 - y0 + 1;
+      px = new Uint8Array(w * h);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const p = (y0 + y) * W + x0 + x;
+        px[y * w + x] = idx[p] === prev[p] ? TR : idx[p];
+      }
+    }
+    /* graphic control: the delay, leave-in-place disposal, transparency */
+    byte(0x21); byte(0xF9); byte(4); byte(prev ? 0x05 : 0x04); word(delayCs); byte(TR); byte(0);
+    byte(0x2C); word(x0); word(y0); word(x1 - x0 + 1); word(y1 - y0 + 1); byte(0);
+    lzw(px, 8, out);
+    prev = idx;
+  });
+  byte(0x3B);
+  return new Uint8Array(out);
+}
+function lzw(px, minSize, out) {
+  out.push(minSize);
+  const clear = 1 << minSize, eoi = clear + 1;
+  let dict = new Map(), next = eoi + 1, size = minSize + 1;
+  const bytes = [];
+  let acc = 0, nb = 0;
+  const emit = code => { acc |= code << nb; nb += size; while (nb >= 8) { bytes.push(acc & 255); acc >>= 8; nb -= 8; } };
+  emit(clear);
+  let cur = px[0];
+  for (let i = 1; i < px.length; i++) {
+    const k = px[i], key = cur * 4096 + k;
+    if (dict.has(key)) { cur = dict.get(key); continue; }
+    emit(cur);
+    if (next < 4096) { dict.set(key, next++); if (next > (1 << size) && size < 12) size++; }
+    else { emit(clear); dict = new Map(); next = eoi + 1; size = minSize + 1; }
+    cur = k;
+  }
+  emit(cur); emit(eoi);
+  if (nb > 0) bytes.push(acc & 255);
+  for (let i = 0; i < bytes.length; i += 255) { const n = Math.min(255, bytes.length - i); out.push(n); for (let j = 0; j < n; j++) out.push(bytes[i + j]); }
+  out.push(0);
+}
+
+/* ================= the shared valley ================= */
+const tri = t => 1 - Math.abs((t % 1) * 2 - 1);            /* 0..1..0 */
+const hop = (t, ph) => Math.round(Math.max(0, Math.sin((t + ph) * Math.PI * 2)) * 6);
+function backdrop(W, H, seed, groundAt) {
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
+  const rnd = SPR.mulberry(seed);
+  const BANDS = ['#2a2340','#3b2c4e','#55395a','#75485e','#9a5c5a','#c07a52','#dd9a4f','#eeba5c'];
+  const bh = Math.ceil(H * 0.60 / BANDS.length);
+  BANDS.forEach((col,i) => { g.fillStyle = col; g.fillRect(0, i*bh, W, bh+1); });
+  const hill = (baseY,col,amp,s) => { const r2 = SPR.mulberry(s); g.fillStyle = col; let y = baseY;
+    for (let x=0;x<W;x+=8){ y += Math.round((r2()-0.5)*amp); y = Math.max(baseY-amp*3, Math.min(baseY+amp*2,y)); g.fillRect(x,y,8,H-y); } };
+  hill(Math.round(H*0.56), '#3d5e3a', 6, 7);
+  hill(Math.round(H*0.63), '#4a7440', 7, 19);
+  for (let x=-10; x<W+10; x += 16 + Math.floor(rnd()*10)) {
+    const t = SPR.decoSprite(rnd()<0.6?'pine':'tree', 2, Math.floor(rnd()*9999));
+    const y = Math.round(H*0.655) - t.height*0.6;
+    g.drawImage(t, x, y);
+    g.fillStyle = 'rgba(24,44,26,.40)'; g.fillRect(x, y, t.width, t.height);
+  }
+  const gy = groundAt;
+  g.fillStyle = '#6fa44f'; g.fillRect(0,gy,W,H-gy);
+  g.fillStyle = '#7fb85a'; g.fillRect(0,gy,W,5);
+  for (let i=0;i<W*0.55;i++){ g.fillStyle = rnd()<.5 ? '#5e9142' : '#86c063';
+    g.fillRect(Math.floor(rnd()*W), gy+Math.floor(rnd()*(H-gy)), 3, 2); }
+  g.fillStyle = '#8a5e2a';
+  for (let x=4;x<W;x+=22) g.fillRect(x, gy-18, 4, 20);
+  g.fillStyle = '#a8783f'; g.fillRect(0,gy-15,W,4); g.fillRect(0,gy-7,W,4);
+  /* the stars are kept for the twinkle */
+  const stars = [];
+  for (let i=0;i<Math.round(W*0.11);i++) stars.push({ x: Math.floor(rnd()*W), y: Math.floor(rnd()*H*0.28), ph: rnd(), big: rnd() < 0.2 });
+  return { c, stars };
+}
+function drawStars(g, stars, t) {
+  stars.forEach(s => {
+    const a = tri(t * 2 + s.ph);
+    g.fillStyle = a > 0.75 ? 'rgba(255,250,230,.95)' : a > 0.35 ? 'rgba(255,250,230,.55)' : 'rgba(255,250,230,.22)';
+    g.fillRect(s.x, s.y, 2, 2);
+    if (s.big && a > 0.8) { g.fillStyle = 'rgba(255,250,230,.6)'; g.fillRect(s.x - 2, s.y, 6, 2); g.fillRect(s.x, s.y - 2, 2, 6); }
+  });
+}
+function drawSun(g, sx, sy, t) {
+  const disc = (r,col) => { g.fillStyle = col;
+    for (let dy=-r; dy<=r; dy+=4){ const half = Math.round(Math.sqrt(Math.max(0,r*r-dy*dy))/4)*4; g.fillRect(sx-half, sy+dy, half*2, 4); } };
+  disc(30 + (tri(t) > 0.5 ? 4 : 0),'rgba(255,216,138,.40)'); disc(23,'#ffd88a'); disc(16,'#fff0c0');
+}
+/* a loose V of birds, crossing once per loop */
+function drawBirds(g, W, t, y0, n) {
+  const span = W + 200;
+  for (let i = 0; i < n; i++) {
+    const x = Math.round(-100 + ((t + i * 0.012) % 1) * span) - Math.abs(i - (n >> 1)) * 14;
+    const y = y0 + Math.abs(i - (n >> 1)) * 8 + (i % 2) * 2;
+    g.drawImage(SPR.birdSprite('small', Math.floor(t * 48 + i) % 3, 2, '#2a2030'), x, y);
+  }
+}
+function shadow(g,x,w,y){ g.fillStyle = 'rgba(20,30,16,.30)'; g.fillRect(x, y, w, 5); }
+function put(g, spr, cx, feet){ const x = Math.round(cx - spr.width/2), y = Math.round(feet - spr.height); g.drawImage(spr, x, y); return [x,y]; }
+function title(g, W, ty, tk, t) {
+  const s = 'INF EGG CO.';
+  const tw = SPR.textW(s, tk), tx = Math.round((W - tw)/2);
+  const lift = tri(t * 2) > 0.5 ? 2 : 0;
+  SPR.drawText(g, s, tx + tk, ty + tk, 'rgba(20,14,10,.55)', tk);
+  SPR.drawText(g, s, tx, ty - lift, '#14171a', tk);
+  /* a glint that runs across the gold once a loop, and only the gold */
+  const oc = document.createElement('canvas'); oc.width = tw + tk * 2; oc.height = tk * 10;
+  const og = oc.getContext('2d'); og.imageSmoothingEnabled = false;
+  SPR.drawText(og, s, 0, 0, '#ffd23f', tk);
+  og.globalCompositeOperation = 'source-atop';
+  const gp = (t % 1) / 0.3, gx = gp < 1 ? -60 + Math.round(gp * (tw + 200)) : -9999;
+  for (let k = 0; k < 3; k++) { og.fillStyle = 'rgba(255,255,240,' + (0.7 - k * 0.22) + ')'; og.fillRect(gx + k * tk * 2, 0, tk * 2, oc.height); }
+  g.drawImage(oc, tx, ty - lift - Math.round(tk*0.6));
+}
+function hazard(g, W, H) {
+  g.fillStyle = '#14171a'; g.fillRect(0,H-10,W,10);
+  for (let x=-10;x<W;x+=20){ g.fillStyle='#ffb32e'; g.beginPath();
+    g.moveTo(x,H); g.lineTo(x+10,H-10); g.lineTo(x+20,H-10); g.lineTo(x+10,H); g.closePath(); g.fill(); }
+}
+/* little hearts and sparkles drifting up off her */
+function hearts(g, cx, cy, t, n) {
+  for (let i = 0; i < n; i++) {
+    const f = (t * 2 + i / n) % 1;
+    const x = Math.round(cx + Math.sin((f + i) * 6) * 18 + (i - n / 2) * 22), y = Math.round(cy - f * 70);
+    if (f > 0.85) continue;
+    const ic = SPR.iconSprite(i % 3 ? 'sparkle' : 'heart', 2);
+    g.globalAlpha = f < 0.15 ? f / 0.15 : f > 0.7 ? (0.85 - f) / 0.15 : 1;
+    g.drawImage(ic, x - 10, y - 10);
+    g.globalAlpha = 1;
+  }
+}
+/* fireflies over the grass */
+function flies(g, W, gy, H, t, n, seed) {
+  const r = SPR.mulberry(seed);
+  for (let i = 0; i < n; i++) {
+    const bx = r() * W, by = gy + 10 + r() * (H - gy - 40), ph = r();
+    const x = Math.round(bx + Math.sin((t + ph) * Math.PI * 2) * 14), y = Math.round(by + Math.cos((t * 2 + ph) * Math.PI * 2) * 6);
+    const on = tri(t * 2 + ph) > 0.45;
+    if (!on) continue;
+    g.fillStyle = 'rgba(255,240,140,.35)'; g.fillRect(x - 2, y - 2, 6, 6);
+    g.fillStyle = '#fff6b0'; g.fillRect(x, y, 2, 2);
+  }
+}
+
+/* ================= the cover: her, front and centre ================= */
+function coverScene() {
+  const W = 630, H = 500, gy = Math.round(H*0.70);
+  const bg = backdrop(W, H, 20260915, gy);
+  const MK = 7, nest = SPR.nestSprite(MK);
+  const feet = H - 64, fy = feet + 30;
+  return { W, H, draw(g, t) {
+    g.drawImage(bg.c, 0, 0);
+    drawStars(g, bg.stars, t);
+    drawSun(g, Math.round(W*0.14), Math.round(H*0.34), t);
+    drawBirds(g, W, t, 150, 5);
+    const nx = Math.round(W/2 - nest.width/2);
+    g.fillStyle = 'rgba(20,40,16,.20)'; g.fillRect(nx - 30, feet - 12, nest.width + 60, 16);
+    shadow(g, nx + 4, nest.width - 8, feet - 6);
+    /* she blinks once a loop and settles into the nest, a pixel at a
+       time; the rim is drawn over her so she sits in it, not on it */
+    const blink = (t % 1) > 0.46 && (t % 1) < 0.52;
+    const bob = tri(t * 4) > 0.5 ? MK : 0;
+    put(g, SPR.mamaSprite(0, MK, blink ? 'blink' : 'happy'), W/2, feet - nest.height + MK * 6 + bob);
+    g.drawImage(nest, nx, feet - nest.height);
+    hearts(g, W/2, feet - nest.height - 60, t, 4);
+    [[-1.42,0],[1.42,1]].forEach(([o,dy],i) => {
+      const h = SPR.chickenSprite(SPECIES[i?3:2], 5, false);
+      const peck = tri(t * 2 + i * 0.5) > 0.7 ? 5 : 0;
+      const p = put(g, h, W/2 + o*nest.width*0.78, feet + 6 + dy + peck);
+      shadow(g, p[0]+5, h.width-10, feet + 3 + dy + 6);
+    });
+    [[-118,0],[112,2]].forEach(([dx,dy],i) => {
+      const c = SPR.chickSprite(SPECIES[i?1:0], 5);
+      const hh = hop(t * 2, i * 0.5);
+      const p = put(g, c, W/2 + dx, fy + dy - hh);
+      shadow(g, p[0]+4 + Math.round(hh / 3), c.width-8 - Math.round(hh / 1.5), fy - 3 + dy);
+    });
+    [[-46,0],[-14,4],[18,-2],[50,2]].forEach(([dx,dy],i) => {
+      const e = SPR.eggSprite(i===2?2:0, 4);
+      /* the golden one wobbles like it is about to hatch */
+      const wob = i === 2 && (t * 4 % 1) < 0.5 ? ((t * 16 | 0) % 2 ? 2 : -2) : 0;
+      const ex = Math.round(W/2 + dx - e.width/2) + wob;
+      g.fillStyle = 'rgba(20,30,16,.26)'; g.fillRect(ex + 2, fy + dy, e.width - 4, 4);
+      g.drawImage(e, ex, fy + dy - e.height);
+    });
+    const boss = SPR.raccoonSprite((t * 4 % 1) < 0.5 ? 'boss' : 'cheer', 3, { hat:'hat_top' }, (t * 4 % 1) < 0.5 ? 'smug' : 'grin');
+    const bp = put(g, boss, W - 54, feet + 18);
+    shadow(g, bp[0]+8, boss.width-16, feet + 15);
+    flies(g, W, gy, H, t, 7, 4);
+    title(g, W, 34, 7, t);
+    hazard(g, W, H);
+  } };
+}
+
+/* ================= the banner: the whole valley, going about its day ================= */
+function bannerScene() {
+  const W = 1600, H = 500, gy = Math.round(H*0.66);
+  const bg = backdrop(W, H, 20260916, gy);
+  const roadY = H - 66;
+  const MK = 6, nest = SPR.nestSprite(MK);
+  const rr = SPR.mulberry(77);
+  const crew = [0, 1, 2].map(() => rollFolk(rr));
+  const flock = [2, 3, 4, 5, 6, 7].map((s, i) => ({ sp: SPECIES[s], x: 120 + i * 92 + (i % 2) * 20, y: gy + 50 + (i % 3) * 14, ph: i * 0.17 }));
+  return { W, H, draw(g, t) {
+    g.drawImage(bg.c, 0, 0);
+    drawStars(g, bg.stars, t);
+    drawSun(g, Math.round(W*0.88), Math.round(H*0.36), t);
+    drawBirds(g, W, t, 130, 7);
+    drawBirds(g, W, (t + 0.5) % 1, 196, 3);
+    /* the road along the foot, cars both ways */
+    g.fillStyle = '#6b5a44'; g.fillRect(0, roadY, W, 50);
+    g.fillStyle = '#7d6a50'; g.fillRect(0, roadY, W, 3);
+    g.fillStyle = '#e8d8a8'; for (let x = (Math.round(t * 80) % 40) - 40; x < W; x += 40) g.fillRect(x, roadY + 24, 20, 3);
+    const car = (kind, col, dir, ph, lane) => {
+      const spr = SPR.carSprite(kind, col, Math.floor(t * 40) % 2, 3);
+      const span = W + spr.width * 2;
+      let x = -spr.width + ((t + ph) % 1) * span;
+      if (dir < 0) x = W - x;
+      const y = roadY + lane - spr.height;
+      if (dir < 0) { g.save(); g.translate(Math.round(x) + spr.width, y); g.scale(-1, 1); g.drawImage(spr, 0, 0); g.restore(); }
+      else g.drawImage(spr, Math.round(x), y);
+    };
+    car('van', '#e8607a', 1, 0, 20);
+    car('sedan', '#5fa8e8', 1, 0.5, 20);
+    car('pickup', '#ffd23f', -1, 0.25, 46);
+    car('bus', '#8fd16a', -1, 0.75, 46);
+    /* the flock, pecking and hopping across the yard */
+    flock.forEach((f, i) => {
+      const h = SPR.chickenSprite(f.sp, 4, false);
+      const peck = tri(t * 2 + f.ph) > 0.7 ? 4 : 0;
+      const p = put(g, h, f.x, f.y + peck);
+      shadow(g, p[0] + 4, h.width - 8, f.y - 3 + 4);
+    });
+    /* Mama on her nest, with the founder beside her */
+    const cx = Math.round(W * 0.5), feet = gy + 70;
+    const nx = cx - Math.round(nest.width / 2);
+    shadow(g, nx + 4, nest.width - 8, feet - 6);
+    const blink = (t % 1) > 0.3 && (t % 1) < 0.36;
+    put(g, SPR.mamaSprite(0, MK, blink ? 'blink' : 'happy'), cx, feet - nest.height + MK * 6 + (tri(t * 4) > 0.5 ? MK : 0));
+    g.drawImage(nest, nx, feet - nest.height);
+    hearts(g, cx, feet - nest.height - 50, t, 3);
+    [[-70, 0], [-40, 3], [60, 1], [92, 4]].forEach(([dx, dy], i) => {
+      const e = SPR.eggSprite(i === 1 ? 2 : 0, 3);
+      g.drawImage(e, cx + dx - e.width / 2, feet + 14 + dy - e.height);
+    });
+    [[-150, 0], [150, 1]].forEach(([dx], i) => {
+      const c = SPR.chickSprite(SPECIES[i], 4);
+      const hh = hop(t * 2, i * 0.5);
+      put(g, c, cx + dx, feet + 16 - hh);
+    });
+    /* the founder and his crew to the right, on the march */
+    const bx = Math.round(W * 0.72), bf = gy + 78;
+    const boss = SPR.raccoonSprite((t * 4 % 1) < 0.5 ? 'boss' : 'cheer', 4, { hat: 'hat_top' }, (t * 4 % 1) < 0.5 ? 'smug' : 'grin');
+    const bp = put(g, boss, bx, bf);
+    shadow(g, bp[0] + 10, boss.width - 20, bf - 3);
+    crew.forEach((look, i) => {
+      const spr = SPR.folkSprite(look, Math.floor(t * 8 + i) % 2, 4);
+      const p = put(g, spr, bx + 90 + i * 70, bf - 4 + (i % 2) * 6);
+      shadow(g, p[0] + 8, spr.width - 16, bf - 7 + (i % 2) * 6);
+    });
+    flies(g, W, gy, roadY, t, 12, 9);
+    title(g, W, 40, 9, t);
+    hazard(g, W, H);
+  } };
+}
+
+/* render N frames of a scene and hand back the GIF and a still */
+window.makeGIF = function (which, N, delay) {
+  const sc = which === 'banner' ? bannerScene() : coverScene();
+  const c = document.createElement('canvas'); c.width = sc.W; c.height = sc.H;
+  const g = c.getContext('2d'); g.imageSmoothingEnabled = false;
+  const frames = [];
+  for (let i = 0; i < N; i++) { sc.draw(g, i / N); frames.push(g.getImageData(0, 0, sc.W, sc.H)); }
+  const gif = encodeGIF(frames, sc.W, sc.H, delay);
+  sc.draw(g, 0.1);
+  let bin = ''; for (let i = 0; i < gif.length; i++) bin += String.fromCharCode(gif[i]);
+  return { gif: btoa(bin), png: c.toDataURL('image/png').split(',')[1] };
+};
+window.READY = 1;
+</script>

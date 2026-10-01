@@ -451,16 +451,33 @@ window.MENU = (() => {
     for (let y = mY + 4; y < mY + mH - 2; y += 9) { bulb(mX - 5, y, (chase + bi++) % 3 !== 0); bulb(mX + mW + 1, y, (chase + bi++) % 3 !== 0); }
 
     /* what he is singing, on a plate under the marquee */
+    /* a line too wide for the stage between the curtains breaks in two */
     const shown = act.line.slice(0, Math.floor(actT * 26));
-    if (shown) stencil(shown, TW / 2, mY + mH + 10, '#f0eee8', 1);
+    if (shown) {
+      const room = TW - PW * 2 - 20;
+      if (SPR.textW(act.line, 1) <= room) stencil(shown, TW / 2, mY + mH + 10, '#f0eee8', 1);
+      else {
+        const words = act.line.split(' ');
+        let cut = words.length;
+        while (cut > 1 && SPR.textW(words.slice(0, cut).join(' '), 1) > room) cut--;
+        const l1 = words.slice(0, cut).join(' ');
+        stencil(shown.slice(0, l1.length), TW / 2, mY + mH + 10, '#f0eee8', 1);
+        if (shown.length > l1.length + 1) stencil(shown.slice(l1.length + 1), TW / 2, mY + mH + 24, '#f0eee8', 1);
+      }
+    }
 
     /* ---------- 13. front of house ---------- */
     if (Math.floor(now / 620) % 2) {
-      const c2 = 'CLICK ANYWHERE TO START';
+      const touch = window.matchMedia && matchMedia('(pointer: coarse)').matches;
+      const c2 = touch ? 'TAP ANYWHERE TO START' : 'CLICK ANYWHERE TO START';
       const w2 = SPR.textW(c2, 1);
-      g.fillStyle = '#ffb32e'; g.fillRect(Math.round(TW / 2 - w2 / 2) - 9, TH - 24, w2 + 18, 12);
-      g.fillStyle = '#14171a'; g.fillRect(Math.round(TW / 2 - w2 / 2) - 7, TH - 22, w2 + 14, 8);
-      SPR.drawText(g, c2, Math.round(TW / 2 - w2 / 2), TH - 21, '#ffb32e', 1);
+      /* clear of the settings key: if the plate would run into it, it
+         stands a row higher instead */
+      const clash = Math.round(TW / 2 + w2 / 2) + 9 > TW - PW - 28;
+      const py = clash ? TH - 50 : TH - 24;
+      g.fillStyle = '#ffb32e'; g.fillRect(Math.round(TW / 2 - w2 / 2) - 9, py, w2 + 18, 12);
+      g.fillStyle = '#14171a'; g.fillRect(Math.round(TW / 2 - w2 / 2) - 7, py + 2, w2 + 14, 8);
+      SPR.drawText(g, c2, Math.round(TW / 2 - w2 / 2), py + 3, '#ffb32e', 1);
     }
     if (hensFound) SPR.drawTiny(g, 'HENS BOTHERED ' + hensFound, PW + 6, TH - 12, '#e8b25a', 1, '#14171a');
     /* the settings key, reachable from the front door too */
